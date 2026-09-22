@@ -602,8 +602,28 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.7 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.8 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.8 — The ticker scrolls again (`desktop-v1.6.8`, 2026-09-22)
+
+#### Fixes
+
+- **The ticker scrolls again for everyone.** If Windows had animation effects turned off, or battery saver switched them off for you, the bar filled with chips and then never moved — it just lurched once in a while. Two of you reported it, and you were right. The bar now scrolls regardless of that setting; the setting still calms the decorative pulses on chips, which is what it is for.
+- **The bar spans your second monitor properly.** On a second screen with a different scale factor than your main one, the ticker came up narrower than the screen and shoved to one side. It now fills the monitor you chose, edge to edge, at any scale.
+- **Pinning your team always shows something.** Pin a team whose next game was more than a day out and the pinned spot stayed blank, as if the pin had failed. A pinned team now always shows its live game, its next fixture or its last result. If there is genuinely nothing — a team between seasons — the pin control says so instead of leaving you guessing.
+- **Game chips hold still.** A chip at its maximum width could shrink or grow when a score came in and nudge the whole bar. It stays put now.
+
+#### New
+
+- **Eight new news sources.** CNN, Fox News, Axios, Politico, ABC News, PBS NewsHour, The Hill and Reason are in the widget directory. One dead feed that had stopped publishing was removed.
+- **The Discord is one click away.** Support now has a card that opens the Scrollr Discord, where the community and the maintainers usually answer within the hour.
+
+#### Under the hood
+
+The ticker now runs inside a real browser in our test suite, so scrolling, chip widths and rotation are checked on every change before it reaches you. Nothing to see, but the next "the ticker stopped" bug should get caught before it ships.
+
+Update from the app or at https://myscrollr.com/download.
 
 ### Scrollr desktop-v1.6.7 (`desktop-v1.6.7`, 2026-09-12)
 
@@ -727,39 +747,3 @@ These went live on the server over the weekend and reach every version of the ap
 - **Live scores poll every fifteen seconds**, paced to what the data provider allows, so a busy Saturday no longer throttles the whole feed.
 - **Games that were stuck live are finalised.** A provider stall on Saturday night left a few MLB games showing an early inning for hours after they ended. The feed now re-checks any game that stops moving and, for MLB, confirms the result against the league's own scoreboard.
 - **Standings on a live game no longer blink out** between refreshes.
-
-### v1.6.0 — Pick your monitors (`desktop-v1.6.0`, 2026-09-06)
-
-The bar used to live on one screen: whichever one Scrollr decided was yours. This release is about letting you decide, and about a Settings app you can read from top to bottom without guessing what a slider does.
-
-#### 🖥️ Pick your monitors
-
-**The ticker can live on any of your screens, or all of them.** Settings › Ticker now draws a map of your monitors, to scale and in the arrangement Windows shows them. Each one has a switch. Click a screen on the map to toggle it, or press **Identify** and a number appears on every screen for a moment so you know which is which. The last one on stays on.
-
-**Every chosen monitor gets its own bar, showing the same content.** Plug a screen in, unplug it, switch modes with Win+P, and the bars follow without a restart. If a screen you had chosen disappears, the bar falls back to your primary rather than vanishing with it. Each bar sits flush on its own screen's edge, at that screen's scale.
-
-#### ⚙️ Settings you can read top to bottom
-
-Three pages, three things: **Appearance** is the app window, **Ticker** is the bar, **Startup** is the computer.
-
-**Ticker** reads in the order you think about it: On · Where · Look · Motion · Behaviour. A *Show the ticker* switch at the top, your monitors and screen edge under it, then how the bar looks and how it moves. Spacing and Direction are gone. *Rotate* is folded into *Page*: if you had Rotate, you are on Page now. Sliders became presets: Size is 85 / 100 / 115 / 130 %, Speed is Slow / Normal / Fast, Time per page is a short list. A stored value that is not on the list snaps to the nearest preset the first time you open the app, so a hand-tuned speed may land one notch off. One *On hover* row replaces the pause-and-slow pair.
-
-**Appearance** has a theme grid, App size on the same presets, a Readability group for font weight and high contrast, and **Units & formats**: °F or °C and 12h or 24h, set once, used by the Weather, Clock and Sysmon widgets and their chips. The per-widget unit controls are gone.
-
-**Startup** is what happens when your computer starts: *Launch at login* and a new *Start in the background*, which brings up the bars and keeps the app window hidden until you open it. The update check always runs now, so its switch is gone, and the interval selects that never did anything are gone too.
-
-**Everywhere says the same words.** The tray and the ticker's right-click menu use the page's labels, search is generated from the rows so it cannot drift, and the fantasy page's "Advanced — ticker items" toggles are gone: the ticker shows what your detail dial says, nothing to pick.
-
-**Send crash reports** is a switch under Data & privacy. On, Scrollr sends the error, stack trace, app version and OS; never your account, IP or file paths. Off, it sends nothing.
-
-#### 🔎 A catalog you can search
-
-**The catalog opens on a hub.** A search box, kinds to browse with a count and the logos of what is inside, **New this month**, and **In your ticker** so you can see what is on the bar and how many slots are left.
-
-**Pick a kind and you are in the directory**: a rail on the left, rows grouped by league or market, one place to add or remove. Removing a widget now offers Undo.
-
-**Search for something that is not there and you can ask for it.** A miss shows a request card; one click counts your vote and shows how many others have asked for the same thing, with the closest group underneath in case it is already here under another name.
-
-#### 🐛 Fixes
-
-- On Windows, a bar could be placed one bar-height off its screen edge, leaving an empty band above it. Each bar is now placed from its own monitor's work area.
