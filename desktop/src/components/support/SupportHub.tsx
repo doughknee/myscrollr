@@ -9,8 +9,10 @@ import {
   CreditCard,
   MessageCircle,
   Sparkles,
+  Users,
 } from "lucide-react";
 import clsx from "clsx";
+import { open } from "@tauri-apps/plugin-shell";
 import { searchSupportContent } from "./support-content";
 import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
@@ -227,6 +229,18 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
               <Sparkles size={18} className="text-accent mb-2.5" />
               <h3 className="text-ui-body font-semibold mb-1">What's New</h3>
               <p className="text-ui-meta">Release notes and version history</p>
+            </button>
+            {/* Discord — opens externally rather than routing, so it
+                sits outside CATEGORIES/SectionId like What's New. */}
+            <button
+              onClick={() => void open("https://discord.gg/4sM494F9qH")}
+              className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm cursor-pointer"
+            >
+              <Users size={18} className="text-accent mb-2.5" />
+              <h3 className="text-ui-body font-semibold mb-1">Discord</h3>
+              <p className="text-ui-meta">
+                Ask the community and the maintainers
+              </p>
             </button>
           </div>
         )}
