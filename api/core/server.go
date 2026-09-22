@@ -511,11 +511,17 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		})
 	}
 
+	// The client's pinned subjects ride along on the request; they stay in
+	// desktop prefs and are never stored server-side (SCROLLR-9). Cloned
+	// because c.Query aliases fasthttp's pooled buffer.
+	pins := ingestread.ParsePinnedSubjects(strings.Clone(c.Query("pins")))
+
 	// Check per-user Redis cache first
 	cacheKey := platform.RedisDashboardCachePrefix + userID
 	if val, err := platform.Rdb.Get(context.Background(), cacheKey).Result(); err == nil {
 		var cached platform.DashboardResponse
 		if json.Unmarshal([]byte(val), &cached) == nil {
+			ingestread.MergePinnedRows(context.Background(), userID, pins, cached.Data)
 			c.Set("X-Cache", "HIT")
 			return c.JSON(cached)
 		}
@@ -620,7 +626,34 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 
 	c.Set("Content-Type", "application/json")
 	c.Set("X-Cache", "MISS")
-	return c.Send(result.([]byte))
+	return c.Send(withPinnedRows(result.([]byte), userID, pins))
+}
+
+// withPinnedRows guarantees one row per pinned subject on top of the
+// cached dashboard payload (SCROLLR-9).
+//
+// Deliberately outside the cache: the cached body stays on the single
+// `cache:dashboard:<sub>` key that every invalidation path deletes by
+// name, and a pin the user just set shows up on the next poll rather
+// than after the 30s TTL. A user with no pins pays nothing -- the bytes
+// go out untouched.
+//
+// Best-effort: if the merge cannot be done the original payload is sent.
+// A dashboard without a pinned row beats no dashboard.
+func withPinnedRows(body []byte, userID string, pins map[string][]string) []byte {
+	if len(pins) == 0 {
+		return body
+	}
+	var res platform.DashboardResponse
+	if err := json.Unmarshal(body, &res); err != nil {
+		return body
+	}
+	ingestread.MergePinnedRows(context.Background(), userID, pins, res.Data)
+	merged, err := json.Marshal(res)
+	if err != nil {
+		return body
+	}
+	return merged
 }
 
 // listChannels returns all discovered channels and their capabilities.

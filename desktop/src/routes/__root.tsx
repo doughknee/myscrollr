@@ -79,6 +79,7 @@ import { useCatalog } from "../hooks/useCatalog";
 import { useAuthState } from "../hooks/useAuthState";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
+import { usePinnedSubjectsSync } from "../hooks/usePinnedSubjectsSync";
 import { useSharedSSE } from "../hooks/useSharedSSE";
 import { useTauriListener } from "../hooks/useTauriListener";
 import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
@@ -283,6 +284,10 @@ function RootLayout() {
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
   const [autostartOn, setAutostartOn] = useState(false);
   const enabledWidgets = prefs.widgets.enabledWidgets;
+
+  // Pins are local, but the server needs them to guarantee a row per
+  // pinned subject, so they ride along on the dashboard request.
+  usePinnedSubjectsSync(prefs.widgets.pins);
 
   const [appVersion, setAppVersion] = useState("");
   useEffect(() => {

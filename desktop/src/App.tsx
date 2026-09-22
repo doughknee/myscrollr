@@ -6,6 +6,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTauriListener } from "./hooks/useTauriListener";
 import { useDashboardCDC } from "./hooks/useDashboardCDC";
+import { usePinnedSubjectsSync } from "./hooks/usePinnedSubjectsSync";
 import { useSharedSSE } from "./hooks/useSharedSSE";
 import { useProductActivity } from "./hooks/useProductActivity";
 import { usePostHogActivity } from "./hooks/usePostHogActivity";
@@ -180,6 +181,10 @@ export default function App() {
 
   // Settings preferences
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
+
+  // Record the pin set for this window's fallback dashboard fetch. No
+  // refetch here: the main window polls and broadcasts.
+  usePinnedSubjectsSync(prefs.widgets.pins, false);
 
   // Mirror the Data & privacy switch into both Sentry clients.
   useEffect(() => {

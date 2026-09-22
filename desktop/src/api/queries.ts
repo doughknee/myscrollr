@@ -7,6 +7,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { isAuthenticated, hasRefreshToken } from "../auth";
 import { authFetch, request, rssApi, fetchOverview } from "./client";
+import { pinnedSubjectsQuery } from "./pinnedSubjects";
 import { DEMO } from "../config";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game, Trade } from "../types";
@@ -79,7 +80,7 @@ async function fetchDashboard(): Promise<DashboardResponse> {
         data: DashboardResponse["data"];
         widgets?: DashboardResponse["widgets"];
         preferences?: DashboardResponse["preferences"];
-      }>("/dashboard");
+      }>(`/dashboard${pinnedSubjectsQuery()}`);
       return {
         data: data.data,
         widgets: data.widgets,

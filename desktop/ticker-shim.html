@@ -18,6 +18,9 @@
     ?comfort=1        tickerMode "detailed" (one extra row per chip)
                       instead of "compact".
     ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
+    ?pin=<w>:<subj>   pin one subject to the fixed zone, repeatable
+                      (e.g. ?pin=sports_mlb:Milwaukee Brewers). Only
+                      the first ':' splits, so a feed url works.
 
   What the seed does: scrollr:settings puts the bar on, continuous and
   compact, with the local clock on the ticker; the fixture's `widgets`
@@ -142,7 +145,20 @@
               // Snaps to the nearest preset (20/40/80 px/s) on load.
               tickerSpeed: Number(params.get("speed")) || 40,
             },
-            widgets: { enabledWidgets: ["clock"], widgetsOnTicker: ["clock"] },
+            widgets: {
+              enabledWidgets: ["clock"],
+              widgetsOnTicker: ["clock"],
+              // SCROLLR-9: the fixed zone, so a pinned subject the
+              // horizon would otherwise hide can be looked at here.
+              pins: params.getAll("pin").map(function (raw) {
+                var at = raw.indexOf(":");
+                return {
+                  widget: at < 0 ? raw : raw.slice(0, at),
+                  subject: at < 0 ? raw : raw.slice(at + 1),
+                  side: "right",
+                };
+              }),
+            },
           }],
         ]);
 

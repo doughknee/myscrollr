@@ -587,6 +587,22 @@ exactly as it did before the model changed.
    (`gamesForTeam`), and a pinned feed shows its newest item past `TICKER_RSS_HOURS`.
 3. **Nothing to show renders nothing.** No placeholder, no dash (§1.7). The pin stays,
    and the chip returns when the subject does.
+
+   The payload guarantees the row (SCROLLR-9). `/dashboard` takes the client's pinned
+   subjects as a `pins` parameter -- a JSON array of `[source, subject]` pairs, capped
+   server-side -- and appends one row per pinned subject it does not already carry:
+   sports = live game, else next fixture, else last result, unbounded by the horizon;
+   finance = the symbol's latest quote; rss = the feed's newest item; predictions = the
+   market's latest state. Bounded to the user's own leagues and widgets, merged *after*
+   the 30s per-user cache, so a just-set pin lands on the next poll and the cache keeps
+   its single invalidatable key. Pins stay in desktop prefs; nothing is stored
+   server-side.
+
+   So a blank fixed zone now means the subject is genuinely empty -- an off-season team,
+   a feed that has never published. That stays blank on the bar, and the pin control on
+   the widget page is what says why ("Nothing to show for the Brewers right now"). The
+   rule is unchanged; what changed is that it can no longer fire merely because the
+   payload's preview was narrow.
 4. **It never scrolls and never rotates.** No `cycles`, no `RotationMemo` in the zone.
 5. **A pinned subject is excluded from the tape**, so it is on the bar exactly once. Each
    source drops `ctx.pinnedSubjects` from its **pool** via `dropPinned` *before*
