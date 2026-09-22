@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -184,6 +185,54 @@ func TestPostHogDesktopEventsMarkInternalUsersAndExcludeTheirPresence(t *testing
 	}
 	if mirrors != 0 {
 		t.Fatalf("local event mirrors = %d, want 0", mirrors)
+	}
+}
+
+func TestPostHogDesktopEventCarriesTheClientVersion(t *testing.T) {
+	resetProductAnalytics(t)
+	t.Setenv("POSTHOG_CAPTURE_ENABLED", "true")
+	t.Setenv("POSTHOG_PROJECT_KEY", "project-key")
+	t.Setenv("POSTHOG_PROJECT_ID", "project-id")
+	t.Setenv("POSTHOG_PERSONAL_API_KEY", "personal-key")
+	t.Setenv("POSTHOG_DISTINCT_ID_SALT", "salt")
+	t.Setenv("POSTHOG_HOST", "https://example.test")
+	t.Setenv("POSTHOG_API_HOST", "https://example.test")
+	t.Setenv("POSTHOG_EXCLUDED_LOGTO_SUBS", "")
+	const sub = "posthog-version-user"
+	previousLogto := postHogLogtoUser
+	postHogLogtoUser = func(id string) (*LogtoUser, error) {
+		return &LogtoUser{ID: id, PrimaryEmail: id + "@example.test"}, nil
+	}
+	previousCapture := postHogCaptureDesktopEvent
+	captured := []string{}
+	postHogCaptureDesktopEvent = func(_ string, event postHogDesktopEvent) error {
+		captured = append(captured, event.AppVersion)
+		return nil
+	}
+	t.Cleanup(func() {
+		postHogLogtoUser = previousLogto
+		postHogCaptureDesktopEvent = previousCapture
+	})
+	if _, err := setPostHogConsent(context.Background(), sub, "enabled"); err != nil {
+		t.Fatal(err)
+	}
+	app := productAnalyticsTestApp()
+	for _, ua := range []string{"Scrollr/1.6.7 (windows)", "curl/8.4.0"} {
+		req := httptest.NewRequest(http.MethodPost, "/posthog-event", strings.NewReader(`{"event":"desktop_app_opened"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Test-Sub", sub)
+		req.Header.Set("User-Agent", ua)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("user agent %q status = %d, want 202", ua, resp.StatusCode)
+		}
+	}
+	if want := []string{"1.6.7", ""}; !reflect.DeepEqual(captured, want) {
+		t.Fatalf("captured app versions = %q, want %q (absent, not \"unknown\", for a non-desktop agent)", captured, want)
 	}
 }
 
