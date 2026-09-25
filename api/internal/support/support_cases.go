@@ -332,6 +332,7 @@ func FetchSimilarCases(ctx context.Context, query, excludeTicket string, limit i
 				ORDER BY m.created_at DESC, m.id DESC LIMIT 1), '')
 		FROM support_cases c, q
 		WHERE c.ticket_number <> $2
+		  AND c.opened_at >= $4
 		  AND EXISTS (SELECT 1 FROM support_messages m
 				WHERE m.ticket_number = c.ticket_number AND m.kind = 'sent')
 		  AND (c.search @@ q.tsq OR EXISTS (SELECT 1 FROM support_messages m
@@ -342,7 +343,7 @@ func FetchSimilarCases(ctx context.Context, query, excludeTicket string, limit i
 			c.updated_at DESC
 		LIMIT $3
 	`
-	rows, err := platform.DBPool.Query(ctx, sql, query, excludeTicket, limit)
+	rows, err := platform.DBPool.Query(ctx, sql, query, excludeTicket, limit, SupportEpoch)
 	if err != nil {
 		log.Printf("[Cases] FetchSimilarCases: %v", err)
 		return nil
