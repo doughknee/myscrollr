@@ -18,6 +18,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// SupportEpoch is the support reset of 25 Sep 2026. Every case opened before
+// it was closed that day and is history: the bot does not learn from those
+// cases and the console does not list or count them. Old rows stay in the
+// table; nothing was deleted.
+var SupportEpoch = time.Date(2026, time.September, 25, 0, 0, 0, 0, time.UTC)
+
 // ===== Support ticket types =====
 
 type SupportTicketRequest struct {

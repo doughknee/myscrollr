@@ -365,8 +365,9 @@ const queueSQL = `
 	  FROM support_cases c
 	  LEFT JOIN latest d ON d.ticket_number = c.ticket_number
 	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub AND c.account_source = 'authenticated'
+	 WHERE c.opened_at >= $1
 	 ORDER BY c.updated_at DESC
-	 LIMIT $1
+	 LIMIT $2
 `
 
 // HandleAdminQueue - GET /admin/support/queue
@@ -482,10 +483,10 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 // never be computed from a capped subset (SCROLLR-210).
 func loadQueueRows(ctx context.Context, limit int, autosend AutoSendState, now time.Time) ([]AdminQueueRow, map[string]int, error) {
 	sql := queueSQL
-	args := []any{limit}
+	args := []any{SupportEpoch, limit}
 	if limit <= 0 {
 		sql = queueSQLUncapped
-		args = nil
+		args = args[:1]
 	}
 	rows, err := platform.DBPool.Query(ctx, sql, args...)
 	if err != nil {
@@ -567,7 +568,7 @@ func loadQueueRows(ctx context.Context, limit int, autosend AutoSendState, now t
 
 // queueSQLUncapped is the same read without the ceiling, for whole-queue
 // totals.
-var queueSQLUncapped = strings.Replace(queueSQL, "LIMIT $1", "", 1)
+var queueSQLUncapped = strings.Replace(queueSQL, "LIMIT $2", "", 1)
 
 // queueAccounts counts what the paying section is measured against: how many
 // accounts pay, and how many cases are joined to an account at all.
@@ -581,8 +582,8 @@ func queueAccounts(ctx context.Context) AdminQueueAccounts {
 	if err := platform.DBPool.QueryRow(ctx, `
 		SELECT (SELECT count(*) FROM stripe_customers s WHERE `+billing.PayingWhere+`),
 		       (SELECT count(*) FROM support_cases
-		         WHERE logto_sub IS NOT NULL AND logto_sub <> '' AND account_source = 'authenticated'),
-		       (SELECT count(*) FROM support_cases)`).Scan(
+		         WHERE logto_sub IS NOT NULL AND logto_sub <> '' AND account_source = 'authenticated' AND opened_at >= $1),
+		       (SELECT count(*) FROM support_cases WHERE opened_at >= $1)`, SupportEpoch).Scan(
 		&a.Paying, &a.CasesWithAccount, &a.Cases); err != nil {
 		log.Printf("[AdminSupport] account counts: %v", err)
 	}

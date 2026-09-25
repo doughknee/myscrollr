@@ -169,14 +169,14 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 	}
 	// ── Trends ────────────────────────────────────────────────────────────
 	var coverageFrom *time.Time
-	if err := platform.DBPool.QueryRow(ctx, `SELECT min(opened_at) FROM support_cases`).Scan(&coverageFrom); err != nil {
+	if err := platform.DBPool.QueryRow(ctx, `SELECT min(opened_at) FROM support_cases WHERE opened_at >= $1`, SupportEpoch).Scan(&coverageFrom); err != nil {
 		return out, err
 	}
 	from := time.Time{}
 	if coverageFrom != nil {
 		from = coverageFrom.UTC()
 	}
-	out.Coverage = platform.CoverageFor(period, from, "Cases are retained since the support database was backfilled from osTicket; closed dates on backfilled cases carry the sync time, not the real close.")
+	out.Coverage = platform.CoverageFor(period, from, "Cases are counted from the support reset on 25 Sep 2026; everything opened before it was closed that day and is not shown.")
 	start := platform.EffectiveStart(period, from)
 	end := period.End
 	if start.IsZero() {
