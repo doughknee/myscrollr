@@ -27,7 +27,7 @@ import { UpdateRequiredOverlay } from "../components/UpdateRequiredOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 // Note: sonner CSS is imported in src/app-main.tsx so it ships in the
 // entry bundle. Importing it here would put it in this route's
 // code-split chunk, causing toasts to appear unstyled until the chunk
@@ -42,7 +42,7 @@ import {
 } from "../components/widget-bar/BarChassis";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
-import LoadingGlyph from "../components/LoadingGlyph";
+import SigningInOverlay from "../components/SigningInOverlay";
 
 // Onboarding
 import AuthGate from "../components/onboarding/AuthGate";
@@ -105,10 +105,6 @@ import { POLL_INTERVALS } from "../cdc";
 import { ShellContext, ShellDataContext } from "../shell-context";
 import { PageIdentityProvider } from "../components/layout/page-context";
 import RouteTransition from "../components/layout/RouteTransition";
-import {
-  backdropMotion,
-  overlaySurfaceMotion,
-} from "../lib/motion";
 
 // Store
 import { onStoreChange, setStore, removeStore } from "../lib/store";
@@ -1132,41 +1128,10 @@ function RootLayout() {
       {/* Signing-in overlay — shows on ALL states (auth gate triggers login too) */}
       <AnimatePresence>
         {auth.loggingIn && (
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Signing in"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="absolute inset-0 z-50 flex items-center justify-center"
-          >
-            <motion.div
-              variants={backdropMotion}
-              className="absolute inset-0 bg-surface/80 backdrop-blur-sm"
-            />
-            <motion.div
-              variants={overlaySurfaceMotion}
-              className="relative text-center"
-            >
-              <LoadingGlyph
-                size={24}
-                className="mx-auto mb-3 text-accent"
-              />
-              <p className="text-sm font-medium text-fg-2">
-                Signing you in...
-              </p>
-              <p className="text-xs text-fg-3 mt-1">
-                Finish signing in from your browser
-              </p>
-              <button
-                onClick={() => auth.setLoggingIn(false)}
-                className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover "
-              >
-                Cancel
-              </button>
-            </motion.div>
-          </motion.div>
+          <SigningInOverlay
+            authUrl={auth.authUrl}
+            onCancel={() => auth.setLoggingIn(false)}
+          />
         )}
       </AnimatePresence>
 

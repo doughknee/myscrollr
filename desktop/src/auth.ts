@@ -13,7 +13,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { fetch } from "@tauri-apps/plugin-http";
-import { open } from "@tauri-apps/plugin-shell";
 import {
   getStore,
   setStore,
@@ -345,8 +344,15 @@ function scheduleRefresh(): void {
  * 4. Exchange the code for tokens
  *
  * Returns the auth state on success, or null on failure/cancel.
+ *
+ * `onAuthUrl`, if given, is called with the one-time Logto authorization
+ * URL right before it's opened — the caller uses it to power the "copy
+ * the sign-in link" fallback (SCROLLR-8) for when the opener silently
+ * fails to launch a browser (the AppImage env-injection trap).
  */
-export async function login(): Promise<AuthState | null> {
+export async function login(
+  onAuthUrl?: (url: string) => void,
+): Promise<AuthState | null> {
   let cleanupPendingAuth = () => {};
   let hasPendingAuthCleanup = false;
   let authServerStarted = false;
@@ -395,6 +401,7 @@ export async function login(): Promise<AuthState | null> {
 
     const authBase = LOGTO_ENDPOINT.replace(/\/+$/, "");
     const authUrl = `${authBase}/oidc/auth?${params.toString()}`;
+    onAuthUrl?.(authUrl);
 
     let resolveListenerReady: (() => void) | null = null;
     let rejectListenerReady: ((error: unknown) => void) | null = null;
@@ -444,8 +451,12 @@ export async function login(): Promise<AuthState | null> {
     );
 
     // Open in system browser after the callback listener is ready.
-    await listenerReadyPromise;
-    await open(authUrl);
+    // Routed through the Rust `open_external` command (not
+    // `@tauri-apps/plugin-shell`'s `open`) so Linux gets a cleaned
+    // environment — inside an AppImage, `xdg-open` run with the
+    // AppRun-injected env silently fails to launch a browser
+    // (SCROLLR-8). Windows/macOS still delegate to plugin-shell there.
+    await invoke("open_external", { url: authUrl });
 
     // Wait for the callback event from Rust.
     const payload = await payloadPromise;
