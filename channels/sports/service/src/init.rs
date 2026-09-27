@@ -58,6 +58,12 @@ struct ReadinessInner {
     state: ReadinessState,
     last_poll: Option<DateTime<Utc>>,
     max_poll_staleness: Option<Duration>,
+    /// Set when this process intentionally never polls — the keyless local
+    /// dev path (SCROLLR-7). `make setup` writes a blank API key on purpose;
+    /// lib.rs/main.rs detect that and stay up serving existing rows instead
+    /// of polling, which otherwise left `last_poll` null forever and
+    /// `/health/ready` stuck at 503 even though nothing was broken.
+    polling_disabled: bool,
 }
 
 /// Snapshot of the readiness gate returned by `/health/ready`. Flat JSON so
@@ -72,6 +78,10 @@ pub struct ReadinessSnapshot {
     /// staleness threshold. Derived for convenience — callers shouldn't have
     /// to recompute it.
     pub stale: bool,
+    /// True when this service was intentionally never going to poll (see
+    /// [`ReadinessGate::mark_polling_disabled`]). core's `/health` reads this
+    /// field and reports the source as `idle` (healthy) rather than `down`.
+    pub polling_disabled: bool,
 }
 
 impl ReadinessGate {
@@ -85,6 +95,7 @@ impl ReadinessGate {
                 state: ReadinessState::Starting,
                 last_poll: None,
                 max_poll_staleness,
+                polling_disabled: false,
             }),
         }
     }
@@ -93,6 +104,19 @@ impl ReadinessGate {
     /// the end of init, before the poll loops start.
     pub async fn mark_ready(&self) {
         self.inner.write().await.state = ReadinessState::Ready;
+    }
+
+    /// Mark that this process will intentionally never poll — the keyless
+    /// local dev path (SCROLLR-7 Option 1). Call this instead of ever
+    /// calling `record_poll()`. `http_status()` then returns 200 without
+    /// requiring a poll timestamp, and the snapshot's `polling_disabled`
+    /// field lets `/health` report `idle` instead of `down`.
+    ///
+    /// Production behavior is unchanged: a service that never calls this
+    /// still needs a real `record_poll()` to pass the staleness check, so a
+    /// service that SHOULD poll but never has still returns 503.
+    pub async fn mark_polling_disabled(&self) {
+        self.inner.write().await.polling_disabled = true;
     }
 
     /// Mark the service as unrecoverably failed. `/health/ready` will return
@@ -124,14 +148,15 @@ impl ReadinessGate {
             last_poll: inner.last_poll,
             max_poll_staleness_secs: inner.max_poll_staleness.map(|d| d.as_secs()),
             stale,
+            polling_disabled: inner.polling_disabled,
         }
     }
 
     /// Compute the HTTP status code `/health/ready` should return. 200 only
-    /// when the service is `Ready` AND (no staleness threshold is set OR
-    /// the last poll is within the threshold OR no poll has been recorded
-    /// yet but the gate was only just marked ready — services without a
-    /// poll loop set `max_poll_staleness` to `None` to skip this check).
+    /// when the service is `Ready` AND (polling is intentionally disabled OR
+    /// no staleness threshold is set OR the last poll is within the
+    /// threshold — services without a poll loop set `max_poll_staleness` to
+    /// `None` to skip this check).
     pub async fn http_status(&self) -> StatusCode {
         let snap = self.snapshot().await;
         match snap.state {
@@ -139,6 +164,13 @@ impl ReadinessGate {
                 StatusCode::SERVICE_UNAVAILABLE
             }
             ReadinessState::Ready => {
+                // Keyless local dev (SCROLLR-7): this process will never
+                // poll by design, so skip the staleness check entirely
+                // rather than waiting forever for a `last_poll` that will
+                // never come.
+                if snap.polling_disabled {
+                    return StatusCode::OK;
+                }
                 // If a staleness threshold is configured, require at least one
                 // successful poll and enforce freshness. Services without a
                 // poll loop pass `None` and are considered ready immediately.
@@ -255,6 +287,18 @@ mod tests {
         // Ready but no poll has happened yet — 503 so probes don't route traffic
         // to a pod that hasn't done any real work.
         assert_eq!(gate.http_status().await, StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn ready_with_polling_disabled_returns_200_without_a_poll() {
+        let gate = ReadinessGate::new(Some(Duration::from_secs(60)));
+        gate.mark_ready().await;
+        gate.mark_polling_disabled().await;
+        // No record_poll() call — the keyless dev path never gets one.
+        assert_eq!(gate.http_status().await, StatusCode::OK);
+        let snap = gate.snapshot().await;
+        assert!(snap.polling_disabled);
+        assert!(snap.last_poll.is_none());
     }
 
     #[tokio::test]

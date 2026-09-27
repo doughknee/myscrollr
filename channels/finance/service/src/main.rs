@@ -254,7 +254,7 @@ async fn run_service() -> Result<()> {
         // Start the background service (WebSocket). Shutdown is cooperative
         // via `cancel`.
         tokio::select! {
-            _ = start_finance_services(pool, health_bg) => {},
+            _ = start_finance_services(pool, health_bg, readiness_bg) => {},
             _ = cancel_bg.cancelled() => {
                 println!("Finance background service shutting down...");
             }

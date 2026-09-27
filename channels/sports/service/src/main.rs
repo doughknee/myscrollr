@@ -260,6 +260,10 @@ async fn run_service() -> Result<()> {
                 let rl = RateLimiter::new_per_league(&leagues, config.daily_quota);
                 publish_quota(&health_bg, &rl, &config).await;
                 readiness_bg.mark_ready().await;
+                // Tell the readiness gate this is by design (SCROLLR-7) so
+                // /health/ready reports 200/idle instead of 503 forever —
+                // no poll is ever coming down this path.
+                readiness_bg.mark_polling_disabled().await;
                 return;
             }
             Err(e) => {

@@ -155,24 +155,39 @@ func buildReadyURL(baseURL string) string {
 	}
 }
 
+// ingestionReadyBody is the subset of a Rust ingester's /health/ready
+// payload that core cares about. `polling_disabled` is set by the
+// ReadinessGate (channels/{finance,sports}/service/src/init.rs) when the
+// service intentionally never polls — the keyless local-dev path
+// (SCROLLR-7). Unknown fields are ignored by json.Decode.
+type ingestionReadyBody struct {
+	PollingDisabled bool `json:"polling_disabled"`
+}
+
 // probeIngestion checks a Rust ingestion service's /health/ready endpoint
 // and returns the HTTP status code it emitted (200 when ready, 503 when
-// starting/failed/stale). An empty URL is a no-op returning (0, nil).
-func probeIngestion(ctx context.Context, internalURL string) (int, error) {
+// starting/failed/stale) plus whether the body reports polling
+// intentionally disabled. An empty URL is a no-op returning (0, false, nil).
+func probeIngestion(ctx context.Context, internalURL string) (int, bool, error) {
 	if internalURL == "" {
-		return 0, nil
+		return 0, false, nil
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildReadyURL(internalURL), nil)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	httpClient := &http.Client{Timeout: ingestionProbeTimeout}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	defer resp.Body.Close()
-	return resp.StatusCode, nil
+
+	var body ingestionReadyBody
+	// Best-effort decode: a malformed/empty body just leaves
+	// PollingDisabled false, same as an ingester that predates this field.
+	_ = json.NewDecoder(io.LimitReader(resp.Body, maxHealthResponseBytes)).Decode(&body)
+	return resp.StatusCode, body.PollingDisabled, nil
 }
 
 // proxyIngestionHealth proxies a health check to an ingestion service URL.

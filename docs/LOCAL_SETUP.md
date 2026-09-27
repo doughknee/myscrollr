@@ -111,6 +111,10 @@ work there are the production ones, and the quota they draw on belongs to
 real users — api-sports bills a shared daily quota per sport host (7,500 on Pro, 75,000 on Ultra)
 across every league. Seeding gives you the same app without spending any of it.
 
+Because those keyless ingesters never poll by design, `/health` reports
+`finance` and `sports` as `idle` (not `down`) in this setup — that is
+expected, not a broken stack.
+
 Loading also rebases timestamps, because several read paths are
 time-relative: RSS articles older than 7 days are deleted by the ingester,
 and the RSS janitor disables curated feeds that look stale. A snapshot

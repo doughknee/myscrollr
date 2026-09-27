@@ -376,7 +376,7 @@ func rssHealth(ctx context.Context) (string, bool) {
 	if internalURL == "" {
 		return "healthy", true
 	}
-	code, err := probeIngestion(ctx, internalURL)
+	code, _, err := probeIngestion(ctx, internalURL)
 	if err != nil || code != http.StatusOK {
 		return "down", false
 	}
