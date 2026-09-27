@@ -216,6 +216,7 @@ pub fn run() {
             commands::window::set_ticker_visible,
             commands::auth::start_auth_server,
             commands::auth::stop_auth_server,
+            commands::open_external::open_external,
             commands::sse::start_sse,
             commands::sse::stop_sse,
             commands::window::show_app_window,

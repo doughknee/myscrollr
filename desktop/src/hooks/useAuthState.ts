@@ -26,6 +26,13 @@ interface UseAuthStateReturn {
   tier: SubscriptionTier;
   loggingIn: boolean;
   setLoggingIn: (v: boolean) => void;
+  /**
+   * The one-time Logto authorization URL for the in-flight login attempt,
+   * or null when none is pending. Powers the "copy the sign-in link"
+   * fallback (SCROLLR-8) — cleared whenever loggingIn is set back to
+   * false, whether that's a completed login, a failure, or Cancel.
+   */
+  authUrl: string | null;
   sessionExpired: boolean;
   setSessionExpired: (v: boolean) => void;
   handleLogin: () => Promise<void>;
@@ -40,8 +47,18 @@ export function useAuthState(): UseAuthStateReturn {
   const [tier, setTier] = useState<SubscriptionTier>(() =>
     checkAuth() ? getTier() : "free",
   );
-  const [loggingIn, setLoggingIn] = useState(false);
+  const [loggingIn, setLoggingInRaw] = useState(false);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
+
+  // The URL is only ever meaningful while a login is in flight — clearing
+  // it alongside loggingIn means every path that ends the attempt (a
+  // completed login, a failure, or the user clicking Cancel) also clears
+  // the fallback link, with nothing extra to remember at each call site.
+  const setLoggingIn = useCallback((v: boolean) => {
+    setLoggingInRaw(v);
+    if (!v) setAuthUrl(null);
+  }, []);
 
   const authenticatedRef = useRef(authenticated);
   authenticatedRef.current = authenticated;
@@ -71,7 +88,7 @@ export function useAuthState(): UseAuthStateReturn {
 
     setLoggingIn(true);
     try {
-      const result = await authLogin();
+      const result = await authLogin(setAuthUrl);
       if (result) {
         setAuthenticated(true);
         setTier(getTier());
@@ -86,7 +103,7 @@ export function useAuthState(): UseAuthStateReturn {
     } finally {
       setLoggingIn(false);
     }
-  }, [queryClient]);
+  }, [queryClient, setLoggingIn]);
 
   const handleLogout = useCallback(async () => {
     await invoke("stop_sse").catch(() => {});
@@ -136,6 +153,7 @@ export function useAuthState(): UseAuthStateReturn {
     tier,
     loggingIn,
     setLoggingIn,
+    authUrl,
     sessionExpired,
     setSessionExpired,
     handleLogin,
