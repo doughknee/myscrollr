@@ -296,7 +296,7 @@ export const Route = createRootRoute({
       {
         name: 'description',
         content:
-          'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker.',
+          'Keep live sports scores, stocks, crypto, news, RSS feeds, weather, and more visible in a customizable desktop ticker.',
       },
       {
         property: 'og:title',
@@ -305,7 +305,7 @@ export const Route = createRootRoute({
       {
         property: 'og:description',
         content:
-          'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker.',
+          'Keep live sports scores, stocks, crypto, news, RSS feeds, weather, and more visible in a customizable desktop ticker.',
       },
       { property: 'og:type', content: 'website' },
       { property: 'og:url', content: 'https://myscrollr.com' },
@@ -328,7 +328,7 @@ export const Route = createRootRoute({
       {
         name: 'twitter:description',
         content:
-          'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker.',
+          'Keep live sports scores, stocks, crypto, news, RSS feeds, weather, and more visible in a customizable desktop ticker.',
       },
       {
         name: 'twitter:image',

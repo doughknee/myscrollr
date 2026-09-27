@@ -3,7 +3,7 @@
  * homepage's visible FAQ always matches the faqPage JSON-LD in
  * routes/index.tsx.
  *
- * Segmented landing pages (e.g. /fantasy) pass their own `items`. That
+ * Segmented landing pages (e.g. /sports) pass their own `items`. That
  * coupling still holds as long as the route hands the SAME array to
  * both this component and its `faqPage()` call — which is the only
  * supported way to use the prop. Don't pass one list here and a

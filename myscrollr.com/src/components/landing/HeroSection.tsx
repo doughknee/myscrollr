@@ -26,12 +26,6 @@ const WORD_ACCENTS = [
     text: 'text-info',
     textMuted: 'text-info/40',
   },
-  {
-    fill: 'bg-accent',
-    track: 'bg-accent/15',
-    text: 'text-accent',
-    textMuted: 'text-accent/40',
-  },
 ] as const
 
 export function HeroSection() {

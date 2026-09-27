@@ -70,7 +70,6 @@ const FEED_MAP = [
   { slug: 'finance-feed', category: 'channels', basename: 'finance' },
   { slug: 'sports-feed', category: 'channels', basename: 'sports' },
   { slug: 'news-feed', category: 'channels', basename: 'news' },
-  { slug: 'fantasy-feed', category: 'channels', basename: 'fantasy' },
 
   // ── Widget feeds ────────────────────────────────────────────────
   { slug: 'clock-world-clocks', category: 'widgets', basename: 'clock' },
@@ -90,11 +89,6 @@ const FEED_MAP = [
     basename: 'sports',
   },
   { slug: 'news-configure-feeds', category: 'configure', basename: 'news' },
-  {
-    slug: 'fantasy-configure-leagues',
-    category: 'configure',
-    basename: 'fantasy',
-  },
   { slug: 'clock-configure', category: 'configure', basename: 'clock' },
   { slug: 'timer-configure', category: 'configure', basename: 'timer' },
   { slug: 'weather-configure', category: 'configure', basename: 'weather' },
@@ -122,11 +116,6 @@ const FEED_MAP = [
     basename: 'sports',
   },
   { slug: 'news-display-preferences', category: 'display', basename: 'news' },
-  {
-    slug: 'fantasy-display-preferences',
-    category: 'display',
-    basename: 'fantasy',
-  },
 
   // ── Overview / catalog / account ────────────────────────────────
   {
@@ -228,7 +217,7 @@ const THEME_NAMES = [
 // Quality stays high (82) because banding around solid-color price
 // chips or league logos is visible immediately.
 
-const TICKER_CHANNELS = ['all-purpose', 'fantasy', 'finance', 'news', 'sports']
+const TICKER_CHANNELS = ['all-purpose', 'finance', 'news', 'sports']
 const TICKER_DENSITIES = ['compact', 'detailed']
 const TICKER_QUALITY_1X = 82
 const TICKER_QUALITY_2X = 76

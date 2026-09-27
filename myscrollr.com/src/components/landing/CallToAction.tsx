@@ -30,7 +30,6 @@ const CHANNELS = [
   { color: '#34d399', label: 'Finance' },
   { color: '#ff4757', label: 'Sports' },
   { color: '#00d4ff', label: 'News' },
-  { color: '#a855f7', label: 'Fantasy' },
 ] as const
 
 /** Floating particle positions — spread across the background.
@@ -49,7 +48,7 @@ const PARTICLES = Array.from({ length: 12 }, (_, i) => {
     size: random() * 3 + 1.5,
     delay: random() * 5,
     duration: random() * 6 + 8,
-    channelIndex: i % 4,
+    channelIndex: i % 3,
   }
 })
 
@@ -125,7 +124,7 @@ export function CallToAction() {
     [],
   )
 
-  /* 4 beams: cardinal channels at 45° offsets. */
+  /* One beam per channel, at 45° offsets. */
   const beams = useMemo<Array<BackdropBeam>>(
     () =>
       CHANNELS.map((channel, i) => ({

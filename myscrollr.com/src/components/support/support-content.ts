@@ -80,10 +80,6 @@ export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
     body: "Quotes pause outside market hours. That's the market, not the app. Crypto streams around the clock; if BTC is frozen too, check Settings → Connection.",
   },
   {
-    title: 'Yahoo Fantasy connect fails',
-    body: "Reconnect from the widget's settings. Yahoo tokens expire roughly monthly. Make sure you complete the Yahoo consent screen in the browser it opens.",
-  },
-  {
     title: 'Subscription not reflecting after purchase',
     body: "Sign out and back in to refresh entitlements. Stripe webhooks land within a minute; if it's been longer, open a ticket with your receipt and we'll sort it same-day.",
   },
@@ -110,12 +106,12 @@ export const GETTING_STARTED_STEPS: Array<GettingStartedStep> = [
   {
     title: 'Add Channels',
     description:
-      'In the desktop app, open the Catalog from the sidebar to browse available data sources. Add Finance for stock prices, Sports for live scores, News for RSS feeds, or Fantasy for Yahoo leagues.',
+      'In the desktop app, open the Catalog from the sidebar to browse available data sources. Add Finance for stock prices, Sports for live scores, or News for RSS feeds.',
   },
   {
     title: 'Configure Your Feeds',
     description:
-      'Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source: add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.',
+      'Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source: add stock symbols, select sports leagues, or subscribe to news feeds.',
   },
   {
     title: 'Customize the Ticker',

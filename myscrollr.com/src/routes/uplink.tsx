@@ -101,7 +101,7 @@ const STATIC_FAQ = [
   {
     question: 'What are widgets, and how many do I get?',
     answer:
-      'Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
+      'Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
   },
   {
     question: 'How fast are live updates?',
@@ -111,7 +111,7 @@ const STATIC_FAQ = [
   {
     question: 'Are there limits inside a widget?',
     answer:
-      'No. Every plan holds unlimited items inside each widget: track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
+      'No. Every plan holds unlimited items inside each widget: track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds. Your plan only sets how many widgets run at once.',
   },
   {
     question: 'What does early access include?',
@@ -366,7 +366,7 @@ function buildUplinkFAQ(
   return [
     {
       question: 'What are widgets, and how many do I get?',
-      answer: `Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
+      answer: `Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
     },
     ...STATIC_FAQ.slice(1),
   ]

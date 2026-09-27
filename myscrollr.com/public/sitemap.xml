@@ -41,11 +41,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://myscrollr.com/fantasy</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://myscrollr.com/sports</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

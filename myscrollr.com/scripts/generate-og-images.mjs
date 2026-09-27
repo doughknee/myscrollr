@@ -12,15 +12,14 @@ const PAGES = [
     file: 'home.png',
     eyebrow: 'Scrollr',
     title: 'A quiet ticker at the edge of your screen.',
-    subtitle:
-      'Live finance, sports, news, and fantasy on macOS, Windows, and Linux.',
+    subtitle: 'Live finance, sports, and news on macOS, Windows, and Linux.',
     accent: '#34d399', // primary green — matches site brand
   },
   {
     file: 'default.png',
     eyebrow: 'Scrollr',
     title: 'A quiet ticker at the edge of your screen.',
-    subtitle: 'Live finance, sports, news, and fantasy. Free and open source.',
+    subtitle: 'Live finance, sports, and news. Free and open source.',
     accent: '#7c3aed',
   },
   {

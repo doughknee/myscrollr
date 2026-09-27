@@ -1,6 +1,6 @@
 # Scrollr — Full LLM Digest
 
-Scrollr is a quiet, source-available desktop ticker for live finance, sports, news, prediction-market, fantasy, weather, and system data. The desktop app is the primary product; myscrollr.com provides marketing, account, billing, support, and download pages.
+Scrollr is a quiet, source-available desktop ticker for live finance, sports, news, weather, and system data. The desktop app is the primary product; myscrollr.com provides marketing, account, billing, support, and download pages.
 
 ## Product
 
@@ -12,9 +12,7 @@ The current catalog is maintained at https://myscrollr.com/widgets and includes:
 
 - individual widgets for supported sports leagues;
 - separate stock and crypto watchlists;
-- curated news publishers;
-- Yahoo Fantasy leagues, matchups, and standings;
-- Kalshi prediction-market data; and
+- curated news publishers; and
 - local utilities such as Clock, Timer, Weather, System Monitor, Uptime, and GitHub Actions status.
 
 The public source is licensed under GNU AGPL v3.0 at https://github.com/doughknee/myscrollr.
@@ -48,7 +46,6 @@ Scrollr can discuss custom-branded deployments and evaluate branding, data-sourc
 - Sports: https://myscrollr.com/sports
 - Markets: https://myscrollr.com/markets
 - News and RSS: https://myscrollr.com/news
-- Yahoo Fantasy: https://myscrollr.com/fantasy
 - Downloads: https://myscrollr.com/download
 - Pricing: https://myscrollr.com/uplink
 - Architecture: https://myscrollr.com/architecture

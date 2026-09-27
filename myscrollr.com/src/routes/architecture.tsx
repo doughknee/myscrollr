@@ -20,7 +20,7 @@ const ARCHITECTURE_TECH_ARTICLE = {
   '@type': 'TechArticle',
   headline: 'Scrollr Architecture: How Real-Time Data Reaches Your Desktop',
   description:
-    'Behind the scenes: how Scrollr delivers real-time finance, sports, news, and fantasy data from source APIs through CDC PubSub to your desktop.',
+    'Behind the scenes: how Scrollr delivers real-time finance, sports, and news data from source APIs through CDC PubSub to your desktop.',
   image: `${BASE_URL}/og/architecture.png`,
   author: { '@type': 'Organization', name: 'Scrollr', url: BASE_URL },
   publisher: {
@@ -39,7 +39,7 @@ export const Route = createFileRoute('/architecture')({
     seo({
       title: 'Scrollr Architecture: How Real-Time Data Reaches You',
       description:
-        'Behind the scenes: how Scrollr delivers real-time finance, sports, news, and fantasy data from source APIs through CDC PubSub to your desktop. Built with Go, Rust, React, PostgreSQL, and Redis.',
+        'Behind the scenes: how Scrollr delivers real-time finance, sports, and news data from source APIs through CDC PubSub to your desktop. Built with Go, Rust, React, PostgreSQL, and Redis.',
       path: '/architecture',
       image: 'https://myscrollr.com/og/architecture.png',
       type: 'article',
@@ -70,18 +70,18 @@ const PIPELINE_STEPS: Array<PipelineStep> = [
   {
     title: 'Data Sources',
     description:
-      'TwelveData WebSocket for market data, ESPN API for scores, RSS/Atom feeds for news, Yahoo Fantasy API for leagues.',
+      'TwelveData WebSocket for market data, ESPN API for scores, RSS/Atom feeds for news.',
     hex: HEX.primary,
     label: 'INGEST',
-    items: ['TwelveData WS', 'ESPN HTTP', 'Yahoo API', 'RSS Feeds'],
+    items: ['TwelveData WS', 'ESPN HTTP', 'RSS Feeds'],
   },
   {
     title: 'Ingestion Services',
     description:
-      'Four independent Rust services collect, normalize, and write data to PostgreSQL. Each runs its own schedule and connection strategy.',
+      'Three independent Rust services collect, normalize, and write data to PostgreSQL. Each runs its own schedule and connection strategy.',
     hex: HEX.info,
     label: 'PROCESS',
-    items: ['Finance :3001', 'Sports :3002', 'RSS :3004', 'Kalshi :3005'],
+    items: ['Finance :3001', 'Sports :3002', 'RSS :3004'],
   },
   {
     title: 'PostgreSQL + CDC',
@@ -89,7 +89,7 @@ const PIPELINE_STEPS: Array<PipelineStep> = [
       'All data lands in PostgreSQL. Sequin monitors table changes via CDC (Change Data Capture) and fires webhooks to the core API.',
     hex: HEX.secondary,
     label: 'DETECT',
-    items: ['trades', 'games', 'rss_items', 'yahoo_*'],
+    items: ['trades', 'games', 'rss_items'],
   },
   {
     title: 'Real-time Delivery',
@@ -140,13 +140,13 @@ const PRINCIPLES: Array<Principle> = [
   {
     title: 'Zero-trust Gateway',
     description:
-      'Core API validates JWTs at the edge. The one proxied service (Fantasy) never sees tokens. It trusts identity headers injected by the gateway.',
+      'Core API validates JWTs at the edge. Proxied services never see tokens directly — they trust identity headers injected by the gateway.',
     hex: HEX.secondary,
   },
   {
     title: 'Self-registration',
     description:
-      'The Fantasy service registers in Redis on startup with a 30s TTL heartbeat and is discovered dynamically. First-party widget sources are served natively by core.',
+      'Proxied services register in Redis on startup with a 30s TTL heartbeat and are discovered dynamically. First-party widget sources are served natively by core.',
     hex: HEX.info,
   },
   {
@@ -181,7 +181,7 @@ const TECH_STACK: Array<TechGroup> = [
     items: [
       { name: 'Rust', detail: 'tokio async runtime' },
       { name: 'WebSocket', detail: 'TwelveData persistent connection' },
-      { name: 'HTTP Polling', detail: 'ESPN 60s, RSS 5min, Yahoo 120s' },
+      { name: 'HTTP Polling', detail: 'ESPN 60s, RSS 5min' },
     ],
   },
   {

@@ -114,9 +114,8 @@ export default function AccountDangerZone({
                   Export your data
                 </h3>
                 <p className="text-xs text-base-content/50 leading-relaxed">
-                  Download a JSON archive of your preferences, channels,
-                  subscription summary, and fantasy league metadata. Yahoo OAuth
-                  tokens are omitted for security.
+                  Download a JSON archive of your preferences, channels, and
+                  subscription summary. OAuth tokens are omitted for security.
                 </p>
                 {exportError && (
                   <p className="mt-2 text-xs text-error">{exportError}</p>
@@ -149,10 +148,10 @@ export default function AccountDangerZone({
                   Delete your account
                 </h3>
                 <p className="text-xs text-base-content/60 leading-relaxed">
-                  Permanently removes your account, preferences, channels, and
-                  Yahoo OAuth connection. Active subscriptions must be canceled
-                  first. If you have a lifetime membership, we keep an
-                  anonymized purchase record for accounting.
+                  Permanently removes your account, preferences, and channels.
+                  Active subscriptions must be canceled first. If you have a
+                  lifetime membership, we keep an anonymized purchase record for
+                  accounting.
                 </p>
               </div>
               <button
@@ -316,7 +315,6 @@ function DeleteConfirmModal({
 
         <ul className="mb-5 space-y-1.5 text-xs text-base-content/70">
           <li>• All widget configurations and preferences will be deleted.</li>
-          <li>• Connected Yahoo Fantasy account will be disconnected.</li>
           <li>• Billing records stay anonymized for tax compliance.</li>
           <li>• You will be signed out and unable to sign back in.</li>
         </ul>

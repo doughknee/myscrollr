@@ -19,7 +19,7 @@ export const organization = {
   url: BASE_URL,
   logo: `${BASE_URL}/icon-128.png`,
   description:
-    'Scrollr is a quiet desktop ticker for live finance, sports, news, and fantasy data. Open source and privacy-first.',
+    'Scrollr is a quiet desktop ticker for live finance, sports, and news data. Open source and privacy-first.',
   sameAs: [
     'https://github.com/doughknee/myscrollr',
     'https://discord.gg/85b49TcGJa',
@@ -49,7 +49,7 @@ export const softwareApplication = {
   operatingSystem: ['macOS', 'Windows', 'Linux'],
   applicationCategory: 'DesktopApplication',
   description:
-    'A quiet desktop ticker for live finance, sports, news, and fantasy data. Open source and privacy-first.',
+    'A quiet desktop ticker for live finance, sports, and news data. Open source and privacy-first.',
   url: BASE_URL,
   downloadUrl: `${BASE_URL}/download`,
   softwareVersion: LATEST_DESKTOP_VERSION,
@@ -59,7 +59,6 @@ export const softwareApplication = {
     `${BASE_URL}/screenshots/channels/finance-dark@2x.webp`,
     `${BASE_URL}/screenshots/channels/sports-dark@2x.webp`,
     `${BASE_URL}/screenshots/channels/news-dark@2x.webp`,
-    `${BASE_URL}/screenshots/channels/fantasy-dark@2x.webp`,
   ],
   offers: [
     {

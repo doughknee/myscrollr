@@ -1,6 +1,6 @@
 # Scrollr
 
-> Scrollr is a quiet desktop ticker for live finance, sports, news, prediction-market, fantasy, weather, and system data. It is source available under GNU AGPL v3.0 and runs on macOS Apple Silicon, Windows x64, and Linux x86_64.
+> Scrollr is a quiet desktop ticker for live finance, sports, news, weather, and system data. It is source available under GNU AGPL v3.0 and runs on macOS Apple Silicon, Windows x64, and Linux x86_64.
 
 The always-on-top ticker can sit at the top or bottom of a chosen monitor. A separate desktop window is used to browse widgets and configure the ticker. The website provides marketing, account, billing, support, and download pages.
 
@@ -9,7 +9,7 @@ Privacy: no advertising trackers or data brokers. Operational diagnostics and au
 ## Product
 
 - [Download](https://myscrollr.com/download): Current packages and platform requirements.
-- [Widgets](https://myscrollr.com/widgets): The current widget catalog, including individual sports leagues, stocks, crypto, curated news, Yahoo Fantasy, Kalshi, and local utilities.
+- [Widgets](https://myscrollr.com/widgets): The current widget catalog, including individual sports leagues, stocks, crypto, curated news, and local utilities.
 - [Architecture](https://myscrollr.com/architecture): How source data reaches the desktop ticker.
 - [Uplink](https://myscrollr.com/uplink): Current plan prices and widget-slot limits.
 - [Business](https://myscrollr.com/business): Discuss a custom deployment; capabilities, price, timing, support, and terms require a written scope.

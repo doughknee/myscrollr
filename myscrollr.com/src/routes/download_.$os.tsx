@@ -28,21 +28,21 @@ const META: Record<
     os: 'macOS',
     title: 'Download Scrollr for macOS',
     description:
-      'Free download of Scrollr for macOS (Apple Silicon). A quiet desktop ticker for live finance, sports, news, and fantasy data. Open source.',
+      'Free download of Scrollr for macOS (Apple Silicon). A quiet desktop ticker for live finance, sports, and news data. Open source.',
     arch: 'Apple Silicon',
   },
   windows: {
     os: 'Windows',
     title: 'Download Scrollr for Windows',
     description:
-      'Free download of Scrollr for x64 Windows. A quiet desktop ticker for live finance, sports, news, and fantasy data. Open source.',
+      'Free download of Scrollr for x64 Windows. A quiet desktop ticker for live finance, sports, and news data. Open source.',
     arch: 'x64',
   },
   linux: {
     os: 'Linux',
     title: 'Download Scrollr for Linux',
     description:
-      'Free download of Scrollr for Linux (x64). Available as AppImage, .deb, and .rpm. A quiet desktop ticker for live finance, sports, news, and fantasy data.',
+      'Free download of Scrollr for Linux (x64). Available as AppImage, .deb, and .rpm. A quiet desktop ticker for live finance, sports, and news data.',
     arch: 'x64',
   },
 }

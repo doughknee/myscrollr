@@ -181,12 +181,12 @@ server {\n\
     #                          /uplink, not /uplink/).\n\
     # Canonical marketing pages are slashless. Keep this list narrow so\n\
     # assets, auth callbacks, API paths, and the SPA fallback are untouched.\n\
-    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|fantasy|releases|architecture|business|support|legal|status)/$ {\n\
+    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|releases|architecture|business|support|legal|status)/$ {\n\
         include /etc/nginx/security-headers.conf;\n\
         return 301 /$1$is_args$args;\n\
     }\n\
 \n\
-    # Retired marketing route and direct index-file duplicates.\n\
+    # Retired marketing routes and direct index-file duplicates.\n\
     location = /index.html {\n\
         include /etc/nginx/security-headers.conf;\n\
         return 301 /$is_args$args;\n\
@@ -199,7 +199,17 @@ server {\n\
         include /etc/nginx/security-headers.conf;\n\
         return 301 /widgets$is_args$args;\n\
     }\n\
-    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|fantasy|releases|architecture|business|support|legal|status)/index\.html$ {\n\
+    # /fantasy retired with the Fantasy/Yahoo feature removal\n\
+    # (SCROLLR-241) — send it where /channels already goes.\n\
+    location = /fantasy/index.html {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /channels$is_args$args;\n\
+    }\n\
+    location ~ ^/fantasy/?$ {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /channels$is_args$args;\n\
+    }\n\
+    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|releases|architecture|business|support|legal|status)/index\.html$ {\n\
         include /etc/nginx/security-headers.conf;\n\
         return 301 /$1$is_args$args;\n\
     }\n\

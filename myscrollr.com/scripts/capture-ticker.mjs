@@ -26,9 +26,7 @@
  * HONESTY BOUNDARY. The app in the shot is the real app, the data is the
  * dev seed advanced by `make live`: real teams and tickers, scores and
  * prices that are simulated. Caption as product shots, never as a
- * specific real day. Fantasy is not re-shot: there is no fantasy data in
- * the dev stack outside an NFL week, so its files are left as they are
- * (see desktop/fixtures/serve-fantasy-demo.mjs for that rig).
+ * specific real day.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync } from "node:fs";
@@ -51,7 +49,7 @@ const CHANNELS = {
   sports: (id) => id.startsWith("sports_"),
   finance: (id) => id.startsWith("finance_"),
   news: (id) => id.startsWith("news_") || id.startsWith("rss_"),
-  "all-purpose": (id) => !id.startsWith("fantasy"),
+  "all-purpose": () => true,
 };
 // Chips at 1.5x so a 3440-wide bar crops to roughly the old retina widths.
 const SCALE = 150;

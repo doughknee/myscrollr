@@ -123,13 +123,6 @@ function MarketsPage() {
               action="BROWSE WIDGETS →"
               to="/widgets"
             />
-            <DeparturesRow
-              index="03"
-              label="Prediction markets"
-              meta="Kalshi is a distinct widget, not a stock or crypto quote"
-              action="SEE CATALOG →"
-              to="/widgets"
-            />
           </div>
         </TerminalContainer>
       </section>

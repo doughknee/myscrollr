@@ -54,14 +54,6 @@ const ROUTES = [
     expectedBody: 'Every widget streams live',
   },
   {
-    // Segmented landing page. Only prerenders because it's listed in
-    // vite.config's `pages` — this assertion catches its removal.
-    path: '/fantasy',
-    file: 'fantasy/index.html',
-    minJsonLd: 3, // organization + softwareApp + FAQPage
-    expectedBody: 'The go-ahead touchdown',
-  },
-  {
     path: '/sports',
     file: 'sports/index.html',
     minJsonLd: 3,

@@ -62,16 +62,15 @@ const FAQ_ITEMS: Array<FAQItem> = [
     question: 'Do I need an account?',
     highlight: 'Yes — a free account unlocks live widget data.',
     answer:
-      'A free Scrollr account is required to stream live widget data. Signing up takes under a minute, secures your config via our hosted auth, and unlocks the widget catalog (sports, stocks, crypto, news, and fantasy), the web dashboard, and preference sync across devices.',
+      'A free Scrollr account is required to stream live widget data. Signing up takes under a minute, secures your config via our hosted auth, and unlocks the widget catalog (sports, stocks, crypto, and news), the web dashboard, and preference sync across devices.',
     accent: 'rose',
   },
   {
     icon: Layers,
     question: 'What data does Scrollr show?',
-    highlight:
-      'Live stocks, scores, news headlines, and fantasy updates in one feed.',
+    highlight: 'Live stocks, scores, and news headlines in one feed.',
     answer:
-      'A catalog of 30+ widgets: real-time stock and crypto prices, live scores from 14 sports leagues, curated news outlets plus custom RSS, and Yahoo Fantasy league updates including standings and matchups.',
+      'A catalog of 30+ widgets: real-time stock and crypto prices, live scores from 14 sports leagues, and curated news outlets plus custom RSS.',
     accent: 'cyan',
   },
   {

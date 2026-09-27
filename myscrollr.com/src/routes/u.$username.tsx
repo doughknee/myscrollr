@@ -1,16 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import {
-  AlertCircle,
-  Check,
-  Link as LinkIcon,
-  Loader2,
-  Shield,
-} from 'lucide-react'
+import { AlertCircle, Loader2, Shield } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { pageVariants, sectionVariants } from '@/lib/animations'
-import { API_BASE, authenticatedFetch } from '@/api/client'
 import { seo } from '@/lib/seo'
 
 export const Route = createFileRoute('/u/$username')({
@@ -39,17 +32,14 @@ interface ProfileData {
   username: string
   display_name?: string
   avatar?: string
-  connected_yahoo: boolean
 }
 
 function ProfilePage() {
   const { username } = Route.useParams()
-  const { isAuthenticated, signIn, getIdTokenClaims, getAccessToken } =
-    useScrollrAuth()
+  const { isAuthenticated, signIn, getIdTokenClaims } = useScrollrAuth()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isOwnProfile, setIsOwnProfile] = useState(false)
 
   useEffect(() => {
     async function loadProfile() {
@@ -88,43 +78,16 @@ function ProfilePage() {
 
       // Get current user's identity
       let ownUsername = ''
-      let ownSub = ''
       if (isAuthenticated) {
         const claims = await getIdTokenClaims()
         ownUsername = claims?.username || ''
-        ownSub = claims?.sub || ''
       }
-
-      // Check if viewing own profile
-      setIsOwnProfile(ownUsername === username || ownSub === username)
 
       // Build profile from Logto data
       const profileData: ProfileData = {
         username,
         display_name: ownUsername || username,
         avatar: '',
-        connected_yahoo: false,
-      }
-
-      // Get Yahoo connection status from our API
-      if (
-        isAuthenticated &&
-        (ownUsername === username || ownSub === username)
-      ) {
-        try {
-          const getToken = async () => {
-            const token = await getAccessToken(API_BASE)
-            return token ?? null
-          }
-          const data = await authenticatedFetch<{ connected: boolean }>(
-            '/users/me/yahoo-status',
-            {},
-            getToken,
-          )
-          profileData.connected_yahoo = data.connected || false
-        } catch {
-          // Yahoo status unavailable — leave connected_yahoo as false
-        }
       }
 
       setProfile(profileData)
@@ -132,7 +95,7 @@ function ProfilePage() {
     }
 
     loadProfile()
-  }, [username, isAuthenticated, getIdTokenClaims, getAccessToken])
+  }, [username, isAuthenticated, getIdTokenClaims])
 
   // ── Loading state ──
   if (loading) {
@@ -258,107 +221,9 @@ function ProfilePage() {
         </div>
       </section>
 
-      {/* ── Connected Accounts ── */}
+      {/* ── Footer ── */}
       <section className="relative overflow-hidden">
         <div className="container py-16 lg:py-24 max-w-4xl mx-auto">
-          <motion.div
-            className="text-center mb-12 sm:mb-16"
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Connected <span className="text-gradient-primary">Widgets</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Linked services and data sources for this profile
-            </p>
-          </motion.div>
-
-          {/* Yahoo Card */}
-          <motion.div
-            className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden group"
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.6, ease: EASE }}
-          >
-            {/* Accent top line */}
-            <div
-              className="absolute top-0 left-0 right-0 h-px"
-              style={{
-                background: `linear-gradient(90deg, transparent, ${HEX.accent} 50%, transparent)`,
-              }}
-            />
-            {/* Corner dot grid */}
-            <div
-              className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                backgroundSize: '8px 8px',
-              }}
-            />
-            {/* Hover glow orb */}
-            <div
-              className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-              style={{ background: `${HEX.accent}10` }}
-            />
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
-              <div className="flex items-center gap-5">
-                {/* Icon badge */}
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{
-                    background: `${HEX.accent}15`,
-                    boxShadow: `0 0 20px ${HEX.accent}15, 0 0 0 1px ${HEX.accent}20`,
-                  }}
-                >
-                  <span className="text-base font-black text-base-content/80">
-                    Y!
-                  </span>
-                </div>
-                <div className="text-left">
-                  <p className="text-base font-black tracking-tight text-base-content">
-                    Yahoo Fantasy
-                  </p>
-                  {profile.connected_yahoo ? (
-                    <p className="text-xs text-success flex items-center gap-1.5 font-semibold mt-1">
-                      <Check size={14} strokeWidth={3} /> Connected
-                    </p>
-                  ) : (
-                    <p className="text-xs text-base-content/30 font-semibold mt-1">
-                      Disconnected
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {isOwnProfile && (
-                <div className="w-full sm:w-auto">
-                  <a
-                    href="/account"
-                    className="btn btn-outline btn-sm w-full sm:w-auto"
-                  >
-                    Manage Account
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Watermark */}
-            <LinkIcon
-              size={130}
-              strokeWidth={0.4}
-              className="absolute -bottom-4 -right-4 text-base-content/[0.025] pointer-events-none"
-            />
-          </motion.div>
-
-          {/* Footer */}
           <motion.div
             className="flex items-center justify-center gap-4 text-base-content/20 text-[10px] uppercase tracking-wide pt-12"
             style={{ opacity: 0 }}

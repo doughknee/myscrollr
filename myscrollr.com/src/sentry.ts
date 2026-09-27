@@ -41,7 +41,7 @@ export function initSentry() {
 
     tracesSampleRate: 0.1,
     // Only attach tracing headers to our own API. NEVER to third-party
-    // services (Stripe, Logto, Yahoo, TwelveData, ESPN, RSS sources).
+    // services (Stripe, Logto, TwelveData, ESPN, RSS sources).
     tracePropagationTargets: [/^https:\/\/api\.myscrollr\./],
 
     beforeSend(event) {

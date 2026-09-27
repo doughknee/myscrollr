@@ -82,7 +82,6 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
             </p>
             <p className="mt-2 text-sm text-base-content/60">
               {planLabel(detail.account)}
-              {detail.account.fantasy && ' · fantasy connected'}
               {detail.account.suspended && ' · suspended'}
               {detail.account.deletion_state &&
                 ` · deletion ${detail.account.deletion_state}`}
