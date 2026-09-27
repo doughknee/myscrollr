@@ -14,8 +14,6 @@ import {
   migrateVenue,
   migrateFinanceDisplay,
   migrateRssDisplay,
-  migratePredictionsDisplay,
-  migrateFantasyDisplay,
   migrateAppearanceTheme,
   resolveThemeName,
   isThemeFamily,
@@ -34,6 +32,8 @@ import {
   isPinned,
   pinCount,
   MAX_PINS,
+  REMOVED_WIDGETS_TIP_ID,
+  takePendingRemovalNotice,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs, WidgetPin } from "./preferences";
 
@@ -179,72 +179,51 @@ describe("migrateRssDisplay", () => {
   });
 });
 
-describe("migratePredictionsDisplay", () => {
-  it("maps the retired 'volume' sort to 'trending' (v1.1.5)", () => {
-    const migrated = migratePredictionsDisplay({
-      defaultSort: "volume",
-    } as unknown as Parameters<typeof migratePredictionsDisplay>[0]);
-    expect(migrated.defaultSort).toBe("trending");
-  });
-
-  it("keeps valid sorts and defaults unknown ones to 'trending'", () => {
-    expect(migratePredictionsDisplay({ defaultSort: "movers" }).defaultSort).toBe("movers");
-    expect(migratePredictionsDisplay({ defaultSort: "closing" }).defaultSort).toBe("closing");
-    expect(migratePredictionsDisplay({ defaultSort: "alpha" }).defaultSort).toBe("alpha");
-    expect(migratePredictionsDisplay({ defaultSort: "trending" }).defaultSort).toBe("trending");
-    expect(
-      migratePredictionsDisplay({
-        defaultSort: "banana",
-      } as unknown as Parameters<typeof migratePredictionsDisplay>[0]).defaultSort,
-    ).toBe("trending");
-    expect(migratePredictionsDisplay(undefined).defaultSort).toBe("trending");
-  });
-});
-
-describe("migrateFantasyDisplay", () => {
-  it("preserves the user's inputs", () => {
-    const migrated = migrateFantasyDisplay({
-      tickerMode: "essential",
-      defaultSubTab: "matchup",
-      enabledLeagueKeys: ["nfl.l.12345"],
-      primaryLeagueKey: "nfl.l.12345",
-      followedPlayerKeys: ["449.p.1", 7, null] as unknown as string[],
+describe("SCROLLR-240: fantasy/predictions removal strip + one-time notice", () => {
+  it("drops fantasy/predictions widget ids and pins on load, and fires the notice once", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      widgets: {
+        enabledWidgets: ["uptime", "fantasy", "predictions"],
+        widgetsOnTicker: ["uptime", "fantasy"],
+        sidebarOrder: ["fantasy", "uptime"],
+        pins: [{ widget: "predictions", subject: "MARKET-1", side: "right" }],
+      },
     });
 
-    expect(migrated.tickerMode).toBe("essential");
-    expect(migrated.defaultSubTab).toBe("matchup");
-    expect(migrated.enabledLeagueKeys).toEqual(["nfl.l.12345"]);
-    expect(migrated.primaryLeagueKey).toBe("nfl.l.12345");
-    expect(migrated.followedPlayerKeys).toEqual(["449.p.1"]);
+    const prefs = loadPrefs();
+    expect(prefs.widgets.enabledWidgets).toEqual(["uptime"]);
+    expect(prefs.widgets.widgetsOnTicker).toEqual(["uptime"]);
+    expect(prefs.widgets.sidebarOrder).toEqual(["uptime"]);
+    expect(prefs.widgets.pins).toEqual([]);
+    expect(prefs.tipsShown).toContain(REMOVED_WIDGETS_TIP_ID);
+    expect(takePendingRemovalNotice()).toBe(true);
+    // Reading it again returns false until the next strip.
+    expect(takePendingRemovalNotice()).toBe(false);
   });
 
-  it("resolves a pre-dial prefs file to 'everything' (the ticker it already had)", () => {
-    expect(migrateFantasyDisplay({}).tickerMode).toBe("everything");
-    expect(
-      migrateFantasyDisplay({ tickerMode: "loud" } as unknown as Parameters<
-        typeof migrateFantasyDisplay
-      >[0]).tickerMode,
-    ).toBe("everything");
+  it("does not re-fire the notice on a second load (already persisted, nothing left to strip)", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      widgets: { enabledWidgets: ["uptime", "fantasy"] },
+    });
+    loadPrefs();
+    expect(takePendingRemovalNotice()).toBe(true);
+
+    // Second launch: the persisted store no longer names fantasy/predictions.
+    const second = loadPrefs();
+    expect(second.tipsShown).toContain(REMOVED_WIDGETS_TIP_ID);
+    expect(takePendingRemovalNotice()).toBe(false);
   });
 
-  it("drops the retired venue prefs, legacy booleans and feed-layout fields (REL-208)", () => {
-    const migrated = migrateFantasyDisplay({
-      tickerShowMatchup: false,
-      showInjuryCount: true,
-      matchupScore: "ticker",
-      injuryDetail: "off",
-      showStandings: false,
-      showMatchups: true,
-      defaultSort: "record",
-    } as unknown as Parameters<typeof migrateFantasyDisplay>[0]);
-
-    expect(Object.keys(migrated).sort()).toEqual([
-      "defaultSubTab",
-      "enabledLeagueKeys",
-      "followedPlayerKeys",
-      "primaryLeagueKey",
-      "tickerMode",
-    ]);
+  it("never fires for a store that never had fantasy/predictions", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      widgets: { enabledWidgets: ["clock"] },
+    });
+    const prefs = loadPrefs();
+    expect(prefs.tipsShown).not.toContain(REMOVED_WIDGETS_TIP_ID);
+    expect(takePendingRemovalNotice()).toBe(false);
   });
 });
 

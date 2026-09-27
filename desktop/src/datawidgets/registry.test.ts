@@ -9,7 +9,7 @@ import { getCatalogItems } from "../marketplace";
 // registers, and every data catalog item is silently dropped — the Catalog
 // page collapses to Utilities only. tsc can't see this (runtime glob match),
 // so assert it here.
-const DATA_SOURCES = ["finance", "sports", "fantasy", "rss", "predictions"] as const;
+const DATA_SOURCES = ["finance", "sports", "rss"] as const;
 
 describe("datawidget registry", () => {
   it("registers every data-widget source", () => {

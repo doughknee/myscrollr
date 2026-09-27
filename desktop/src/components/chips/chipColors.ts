@@ -92,17 +92,6 @@ const MUTED: ChipColors = {
   tabBg: "bg-fg-3/[0.14]",
 };
 
-const PREDICTIONS: ChipColors = {
-  bg: "bg-predictions/[0.06]",
-  border: "border-predictions/25",
-  hoverBorder: "hover:border-predictions/40",
-  text: "text-predictions",
-  textDim: "text-predictions/70",
-  textFaint: "text-predictions/55",
-  divider: "border-predictions/45",
-  tabBg: "bg-predictions/[0.18]",
-};
-
 // ── Widget color palettes ───────────────────────────────────────
 
 const WIDGET_CLOCK: ChipColors = {
@@ -177,10 +166,6 @@ const WIDGET_MAP: Record<string, ChipColors> = {
   finance: PRIMARY,
   sports: SECONDARY,
   rss: INFO,
-  fantasy: PURPLE,
-  // Predictions brand teal (#1fc9a0, v1.1.5) — its own static token so the
-  // ticker chip matches the catalog card and the widget accent everywhere.
-  predictions: PREDICTIONS,
   clock: WIDGET_CLOCK,
   timer: WIDGET_TIMER,
   weather: WIDGET_WEATHER,

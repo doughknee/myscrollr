@@ -104,20 +104,6 @@ function mergeWidgetRecords(
   return updated;
 }
 
-// Fantasy tables whose CDC events should trigger a fast dashboard
-// re-fetch. Unlike the flat-array tables we merge inline (finance,
-// sports, rss), fantasy data arrives as a nested bundle, so the
-// simplest correctness story is "invalidate and let the backend's
-// freshly-cleared Redis cache serve the new bundle."
-const FANTASY_CDC_TABLES = new Set([
-  "yahoo_leagues",
-  "yahoo_standings",
-  "yahoo_matchups",
-  "yahoo_rosters",
-]);
-
-const FANTASY_REFETCH_DELAY_MS = 250;
-
 // ── Hook ─────────────────────────────────────────────────────────
 
 /**
@@ -127,18 +113,16 @@ const FANTASY_REFETCH_DELAY_MS = 250;
 export function useDashboardCDC(): void {
   const queryClient = useQueryClient();
 
-  // Debounce state for the safety-net and fantasy refetches. Production
-  // SSE throughput can hit ~47 events/sec; without coalescing, every
-  // event scheduled its own `setTimeout(invalidate, 500)` and we'd queue
-  // ~24 simultaneous refetch timers per burst. Trailing-edge debounce
-  // collapses a burst into one refetch fired after the storm settles.
+  // Debounce state for the safety-net refetch. Production SSE throughput
+  // can hit ~47 events/sec; without coalescing, every event scheduled its
+  // own `setTimeout(invalidate, 500)` and we'd queue ~24 simultaneous
+  // refetch timers per burst. Trailing-edge debounce collapses a burst
+  // into one refetch fired after the storm settles.
   const pendingSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingFantasyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (pendingSafetyRef.current) clearTimeout(pendingSafetyRef.current);
-      if (pendingFantasyRef.current) clearTimeout(pendingFantasyRef.current);
     };
   }, []);
 
@@ -191,21 +175,6 @@ export function useDashboardCDC(): void {
           };
         },
       );
-
-      // ── Fantasy fast-path ───────────────────────────────────
-      // If any yahoo_* records arrived we skip the long SSE delay
-      // and re-fetch quickly so live scores update in <1s.
-      const fantasyTouched = records.some(
-        (r) => r.metadata?.table_name && FANTASY_CDC_TABLES.has(r.metadata.table_name),
-      );
-      if (fantasyTouched) {
-        if (pendingFantasyRef.current) clearTimeout(pendingFantasyRef.current);
-        pendingFantasyRef.current = setTimeout(() => {
-          pendingFantasyRef.current = null;
-          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-        }, FANTASY_REFETCH_DELAY_MS);
-        return;
-      }
 
       // ── Safety-net refetch ──────────────────────────────────
       // A full dashboard re-fetch after a short delay ensures the

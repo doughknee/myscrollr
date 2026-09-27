@@ -1,10 +1,10 @@
 /**
  * The ticker's `source → renderer` registry (VISION §4.1, backlog #5).
  *
- * ScrollrTicker used to carry a per-source if/switch ladder: a `fantasy`
- * branch plus `case "finance" | "sports" | "rss" | "predictions"`, each
- * reaching for that source's display prefs, selector, and chip component.
- * Adding a source meant editing an 884-line component.
+ * ScrollrTicker used to carry a per-source if/switch ladder: one branch
+ * per `case "finance" | "sports" | "rss"`, each reaching for that source's
+ * display prefs, selector, and chip component. Adding a source meant
+ * editing an 884-line component.
  *
  * Now each source exports a `TickerSource` from its own folder and the
  * ticker just looks one up. Two things fall out of that:
@@ -53,13 +53,11 @@ export interface TickerContext {
   comfort: boolean;
   chipColorMode: ChipColorMode;
   widgetDisplay?: WidgetDisplayPrefs;
-  /** Starred prediction markets, live across windows. */
-  predictionsWatchlist: ReadonlySet<string>;
   /**
    * How many times each rotating slot has left the viewport, by slot key.
    * A slot's content advances only when this changes, which is how a chip
    * never swaps while someone is reading it. Absent from callers that do
-   * not scroll (the fantasy preview): nothing rotates there.
+   * not scroll: nothing rotates there.
    */
   cycles?: Readonly<Record<string, number>>;
   /** Freezes a rotating slot's item across renders (see `rotateSlots`). */
@@ -90,9 +88,9 @@ export interface TickerSource {
   /**
    * Build this source's chips from its slice of dashboard.data.
    *
-   * Receives the payload raw — most sources get an array, fantasy gets a
-   * `{ leagues: [...] }` object — and returns an empty array when it has
-   * nothing to show (missing prefs, empty payload).
+   * Receives the payload raw — most sources get an array — and returns
+   * an empty array when it has nothing to show (missing prefs, empty
+   * payload).
    */
   chips(raw: unknown, ctx: TickerContext): TickerChip[];
   /**

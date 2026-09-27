@@ -292,7 +292,6 @@ export interface GitHubWidgetConfig {
  *   sports      -> team name           ("New York Yankees")
  *   finance     -> symbol              ("AAPL")
  *   rss         -> feed url
- *   predictions -> market id
  *   uptime      -> monitor id          github -> repo id
  *   clock / timer / weather / sysmon -> the widget id itself (one chip)
  */
@@ -381,21 +380,12 @@ export interface WidgetPrefs {
  *   both    — shown in both places (default for migrated `true` booleans)
  *   ticker  — shown on the always-on-top ticker only; hidden from the feed
  *
- * Nothing reads a Venue any more: the last per-item toggles (fantasy's
- * Advanced block) went in REL-208, and the ticker shows a fixed set per
- * source (docs/CHIP_SPEC.md §8). The type survives only so the sports
- * migration can coerce the legacy `showUpcoming` / `showFinal` booleans.
+ * Nothing reads a Venue any more: the last per-item toggles went in
+ * REL-208, and the ticker shows a fixed set per source (docs/CHIP_SPEC.md
+ * §8). The type survives only so the sports migration can coerce the
+ * legacy `showUpcoming` / `showFinal` booleans.
  */
 export type Venue = "off" | "feed" | "both" | "ticker";
-
-/**
- * Fantasy ticker simplicity dial; see FantasyDisplayPrefs.tickerMode.
- *
- * Named for the widget because `TickerMode` is already taken by the
- * ticker's density setting (compact | detailed) — a genuinely different
- * axis that happens to want the same word.
- */
-export type FantasyTickerMode = "essential" | "standard" | "everything";
 
 /**
  * Coerce a saved value (boolean from the pre-v1.0.2 era, or any other
@@ -433,15 +423,6 @@ export interface FinanceDisplayPrefs {
   defaultSort: "alpha" | "price" | "change" | "updated";
 }
 
-export interface PredictionsDisplayPrefs {
-  /**
-   * v1.1.5: drives the TICKER's no-stars fallback ordering (the feed is
-   * lens-driven and owns its own ordering). "trending" = trailing-24h
-   * volume; legacy saved "volume" values migrate to it.
-   */
-  defaultSort: "trending" | "movers" | "closing" | "alpha";
-}
-
 export interface RssDisplayPrefs {
   /** Sticky feed sort (2026-07-17 unification): the bar's sort choice
    *  persists per widget via the config.display override; this is the
@@ -455,62 +436,17 @@ export interface RssDisplayPrefs {
   maxArticleAgeDays: number;
 }
 
-export type FantasySubTab = "overview" | "matchup" | "standings" | "roster";
-
-export interface FantasyDisplayPrefs {
-  // ── Followed players (Phase 2, 2026-04-25) ──
-  /**
-   * Yahoo player_keys the user wants surfaced as their own dedicated
-   * ticker chips, separate from the league-summary chips. Use case:
-   * track specific players (CMC, Mahomes) live without parsing
-   * league-summary segments. Each entry renders one
-   * `FollowedPlayerChip` next to the league chips in the ticker.
-   *
-   * Stored as an array (not a Set) so the JSON round-trips cleanly
-   * through the prefs store. Order is preservation-only (no inherent
-   * meaning to position).
-   *
-   * Empty array = no followed players, no chips render.
-   */
-  followedPlayerKeys: string[];
-
-  // ── Ticker simplicity dial (2026-08) ──
-  /**
-   * How much of the fantasy story reaches the ticker. Each position is
-   * a fixed set built in ticker.tsx — there is no per-item control
-   * underneath it any more (REL-208; docs/CHIP_SPEC.md §8).
-   *
-   *   essential  — one smart chip per league, nothing else
-   *   standard   — + live moment chips (in-play, breaking injury).
-   *                THE DEFAULT for fresh installs.
-   *   everything — + top scorers, worst starter, bench top, injury report
-   *
-   * Followed players are deliberately outside the dial — an explicit
-   * opt-in shouldn't be silently dropped by a simplicity setting.
-   */
-  tickerMode: FantasyTickerMode;
-
-  /** Which sub-tab the Feed view opens on. Defaults to overview when in 2+ leagues, matchup otherwise. */
-  defaultSubTab: FantasySubTab;
-  /** The user-preferred "primary" league key shown as the hero in Overview/Matchup tabs. */
-  primaryLeagueKey: string | null;
-  /** Explicit list of league keys the user wants visible. Empty array means "all imported leagues". */
-  enabledLeagueKeys: string[];
-}
-
 export interface WidgetDisplayPrefs {
   finance: FinanceDisplayPrefs;
   rss: RssDisplayPrefs;
-  fantasy: FantasyDisplayPrefs;
-  predictions: PredictionsDisplayPrefs;
 }
 
 /**
  * Per-widget homepage preview filter.
  *
  * Keys are group identifiers: symbols for finance, league names for
- * sports, source names for rss, and league keys for fantasy.
- * An empty array means "auto" — use default sort/slice.
+ * sports, source names for rss. An empty array means "auto" — use
+ * default sort/slice.
  */
 export interface AppPreferences {
   appearance: AppearancePrefs;
@@ -601,24 +537,6 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
     feedSort: "newest",
     maxArticles: 0,
     maxArticleAgeDays: 0,
-  },
-  predictions: {
-    defaultSort: "trending",
-  },
-  fantasy: {
-    followedPlayerKeys: [],
-    // Standard, not Essential: the smart league chip tells you a league
-    // is live but not WHO is doing it, and the player mid-game is the
-    // thing worth glancing at. Standard adds exactly those moment chips
-    // and nothing else, so it stays calm while being useful. Essential
-    // remains for anyone who wants strictly one chip per league.
-    //
-    // Existing users keep their configured ticker regardless — see
-    // migrateFantasyDisplay.
-    tickerMode: "standard",
-    defaultSubTab: "overview",
-    primaryLeagueKey: null,
-    enabledLeagueKeys: [],
   },
 };
 
@@ -744,6 +662,51 @@ function shouldAddLegacyTimerToTicker(
   return onTicker.includes("clock") && !onTicker.includes("timer");
 }
 
+/**
+ * Widget ids retired by SCROLLR-240 (Removal 2/3). Stripped from every
+ * saved id list and pin on load so an upgrading install never renders a
+ * chip, settings row, or pin for a widget that no longer exists. See
+ * `loadPrefs`'s one-time upgrade notice.
+ */
+const REMOVED_WIDGET_IDS: readonly string[] = ["fantasy", "predictions"];
+
+function dropRemovedWidgetIds(ids: string[]): string[] {
+  return ids.filter((id) => !REMOVED_WIDGET_IDS.includes(id));
+}
+
+/** True if any of these ids/pins name a widget SCROLLR-240 removed. */
+function hasRemovedWidget(
+  idLists: readonly (string[] | undefined)[],
+  pins: readonly { widget?: unknown }[],
+): boolean {
+  return (
+    idLists.some((ids) => ids?.some((id) => REMOVED_WIDGET_IDS.includes(id))) ||
+    pins.some((p) => REMOVED_WIDGET_IDS.includes(p?.widget as string))
+  );
+}
+
+/**
+ * One-time upgrade notice (SCROLLR-240): shown exactly once, the first time
+ * `loadPrefs` finds and strips one of `REMOVED_WIDGET_IDS` from a widget id
+ * list or pin. Recorded in `tipsShown` like any other one-time tip (see
+ * `lib/tips.ts`) so it survives restarts and is never repeated once shown.
+ */
+export const REMOVED_WIDGETS_TIP_ID = "widgets-retired-2026-09";
+export const REMOVED_WIDGETS_MESSAGE =
+  "Fantasy and Predictions have been removed from Scrollr for now.";
+
+/** Set by `loadPrefs` when THIS call is the one that found something to
+ *  strip. The main window's mount effect reads and clears it via
+ *  `takePendingRemovalNotice` right after loading prefs, to show the
+ *  notice above exactly once. */
+let pendingRemovalNotice = false;
+
+export function takePendingRemovalNotice(): boolean {
+  const fired = pendingRemovalNotice;
+  pendingRemovalNotice = false;
+  return fired;
+}
+
 /** Deep-merge saved widget prefs with defaults.
  *  Handles migration from the old flat shape gracefully. */
 export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
@@ -769,22 +732,29 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
     ? saved.widgetsOnTicker
     : savedEnabledWidgets;
   const shouldEnableLegacyTimer = !tmr && savedEnabledWidgets.includes("clock");
-  const enabledWidgets =
+  const enabledWidgets = dropRemovedWidgetIds(
     shouldEnableLegacyTimer && !savedEnabledWidgets.includes("timer")
       ? [...savedEnabledWidgets, "timer"]
-      : savedEnabledWidgets;
-  const widgetsOnTicker = shouldAddLegacyTimerToTicker(saved)
-    ? [...savedWidgetsOnTicker, "timer"]
-    : savedWidgetsOnTicker;
+      : savedEnabledWidgets,
+  );
+  const widgetsOnTicker = dropRemovedWidgetIds(
+    shouldAddLegacyTimerToTicker(saved)
+      ? [...savedWidgetsOnTicker, "timer"]
+      : savedWidgetsOnTicker,
+  );
 
   return {
     enabledWidgets,
     sidebarOrder: Array.isArray(saved.sidebarOrder)
-      ? saved.sidebarOrder.filter((id): id is string => typeof id === "string")
+      ? dropRemovedWidgetIds(
+          saved.sidebarOrder.filter((id): id is string => typeof id === "string"),
+        )
       : [],
     // Migration: if widgetsOnTicker doesn't exist, default to enabledWidgets
     widgetsOnTicker,
-    pins: migratePins(saved as Record<string, unknown>),
+    pins: migratePins(saved as Record<string, unknown>).filter(
+      (p) => !REMOVED_WIDGET_IDS.includes(p.widget),
+    ),
     // Stored clock/weather blocks and the per-widget `ticker` sub-configs
     // (other than sysmon's) are dropped here: the fields were force-reset
     // on every load since 2026-07-17 and REL-208 removed them outright.
@@ -859,22 +829,6 @@ export function migrateFinanceDisplay(
   };
 }
 
-export function migratePredictionsDisplay(
-  saved: Partial<PredictionsDisplayPrefs> | undefined,
-): PredictionsDisplayPrefs {
-  const raw = (saved ?? {}) as Record<string, unknown>;
-  // v1.1.5: the all-time volume sort became Trending (24h).
-  const stored = raw.defaultSort === "volume" ? "trending" : raw.defaultSort;
-  return {
-    ...DEFAULT_WIDGET_DISPLAY.predictions,
-    defaultSort: oneOf(
-      stored,
-      ["trending", "movers", "closing", "alpha"],
-      DEFAULT_WIDGET_DISPLAY.predictions.defaultSort,
-    ),
-  };
-}
-
 export function migrateRssDisplay(
   saved: Partial<RssDisplayPrefs> | undefined,
 ): RssDisplayPrefs {
@@ -902,55 +856,6 @@ export function migrateRssDisplay(
       Number.isFinite(raw.maxArticleAgeDays)
         ? Math.min(30, Math.max(0, Math.round(raw.maxArticleAgeDays)))
         : DEFAULT_WIDGET_DISPLAY.rss.maxArticleAgeDays,
-  };
-}
-
-export function isFantasyTickerMode(v: unknown): v is FantasyTickerMode {
-  return v === "essential" || v === "standard" || v === "everything";
-}
-
-export function migrateFantasyDisplay(
-  saved: Partial<FantasyDisplayPrefs> | undefined,
-): FantasyDisplayPrefs {
-  const raw = (saved ?? {}) as Record<string, unknown>;
-
-  // A prefs file that predates the dial resolves to "everything": every
-  // per-item venue pref defaulted to "both" back then, so that is the
-  // ticker those users already had. Only genuinely fresh installs, which
-  // never reach this function, get the calm default.
-  //
-  // The 14 venue prefs, the two legacy booleans they were folded from
-  // (`tickerShowMatchup`, `showInjuryCount`), and the never-read
-  // `showStandings` / `showMatchups` / `defaultSort` are not carried
-  // (REL-208) — the object built here is what gets saved back, so they
-  // fall off on the next write.
-  const tickerMode: FantasyTickerMode = isFantasyTickerMode(raw.tickerMode)
-    ? raw.tickerMode
-    : "everything";
-
-  return {
-    ...DEFAULT_WIDGET_DISPLAY.fantasy,
-    tickerMode,
-    // Followed players is just a string array — no enum migration.
-    // Filter to strings defensively in case the persisted shape is
-    // garbled (older prefs files with no key get [] from the default).
-    followedPlayerKeys: Array.isArray(raw.followedPlayerKeys)
-      ? (raw.followedPlayerKeys as unknown[]).filter(
-          (k): k is string => typeof k === "string",
-        )
-      : DEFAULT_WIDGET_DISPLAY.fantasy.followedPlayerKeys,
-    defaultSubTab: oneOf(
-      raw.defaultSubTab,
-      ["overview", "matchup", "standings", "roster"],
-      DEFAULT_WIDGET_DISPLAY.fantasy.defaultSubTab,
-    ),
-    primaryLeagueKey:
-      typeof raw.primaryLeagueKey === "string" || raw.primaryLeagueKey === null
-        ? (raw.primaryLeagueKey as string | null)
-        : DEFAULT_WIDGET_DISPLAY.fantasy.primaryLeagueKey,
-    enabledLeagueKeys: Array.isArray(raw.enabledLeagueKeys)
-      ? (raw.enabledLeagueKeys as string[])
-      : DEFAULT_WIDGET_DISPLAY.fantasy.enabledLeagueKeys,
   };
 }
 
@@ -1089,8 +994,6 @@ export function loadPrefs(): AppPreferences {
       widgetDisplay: {
         finance: migrateFinanceDisplay(savedDisplay?.finance),
         rss: migrateRssDisplay(savedDisplay?.rss),
-        fantasy: migrateFantasyDisplay(savedDisplay?.fantasy),
-        predictions: migratePredictionsDisplay(savedDisplay?.predictions),
       },
       // Tolerate older builds that didn't have `tipsShown`. Treat
       // missing/invalid as "no tips shown yet" so the user gets a
@@ -1099,6 +1002,31 @@ export function loadPrefs(): AppPreferences {
         ? (source.tipsShown.filter((id) => typeof id === "string") as string[])
         : [],
     };
+
+    // SCROLLR-240 (Removal 2/3): a store saved before REMOVED_WIDGET_IDS
+    // were retired may still name them in enabledWidgets/widgetsOnTicker/
+    // sidebarOrder/pins. `mergeWidgetPrefs` already stripped every one of
+    // those out of `merged.widgets` above; this only decides whether THIS
+    // load is the one that found something to strip, so the one-time
+    // upgrade notice fires exactly once, the load after which nothing
+    // removed remains to detect.
+    const rawWidgetsForNotice = source.widgets as
+      | (Partial<WidgetPrefs> & { pins?: unknown })
+      | undefined;
+    const strippedRemovedWidget = hasRemovedWidget(
+      [
+        rawWidgetsForNotice?.enabledWidgets as string[] | undefined,
+        rawWidgetsForNotice?.widgetsOnTicker as string[] | undefined,
+        rawWidgetsForNotice?.sidebarOrder as string[] | undefined,
+      ],
+      Array.isArray(rawWidgetsForNotice?.pins)
+        ? (rawWidgetsForNotice.pins as Array<{ widget?: unknown }>)
+        : [],
+    );
+    if (strippedRemovedWidget && !merged.tipsShown.includes(REMOVED_WIDGETS_TIP_ID)) {
+      merged.tipsShown = [...merged.tipsShown, REMOVED_WIDGETS_TIP_ID];
+      pendingRemovalNotice = true;
+    }
 
     // Legacy split: users who had the combined clock/timer widget on the
     // ticker should get the timer too. This used to walk each ticker row's
@@ -1117,10 +1045,11 @@ export function loadPrefs(): AppPreferences {
       }
     }
 
-    // Persist the migrated shape so it runs once: v1 → v2, and the
-    // legacy unit keys folding into appearance.units (their store keys
-    // go away here; sysmon.tempUnit falls off on the next save).
-    if (isV1 || hadLegacyUnits) {
+    // Persist the migrated shape so it runs once: v1 → v2, the legacy unit
+    // keys folding into appearance.units (their store keys go away here;
+    // sysmon.tempUnit falls off on the next save), and the removed-widget
+    // strip recording that the upgrade notice has fired.
+    if (isV1 || hadLegacyUnits || strippedRemovedWidget) {
       setStore(PREFIX, merged);
       removeStore(LS_WEATHER_UNIT);
       removeStore(LS_CLOCK_FORMAT);

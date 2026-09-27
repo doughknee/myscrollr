@@ -1,8 +1,8 @@
 /**
- * Contained segmented control (ex-predictions ViewSwitcher) — the bar's
- * top-level view switch. Deliberately a different shape from the open
- * BarPills so the two control levels (which VIEW vs which FILTER within
- * a view) never read as one row of identical chips.
+ * Contained segmented control (ex-ViewSwitcher) — the bar's top-level
+ * view switch. Deliberately a different shape from the open BarPills so
+ * the two control levels (which VIEW vs which FILTER within a view)
+ * never read as one row of identical chips.
  */
 import { useId } from "react";
 import { clsx } from "clsx";

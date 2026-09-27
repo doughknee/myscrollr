@@ -6,7 +6,7 @@
  * Schedule filters upcoming pre-games by date.
  * Standings fetches league standings from the API.
  *
- * ONE Kalshi-style control bar (widget-bar primitives): Segmented
+ * ONE control bar (widget-bar primitives): Segmented
  * [Scores | Schedule | Standings] · freshness · favorite-team and
  * time-window SelectMenus — all via useSportsConfig.
  * No league management: per-league widgets have an intrinsic league,

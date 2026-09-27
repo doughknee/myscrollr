@@ -36,20 +36,12 @@ type IconProps = { size?: number; className?: string };
 // ── Categories ──────────────────────────────────────────────────
 // A cosmetic filter tag on a widget, independent of its source (§4.1).
 // The server sends the tag; these are the display labels for it.
-export type WidgetCategory =
-  | "sports"
-  | "finance"
-  | "news"
-  | "fantasy"
-  | "predictions"
-  | "utility";
+export type WidgetCategory = "sports" | "finance" | "news" | "utility";
 
 export const CATEGORY_LABELS: Record<WidgetCategory, string> = {
   sports: "Sports",
   finance: "Finance",
   news: "News",
-  fantasy: "Fantasy",
-  predictions: "Predictions",
   utility: "Utilities",
 };
 
@@ -138,9 +130,8 @@ export interface CatalogItem {
   hidden?: boolean;
   category: WidgetCategory;
   /**
-   * The source that owns the renderer + data
-   * (finance | sports | rss | fantasy | predictions), or undefined for a
-   * local-only utility widget.
+   * The source that owns the renderer + data (finance | sports | rss),
+   * or undefined for a local-only utility widget.
    *
    * Its presence IS the data/utility distinction — a data widget is created
    * via the widgets API and fed by CDC, a utility lives in preferences. A

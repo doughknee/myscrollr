@@ -1,6 +1,6 @@
 /**
  * Widget route — THE source page. Every widget renders here (REL-49):
- * data widgets (finance_stocks, sports_nfl, news_bbc, predictions, …)
+ * data widgets (finance_stocks, sports_nfl, news_bbc, …)
  * and local utilities (clock, weather, sysmon, uptime, github, timer).
  * The one route for every widget — /channel/$type was retired with the
  * rest of the "widget" vocabulary.

@@ -43,7 +43,6 @@ export function installTickerAudit() {
         if (tag === "spo") return "sports";
         if (tag === "fin") return "finance";
         if (tag === "rss") return "news";
-        if (tag === "pred") return "predictions";
         if (tag === "uptime" || tag === "github") return "utility-capped";
         return tag;
       }

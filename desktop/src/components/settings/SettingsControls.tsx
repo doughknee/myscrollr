@@ -9,10 +9,9 @@
  * longer lights up when you are only reaching for the toggle.
  *
  * NOTE ON BLAST RADIUS: this file is not settings-only. `Section`,
- * `DisplayRow` and `ActionRow` are also imported by three fantasy
- * widget screens (LeaguePicker, ConnectedView, ImportProgress), so the
- * restyle lands there too. That is deliberate — one kit, one look — but
- * it means changes here need a look at the fantasy screens as well.
+ * `DisplayRow` and `ActionRow` were also imported by other widget config
+ * screens historically — check for other callers before a restyle lands
+ * here, since one kit, one look was the whole point.
  */
 import { useId } from "react";
 import { clsx } from "clsx";
@@ -89,44 +88,6 @@ export function SettingsGroup({
         {children}
       </div>
     </section>
-  );
-}
-
-// ── Section (legacy) ────────────────────────────────────────────
-// Kept for the fantasy widget screens, which render a titled card. The
-// settings surface itself uses SettingsGroup.
-
-interface SectionProps {
-  title: string;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-  variant?: "open" | "card";
-}
-
-export function Section({ title, children, action, variant = "open" }: SectionProps) {
-  if (variant === "card") {
-    return (
-      <section className={clsx(CARD_SURFACE, "overflow-hidden")}>
-        <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
-          <h3 className="text-ui-section font-mono text-fg-4">{title}</h3>
-          {action && <div className="shrink-0">{action}</div>}
-        </div>
-        <div className="pb-1">{children}</div>
-      </section>
-    );
-  }
-
-  return (
-    <div className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0">
-      {/* px-4, matching the row box — rows moved from px-3 to px-4 with
-          the redesign, and a px-3 title left them visibly indented from
-          their own heading on the fantasy screens that use this variant. */}
-      <div className="flex items-center justify-between mb-3 px-4">
-        <h3 className="text-ui-section font-mono">{title}</h3>
-        {action && <div className="shrink-0">{action}</div>}
-      </div>
-      <div className="space-y-0.5">{children}</div>
-    </div>
   );
 }
 

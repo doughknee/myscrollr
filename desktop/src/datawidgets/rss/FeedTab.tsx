@@ -5,7 +5,7 @@
  * limiting, category badges, and real-time updates via the desktop
  * CDC/SSE pipeline.
  *
- * ONE Kalshi-style control bar (widget-bar primitives): Articles/Feeds
+ * ONE control bar (widget-bar primitives): Articles/Feeds
  * segmented switch (rss_custom only — curated widgets have an intrinsic
  * feed) · sort SelectMenu · source/category MultiSelectMenus with counts
  * · freshness · article-window SelectMenu (written as the per-widget

@@ -19,8 +19,6 @@ export const CATEGORY_ORDER: WidgetCategory[] = [
   "sports",
   "finance",
   "news",
-  "fantasy",
-  "predictions",
   "utility",
 ];
 

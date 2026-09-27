@@ -15,7 +15,6 @@ import type {
   Game,
   RssItem,
   WidgetTickerData,
-  Prediction,
   UptimeChipData,
   GitHubChipData,
   ClockChipData,
@@ -30,7 +29,6 @@ import type {
   WidgetPin,
   WidgetDisplayPrefs,
 } from "../preferences";
-import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
 import { GitHubCappedChip, UptimeCappedChip } from "./chips/CappedChip";
 import {
   ClockChip,
@@ -38,10 +36,6 @@ import {
   TimerChip,
   WeatherChip,
 } from "./chips/UtilityChips";
-import {
-  getWatchlist,
-  onWatchlistChange,
-} from "../datawidgets/predictions/watchlist";
 import { catalogItemById, sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
@@ -326,19 +320,6 @@ export default function ScrollrTicker({
   const effectiveSpeed: number = speed;
   const effectiveMixMode: MixMode = mixMode;
 
-  // Predictions watchlist (starred tickers). The pref store's cache is
-  // per-webview: stars are toggled in the MAIN window, and this ticker
-  // window only learns about them through the cross-window store
-  // subscription — without it, stars wouldn't reach the ticker until
-  // the next launch.
-  const [predictionsWatchlist, setPredictionsWatchlist] = useState<Set<string>>(
-    () => new Set(getWatchlist()),
-  );
-  useEffect(
-    () => onWatchlistChange((list) => setPredictionsWatchlist(new Set(list))),
-    [],
-  );
-
   // Build chip arrays per widget, then combine based on mixMode.
   // The chip builder resolves each tab through sourceForWidget(); without
   // subscribing, a server-added widget renders with no source and is skipped.
@@ -452,7 +433,6 @@ export default function ScrollrTicker({
         comfort,
         chipColorMode,
         widgetDisplay,
-        predictionsWatchlist,
         cycles,
         rotationMemo: rotationMemoRef.current,
         pinnedSubjects,
@@ -484,7 +464,6 @@ export default function ScrollrTicker({
     effectiveMixMode,
     chipColorMode,
     widgetDisplay,
-    predictionsWatchlist,
     catalogVersion,
     cycles,
   ]);
@@ -671,7 +650,6 @@ export default function ScrollrTicker({
       comfort,
       chipColorMode,
       widgetDisplay,
-      predictionsWatchlist,
       pinnedSubject: pin.subject,
       onChipClick,
     });

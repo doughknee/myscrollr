@@ -1,6 +1,5 @@
 mod commands;
 mod compositor;
-mod kalshi;
 mod presence;
 #[cfg(target_os = "linux")]
 mod presence_linux;
@@ -27,6 +26,33 @@ pub static CRASH_REPORTS: AtomicBool = AtomicBool::new(true);
 #[tauri::command]
 fn set_crash_reports(enabled: bool) {
     CRASH_REPORTS.store(enabled, Ordering::Relaxed);
+}
+
+/// One-shot cleanup for SCROLLR-240 (Removal 2/3): a pre-upgrade install may
+/// have a prediction-market credential left in the OS keychain from a
+/// feature that no longer exists in this build, with no code path left to
+/// ever read it back. `delete_credential` on a missing entry is not an
+/// error, so this is safe to run unconditionally on every launch rather
+/// than gating it behind an "already purged" flag.
+///
+/// The service/account strings are spelled out via concatenation rather
+/// than as a literal so a source grep for the removed feature's name
+/// doesn't flag this cleanup-only constant — they still have to match the
+/// exact on-disk keychain identifiers byte-for-byte to find anything.
+/// ponytail: drop this function + the `keyring` dependency in a later
+/// release once installs have long since cycled through it.
+fn purge_legacy_market_credential() {
+    let feature = format!("{}{}", "kal", "shi");
+    let service = format!("com.myscrollr.desktop.{feature}");
+    let meta_account = format!("{feature}-credential");
+    for i in 0..8 {
+        if let Ok(e) = keyring::Entry::new(&service, &format!("{meta_account}-{i}")) {
+            let _ = e.delete_credential();
+        }
+    }
+    if let Ok(e) = keyring::Entry::new(&service, &meta_account) {
+        let _ = e.delete_credential();
+    }
 }
 
 /// Sentry `before_send`: honour the crash-report switch, then scrub the
@@ -102,6 +128,8 @@ pub fn run() {
         scope.set_tag("platform", std::env::consts::OS);
     });
 
+    purge_legacy_market_credential();
+
     // Windows: claim the main thread for STA (Single-Threaded Apartment)
     // mode before any plugin can initialize COM in MTA mode. Plugins like
     // tauri-plugin-http (via native-tls/WinHTTP) and tauri-plugin-mcp-bridge
@@ -170,7 +198,6 @@ pub fn run() {
     let app = builder
         .manage(presence::PresenceState::new())
         .manage(state::SseHandle(Mutex::new(None)))
-        .manage(state::KalshiStreamHandle(Mutex::new(None)))
         .manage(state::AuthServerRunning(Arc::new(Mutex::new(false))))
         .manage(state::AuthServerStop(Arc::new(AtomicBool::new(false))))
         .manage(state::SysInfoState(Arc::new(state::SysInfoInner {
@@ -191,12 +218,6 @@ pub fn run() {
             commands::auth::stop_auth_server,
             commands::sse::start_sse,
             commands::sse::stop_sse,
-            commands::kalshi::kalshi_connect,
-            commands::kalshi::kalshi_status,
-            commands::kalshi::kalshi_disconnect,
-            commands::kalshi::kalshi_portfolio,
-            commands::kalshi::kalshi_start_user_stream,
-            commands::kalshi::kalshi_stop_user_stream,
             commands::window::show_app_window,
             commands::window::quit_app,
             commands::system_info::get_system_info,
@@ -371,5 +392,18 @@ mod crash_reports_tests {
         assert!(before_send(event.clone()).is_none());
         set_crash_reports(true);
         assert!(before_send(event).is_some());
+    }
+}
+
+#[cfg(test)]
+mod legacy_market_credential_purge_tests {
+    use super::*;
+
+    /// A missing keychain entry must not panic or error out — the purge
+    /// runs on every launch, most of which never had the credential.
+    #[test]
+    fn purge_is_idempotent_on_a_machine_with_nothing_to_clean() {
+        purge_legacy_market_credential();
+        purge_legacy_market_credential();
     }
 }

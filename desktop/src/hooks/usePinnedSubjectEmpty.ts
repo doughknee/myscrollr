@@ -41,7 +41,6 @@ export function usePinnedSubjectEmpty(widget: string, subject: string): boolean 
       dashboard,
       comfort: false,
       chipColorMode: "theme",
-      predictionsWatchlist: new Set<string>(),
       pinnedSubject: subject,
     }) === null
   );

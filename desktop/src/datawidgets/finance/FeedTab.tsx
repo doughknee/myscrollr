@@ -5,7 +5,7 @@
  * via the desktop CDC/SSE pipeline. Supports compact and comfort
  * display modes.
  *
- * ONE Kalshi-style control bar (widget-bar primitives): All/Watchlist
+ * ONE control bar (widget-bar primitives): All/Watchlist
  * · sort/category menus · symbol search · freshness.
  * Search is the symbol manager: catalog matches surface inline with
  * Add/Remove actions (the separate Symbols view is gone). Controls remain

@@ -148,10 +148,10 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   const [widgetSelection, setWidgetSelection] = useState("");
 
   // Driven by the catalog rather than a hardcoded list. The old options were
-  // the four coarse sources (Finance/Sports/RSS/Fantasy) under a label that
-  // already asked "Which widget?" — so a user reporting a broken NFL feed had
-  // to pick "Sports". The catalog is the authority on what a widget is, and
-  // this stays correct as widgets are added server-side.
+  // the coarse sources (Finance/Sports/RSS) under a label that already asked
+  // "Which widget?" — so a user reporting a broken NFL feed had to pick
+  // "Sports". The catalog is the authority on what a widget is, and this
+  // stays correct as widgets are added server-side.
   // Keyed on the catalog version: with `[]` this pinned the option list to
   // whatever the bundled snapshot held at mount, so a widget added
   // server-side never became reportable.

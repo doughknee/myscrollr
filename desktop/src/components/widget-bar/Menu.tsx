@@ -1,6 +1,6 @@
 /**
  * Popover-menu primitives for widget bars — one look + one entrance for
- * every bar menu (extracted from the predictions FeedTab, v1.1.6).
+ * every bar menu (extracted from a widget FeedTab, v1.1.6).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";

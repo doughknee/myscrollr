@@ -49,10 +49,6 @@ import { useTheme } from "./hooks/useTheme";
 import { useCatalog } from "./hooks/useCatalog";
 
 
-// ── Constants ────────────────────────────────────────────────────
-
-import { DEMO } from "./config";
-
 /** Ticker window height in px: per-mode row height × scale. */
 function tickerHeight(p: AppPreferences): number {
   return Math.round(
@@ -119,16 +115,12 @@ export default function App() {
 
   const widgetTabs = useMemo(() => {
     if (widgets.length === 0) {
-      // Demo mode (VITE_DEMO) talks to the local bridge, which serves only the
-      // predictions slice and may not surface widgets[] on the ticker window
-      // in time — show predictions rather than the finance/sports teaser the
-      // bridge can't fill.
-      if (DEMO) return ["predictions"];
-      // Signed-out users get the finance + sports demo tabs so the
-      // public-feed teaser renders on the ticker. Signed-in users with
-      // zero widgets deliberately get an empty tab list so the ticker
-      // renders its inline "no sources yet" CTA instead of pretending
-      // to have data the user never opted into.
+      // Signed-out users (including demo mode, VITE_DEMO, which runs
+      // signed-out against a no-auth local bridge) get the finance + sports
+      // demo tabs so the public-feed teaser renders on the ticker.
+      // Signed-in users with zero widgets deliberately get an empty tab
+      // list so the ticker renders its inline "no sources yet" CTA instead
+      // of pretending to have data the user never opted into.
       return authenticated
         ? []
         : loadPref("activeFeedTabs", ["finance", "sports"]);
@@ -218,14 +210,7 @@ export default function App() {
             category,
           ): category is import("./api/client").ProductActivityCategory =>
             typeof category === "string" &&
-            [
-              "sports",
-              "markets",
-              "news",
-              "fantasy",
-              "predictions",
-              "utilities",
-            ].includes(category),
+            ["sports", "markets", "news", "utilities"].includes(category),
         ),
     [measuredWidgetIds, resolveMeasuredCategory],
   );

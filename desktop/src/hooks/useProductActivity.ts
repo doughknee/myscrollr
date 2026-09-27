@@ -42,8 +42,6 @@ const categoryMap: Record<string, ProductActivityCategory | undefined> = {
   markets: "markets",
   rss: "news",
   news: "news",
-  fantasy: "fantasy",
-  predictions: "predictions",
   utility: "utilities",
   utilities: "utilities",
 };

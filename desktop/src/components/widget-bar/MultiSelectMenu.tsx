@@ -1,8 +1,8 @@
 /**
- * Multi-select filter popover (ex-predictions CategoryMenu) — empty
- * selection means "all". Toggling keeps the menu open so several options
- * combine in one visit; outside-click or Esc dismisses. Replaces native
- * <select>s, whose OS-drawn popup is unstylable and unanimatable.
+ * Multi-select filter popover (ex-CategoryMenu) — empty selection means
+ * "all". Toggling keeps the menu open so several options combine in one
+ * visit; outside-click or Esc dismisses. Replaces native <select>s, whose
+ * OS-drawn popup is unstylable and unanimatable.
  */
 import { MenuPopover, MenuRow } from "./Menu";
 

@@ -23,7 +23,7 @@ import type { SubscriptionTier } from "./auth";
 //
 // WIDGET/SLOT REDESIGN (2026-06-30): `maxWidgets` is the ONLY monetization
 // lever — how many widgets a tier runs at once. The per-feature depth caps
-// (symbols/feeds/custom_feeds/leagues/fantasy) were RETIRED on 2026-07-02:
+// were RETIRED on 2026-07-02:
 // every tier has unlimited depth inside a widget ("track a hundred stocks in
 // one Stocks widget"), and the desktop mirror stopped carrying them entirely
 // (REL-60) — the backend still sends the keys as `null`, which the drift test

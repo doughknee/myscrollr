@@ -18,7 +18,6 @@ function ctx(over: Partial<TickerContext> = {}): TickerContext {
     comfort: false,
     chipColorMode: "theme",
     widgetDisplay: DEFAULT_WIDGET_DISPLAY,
-    predictionsWatchlist: new Set<string>(),
     ...over,
   } as TickerContext;
 }
@@ -26,7 +25,7 @@ function ctx(over: Partial<TickerContext> = {}): TickerContext {
 describe("ticker source registry", () => {
   it("covers every data source the catalog ships", () => {
     expect(Object.keys(TICKER_SOURCES).sort()).toEqual(
-      ["fantasy", "finance", "predictions", "rss", "sports"].sort(),
+      ["finance", "rss", "sports"].sort(),
     );
   });
 
@@ -64,16 +63,5 @@ describe("finance chips", () => {
       ctx({ widgetDisplay: undefined }),
     );
     expect(chips).toHaveLength(2);
-  });
-});
-
-describe("fantasy chips", () => {
-  it("handles the structured payload shape, not an array", () => {
-    const source = TICKER_SOURCES["fantasy"]!;
-    const c = ctx({ tab: "fantasy_yahoo", source: "fantasy" });
-    // No leagues → nothing, and notably no crash on the object payload that
-    // every other source would reject as non-array.
-    expect(source.chips({ leagues: [] }, c)).toEqual([]);
-    expect(source.chips(undefined, c)).toEqual([]);
   });
 });

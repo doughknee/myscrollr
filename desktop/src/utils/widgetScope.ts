@@ -9,7 +9,7 @@ import type { Game, Trade, RssItem } from "../types";
  * `config`. Shared by the ticker (ScrollrTicker) and the Home feed so both
  * surfaces scope identically. A nullish config (a legacy coarse widget row)
  * returns the payload unscoped. Sources without a per-widget dimension
- * (fantasy, predictions — single widgets) fall through and return everything.
+ * fall through and return everything.
  */
 export function scopeSourceData(
   source: string,
