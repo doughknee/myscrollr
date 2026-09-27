@@ -40,9 +40,8 @@ const gdprConfirmPhrase = "DELETE MY ACCOUNT"
 
 // HandleExportUserData serves a JSON archive of everything we store about
 // the authenticated user. Returned as an attachment so browsers download
-// rather than display it inline. Security-sensitive fields (Yahoo OAuth
-// refresh tokens, Stripe IDs that are server-internal) are intentionally
-// omitted.
+// rather than display it inline. Security-sensitive fields (Stripe IDs
+// that are server-internal) are intentionally omitted.
 func HandleExportUserData(c *fiber.Ctx) error {
 	userID := platform.GetUserID(c)
 	if userID == "" {
@@ -60,7 +59,6 @@ func HandleExportUserData(c *fiber.Ctx) error {
 			"email":     c.Locals("user_email"),
 			"roles":     platform.GetUserRoles(c),
 		},
-		"notes": "Yahoo OAuth tokens are omitted from this export for security.",
 	}
 
 	// preferences
@@ -117,32 +115,6 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		log.Printf("[Export] subscription for %s: %v", userID, err)
 	}
 	archive["subscription"] = subscription
-
-	// fantasy leagues (key + name + season; no tokens)
-	fantasyRows, err := platform.DBPool.Query(ctx, `
-		SELECT yul.league_key, COALESCE(yl.name, '') AS name, COALESCE(yl.season, '') AS season
-		FROM yahoo_user_leagues yul
-		LEFT JOIN yahoo_users yu ON yu.guid = yul.guid
-		LEFT JOIN yahoo_leagues yl ON yl.league_key = yul.league_key
-		WHERE yu.logto_sub = $1
-	`, userID)
-	leagues := make([]map[string]any, 0)
-	if err == nil {
-		defer fantasyRows.Close()
-		for fantasyRows.Next() {
-			var key, name, season string
-			if err := fantasyRows.Scan(&key, &name, &season); err == nil {
-				leagues = append(leagues, map[string]any{
-					"league_key": key,
-					"name":       name,
-					"season":     season,
-				})
-			}
-		}
-	} else {
-		log.Printf("[Export] fantasy leagues for %s: %v", userID, err)
-	}
-	archive["fantasy_leagues"] = leagues
 
 	// deletion status, if any
 	if status, _ := getUserDeletionStatus(ctx, userID); status != nil {
@@ -576,21 +548,6 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		`DELETE FROM user_widgets WHERE logto_sub = $1`, logtoSub,
 	); err != nil {
 		return fmt.Errorf("delete user_widgets: %w", err)
-	}
-
-	// Fantasy junction + OAuth tokens. Junction row is keyed on guid,
-	// which maps via yahoo_users.logto_sub. Delete junction rows first
-	// then the yahoo_users row.
-	if _, err := tx.Exec(ctx, `
-		DELETE FROM yahoo_user_leagues
-		 WHERE guid IN (SELECT guid FROM yahoo_users WHERE logto_sub = $1)
-	`, logtoSub); err != nil {
-		return fmt.Errorf("delete yahoo_user_leagues: %w", err)
-	}
-	if _, err := tx.Exec(ctx,
-		`DELETE FROM yahoo_users WHERE logto_sub = $1`, logtoSub,
-	); err != nil {
-		return fmt.Errorf("delete yahoo_users: %w", err)
 	}
 
 	// Stripe customers: anonymize if lifetime, delete otherwise.
