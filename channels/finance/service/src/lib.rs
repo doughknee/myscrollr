@@ -22,7 +22,11 @@ pub mod log;
 pub mod database;
 pub mod init;
 
-pub async fn start_finance_services(pool: Arc<PgPool>, health_state: Arc<Mutex<FinanceHealth>>) {
+pub async fn start_finance_services(
+    pool: Arc<PgPool>,
+    health_state: Arc<Mutex<FinanceHealth>>,
+    readiness: Arc<init::ReadinessGate>,
+) {
     info!("Starting finance service...");
 
     // Seed from JSON if database is empty, or update name/category for existing symbols
@@ -55,6 +59,10 @@ pub async fn start_finance_services(pool: Arc<PgPool>, health_state: Arc<Mutex<F
         std::env::var("TWELVEDATA_API_KEY").ok().as_deref(),
     ) {
         info!("TWELVEDATA_API_KEY not set; not polling. Existing database rows are still served.");
+        // Tell the readiness gate this is by design (SCROLLR-7) so
+        // /health/ready reports 200/idle instead of 503 forever — no poll
+        // is ever coming in this path.
+        readiness.mark_polling_disabled().await;
         return;
     }
 

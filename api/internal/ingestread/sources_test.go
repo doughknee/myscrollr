@@ -51,7 +51,7 @@ func TestProbeIngestion_ForwardsStatusCode(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			got, err := probeIngestion(context.Background(), srv.URL)
+			got, _, err := probeIngestion(context.Background(), srv.URL)
 			if err != nil {
 				t.Fatalf("probeIngestion: unexpected error: %v", err)
 			}
@@ -72,7 +72,7 @@ func TestProbeIngestion_NetworkErrorReturnsError(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 
-	_, err := probeIngestion(context.Background(), url)
+	_, _, err := probeIngestion(context.Background(), url)
 	if err == nil {
 		t.Fatalf("probeIngestion: expected network error, got nil")
 	}
@@ -82,12 +82,62 @@ func TestProbeIngestion_NetworkErrorReturnsError(t *testing.T) {
 // configured" case doesn't error — returns (0, nil) so the caller can
 // skip the ingestion branch entirely.
 func TestProbeIngestion_EmptyURLIsNoOp(t *testing.T) {
-	code, err := probeIngestion(context.Background(), "")
+	code, pollingDisabled, err := probeIngestion(context.Background(), "")
 	if err != nil {
 		t.Fatalf("probeIngestion(''): unexpected error: %v", err)
 	}
 	if code != 0 {
 		t.Errorf("probeIngestion(''): got %d, want 0", code)
+	}
+	if pollingDisabled {
+		t.Errorf("probeIngestion(''): pollingDisabled = true, want false")
+	}
+}
+
+// TestProbeIngestion_ReadsPollingDisabledField verifies probeIngestion
+// surfaces the ReadinessGate's `polling_disabled` field from the response
+// body (SCROLLR-7) so callers can tell "intentionally not polling" apart
+// from a real outage.
+func TestProbeIngestion_ReadsPollingDisabledField(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"state":"ready","last_poll":null,"polling_disabled":true}`))
+	}))
+	defer srv.Close()
+
+	code, pollingDisabled, err := probeIngestion(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("probeIngestion: unexpected error: %v", err)
+	}
+	if code != http.StatusOK {
+		t.Errorf("probeIngestion: got status %d, want 200", code)
+	}
+	if !pollingDisabled {
+		t.Errorf("probeIngestion: pollingDisabled = false, want true")
+	}
+}
+
+// TestFinanceHealth_PollingDisabledIsIdleAndHealthy pins the SCROLLR-7 fix
+// end to end: a keyless-dev finance ingester reports 200 with
+// polling_disabled=true, and financeHealth must surface that as "idle" with
+// healthy=true — not "down". healthy=true is what keeps server.go's
+// /health aggregator (`res.Status = "degraded"` only fires when a source's
+// Healthy is false) from marking the whole response degraded.
+func TestFinanceHealth_PollingDisabledIsIdleAndHealthy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"state":"ready","last_poll":null,"polling_disabled":true}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("INTERNAL_FINANCE_URL", srv.URL)
+
+	status, healthy := financeHealth(context.Background())
+	if status != "idle" {
+		t.Errorf("financeHealth: status = %q, want %q", status, "idle")
+	}
+	if !healthy {
+		t.Errorf("financeHealth: healthy = false, want true (idle must not degrade /health)")
 	}
 }
 

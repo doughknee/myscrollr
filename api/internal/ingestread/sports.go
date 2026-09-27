@@ -560,9 +560,14 @@ func sportsHealth(ctx context.Context) (string, bool) {
 	if internalURL == "" {
 		return "healthy", true
 	}
-	code, err := probeIngestion(ctx, internalURL)
+	code, pollingDisabled, err := probeIngestion(ctx, internalURL)
 	if err != nil || code != http.StatusOK {
 		return "down", false
+	}
+	if pollingDisabled {
+		// Keyless local dev (SCROLLR-7): the ingester is intentionally not
+		// polling and says so. Healthy, not degraded — just not moving.
+		return "idle", true
 	}
 	return "healthy", true
 }
