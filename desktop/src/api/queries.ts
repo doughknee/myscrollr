@@ -11,8 +11,6 @@ import { pinnedSubjectsQuery } from "./pinnedSubjects";
 import { DEMO } from "../config";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game, Trade } from "../types";
-import { stampGameStates } from "../datawidgets/fantasy/gameState";
-import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
 
 // ── Query Keys ───────────────────────────────────────────────────
 
@@ -24,11 +22,6 @@ export const queryKeys = {
     finance: ["catalogs", "finance"] as const,
     rss: ["catalogs", "rss"] as const,
     rssAll: ["catalogs", "rss", "all"] as const,
-    predictions: ["catalogs", "predictions"] as const,
-  },
-  fantasy: {
-    status: ["fantasy", "status"] as const,
-    leagues: ["fantasy", "leagues"] as const,
   },
   standings: (league: string) => ["standings", league] as const,
   userOverview: ["userOverview"] as const,
@@ -38,8 +31,8 @@ export const queryKeys = {
 
 /**
  * Aggregated account view: identity + tier + subscription summary +
- * widget counts + fantasy summary + GDPR state. Backed by the core
- * API's singleflight cache (~30s).
+ * widget counts + GDPR state. Backed by the core API's singleflight
+ * cache (~30s).
  */
 export function userOverviewQueryOptions() {
   return queryOptions<UserOverview>({
@@ -56,8 +49,8 @@ export function userOverviewQueryOptions() {
 
 async function fetchDashboard(): Promise<DashboardResponse> {
   // Demo mode: talk to the no-auth bridge directly (it serves /dashboard with
-  // widgets[] and ignores Authorization), so the live Kalshi demo works
-  // signed-out with zero infra. See channels/predictions/LOCAL_DEV.md.
+  // widgets[] and ignores Authorization), so the demo works signed-out with
+  // zero infra.
   if (DEMO) {
     const demo = await request<{
       data: DashboardResponse["data"];
@@ -97,51 +90,11 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   return { data: data.data } as DashboardResponse;
 }
 
-/**
- * Join fantasy rosters against real game clocks.
- *
- * Runs at the dashboard boundary rather than in a view because BOTH
- * windows read the dashboard through this query — enriching here means
- * the app views and the ticker chips get the same data without either
- * knowing the join exists.
- *
- * Deliberately best-effort. The extra request only fires when there are
- * fantasy rosters to enrich, and any failure leaves `game_state` unset,
- * which every consumer already renders as "—". A dashboard that loads
- * without clocks beats a dashboard that doesn't load.
- */
-async function withFantasyGameState(
-  dash: DashboardResponse,
-): Promise<DashboardResponse> {
-  const fantasy = dash.data?.fantasy as { leagues?: unknown } | undefined;
-  const leagues = Array.isArray(fantasy?.leagues)
-    ? (fantasy.leagues as FantasyLeague[])
-    : null;
-  if (!leagues?.length) return dash;
-  if (!leagues.some((l) => l.rosters?.length)) return dash;
-
-  try {
-    // Ungated and server-cached — see the note in gameState.ts for why
-    // dashboard.data.sports is the wrong source.
-    const sports = await request<{ sports?: Game[] }>("/sports/public");
-    const games = sports.sports ?? [];
-    if (games.length === 0) return dash;
-    const stamped = stampGameStates(leagues, games);
-    if (stamped === leagues) return dash;
-    return {
-      ...dash,
-      data: { ...dash.data, fantasy: { ...(fantasy ?? {}), leagues: stamped } },
-    };
-  } catch {
-    return dash;
-  }
-}
-
 /** Query options for the dashboard — usable in route loaders and components. */
 export function dashboardQueryOptions() {
   return queryOptions({
     queryKey: queryKeys.dashboard,
-    queryFn: async () => withFantasyGameState(await fetchDashboard()),
+    queryFn: fetchDashboard,
     staleTime: 10_000,
   });
 }
@@ -169,18 +122,6 @@ export interface TrackedSymbol {
   symbol: string;
   name: string;
   category: string;
-}
-
-/**
- * Catalog entry for the Predictions widget — one row per trackable
- * Kalshi market, surfaced by `GET /predictions/catalog`. Drives the
- * the predictions Configure page's category chips + counts.
- */
-export interface PredictionCatalogEntry {
-  ticker: string;
-  title: string;
-  category: string;
-  series_ticker?: string;
 }
 
 export interface Standing {
@@ -276,35 +217,6 @@ export function financeMarketOptions() {
   });
 }
 
-export function predictionsCatalogOptions() {
-  return queryOptions({
-    queryKey: queryKeys.catalogs.predictions,
-    queryFn: () => request<PredictionCatalogEntry[]>("/predictions/catalog"),
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-// ── Prediction price history (v1.1.4 detail-modal chart) ────────
-
-/** One hourly candle from the Kalshi proxy. Prices are decimal-dollar
- *  strings ("0.0450" == 4.5% implied); `price` is absent for hours
- *  with no trades. */
-export interface PredictionCandle {
-  end_period_ts: number;
-  price?: {
-    open_dollars?: string;
-    close_dollars?: string;
-    high_dollars?: string;
-    low_dollars?: string;
-    mean_dollars?: string;
-    previous_dollars?: string;
-  };
-}
-
-export interface PredictionCandlesticksResponse {
-  candlesticks?: PredictionCandle[];
-}
-
 export function rssCatalogOptions(opts?: { includeFailing?: boolean }) {
   const includeFailing = opts?.includeFailing ?? false;
   return queryOptions({
@@ -314,35 +226,6 @@ export function rssCatalogOptions(opts?: { includeFailing?: boolean }) {
     queryFn: () =>
       rssApi.getCatalog(includeFailing ? { includeFailing: true } : undefined),
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-// ── Fantasy Queries ─────────────────────────────────────────────
-
-interface YahooStatusResponse {
-  connected: boolean;
-  synced: boolean;
-}
-
-// MyLeaguesResponse imported from canonical source to avoid duplicate types.
-import type { MyLeaguesResponse } from "../datawidgets/fantasy/types";
-export type { MyLeaguesResponse } from "../datawidgets/fantasy/types";
-
-export function fantasyStatusOptions() {
-  return queryOptions({
-    queryKey: queryKeys.fantasy.status,
-    queryFn: () => authFetch<YahooStatusResponse>("/users/me/yahoo-status"),
-    staleTime: 30_000,
-    retry: false,
-  });
-}
-
-export function fantasyLeaguesOptions() {
-  return queryOptions({
-    queryKey: queryKeys.fantasy.leagues,
-    queryFn: () => authFetch<MyLeaguesResponse>("/users/me/yahoo-leagues"),
-    staleTime: 30_000,
-    retry: false,
   });
 }
 

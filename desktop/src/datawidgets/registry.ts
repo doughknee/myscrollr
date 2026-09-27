@@ -12,7 +12,7 @@ const modules = import.meta.glob<Record<string, DataWidgetManifest>>("./*/FeedTa
 });
 
 /** Canonical display order. Anything not listed sorts by id after these. */
-const ORDER = ["finance", "sports", "fantasy", "rss", "predictions"];
+const ORDER = ["finance", "sports", "rss"];
 
 const registry = new Map<string, DataWidgetManifest>();
 for (const mod of Object.values(modules)) {

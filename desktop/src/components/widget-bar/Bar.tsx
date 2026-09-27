@@ -1,7 +1,6 @@
 /**
- * Widget-bar shell primitives — extracted from the predictions/Kalshi
- * FeedTab (v1.1.6), where the anatomy was designed and verified
- * (docs/kalshi-ui-review-notes.md is binding for the details).
+ * Widget-bar shell primitives — extracted from a widget FeedTab (v1.1.6)
+ * where the anatomy was originally designed and verified.
  *
  * Host contract:
  * - The FeedTab root must be `flex min-h-full flex-col` with NO inner

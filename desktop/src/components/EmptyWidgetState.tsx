@@ -1,8 +1,8 @@
 /**
  * EmptyWidgetState — shared empty-state placeholder for widget FeedTabs.
  *
- * Replaces the repeated empty-state pattern in finance, sports, rss, and
- * fantasy feeds.
+ * Replaces the repeated empty-state pattern in finance, sports, and rss
+ * feeds.
  *
  * Since the configure-page teardown, every widget's settings live in
  * its bar; the CTA (when a widget passes one) opens the relevant

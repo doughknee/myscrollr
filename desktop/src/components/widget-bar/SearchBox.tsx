@@ -1,8 +1,7 @@
 /**
- * Bar search field (ex-predictions) — compact by default, expands on
- * focus. Two-stage Escape lives HERE: first Escape clears the query,
- * second blurs. Hosts pass extra key handling (roving ↑/↓ + Enter)
- * through `onKeyDown`.
+ * Bar search field — compact by default, expands on focus. Two-stage
+ * Escape lives HERE: first Escape clears the query, second blurs. Hosts
+ * pass extra key handling (roving ↑/↓ + Enter) through `onKeyDown`.
  */
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";

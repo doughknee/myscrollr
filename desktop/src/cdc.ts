@@ -7,7 +7,7 @@
  *
  * Adding a new CDC-backed widget = add one entry to CDC_TABLES.
  */
-import type { Trade, Game, RssItem, Prediction } from "./types";
+import type { Trade, Game, RssItem } from "./types";
 import type { SubscriptionTier } from "./auth";
 
 // ── CDC Table Config ─────────────────────────────────────────────
@@ -66,20 +66,6 @@ export const CDC_TABLES: CDCTableConfig[] = [
     validate: (r) =>
       typeof r.feed_url === "string" && typeof r.guid === "string",
     maxItems: 50,
-  },
-  {
-    table: "markets",
-    dataKey: "predictions",
-    keyOf: (item) => (item as Prediction).id,
-    // Stable, tick-independent cache order — display ordering is owned by the
-    // FeedTab / ticker pipeline. Sorting by updated_at here would yank the
-    // just-ticked market to the front on every SSE event and churn the feed.
-    sort: (a, b) => (a as Prediction).id.localeCompare((b as Prediction).id),
-    validate: (r) => r.id != null,
-    // Payload-sized (v1.1.5): ~240 live + resolved-today riders. The old 60
-    // was far below the poll payload, so every legit CDC insert evicted
-    // from the head and churned until the safety-net refetch restored it.
-    maxItems: 300,
   },
 ];
 

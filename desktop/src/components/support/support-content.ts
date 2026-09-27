@@ -31,12 +31,12 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Do I need an account?",
     answer:
-      "You can browse widgets and explore the app without signing in. An account is needed to add widgets (Finance, Sports, News, Fantasy) and to sync your setup.",
+      "You can browse widgets and explore the app without signing in. An account is needed to add widgets (Finance, Sports, News) and to sync your setup.",
   },
   {
     question: "What data does Scrollr show?",
     answer:
-      "Widgets showing live stock and crypto prices (Finance), scores across 14 leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
+      "Widgets showing live stock and crypto prices (Finance), scores across 14 leagues (Sports), and articles from RSS feeds (News). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
   },
   {
     question: "Can I customize the feed?",
@@ -131,18 +131,6 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     ],
   },
   {
-    title: "Yahoo Fantasy connect fails",
-    symptoms: [
-      "Clicking \"Connect Yahoo\" opens browser but nothing happens",
-      "Returns an error after authorizing",
-    ],
-    steps: [
-      "Yahoo's OAuth can be intermittent. Wait 30 seconds and try again.",
-      "Make sure you're authorizing the correct Yahoo account.",
-      "If you see \"invalid redirect URI\", this is a known Yahoo issue — retry usually works.",
-    ],
-  },
-  {
     title: "Sports scores appear stale",
     symptoms: [
       "Scores don't match live TV",
@@ -222,13 +210,13 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Add Widgets",
     iconName: "LayoutGrid",
     description:
-      "Click \"+ Add widget\" in the sidebar (or open the Catalog) to browse available widgets. Add Finance for stock prices, Sports for live scores, News for RSS feeds, or Fantasy for Yahoo leagues.",
+      "Click \"+ Add widget\" in the sidebar (or open the Catalog) to browse available widgets. Add Finance for stock prices, Sports for live scores, or News for RSS feeds.",
   },
   {
     title: "Configure Your Widgets",
     iconName: "Settings",
     description:
-      "Every setting lives in the widget's own top bar. Open a widget and use the controls there — type in Finance's search box to add stock symbols, pick a favorite team in Sports, choose feeds and categories in News, or connect your Yahoo account from Fantasy's Account pill.",
+      "Every setting lives in the widget's own top bar. Open a widget and use the controls there — type in Finance's search box to add stock symbols, pick a favorite team in Sports, or choose feeds and categories in News.",
   },
   {
     title: "Customize the Ticker",

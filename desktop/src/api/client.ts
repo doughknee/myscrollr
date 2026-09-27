@@ -210,8 +210,6 @@ export type ProductActivityCategory =
   | "sports"
   | "markets"
   | "news"
-  | "fantasy"
-  | "predictions"
   | "utilities";
 
 export function getProductAnalyticsConsent(): Promise<ProductAnalyticsConsent> {
@@ -278,14 +276,14 @@ export function recordPostHogDesktopEvent(
 // ── Widget row types ──────────────────────────────────────────────────
 
 /**
- * A widget id from the catalog ("sports_nfl", "news_bbc", "predictions").
+ * A widget id from the catalog ("sports_nfl", "news_bbc").
  *
  * Deliberately an open string, not a union. This used to be
- * `"finance" | "sports" | "fantasy" | "rss" | "predictions"` — the five
- * SOURCES, not widget ids — which stopped being true at the widget split
- * and survived only because call sites cast to it. Widget ids are defined
- * by the server catalog and new ones must appear without a client release
- * (VISION §4.2), so the client cannot enumerate them.
+ * `"finance" | "sports" | "rss"` — the SOURCES, not widget ids — which
+ * stopped being true at the widget split and survived only because call
+ * sites cast to it. Widget ids are defined by the server catalog and new
+ * ones must appear without a client release (VISION §4.2), so the client
+ * cannot enumerate them.
  */
 export type WidgetId = string;
 
@@ -420,8 +418,6 @@ export interface UserOverview {
       symbols: number;
       feeds: number;
       custom_feeds: number;
-      leagues: number;
-      fantasy: number;
       max_ticker_rows: number;
       max_ticker_customization: boolean;
     };
@@ -436,11 +432,6 @@ export interface UserOverview {
       ticker_enabled: boolean;
     }>;
   };
-  fantasy: {
-    yahoo_connected: boolean;
-    yahoo_synced: boolean;
-    league_count: number;
-  } | null;
   gdpr: {
     deletion_status: "none" | "pending" | "canceled" | "purged";
     requested_at: string | null;

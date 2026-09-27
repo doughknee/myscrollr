@@ -7,7 +7,7 @@
  *
  * Now: a live mini-ticker, a greeting, a "Happening now" row for the few
  * things worth interrupting for, then a bento grid that groups by source
- * — Scores, Headlines, Markets, Fantasy, Kalshi, utility tiles.
+ * — Scores, Headlines, Markets, utility tiles.
  *
  * Four states fall out of the data rather than being modes: a busy slate
  * fills the hero row, a quiet one drops it, unconfigured widgets keep
@@ -18,7 +18,6 @@
 import { useCallback, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  Activity,
   ArrowRight,
   Newspaper,
   Plus,
@@ -173,8 +172,6 @@ function HomePage() {
   const sports = bySource("sports");
   const finance = bySource("finance");
   const rss = bySource("rss");
-  const fantasy = bySource("fantasy");
-  const predictions = bySource("predictions");
 
   const hasAnything = resolved.length > 0 || utilities.length > 0;
 
@@ -200,9 +197,9 @@ function HomePage() {
     };
     collect(sports);
     collect(finance);
-    collect([...rss, ...fantasy, ...predictions]);
+    collect(rss);
     return out.slice(0, 3);
-  }, [sports, finance, rss, fantasy, predictions]);
+  }, [sports, finance, rss]);
 
   // ── Ticker chips ──────────────────────────────────────────────
   const chips = useMemo<TickerChip[]>(() => {
@@ -243,11 +240,10 @@ function HomePage() {
 
   // A widget that returned no rows AND owns a config is unconfigured —
   // distinct from a zero-config source that simply has nothing on right
-  // now. Sports/news/predictions never appear here.
+  // now. Sports/news never appear here.
   const needsSetup = useMemo(
-    () =>
-      [...finance, ...fantasy].filter((r) => r.data.length === 0),
-    [finance, fantasy],
+    () => finance.filter((r) => r.data.length === 0),
+    [finance],
   );
 
   // ── First run ─────────────────────────────────────────────────
@@ -374,8 +370,6 @@ function HomePage() {
           sports={sports}
           finance={finance}
           rss={rss}
-          fantasy={fantasy}
-          predictions={predictions}
           utilities={utilities}
           openWidget={openWidget}
         />
@@ -394,22 +388,17 @@ function BentoGrid({
   sports,
   finance,
   rss,
-  fantasy,
-  predictions,
   utilities,
   openWidget,
 }: {
   sports: Resolved[];
   finance: Resolved[];
   rss: Resolved[];
-  fantasy: Resolved[];
-  predictions: Resolved[];
   utilities: WidgetManifest[];
   openWidget: (id: string) => void;
 }) {
   const left = sports.length > 0 || rss.length > 0 || utilities.length > 0;
-  const right =
-    finance.length > 0 || fantasy.length > 0 || predictions.length > 0;
+  const right = finance.length > 0;
 
   return (
     <div
@@ -435,12 +424,6 @@ function BentoGrid({
         <div className="flex flex-col gap-3.5">
           {finance.length > 0 && (
             <MarketsCard items={finance} openWidget={openWidget} />
-          )}
-          {fantasy.length > 0 && (
-            <FantasyCard items={fantasy} openWidget={openWidget} />
-          )}
-          {predictions.length > 0 && (
-            <KalshiCard items={predictions} openWidget={openWidget} />
           )}
         </div>
       )}
@@ -652,106 +635,6 @@ function MarketsCard({
   );
 }
 
-// ── Fantasy ─────────────────────────────────────────────────────
-
-function FantasyCard({
-  items,
-  openWidget,
-}: {
-  items: Resolved[];
-  openWidget: (id: string) => void;
-}) {
-  const first = items[0];
-  const leagues = first.data as Record<string, unknown>[];
-
-  return (
-    <Card
-      title={first.manifest.name}
-      icon={<Activity size={14} />}
-      chips={[
-        {
-          id: first.row.widget_type,
-          label: "Open",
-          onClick: () => openWidget(first.row.widget_type),
-        },
-      ]}
-    >
-      {leagues.length === 0 ? (
-        <SetupBody
-          message="Connect your Yahoo account to follow your matchups here."
-          cta="Connect Yahoo"
-          tone="brand"
-          onCta={() => openWidget(first.row.widget_type)}
-        />
-      ) : (
-        leagues.slice(0, 2).map((l, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => openWidget(first.row.widget_type)}
-            className="flex w-full cursor-pointer flex-col gap-1 border-t border-fg/7 px-3.5 py-2.5 text-left first:border-t-0 hover:bg-surface-hover/40"
-          >
-            <span className="truncate text-ui-meta font-semibold text-fg">
-              {String(l.league_name ?? l.name ?? "League")}
-            </span>
-            <span className="font-mono text-ui-chip tabular-nums text-fg-3">
-              {String(l.my_score ?? l.team_points ?? "—")} –{" "}
-              {String(l.opp_score ?? l.opponent_points ?? "—")}
-            </span>
-          </button>
-        ))
-      )}
-    </Card>
-  );
-}
-
-// ── Kalshi ──────────────────────────────────────────────────────
-
-function KalshiCard({
-  items,
-  openWidget,
-}: {
-  items: Resolved[];
-  openWidget: (id: string) => void;
-}) {
-  const first = items[0];
-  const markets = (first.data as Record<string, unknown>[]).slice(0, 4);
-
-  return (
-    <Card
-      title={first.manifest.name}
-      icon={<Activity size={14} />}
-      chips={[
-        {
-          id: first.row.widget_type,
-          label: "Open",
-          onClick: () => openWidget(first.row.widget_type),
-        },
-      ]}
-    >
-      {markets.length === 0 ? (
-        <EmptyBody>No markets right now.</EmptyBody>
-      ) : (
-        markets.map((m, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => openWidget(first.row.widget_type)}
-            className="flex w-full cursor-pointer items-center gap-3 border-t border-fg/7 px-3.5 py-2.5 first:border-t-0 hover:bg-surface-hover/40"
-          >
-            <span className="min-w-0 flex-1 truncate text-left text-ui-meta text-fg">
-              {String(m.title ?? m.question ?? m.ticker ?? "")}
-            </span>
-            <span className="shrink-0 font-mono text-ui-meta font-semibold tabular-nums text-fg">
-              {m.yes_price != null ? `${Number(m.yes_price)}%` : "—"}
-            </span>
-          </button>
-        ))
-      )}
-    </Card>
-  );
-}
-
 // ── Utility tiles ───────────────────────────────────────────────
 
 function UtilityTiles({
@@ -810,7 +693,7 @@ function UtilityTiles({
 
 const STARTERS: { id: string; blurb: string }[] = [
   { id: "finance_stocks", blurb: "Live quotes the moment you add it." },
-  { id: "predictions", blurb: "The news, in numbers." },
+  { id: "sports_nfl", blurb: "Scores the moment kickoff happens." },
   { id: "clock", blurb: "Local time and world clocks." },
 ];
 

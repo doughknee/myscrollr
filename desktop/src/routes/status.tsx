@@ -18,13 +18,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  BarChart3,
   CheckCircle2,
   Database,
   Layers,
   Newspaper,
   RefreshCw,
-  Trophy,
   TrendingUp,
   Volleyball,
   WifiOff,
@@ -57,9 +55,7 @@ const isOk = (s: string | undefined) => s === "healthy";
 const SERVICE_META: Record<string, { label: string; icon: LucideIcon }> = {
   database: { label: "Database", icon: Database },
   redis: { label: "Cache", icon: Layers },
-  fantasy: { label: "Fantasy", icon: Trophy },
   finance: { label: "Finance", icon: TrendingUp },
-  predictions: { label: "Kalshi", icon: BarChart3 },
   rss: { label: "News", icon: Newspaper },
   sports: { label: "Sports", icon: Volleyball },
 };

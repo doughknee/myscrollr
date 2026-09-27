@@ -107,8 +107,7 @@ function WeatherFeedTab(props: FeedTabProps) {
     <div className="flex min-h-full flex-col">
       {comfort && (
         <WidgetBar>
-          {/* Right-cluster grammar: search → action pills last (same
-              order as fantasy's Account pill). */}
+          {/* Right-cluster grammar: search → action pills last. */}
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">
             <SearchBox
               inputRef={searchRef}

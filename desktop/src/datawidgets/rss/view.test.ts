@@ -213,15 +213,15 @@ describe("applyRssPipeline", () => {
 // ── Ticker horizon ──────────────────────────────────────────────
 //
 // A per-feed news widget put every article in its window on the rail, and
-// the default window is unlimited. A Yahoo Sports widget was 297 chips.
+// the default window is unlimited. A high-volume sports feed was 297 chips.
 
 describe("selectRssForTicker horizon", () => {
   const NOW_T = new Date("2026-09-04T12:00:00Z").getTime();
   const ago = (h: number) => new Date(NOW_T - h * 3_600_000).toISOString();
-  const feed = "https://sports.yahoo.com/rss/";
+  const feed = "https://sports.example.com/rss/";
 
   it("admits everything inside the window -- the slots do the limiting, not a cap", () => {
-    const items = Array.from({ length: 40 }, (_, i) => mk(i + 1, "yahoo", ago(i * 0.1), feed));
+    const items = Array.from({ length: 40 }, (_, i) => mk(i + 1, "src", ago(i * 0.1), feed));
     expect(selectRssForTicker(items, NOW_T)).toHaveLength(40);
   });
 

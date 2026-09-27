@@ -59,8 +59,7 @@ export const REFRESH_BUFFER_MS = 60_000;
 
 // ── Dev demo mode ───────────────────────────────────────────────
 // VITE_DEMO=1 runs the app SIGNED OUT against a no-auth local backend
-// (the predictions `serve_bridge`, which ignores Authorization), bypassing
-// Logto so the live Kalshi demo works with zero infra. STRICTLY a local
-// dev affordance — never set in release/CI builds. See
-// channels/predictions/LOCAL_DEV.md.
+// (a `serve_bridge` that ignores Authorization), bypassing Logto so a
+// live demo works with zero infra. STRICTLY a local dev affordance —
+// never set in release/CI builds.
 export const DEMO = import.meta.env.VITE_DEMO === "1";

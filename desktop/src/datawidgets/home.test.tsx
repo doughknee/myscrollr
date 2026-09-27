@@ -57,47 +57,14 @@ describe("Home previews", () => {
     expect(screen.getByText("BBC")).toBeInTheDocument();
   });
 
-  it("fantasy renders league name and matchup score", () => {
-    rows("fantasy", [
-      { league_key: "nfl.1", league_name: "Dynasty", my_score: 101, opp_score: 98 },
-    ]);
-    expect(screen.getByText("Dynasty")).toBeInTheDocument();
-    expect(screen.getByText(/101\s*–\s*98/)).toBeInTheDocument();
-  });
-
-  it("predictions renders the market title", () => {
-    rows("predictions", [
-      {
-        id: "m1",
-        title: "Will it rain?",
-        event_title: "Weather",
-        yes_price: 62,
-        status: "active",
-      },
-    ]);
-    expect(screen.getByText("Weather")).toBeInTheDocument();
-  });
-
   // The empty state is the path REL-63 changed most: it used to come from an
-  // EMPTY_HINTS map in feed.tsx that had no `predictions` entry, so that one
-  // silently lost its call to action. Every source now owns its own copy.
+  // EMPTY_HINTS map in feed.tsx that could silently miss an entry, quietly
+  // dropping that widget's call to action. Every source now owns its own copy.
   it.each([
     ["finance", /no stocks/i],
     ["rss", /no feeds/i],
-    ["fantasy", /no leagues/i],
-    ["predictions", /no markets/i],
   ])("%s shows a specific empty state", (source, pattern) => {
     rows(source, []);
     expect(screen.getByText(pattern)).toBeInTheDocument();
-  });
-});
-
-describe("normalizeHome", () => {
-  it("fantasy unwraps its payload", () => {
-    const m = getDataWidget("fantasy")!;
-    // The wrapper is the bug this hook exists for: treating the payload as a
-    // flat array showed "No leagues imported yet" to users who had leagues.
-    expect(m.normalizeHome!({ leagues: [{ league_key: "a" }] })).toHaveLength(1);
-    expect(m.normalizeHome!(undefined)).toEqual([]);
   });
 });

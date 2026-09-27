@@ -36,45 +36,6 @@ export interface Trade {
   day_high?: number;
 }
 
-// ── Predictions ──────────────────────────────────────────────────
-
-export interface Prediction {
-  id: string;
-  source: string;
-  ticker: string;
-  event_ticker?: string;
-  /** The event's human question ("More tech layoffs in 2026 than in
-   *  2025?") — `title` is just this market's leg ("Yes", "Atlanta").
-   *  Empty until the post-migration sweep backfills it (v1.1.4). */
-  event_title?: string;
-  /** Leg rank within the event: 1 = most liquid (is_primary), 2 = the
-   *  second outcome the server ships for event cards (v1.1.4). */
-  event_rank?: number;
-  category?: string;
-  title: string;
-  subtitle?: string;
-  yes_price: number; // cents 0-100 == implied %
-  yes_bid?: number;
-  yes_ask?: number;
-  prev_yes_price?: number; // for ▲/▼ delta
-  volume?: number;
-  /** Trailing-24h volume — the "Trending" sort key (v1.1.5). Absent on
-   *  old payloads; fall back to all-time `volume`. */
-  volume_24h?: number;
-  open_interest?: number;
-  /** False once the market left the server's curated sweep selection
-   *  (v1.1.5). Treat undefined (old payloads) as true. */
-  in_sweep?: boolean;
-  status?: string;
-  result?: string;
-  /** When the market resolved (once-stamped server-side, v1.1.5).
-   *  Preferred over `updated_at` for "Resolved today". RFC3339. */
-  settled_at?: string;
-  close_time?: string; // RFC3339
-  link?: string;
-  updated_at?: string; // RFC3339
-}
-
 // ── Sports ───────────────────────────────────────────────────────
 
 export interface Game {
@@ -157,7 +118,6 @@ export interface DashboardResponse {
     sports?: Game[];
     sports_meta?: SportsMeta;
     rss?: RssItem[];
-    predictions?: Prediction[];
     [key: string]: unknown;
   };
   preferences?: {
@@ -239,8 +199,8 @@ export interface DataWidgetManifest {
 
   /**
    * Coerce this source's raw `/dashboard` payload to a flat array.
-   * Omit when the payload is already an array (most sources); fantasy
-   * wraps its rows in `{ leagues: [...] }`.
+   * Omit when the payload is already an array, which is every current
+   * source; kept for a future source whose payload isn't one.
    */
   normalizeHome?: (raw: unknown) => unknown[];
 

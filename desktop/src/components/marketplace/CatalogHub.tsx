@@ -37,14 +37,12 @@ interface CatalogHubProps extends CatalogViewShared {
 
 /** What people look for; the last one is a deliberate miss so the
  *  request path is one click from the front door. */
-const TRIES = ["NFL", "Bitcoin", "Weather", "Hacker News", "Kalshi", "Eredivisie"];
+const TRIES = ["NFL", "Bitcoin", "Weather", "Hacker News", "Eredivisie"];
 
 const BLURBS: Record<WidgetCategory, string> = {
   sports: "Live scores from the leagues you follow",
   finance: "Quotes, watchlists and calendars",
   news: "Headlines from publications and feeds",
-  fantasy: "Your leagues, matchups and standings",
-  predictions: "Live odds from prediction markets",
   utility: "Clocks, weather, dev status and more",
 };
 

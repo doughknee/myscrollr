@@ -65,6 +65,8 @@ import {
   savePrefs,
   reconcileSidebarOrder,
   resolveThemeMode,
+  takePendingRemovalNotice,
+  REMOVED_WIDGETS_MESSAGE,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
@@ -318,6 +320,20 @@ function RootLayout() {
     savePrefs(next);
   }, []);
 
+  // ── One-time upgrade notice: removed widgets (SCROLLR-240) ──
+  // `loadPrefs()` (the useState initializer above) strips any retired
+  // widget id/pin it finds in the saved store on every launch, and
+  // records the FIRST time it did so in `prefs.tipsShown`.
+  // `takePendingRemovalNotice()` tells us whether THIS load was that
+  // first time, so the toast fires exactly once, ever, per install.
+  useEffect(() => {
+    if (takePendingRemovalNotice()) {
+      toast.message(REMOVED_WIDGETS_MESSAGE, { duration: 8_000 });
+    }
+    // Runs once on mount only — the flag is consumed immediately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── First-run discovery tip: right-click the ticker ─────────
   // Surfaces the ticker context menu (widgets, widgets, position,
   // "Customize Ticker") to users who would never know it exists.
@@ -390,8 +406,8 @@ function RootLayout() {
   // ── App / auth state ────────────────────────────────────────
   // The wizard was removed in the IA refactor (2026-05-09). New
   // users land directly on /feed which renders an empty hero card.
-  // Demo mode (VITE_DEMO=1) bypasses the Logto auth wall so the live Kalshi
-  // demo runs signed-out against the no-auth bridge. Strictly dev-only.
+  // Demo mode (VITE_DEMO=1) bypasses the Logto auth wall so a live demo
+  // runs signed-out against the no-auth bridge. Strictly dev-only.
   //
   // `sessionExpired` holds the shell open. Without it the banner below is
   // unreachable code: it renders inside `showApp`, but the only things that

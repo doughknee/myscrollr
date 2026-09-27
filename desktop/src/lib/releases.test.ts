@@ -55,8 +55,8 @@ describe("extractHeadline", () => {
 
   it("uses the LAST em dash when there are several", () => {
     expect(
-      extractHeadline("Scrollr — Desktop v1.0.20 — Kalshi Predictions", ""),
-    ).toBe("Kalshi Predictions");
+      extractHeadline("Scrollr — Desktop v1.0.20 — Dark Mode Everywhere", ""),
+    ).toBe("Dark Mode Everywhere");
   });
 
   it("falls back to the first ## heading in the body", () => {

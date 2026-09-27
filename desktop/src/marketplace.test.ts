@@ -112,7 +112,7 @@ describe("refreshCatalog", () => {
     // A server-side rename reaches the UI with no client release.
     expect(catalogItemById("sports_nfl")!.name).toBe("Renamed NFL");
     // …and a widget the server dropped is gone.
-    expect(catalogItemById("predictions")).toBeUndefined();
+    expect(catalogItemById("news_bbc")).toBeUndefined();
 
     // Re-fetching the same version is a no-op, so no needless re-render.
     const again = await refreshCatalog(async () => next);

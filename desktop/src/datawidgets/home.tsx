@@ -21,8 +21,8 @@ export const HOME_PREVIEW_MAX = 5;
  *
  * Each source passes its own copy. This replaced an `EMPTY_HINTS` map keyed
  * by source name in feed.tsx — a sixth place source knowledge lived, and one
- * that had silently gone stale: it had no `predictions` entry, so that
- * widget's empty state lost its call to action.
+ * that had silently gone stale: a widget missing an entry lost its call to
+ * action.
  */
 export function HomeEmptyRow({
   message,

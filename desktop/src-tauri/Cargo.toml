@@ -4,7 +4,7 @@ version = "1.6.8"
 edition = "2021"
 # std::env::home_dir (Sentry path scrubber) is only correct on Windows from 1.85+
 rust-version = "1.85"
-description = "Scrollr desktop app — pinned live ticker for sports, finance, RSS, and Yahoo Fantasy."
+description = "Scrollr desktop app — pinned live ticker for sports, finance, and RSS."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/brandon-relentnet/myscrollr"
@@ -56,6 +56,7 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-log = "2"
 log = "0.4"
 sysinfo = "0.33"
+anyhow = "1"
 
 # Sentry — error monitoring for the native (Rust) process.
 # DSN is read at COMPILE TIME via option_env!("SENTRY_DSN_RUST"). The
@@ -70,31 +71,17 @@ sentry = { version = "0.42", default-features = false, features = [
     "release-health",
 ] }
 
-# ── Client-side Kalshi account link (on-device, read-only) ──────────
-# The user's Kalshi key never leaves the machine: we sign their requests
-# locally and store the key in the OS keychain (see `keyring`, per-target
-# below). The RSA-PSS signer is a cross-crate copy of
-# channels/predictions/service/src/kalshi/sign.rs (duplication is the repo
-# convention); versions are pinned to match the service crate so the two
-# signers stay byte-for-byte compatible. `tokio-tungstenite` powers the
-# authenticated, read-only user-data WS stream (market_positions/fill/
-# user_orders).
-anyhow = "1"
-rsa = { version = "0.9", features = ["pem"] }
-sha2 = "0.10"
 rand = "0.8"
-base64 = "0.22"
-tokio-tungstenite = { version = "0.28", default-features = false, features = [
-    "connect",
-    "rustls-tls-native-roots",
-] }
 
 # ── OS keychain (per-platform backend) ──────────────────────────────
-# `keyring` v3 requires an explicit platform backend feature. We enable
-# exactly one per target so each OS pulls only its native secret store and
-# release builds stay lean: Windows Credential Manager, macOS Keychain,
-# Linux Secret Service. Declared in the per-target sections below.
-
+# `keyring` v3 requires an explicit platform backend feature. Kept only
+# for `purge_legacy_kalshi_key` (lib.rs) — the one-shot cleanup that
+# deletes a pre-SCROLLR-240 install's stored Kalshi credential from the
+# OS keychain now that the Kalshi feature (and the code that ever read
+# it back) is gone. Idempotent and cheap, so it runs unconditionally on
+# every launch rather than gating on a "already purged" flag.
+# ponytail: drop this dependency + purge call in a later release once
+# installs have long since cycled through it.
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
 # Taller unified title bar (see src/titlebar.rs). Pinned to the objc2
