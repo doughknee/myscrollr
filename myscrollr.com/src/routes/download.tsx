@@ -25,7 +25,7 @@ export const Route = createFileRoute('/download')({
     seo({
       title: 'Download Scrollr for macOS, Windows, Linux',
       description:
-        'Free download of Scrollr, the quiet desktop ticker for live finance, sports, news, and fantasy data. Native builds for macOS, Windows, and Linux.',
+        'Free download of Scrollr, the quiet desktop ticker for live finance, sports, and news data. Native builds for macOS, Windows, and Linux.',
       path: '/download',
       image: 'https://myscrollr.com/og/download.png',
       jsonLd: [organization, softwareApplication],
@@ -330,9 +330,6 @@ export function DownloadPage({
                   </Link>
                   <Link to="/news" className="text-primary">
                     NEWS & RSS →
-                  </Link>
-                  <Link to="/fantasy" className="text-primary">
-                    YAHOO FANTASY →
                   </Link>
                 </nav>
               </div>

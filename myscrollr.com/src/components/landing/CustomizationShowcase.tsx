@@ -65,11 +65,11 @@ const CARDS: Array<CustomizationCard> = [
     slot: 'top-left',
     eyebrow: 'Widgets · Utilities · Extensions',
     title: 'Add what you actually need',
-    body: 'Markets, scores, headlines, and fantasy are just the start. Pin live system stats, your Uptime Kuma board, or GitHub Actions status right next to last quarter\u2019s earnings &mdash; the ticker becomes whatever your day looks like.',
+    body: 'Markets, scores, and headlines are just the start. Pin live system stats, your Uptime Kuma board, or GitHub Actions status right next to last quarter\u2019s earnings &mdash; the ticker becomes whatever your day looks like.',
     media: {
       kind: 'single',
       basename: 'overview/catalog',
-      alt: 'Scrollr source catalog showing Finance, Sports, Fantasy, News, Clock, and Weather as added, alongside available widgets for System Monitor, Uptime, and GitHub.',
+      alt: 'Scrollr source catalog showing Finance, Sports, News, Clock, and Weather as added, alongside available widgets for System Monitor, Uptime, and GitHub.',
     },
     chips: [
       { icon: Activity, label: 'System Monitor' },

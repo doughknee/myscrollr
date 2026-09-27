@@ -51,7 +51,6 @@ const ROUTES = [
   { path: '/admin', file: '_shell.html', authShell: true },
   { path: '/', file: 'index.html' },
   { path: '/widgets', file: 'widgets/index.html' },
-  { path: '/fantasy', file: 'fantasy/index.html' },
   { path: '/sports', file: 'sports/index.html' },
   { path: '/markets', file: 'markets/index.html' },
   { path: '/news', file: 'news/index.html' },

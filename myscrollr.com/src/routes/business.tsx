@@ -148,7 +148,6 @@ function brandChips(brand: BrandId, tick: number): Array<DemoChip> {
 const AUDIENCES = [
   { tag: 'VENUE', color: '#fbbf24', name: 'Sports bars & restaurants', copy: 'Explore a branded ticker for scores, news, and venue messages across one or more displays.' },
   { tag: 'FIN', color: '#00d4ff', name: 'Brokerages & advisors', copy: 'Explore a branded desktop ticker for client watchlists, market data, and company updates.' },
-  { tag: 'FAN', color: '#ff4757', name: 'Fantasy sports platforms', copy: "Explore a desktop companion for your platform's matchups, standings, and brand." },
   { tag: 'ODDS', color: '#a855f7', name: 'Sportsbooks & betting affiliates', copy: 'Explore a desktop ticker for approved odds, scores, and timely account messages.' },
   { tag: 'CRYPTO', color: '#34d399', name: 'Crypto exchanges', copy: 'Explore a branded price ticker for selected pairs and market updates.' },
   { tag: 'NEWS', color: '#0ea5e9', name: 'News publishers', copy: "Explore a quiet desktop channel for your publication's headlines and alerts." },
@@ -185,7 +184,6 @@ const USE_CASE_OPTIONS = [
   { value: '', label: 'Select your use case' },
   { value: 'sports-bars', label: 'Sports bar / restaurant' },
   { value: 'brokerages', label: 'Brokerage / financial advisor' },
-  { value: 'fantasy', label: 'Fantasy sports platform' },
   { value: 'sportsbooks', label: 'Sportsbook / betting affiliate' },
   { value: 'crypto', label: 'Crypto exchange' },
   { value: 'news', label: 'News aggregator / publisher' },

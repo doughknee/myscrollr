@@ -32,9 +32,9 @@ import { CountUp } from '@/components/CountUp'
 export const Route = createFileRoute('/widgets')({
   head: () =>
     seo({
-      title: 'Scrollr Widget Catalog: Live Sports, Finance, News, Fantasy',
+      title: 'Scrollr Widget Catalog: Live Sports, Finance, News',
       description:
-        'Browse the full Scrollr widget catalog: live sports leagues, stocks and crypto, curated news and custom RSS, Yahoo Fantasy, prediction markets, and utilities. Every widget streams live.',
+        'Browse the full Scrollr widget catalog: live sports leagues, stocks and crypto, curated news and custom RSS, and utilities. Every widget streams live.',
       path: '/widgets',
       jsonLd: organization,
     }),
@@ -86,8 +86,6 @@ function ChannelsPage() {
     news: 'NEWS',
     finance: 'FINANCE',
     utility: 'UTILITY',
-    fantasy: 'FANTASY',
-    predictions: 'PREDICTIONS',
   }
   const filters = [
     { id: 'all', label: `ALL ${n}` },

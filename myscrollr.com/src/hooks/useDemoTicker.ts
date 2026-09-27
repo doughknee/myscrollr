@@ -87,8 +87,8 @@ export interface DemoPalette {
   muted: string
   /** Theme accent (app --color-primary): bar dot, hairline, swatch dot. */
   accent: string
-  /** Per-source chip accents (app --color-primary/secondary/info/accent-purple). */
-  chips: { fin: string; spt: string; news: string; fantasy: string }
+  /** Per-source chip accents (app --color-primary/secondary/info). */
+  chips: { fin: string; spt: string; news: string }
   /** Delta colors (app --color-up / --color-down). */
   up: string
   down: string
@@ -115,33 +115,33 @@ export const APP_THEME_COUNT = 20
 export const DEMO_THEMES: Array<DemoThemeFamily> = [
   {
     id: 'scrollr', name: 'SCROLLR',
-    dark: { bg: 'rgba(23,23,38,.92)', border: '#282838', text: '#b7b7c6', muted: '#9292a4', accent: '#34d399', chips: { fin: '#34d399', spt: '#ff4757', news: '#00d4ff', fantasy: '#a855f7' }, up: '#22c55e', down: '#ef4444' },
-    light: { bg: 'rgba(246,247,251,.94)', border: '#d5d7e2', text: '#4a4a5a', muted: '#7a7a8a', accent: '#34d399', chips: { fin: '#34d399', spt: '#ff4757', news: '#00b8db', fantasy: '#a855f7' }, up: '#22c55e', down: '#ef4444' },
+    dark: { bg: 'rgba(23,23,38,.92)', border: '#282838', text: '#b7b7c6', muted: '#9292a4', accent: '#34d399', chips: { fin: '#34d399', spt: '#ff4757', news: '#00d4ff' }, up: '#22c55e', down: '#ef4444' },
+    light: { bg: 'rgba(246,247,251,.94)', border: '#d5d7e2', text: '#4a4a5a', muted: '#7a7a8a', accent: '#34d399', chips: { fin: '#34d399', spt: '#ff4757', news: '#00b8db' }, up: '#22c55e', down: '#ef4444' },
   },
   {
     id: 'catppuccin', name: 'CATPPUCCIN',
-    dark: { bg: 'rgba(24,24,37,.92)', border: '#313244', text: '#bac2de', muted: '#a6adc8', accent: '#a6e3a1', chips: { fin: '#a6e3a1', spt: '#f38ba8', news: '#89dceb', fantasy: '#cba6f7' }, up: '#a6e3a1', down: '#f38ba8' },
-    light: { bg: 'rgba(230,233,239,.94)', border: '#ccd0da', text: '#5c5f77', muted: '#6c6f85', accent: '#40a02b', chips: { fin: '#40a02b', spt: '#d20f39', news: '#04a5e5', fantasy: '#8839ef' }, up: '#40a02b', down: '#d20f39' },
+    dark: { bg: 'rgba(24,24,37,.92)', border: '#313244', text: '#bac2de', muted: '#a6adc8', accent: '#a6e3a1', chips: { fin: '#a6e3a1', spt: '#f38ba8', news: '#89dceb' }, up: '#a6e3a1', down: '#f38ba8' },
+    light: { bg: 'rgba(230,233,239,.94)', border: '#ccd0da', text: '#5c5f77', muted: '#6c6f85', accent: '#40a02b', chips: { fin: '#40a02b', spt: '#d20f39', news: '#04a5e5' }, up: '#40a02b', down: '#d20f39' },
   },
   {
     id: 'dracula', name: 'DRACULA',
-    dark: { bg: 'rgba(33,34,44,.92)', border: '#44475a', text: '#d8d8d2', muted: '#a8a8a2', accent: '#50fa7b', chips: { fin: '#50fa7b', spt: '#ff5555', news: '#8be9fd', fantasy: '#bd93f9' }, up: '#50fa7b', down: '#ff5555' },
-    light: { bg: 'rgba(239,239,230,.94)', border: '#c2c2b2', text: '#44475a', muted: '#6272a4', accent: '#2a9d6f', chips: { fin: '#2a9d6f', spt: '#c43a3a', news: '#2a8aa5', fantasy: '#7a52d8' }, up: '#2a9d6f', down: '#c43a3a' },
+    dark: { bg: 'rgba(33,34,44,.92)', border: '#44475a', text: '#d8d8d2', muted: '#a8a8a2', accent: '#50fa7b', chips: { fin: '#50fa7b', spt: '#ff5555', news: '#8be9fd' }, up: '#50fa7b', down: '#ff5555' },
+    light: { bg: 'rgba(239,239,230,.94)', border: '#c2c2b2', text: '#44475a', muted: '#6272a4', accent: '#2a9d6f', chips: { fin: '#2a9d6f', spt: '#c43a3a', news: '#2a8aa5' }, up: '#2a9d6f', down: '#c43a3a' },
   },
   {
     id: 'tokyo-night', name: 'TOKYO NIGHT',
-    dark: { bg: 'rgba(22,22,30,.92)', border: '#2f334d', text: '#a9b1d6', muted: '#9aa5ce', accent: '#7aa2f7', chips: { fin: '#7aa2f7', spt: '#f7768e', news: '#7dcfff', fantasy: '#bb9af7' }, up: '#9ece6a', down: '#f7768e' },
-    light: { bg: 'rgba(213,214,220,.94)', border: '#c4c8da', text: '#4c5079', muted: '#6172b0', accent: '#2e7de9', chips: { fin: '#2e7de9', spt: '#f52a65', news: '#007197', fantasy: '#9854f1' }, up: '#587539', down: '#f52a65' },
+    dark: { bg: 'rgba(22,22,30,.92)', border: '#2f334d', text: '#a9b1d6', muted: '#9aa5ce', accent: '#7aa2f7', chips: { fin: '#7aa2f7', spt: '#f7768e', news: '#7dcfff' }, up: '#9ece6a', down: '#f7768e' },
+    light: { bg: 'rgba(213,214,220,.94)', border: '#c4c8da', text: '#4c5079', muted: '#6172b0', accent: '#2e7de9', chips: { fin: '#2e7de9', spt: '#f52a65', news: '#007197' }, up: '#587539', down: '#f52a65' },
   },
   {
     id: 'nord', name: 'NORD',
-    dark: { bg: 'rgba(41,46,57,.92)', border: '#3b4252', text: '#e5e9f0', muted: '#d8dee9', accent: '#88c0d0', chips: { fin: '#88c0d0', spt: '#bf616a', news: '#81a1c1', fantasy: '#b48ead' }, up: '#a3be8c', down: '#bf616a' },
-    light: { bg: 'rgba(229,233,240,.94)', border: '#d8dee9', text: '#434c5e', muted: '#4c566a', accent: '#5e81ac', chips: { fin: '#5e81ac', spt: '#bf616a', news: '#5d8eaf', fantasy: '#9c6c8d' }, up: '#6a8857', down: '#bf616a' },
+    dark: { bg: 'rgba(41,46,57,.92)', border: '#3b4252', text: '#e5e9f0', muted: '#d8dee9', accent: '#88c0d0', chips: { fin: '#88c0d0', spt: '#bf616a', news: '#81a1c1' }, up: '#a3be8c', down: '#bf616a' },
+    light: { bg: 'rgba(229,233,240,.94)', border: '#d8dee9', text: '#434c5e', muted: '#4c566a', accent: '#5e81ac', chips: { fin: '#5e81ac', spt: '#bf616a', news: '#5d8eaf' }, up: '#6a8857', down: '#bf616a' },
   },
   {
     id: 'gruvbox', name: 'GRUVBOX',
-    dark: { bg: 'rgba(50,48,47,.92)', border: '#3c3836', text: '#d5c4a1', muted: '#bdae93', accent: '#b8bb26', chips: { fin: '#b8bb26', spt: '#fb4934', news: '#83a598', fantasy: '#d3869b' }, up: '#b8bb26', down: '#fb4934' },
-    light: { bg: 'rgba(242,229,188,.94)', border: '#ebdbb2', text: '#504945', muted: '#665c54', accent: '#79740e', chips: { fin: '#79740e', spt: '#9d0006', news: '#076678', fantasy: '#8f3f71' }, up: '#79740e', down: '#9d0006' },
+    dark: { bg: 'rgba(50,48,47,.92)', border: '#3c3836', text: '#d5c4a1', muted: '#bdae93', accent: '#b8bb26', chips: { fin: '#b8bb26', spt: '#fb4934', news: '#83a598' }, up: '#b8bb26', down: '#fb4934' },
+    light: { bg: 'rgba(242,229,188,.94)', border: '#ebdbb2', text: '#504945', muted: '#665c54', accent: '#79740e', chips: { fin: '#79740e', spt: '#9d0006', news: '#076678' }, up: '#79740e', down: '#9d0006' },
   },
 ]
 
@@ -157,15 +157,14 @@ export function resolvePalette(
 /**
  * Accent remap for a palette: chips are authored in the default
  * (scrollr-dark) accents; the app re-tints every source chip when the
- * theme changes, so the demo bar does the same. Utility-widget and
- * predictions accents are theme-static in the app and pass through.
+ * theme changes, so the demo bar does the same. Utility-widget accents
+ * are theme-static in the app and pass through.
  */
 export function paletteRemap(pal: DemoPalette): Record<string, string> {
   return {
     [C.fin]: pal.chips.fin,
     [C.spt]: pal.chips.spt,
     [C.news]: pal.chips.news,
-    [C.fantasy]: pal.chips.fantasy,
   }
 }
 
@@ -310,15 +309,12 @@ export function useDemoTicker() {
 /**
  * Chip accents mirror the app's per-source chip colors
  * (desktop/src/components/chips/chipColors.ts + style.css tokens):
- * finance=primary, sports=secondary, rss=info, fantasy=purple,
- * predictions=teal, utilities per-widget.
+ * finance=primary, sports=secondary, rss=info, utilities per-widget.
  */
 const C = {
   fin: '#34d399',
   spt: '#ff4757',
   news: '#00d4ff',
-  fantasy: '#a855f7',
-  predictions: '#1fc9a0',
   clock: '#6366f1',
   timer: '#f59e0b',
   weather: '#0ea5e9',
@@ -589,25 +585,6 @@ export function chipsFor(
     case 'rss_custom':
       return [
         news('anything with an RSS URL goes here', 'YOUR FEED', 'just now'),
-      ]
-    case 'fantasy_yahoo':
-      return [
-        {
-          kind: 'text',
-          accent: C.fantasy,
-          label: 'You ' + jitter(t, 112.4, 7, 0.8).toFixed(1) + ' — Mike 98.7',
-          sub: 'YAHOO FANTASY · SUN',
-        },
-      ]
-    case 'predictions':
-      return [
-        {
-          kind: 'text',
-          accent: C.predictions,
-          label: 'Sept rate cut',
-          value: Math.round(jitter(t, 71, 6, 2)) + '¢',
-          sub: 'KALSHI',
-        },
       ]
     case 'clock':
       return [

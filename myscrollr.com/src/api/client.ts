@@ -413,12 +413,6 @@ export interface UserOverviewWidgets {
   by_type: Array<UserOverviewWidgetRow>
 }
 
-export interface UserOverviewFantasy {
-  yahoo_connected: boolean
-  yahoo_synced: boolean
-  league_count: number
-}
-
 export interface UserOverviewGDPR {
   deletion_status: 'none' | 'pending' | 'canceled' | 'purged'
   requested_at: string | null
@@ -434,7 +428,6 @@ export interface UserOverview {
   tier: UserOverviewTier
   subscription: SubscriptionStatus | null
   widgets: UserOverviewWidgets
-  fantasy: UserOverviewFantasy | null
   gdpr: UserOverviewGDPR
   links: UserOverviewLinks
 }
@@ -446,7 +439,7 @@ export interface UpdateProfileResponse {
 }
 
 export const userApi = {
-  /** Unified read for the /account hub — identity, tier, widgets, GDPR, fantasy. */
+  /** Unified read for the /account hub — identity, tier, widgets, GDPR. */
   overview: (getToken: () => Promise<string | null>) =>
     authenticatedFetch<UserOverview>('/users/me/overview', {}, getToken),
 
@@ -603,7 +596,6 @@ export const supportApi = {
 export type BusinessUseCase =
   | 'sports-bars'
   | 'brokerages'
-  | 'fantasy'
   | 'sportsbooks'
   | 'crypto'
   | 'news'

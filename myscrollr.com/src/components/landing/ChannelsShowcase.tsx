@@ -4,10 +4,8 @@ import { Link } from '@tanstack/react-router'
 import {
   ArrowRight,
   Coffee,
-  Ghost,
   Newspaper,
   Rss,
-  Swords,
   Timer,
   TrendingUp,
   Trophy,
@@ -16,7 +14,7 @@ import { useInViewport } from '@/hooks/useInViewport'
 
 // ── Types ────────────────────────────────────────────────────────
 
-type ChannelKey = 'finance' | 'sports' | 'news' | 'fantasy'
+type ChannelKey = 'finance' | 'sports' | 'news'
 
 interface TickerChip {
   label: string
@@ -96,23 +94,6 @@ const CHANNELS: Array<ChannelInfo> = [
     stat: '10+',
     statLabel: 'outlets + custom RSS',
   },
-  {
-    key: 'fantasy',
-    name: 'Fantasy',
-    icon: Ghost,
-    color: 'text-accent',
-    bg: 'bg-accent/8',
-    border: 'border-accent/20',
-    activeBg: 'bg-accent',
-    activeText: 'text-accent-content',
-    tagline: 'League intel on your desktop',
-    scenarioIcon: Swords,
-    scenarioTitle: 'Matchup updates, zero effort',
-    scenarioBody:
-      'Connect your Yahoo account and see standings, matchups, and live scoring across all your leagues without switching apps.',
-    stat: '∞',
-    statLabel: 'leagues supported',
-  },
 ]
 
 // ── Ticker chip data ─────────────────────────────────────────────
@@ -124,7 +105,6 @@ const TICKER_CHIPS: Array<TickerChip> = [
   { label: 'Fed holds rates steady', value: 'Reuters', channel: 'news' },
   { label: 'MIA 94', value: 'GSW 88 · Q4', channel: 'sports' },
   { label: 'ETH', value: '$3,412 ↓', channel: 'finance' },
-  { label: 'Your Team', value: '2nd Place', channel: 'fantasy' },
   { label: 'SPY', value: '$512.08 ↑', channel: 'finance' },
   {
     label: 'AI hiring surges as layoffs slow',
@@ -133,11 +113,9 @@ const TICKER_CHIPS: Array<TickerChip> = [
   },
   { label: 'NYG 21', value: 'DAL 17 · HALF', channel: 'sports' },
   { label: 'AAPL', value: '$189.54 ↓', channel: 'finance' },
-  { label: 'Matchup: W 6-4', value: 'vs Team Alpha', channel: 'fantasy' },
   { label: 'TSLA', value: '$242.68 ↑', channel: 'finance' },
   { label: 'Climate summit opens in Dubai', value: 'AP', channel: 'news' },
   { label: 'BUF 28', value: 'KC 24 · Q3', channel: 'sports' },
-  { label: 'Roster Alert', value: 'J. Chase → IR', channel: 'fantasy' },
 ]
 
 // ── Chip color map (per-channel) ─────────────────────────────────
@@ -163,12 +141,6 @@ const chipColors: Record<
     text: 'text-info',
     bg: 'bg-info/[0.06]',
     sub: 'text-info/60',
-  },
-  fantasy: {
-    border: 'border-accent/25',
-    text: 'text-accent',
-    bg: 'bg-accent/[0.06]',
-    sub: 'text-accent/60',
   },
 }
 
@@ -369,9 +341,7 @@ function ScenarioCard({ stream }: { stream: ChannelInfo }) {
       ? 'primary'
       : stream.key === 'sports'
         ? 'secondary'
-        : stream.key === 'news'
-          ? 'info'
-          : 'accent'
+        : 'info'
 
   return (
     <div
@@ -421,7 +391,7 @@ function ScenarioCard({ stream }: { stream: ChannelInfo }) {
 
 export function ChannelsShowcase() {
   const [activeChannels, setActiveChannels] = useState<Set<ChannelKey>>(
-    new Set(['finance', 'sports', 'news', 'fantasy']),
+    new Set(['finance', 'sports', 'news']),
   )
   // Pause the RAF marquee while the section is off-screen. The 200 px
   // viewport margin (default in `useInViewport`) primes the scroll loop
@@ -470,8 +440,8 @@ export function ChannelsShowcase() {
             <span className="text-gradient-primary">One Ticker.</span>
           </h2>
           <p className="text-base text-base-content/45 max-w-lg leading-relaxed text-center">
-            Sports, stocks, crypto, news, and fantasy widgets today &mdash; with
-            more on the way. Add what you want, ignore the rest.
+            Sports, stocks, crypto, and news widgets today &mdash; with more on
+            the way. Add what you want, ignore the rest.
           </p>
         </motion.div>
 

@@ -191,7 +191,6 @@ export interface AccountRow {
   lifetime: boolean
   widgets: number
   on_ticker: number
-  fantasy: boolean
   tickets: number
   /** From Logto. When they created the account. */
   signed_up_at: string | null

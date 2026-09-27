@@ -22,7 +22,7 @@ export function StepsSection() {
             {
               num: '02',
               title: 'Pick your widgets',
-              body: `Leagues, markets, feeds, your fantasy team: ${widgets.length} widgets and counting. Each costs one slot. Three are free.`,
+              body: `Leagues, markets, feeds, your favorite outlets: ${widgets.length} widgets and counting. Each costs one slot. Three are free.`,
             },
             {
               num: '03',

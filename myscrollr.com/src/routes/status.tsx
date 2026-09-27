@@ -80,11 +80,6 @@ const CHANNEL_META: Partial<Record<string, ChannelMeta>> = {
     description: 'ESPN API · scores polling every 60s',
     port: 3002,
   },
-  fantasy: {
-    code: 'CHN—FAN',
-    description: 'Yahoo Fantasy · Go-native sync, no Rust ingestion',
-    port: 8084,
-  },
   rss: {
     code: 'CHN—RSS',
     description: 'RSS/Atom/JSON · feed aggregation every 5 min',
@@ -302,7 +297,7 @@ function StatusPage() {
                 )
               })
             ) : !fetchError ? (
-              ['finance', 'sports', 'fantasy', 'rss'].map((name) => {
+              ['finance', 'sports', 'rss'].map((name) => {
                 const meta = CHANNEL_META[name]
                 return (
                   <LedgerRow

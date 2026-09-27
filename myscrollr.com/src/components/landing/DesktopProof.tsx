@@ -24,7 +24,7 @@ const ANNOTATIONS: ReadonlyArray<[string, string]> = [
   ['① THE BAR', 'pinned to the top edge, floating over every window'],
   [
     '② LIVE WIDGETS',
-    'eight running at once: MLB, MLS, markets, Kalshi, a Pomodoro timer',
+    'eight running at once: MLB, MLS, markets, a Pomodoro timer',
   ],
   ['③ HOME WINDOW', 'the glanceable briefing, open only when you want it'],
 ]
@@ -96,7 +96,7 @@ export function DesktopProof({
               height={1041}
               loading="lazy"
               decoding="async"
-              alt="Scrollr on a real macOS desktop: the live ticker pinned along the top of the screen showing weather, MLB and MLS games, markets, and a timer, with the Home window open showing scores, markets, and Kalshi"
+              alt="Scrollr on a real macOS desktop: the live ticker pinned along the top of the screen showing weather, MLB and MLS games, markets, and a timer, with the Home window open showing scores and markets"
               className="block h-auto w-full rounded-[8px] border border-hairline"
             />
             <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-content/45">

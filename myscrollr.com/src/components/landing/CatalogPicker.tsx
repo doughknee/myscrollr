@@ -28,21 +28,17 @@ const FEATURED_IDS = [
   'sports_nba',
   'news_bbc',
   'news_hackernews',
-  'predictions',
-  'fantasy_yahoo',
   'weather',
 ]
 
 /** Compact category labels for the count line (mockup: "14 SPORTS · 11
- *  NEWS · … · FANTASY · PREDICTIONS" — singular categories drop the
- *  number). Order mirrors CATEGORY_ORDER. */
+ *  NEWS · … · UTILITIES" — singular categories drop the number). Order
+ *  mirrors CATEGORY_ORDER. */
 const COUNT_LINE_LABELS: ReadonlyArray<[string, string]> = [
   ['sports', 'SPORTS'],
   ['news', 'NEWS'],
   ['finance', 'FINANCE'],
   ['utility', 'UTILITIES'],
-  ['fantasy', 'FANTASY'],
-  ['predictions', 'PREDICTIONS'],
 ]
 
 export function CatalogPicker() {
@@ -139,9 +135,6 @@ export function CatalogPicker() {
           </Link>
           <Link to="/news" className="text-primary">
             NEWS & RSS TICKER →
-          </Link>
-          <Link to="/fantasy" className="text-primary">
-            YAHOO FANTASY TICKER →
           </Link>
         </nav>
         {/* sync mode (no "wait"): the leaving block collapses while the

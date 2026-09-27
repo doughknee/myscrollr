@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   Download,
-  Ghost,
   Rss,
   Shield,
   Star,
@@ -27,8 +26,7 @@ const STEPS = [
   {
     id: 'choose',
     title: 'Pick Your Widgets',
-    description:
-      'Toggle on sports, markets, news, or fantasy. Whatever matters to you.',
+    description: 'Toggle on sports, markets, or news. Whatever matters to you.',
   },
   {
     id: 'work',
@@ -40,7 +38,7 @@ const STEPS = [
 
 // ── Channel & chip data for visuals ──────────────────────────────
 
-type ChannelColor = 'primary' | 'secondary' | 'info' | 'accent'
+type ChannelColor = 'primary' | 'secondary' | 'info'
 type ChipColor = 'primary' | 'secondary' | 'info'
 
 const CHANNELS: Array<{
@@ -52,7 +50,6 @@ const CHANNELS: Array<{
   { name: 'Finance', icon: TrendingUp, color: 'primary', defaultOn: true },
   { name: 'Sports', icon: Trophy, color: 'secondary', defaultOn: true },
   { name: 'News', icon: Rss, color: 'info', defaultOn: false },
-  { name: 'Fantasy', icon: Ghost, color: 'accent', defaultOn: true },
 ]
 
 const DEMO_CHIPS: Array<{ label: string; value: string; color: ChipColor }> = [
@@ -68,14 +65,12 @@ const toggleBg: Record<ChannelColor, string> = {
   primary: 'bg-primary',
   secondary: 'bg-secondary',
   info: 'bg-info',
-  accent: 'bg-accent',
 }
 
 const iconStyle: Record<ChannelColor, string> = {
   primary: 'text-primary bg-primary/10 border border-primary/15',
   secondary: 'text-secondary bg-secondary/10 border border-secondary/15',
   info: 'text-info bg-info/10 border border-info/15',
-  accent: 'text-accent bg-accent/10 border border-accent/15',
 }
 
 const chipStyle: Record<

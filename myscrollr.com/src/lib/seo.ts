@@ -8,8 +8,9 @@ type SeoInput = {
   noindex?: boolean
   jsonLd?: object | Array<object>
   /**
-   * Extra `<link>` tags to inject into the route's `<head>`. Used by the
-   * fantasy route to add a responsive `rel="preload"` for its hero image.
+   * Extra `<link>` tags to inject into the route's `<head>`. Used by
+   * segmented landing routes to add a responsive `rel="preload"` for
+   * their hero image.
    */
   extraLinks?: Array<LinkTag>
 }

@@ -1,7 +1,7 @@
 {
   "name": "Scrollr",
   "short_name": "Scrollr",
-  "description": "A quiet desktop ticker for live finance, sports, news, and fantasy data.",
+  "description": "A quiet desktop ticker for live finance, sports, and news data.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#141420",

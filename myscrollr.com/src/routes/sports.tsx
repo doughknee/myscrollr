@@ -140,15 +140,15 @@ function SportsPage() {
         <TerminalContainer className="py-10">
           <div className="flex flex-wrap items-center justify-between gap-6">
             <p className="m-0 max-w-xl text-base-content/60">
-              Pair live games with your Yahoo Fantasy matchup, or start with any
+              Pair live games with markets and headlines, or start with any
               three widgets for free.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                to="/fantasy"
+                to="/markets"
                 className="rounded-[4px] border border-hairline px-5 py-3 font-mono text-xs text-primary"
               >
-                YAHOO FANTASY →
+                MARKETS →
               </Link>
               <Link
                 to="/download"

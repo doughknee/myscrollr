@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 
-export const WORDS = ['Scores', 'Markets', 'Headlines', 'Leagues'] as const
+export const WORDS = ['Scores', 'Markets', 'Headlines'] as const
 
 interface HeroTextSwapProps {
   activeIndex: number

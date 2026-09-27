@@ -319,7 +319,7 @@ export const website: Website = {
   curve_step: '24h0m0s',
   top_paths: [{ key: '/', pageviews: 2000, visitors: 800 }],
   top_referrers: [{ key: 'google.com', pageviews: 900, visitors: 600 }],
-  top_campaigns: [{ key: 'fantasy-launch', pageviews: 120, visitors: 90 }],
+  top_campaigns: [{ key: 'spring-launch', pageviews: 120, visitors: 90 }],
   downloads_by_os: [{ key: 'windows', pageviews: 50, visitors: 45 }],
   definition: 'Unique visitors are count(DISTINCT person_id) over $pageview.',
   cached: false,

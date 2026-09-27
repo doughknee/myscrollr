@@ -15,7 +15,7 @@ const ASPECT_DETAILED = '2930 / 124'
 // ── Row catalog ──────────────────────────────────────────────────
 //
 // Each row demonstrates one (channel × density) combination. The order
-// is deliberately mixed (sports → finance → news → fantasy, alternating
+// is deliberately mixed (sports → finance → news, alternating
 // detailed/compact) so the section visually communicates "you can put
 // anything at any density" without spelling it out. The two
 // `all-purpose` rows close the sequence as a "this is everything at
@@ -57,25 +57,18 @@ const ROWS: ReadonlyArray<TickerRow> = [
     alt: 'Scrollr ticker showing recent RSS headlines with source attribution in the detailed density.',
   },
   {
-    basename: 'ticker/fantasy-compact',
-    channelLabel: 'Fantasy',
-    densityLabel: 'Compact',
-    aspect: ASPECT_COMPACT,
-    alt: 'Scrollr ticker showing Yahoo Fantasy league matchups in the compact density.',
-  },
-  {
     basename: 'ticker/all-purpose-detailed',
     channelLabel: 'All widgets',
     densityLabel: 'Detailed',
     aspect: ASPECT_DETAILED,
-    alt: 'Scrollr ticker showing sports, finance, news, and fantasy together in the detailed density.',
+    alt: 'Scrollr ticker showing sports, finance, and news together in the detailed density.',
   },
   {
     basename: 'ticker/all-purpose-compact',
     channelLabel: 'All widgets',
     densityLabel: 'Compact',
     aspect: ASPECT_COMPACT,
-    alt: 'Scrollr ticker showing sports, finance, news, and fantasy together in the compact density.',
+    alt: 'Scrollr ticker showing sports, finance, and news together in the compact density.',
   },
 ] as const
 

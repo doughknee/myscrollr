@@ -85,7 +85,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Use of the Platform',
         content: [
-          'The Platform aggregates publicly available and third-party data including financial market data, sports scores, RSS news feeds, fantasy sports information, and prediction-market data. This data is provided for informational and entertainment purposes only.',
+          'The Platform aggregates publicly available and third-party data including financial market data, sports scores, and RSS news feeds. This data is provided for informational and entertainment purposes only.',
           'You may use the Platform for personal, non-commercial purposes in accordance with these Terms and our Acceptable Use Policy. You may not use the Platform in any way that violates applicable laws or regulations.',
         ],
       },
@@ -100,7 +100,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Intellectual Property',
         content: [
           'The Scrollr platform source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). This means the source code is freely available, and you may use, modify, and distribute it in accordance with the terms of that license.',
-          'The Scrollr name, logo, and branding are trademarks of the project maintainers and may not be used without permission. Third-party data displayed through the Platform (market data, sports scores, news feeds, fantasy sports data, prediction-market data) remains the property of its respective owners.',
+          'The Scrollr name, logo, and branding are trademarks of the project maintainers and may not be used without permission. Third-party data displayed through the Platform (market data, sports scores, news feeds) remains the property of its respective owners.',
         ],
       },
       {
@@ -157,11 +157,9 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'Account Information: When you create an account, our authentication provider (Logto) collects your email address, username, and display name. We store a unique identifier (Logto sub) to associate your account with your preferences and data channels.',
           'User Preferences: We store your feed display preferences (position, mode, behavior, enabled/disabled sites) in our PostgreSQL database, associated with your account identifier.',
-          'Channel Configuration: We store which data channels you have enabled (finance, sports, RSS, fantasy) and their configuration settings.',
-          'Yahoo Fantasy Data: If you connect your Yahoo Fantasy account, we store an encrypted refresh token (AES-256-GCM encryption) to maintain your connection. We also store your Yahoo user identifier, league data, standings, rosters, and matchup information that Yahoo provides through their API.',
-          "Kalshi Account Connection: If you connect your own Kalshi account in the desktop application (an optional feature for viewing your positions), your Kalshi API key ID and private key are stored ONLY in your device's operating-system keychain or credential store. They are never transmitted to our servers, never included in our database, and are used solely for read-only portfolio requests made directly from your device to Kalshi.",
+          'Channel Configuration: We store which data channels you have enabled (finance, sports, RSS) and their configuration settings.',
           'Operational Data: We keep anonymous totals for API requests, app versions, operating systems, failures, and active SSE connections. These totals carry no account identifier, IP address, or ticker contents. Separately, PostHog receives only the fixed public-page or desktop events described below and provides an opt-out control.',
-          'Usage Analytics: The desktop app has one "Share usage analytics" setting for signed-in accounts, on by default unless a saved decision says otherwise. While enabled, we record one daily fact after a native ticker is actually visible with at least one enabled widget for 30 continuous seconds. The fact may include only broad categories — sports, markets, news, fantasy, predictions, and utilities — that were enabled during that qualifying activity. We do not receive symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint. Multiple windows, monitors, and devices deduplicate to the same account and UTC day. This measures qualifying ticker use, not attention. While the same setting is enabled, the desktop app also checks in about every 30 seconds to say that it is running, whether the computer is locked, its display asleep, or its input idle, whether each ticker screen is shown, and which widget types each screen is showing, under a random identifier created at each launch rather than a device identifier. Ending the app or sleeping the computer ends that session.',
+          'Usage Analytics: The desktop app has one "Share usage analytics" setting for signed-in accounts, on by default unless a saved decision says otherwise. While enabled, we record one daily fact after a native ticker is actually visible with at least one enabled widget for 30 continuous seconds. The fact may include only broad categories — sports, markets, news, and utilities — that were enabled during that qualifying activity. We do not receive symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint. Multiple windows, monitors, and devices deduplicate to the same account and UTC day. This measures qualifying ticker use, not attention. While the same setting is enabled, the desktop app also checks in about every 30 seconds to say that it is running, whether the computer is locked, its display asleep, or its input idle, whether each ticker screen is shown, and which widget types each screen is showing, under a random identifier created at each launch rather than a device identifier. Ending the app or sleeping the computer ends that session.',
           'PostHog Analytics: Website analytics default on only when Scrollr locally resolves a fresh country lookup to the US; elsewhere or when location cannot be resolved, the site asks first. The lookup IP never leaves our API and is not stored. While analytics are enabled, a first-party browser identifier links public-page paths without query strings, standard campaign attribution, verified signup, and platform download steps across visits. When a visitor signs in, the browser identifier is linked to a server-generated HMAC pseudonym, never the raw account ID or email. Limited desktop analytics are on by default and can be turned off anytime; they send app opened, app running, and broad configured-feature categories through our API under the same kind of pseudonym. PostHog IP and location enrichment, private routes, ticker contents, symbols, teams, feeds, support text, session replay, and unrelated device activity are excluded.',
         ],
       },
@@ -176,7 +174,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Data Storage and Security',
         content: [
-          'Your data is stored in a PostgreSQL database hosted on our self-hosted infrastructure (Coolify). Sensitive tokens (such as Yahoo OAuth refresh tokens) are encrypted at rest using AES-256-GCM encryption.',
+          'Your data is stored in a PostgreSQL database hosted on our self-hosted infrastructure (Coolify). Sensitive tokens are encrypted at rest using AES-256-GCM encryption.',
           'Real-time data routing uses Redis for per-user pub/sub channels and caching. Redis data is ephemeral and not persisted long-term.',
           'We implement reasonable security measures to protect your information, but no method of transmission or storage is 100% secure.',
         ],
@@ -185,14 +183,14 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Third-Party Services',
         content: [
           'The Platform integrates with several third-party services. Each has its own privacy policy that we encourage you to review:',
-          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. Yahoo provides fantasy sports data when you authorize your account. Kalshi provides prediction-market data. RSS feed publishers provide news content through their public feeds. PostHog receives only the limited analytics described above; website analytics default on only in the US and can be turned off in the footer, while other locations are asked first. The desktop also provides an opt-out control.',
+          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. RSS feed publishers provide news content through their public feeds. PostHog receives only the limited analytics described above; website analytics default on only in the US and can be turned off in the footer, while other locations are asked first. The desktop also provides an opt-out control.',
           'We send your user identifier to our channel APIs via internal HTTP headers (X-User-Sub) to route data to your account. Third-party data providers do not receive your personal information directly from us.',
         ],
       },
       {
         heading: 'Data Retention',
         content: [
-          'We retain your account information and preferences for as long as your account is active. Optional product-activity daily facts and presence check-in totals (kept per hour, never per check-in) are retained for 90 days; live presence expires 90 seconds after the last check-in. While PostHog analytics are enabled, Scrollr keeps an export mirror of the fixed account-linked desktop event fields. After desktop opt-out it remains only until PostHog accepts the deletion request; account purge removes the mirror immediately and keeps only a minimal deletion tombstone. RSS articles are automatically deleted after 7 days. Yahoo Fantasy data is refreshed on a sync cycle (default: every 120 seconds for active users).',
+          'We retain your account information and preferences for as long as your account is active. Optional product-activity daily facts and presence check-in totals (kept per hour, never per check-in) are retained for 90 days; live presence expires 90 seconds after the last check-in. While PostHog analytics are enabled, Scrollr keeps an export mirror of the fixed account-linked desktop event fields. After desktop opt-out it remains only until PostHog accepts the deletion request; account purge removes the mirror immediately and keeps only a minimal deletion tombstone. RSS articles are automatically deleted after 7 days.',
           'You may request deletion of your account and associated data by contacting us through our community channels.',
         ],
       },
@@ -248,18 +246,17 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'The Scrollr desktop application stores the following data on your device:',
           'Authentication tokens: Your access token and refresh token for authenticating with our API servers. These are stored in the application data directory and are not shared with any third party.',
-          'Channel and widget configurations: Your selected data sources (stock symbols, RSS feeds, sports leagues, fantasy leagues), ticker layout preferences, and per-channel display settings.',
+          'Channel and widget configurations: Your selected data sources (stock symbols, RSS feeds, sports leagues), ticker layout preferences, and per-channel display settings.',
           'Feed preferences: Display settings including ticker position, mode, behavior, visibility, scroll speed, and appearance customizations.',
           'Dashboard state: Cached dashboard data for faster loading between sessions.',
           'Application logs: Diagnostic log files are written to a local logs directory within the application data folder. These logs contain operational information (connection status, errors, data sync events) and do not contain personal data, browsing activity, or content from other applications.',
           'Window state: Window position, size, and display information used to restore your ticker and main window layout between sessions.',
-          "Kalshi credentials (optional): If you connect your own Kalshi account, your Kalshi API key ID and RSA private key are stored in your operating system's secure keychain or credential store — not in the application data directory. The private key is read and used exclusively by the application's native layer; it is never exposed to the interface layer, never written to logs, and never transmitted to Scrollr servers. Disconnecting removes the stored credentials.",
         ],
       },
       {
         heading: 'Network Communication',
         content: [
-          "The desktop application communicates with Scrollr API servers (api.myscrollr.com) to retrieve real-time data via Server-Sent Events (SSE) and to synchronize your configuration. If you optionally connect your own Kalshi account, the application additionally communicates directly with Kalshi's API from your device (see Third-Party Services below).",
+          'The desktop application communicates with Scrollr API servers (api.myscrollr.com) to retrieve real-time data via Server-Sent Events (SSE) and to synchronize your configuration.',
           'All network communication uses HTTPS encryption. The application sends your authentication token, subscription tier, and its own version and operating system with each request; we keep the last two only as anonymous daily totals, to tell which builds a bug affects. While Share usage analytics is enabled, an authenticated daily report may say that the native ticker was visible with an enabled broad category for 30 continuous seconds, and an authenticated check-in about every 30 seconds says that the app is running, whether the computer is locked, its display asleep, or its input idle, whether each ticker screen is shown, and which widget types each screen shows. Idle means only how long since the last key or mouse event, never what it was. Widget types are catalog names such as "NFL" or "BBC News"; the check-in does not transmit any data about other applications, files, browsing, symbols, teams, feed URLs, titles, or ticker content.',
         ],
       },
@@ -279,8 +276,6 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Third-Party Services',
         content: [
-          'Yahoo Fantasy Sports: If you connect your Yahoo account, the desktop application opens your default browser for the OAuth authorization flow. The application stores an encrypted refresh token locally and on our servers to maintain the connection. See our Privacy Policy for details on Yahoo data handling.',
-          "Kalshi (optional): If you connect your own Kalshi account, the application communicates directly from your device to Kalshi's API using your credentials for READ-ONLY portfolio and position data. These requests do not pass through Scrollr servers. The application cannot place, modify, or cancel orders on your Kalshi account.",
           'Scrollr includes no advertising frameworks or data sales. PostHog analytics are separate from crash reports. Website analytics default on only in the US after a local country check; elsewhere the site asks first, and every visitor can turn them off in the footer. Limited desktop analytics are on by default and can be turned off anytime. Public-site analytics exclude private routes and page contents. Desktop analytics use a pseudonymous account identifier and fixed broad events only; they never include ticker contents, symbols, teams, feeds, support text, or unrelated device activity. The independent "Send crash reports" setting controls Sentry.',
         ],
       },
@@ -398,17 +393,9 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         ],
       },
       {
-        heading: 'Prediction Markets Disclaimer',
-        content: [
-          'Prediction-market data displayed through the Platform is sourced from Kalshi, a CFTC-regulated exchange for event contracts. Scrollr displays market prices, volumes, and outcomes for informational and entertainment purposes only. Scrollr is not affiliated with, endorsed by, or sponsored by Kalshi.',
-          'Scrollr CANNOT and DOES NOT place, modify, or cancel orders on any prediction market. The optional "My Positions" feature reads your own Kalshi account data directly from your device using your own credentials and is strictly read-only.',
-          'Event contracts involve risk, including the possible loss of your entire position. Displayed prices may be delayed or incomplete and should not be relied upon as the sole basis for any trading decision. Nothing displayed constitutes a recommendation to buy or sell any event contract.',
-        ],
-      },
-      {
         heading: 'Third-Party Data Provider',
         content: [
-          "Financial data is provided by TwelveData (twelvedata.com). Prediction-market data is provided by Kalshi (kalshi.com). Each provider's terms of service and data usage policies apply to the data we display. We are not responsible for the accuracy, availability, or completeness of data provided by TwelveData, Kalshi, or any other third-party data source.",
+          "Financial data is provided by TwelveData (twelvedata.com). Each provider's terms of service and data usage policies apply to the data we display. We are not responsible for the accuracy, availability, or completeness of data provided by TwelveData or any other third-party data source.",
         ],
       },
     ],
@@ -444,20 +431,6 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           "Live sports scores, game schedules, and team information are sourced from ESPN's publicly available APIs. This data covers NFL, NBA, NHL, MLB, College Football, Men's College Basketball, Women's College Basketball, and College Baseball. ESPN is a trademark of ESPN Inc. We are not affiliated with or endorsed by ESPN.",
           'Sports data is polled at regular intervals (approximately every 60 seconds) and may not reflect the absolute latest scores during live games.',
-        ],
-      },
-      {
-        heading: 'Fantasy Sports Data — Yahoo',
-        content: [
-          "Yahoo Fantasy Sports data is accessed through Yahoo's official API with explicit user authorization via OAuth 2.0. We only access fantasy sports data for users who have actively connected their Yahoo account. Yahoo and Yahoo Fantasy are trademarks of Yahoo Inc. We are not affiliated with or endorsed by Yahoo.",
-          'Fantasy data includes league information, standings, matchups, and roster details. This data is synced periodically for active users.',
-        ],
-      },
-      {
-        heading: 'Prediction Market Data — Kalshi',
-        content: [
-          "Prediction-market data (event-contract prices, volumes, and outcomes) is sourced from Kalshi's public API under our own API credentials. Kalshi is a trademark of Kalshi Inc. We are not affiliated with, endorsed by, or sponsored by Kalshi.",
-          'Scrollr displays this data read-only and does not route, place, or execute orders. Users who optionally connect their own Kalshi account do so directly from their device with their own credentials; those requests do not pass through Scrollr servers. See our Financial Data Disclaimer for the prediction-markets risk disclosure.',
         ],
       },
       {
@@ -578,7 +551,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Non-Refundable Circumstances',
         content: [
-          'Refunds will not be granted for: requests made after the applicable refund window; dissatisfaction with third-party data accuracy (we do not control data from TwelveData, ESPN, Yahoo, or RSS publishers); temporary service outages or maintenance periods; or features that are clearly documented as not included in Uplink.',
+          'Refunds will not be granted for: requests made after the applicable refund window; dissatisfaction with third-party data accuracy (we do not control data from TwelveData, ESPN, or RSS publishers); temporary service outages or maintenance periods; or features that are clearly documented as not included in Uplink.',
         ],
       },
       {
@@ -817,7 +790,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Our Security Practices',
         content: [
           'Scrollr takes the security of its platform and user data seriously. We implement multiple layers of security across our infrastructure:',
-          'Encryption: All API communication is encrypted via HTTPS/TLS. Yahoo OAuth refresh tokens are encrypted at rest using AES-256-GCM with a 256-bit key. OAuth state parameters use Redis-backed CSRF tokens with a 10-minute TTL.',
+          'Encryption: All API communication is encrypted via HTTPS/TLS. OAuth refresh tokens are encrypted at rest using AES-256-GCM with a 256-bit key. OAuth state parameters use Redis-backed CSRF tokens with a 10-minute TTL.',
           'Authentication: User authentication is handled by Logto, a self-hosted OIDC provider. Access tokens are validated using JWKS with automatic key rotation. The desktop application uses PKCE (Proof Key for Code Exchange) for its OAuth flow. Channel APIs never validate JWTs directly — they receive trusted user identity from the core API via internal HTTP headers.',
           'Infrastructure: The platform is deployed on self-hosted infrastructure (Coolify) with network isolation between services. Database connections use connection pooling with parameterized queries to prevent SQL injection.',
         ],
@@ -833,7 +806,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Scope',
         content: [
           'The following are in scope for security reports: the Scrollr web application (myscrollr.com), the Scrollr desktop application, the core API and channel APIs, authentication and authorization flows, and data storage and encryption implementations.',
-          'The following are out of scope: third-party services we integrate with (TwelveData, ESPN, Yahoo, Logto itself), denial-of-service attacks, social engineering of Scrollr maintainers, and any testing against production systems without permission.',
+          'The following are out of scope: third-party services we integrate with (TwelveData, ESPN, Logto itself), denial-of-service attacks, social engineering of Scrollr maintainers, and any testing against production systems without permission.',
         ],
       },
       {

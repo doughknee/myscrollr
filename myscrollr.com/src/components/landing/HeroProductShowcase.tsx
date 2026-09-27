@@ -23,14 +23,14 @@ import { useTheme } from '@/hooks/useTheme'
  *
  * Props match the previous component so `HeroSection.tsx` does not
  * need to change shape:
- *   - activeIndex: 0..3 corresponding to ['sports','finance','news','fantasy']
+ *   - activeIndex: 0..2 corresponding to ['sports','finance','news']
  *   - onSelect:    optional click-to-jump handler (kept for parity even
  *                  though the new component does not surface clickable
  *                  tabs itself; click control lives in the parent's
  *                  progress-bar UI).
  */
 
-const CHANNELS = ['sports', 'finance', 'news', 'fantasy'] as const
+const CHANNELS = ['sports', 'finance', 'news'] as const
 type Channel = (typeof CHANNELS)[number]
 
 // Accent colors for the ambient glow behind each channel. Kept in
@@ -39,7 +39,6 @@ const ACCENT_GLOW: Record<Channel, string> = {
   sports: 'rgba(255,71,87,0.10)', // red
   finance: 'rgba(52,211,153,0.10)', // emerald
   news: 'rgba(0,212,255,0.10)', // cyan
-  fantasy: 'rgba(168,85,247,0.10)', // violet
 }
 
 // Accessible alt-text per channel. Surfaces what the screenshot
@@ -52,8 +51,6 @@ const ALT_TEXT: Record<Channel, string> = {
   finance:
     'Scrollr desktop app showing live stock and crypto prices with category tags, percent change, and Gainers/Losers filters.',
   news: 'Scrollr desktop app showing the latest news headlines from custom RSS sources, with recency indicators.',
-  fantasy:
-    'Scrollr desktop app showing Yahoo Fantasy league overview cards with a live matchup score, win probability, and league standings context.',
 }
 
 interface HeroProductShowcaseProps {
