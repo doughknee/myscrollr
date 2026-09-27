@@ -16,12 +16,31 @@ import (
 // CountEnabledWidgets returns how many enabled widgets a user
 // currently has — the "slots in use" for the widget/slot model. Used by
 // CreateWidget to gate new additions against the tier's MaxWidgets cap.
+//
+// A row whose widget_type is no longer in the catalog (a retired widget,
+// e.g. fantasy_yahoo/predictions after SCROLLR-239) never counts: it is
+// unusable and unremovable by the user, so letting it hold a slot forever
+// locks them out of adding anything new (SCROLLR-245).
 func CountEnabledWidgets(ctx context.Context, logtoSub string) (int, error) {
-	var n int
-	err := platform.DBPool.QueryRow(ctx,
-		`SELECT count(*) FROM user_widgets WHERE logto_sub = $1 AND enabled = true`,
-		logtoSub).Scan(&n)
-	return n, err
+	rows, err := platform.DBPool.Query(ctx,
+		`SELECT widget_type FROM user_widgets WHERE logto_sub = $1 AND enabled = true`,
+		logtoSub)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	n := 0
+	for rows.Next() {
+		var widgetType string
+		if err := rows.Scan(&widgetType); err != nil {
+			return 0, err
+		}
+		if platform.IsKnownWidgetType(widgetType) {
+			n++
+		}
+	}
+	return n, rows.Err()
 }
 
 // callWidgetLifecycle delivers a widget lifecycle event to its backing
@@ -509,10 +528,12 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 
 // partitionWidgetsForCap splits a created_at-ascending widget list into
 // the enabled widgets that fit the slot cap (oldest first) and the
-// enabled overflow to disable. Disabled rows pass through untouched.
+// enabled overflow to disable. Disabled rows pass through untouched. A
+// retired widget type (not in the catalog, SCROLLR-245) never counts
+// against the cap and is left alone — it is not a slot to reclaim.
 func partitionWidgetsForCap(widgets []platform.Widget, max int) (kept, pruned []platform.Widget) {
 	for _, ch := range widgets {
-		if !ch.Enabled {
+		if !ch.Enabled || !platform.IsKnownWidgetType(ch.WidgetType) {
 			continue
 		}
 		if len(kept) < max {
