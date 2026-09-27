@@ -349,3 +349,23 @@ Per-component templates that DO exist: `api/`, `channels/{finance,sports,rss}/`,
 `ENCRYPTION_KEY` must be **identical** across `api/.env` and every `channels/*/.env` — core encrypts third-party tokens and the channels decrypt them. `make setup` generates one value and writes it everywhere.
 
 Never commit `.env` files. Package manager is **npm** throughout (not pnpm/yarn).
+
+## Home
+
+Lessons the Home session learned running this repo; every worker reads them.
+
+- **Retiring a widget is four changes, not three** (SCROLLR-245, 27 Sep 2026): the
+  catalog entry, the client strip list, the generated mirrors — and the rows in
+  `user_widgets`. Purge those rows in the same change (`000024` is the shape).
+  `CountEnabledWidgets` now ignores unknown types, so a miss no longer blocks users,
+  but the phantom rows still have to go.
+- **Removal PRs must grep the GDPR path and the dev scripts.** #421 left readers of
+  the Yahoo tables in `api/internal/accounts/user_deletion.go` and a `markets`
+  update in `scripts/dev/live.sh` (SCROLLR-242). Before any DROP TABLE, grep
+  `api/ channels/ scripts/ k8s/ docker/` for the table names and check
+  `pg_publication_tables` on prod.
+- **Sequin's sink table list is not in the repo.** Sequin is self-hosted
+  (`sequin.myscrollr.com`, console login); removing a table from the sink is a
+  console action. `docs/cdc-runbook.md` has the topology.
+- **Kubernetes collapses `$$` to `$` in pod env values.** A psql script passed
+  through `env` cannot use `DO $$ … $$` blocks; use plain SQL.
