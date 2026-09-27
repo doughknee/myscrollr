@@ -1,0 +1,15 @@
+-- Purge retired fantasy/predictions widget rows (SCROLLR-245 / SCROLLR-237).
+--
+-- SCROLLR-239 removed fantasy_yahoo and predictions from the widget catalog,
+-- but left existing user_widgets rows of those types in place. The client
+-- strips retired ids from its own local lists (SCROLLR-240), so the desktop
+-- app shows a lower widget count than the server does, and the server's
+-- slot gate (CountEnabledWidgets) still counts those rows — silently
+-- consuming a slot the user can no longer see or remove. Confirmed on
+-- support ticket #389548 (SCROLLR-245): a Free-tier account with one
+-- `predictions` row could not add a third widget despite the app showing
+-- only two in use.
+--
+-- These widget types have no renderer, no data source, and no way for the
+-- user to remove them through the app, so the rows are simply gone.
+DELETE FROM user_widgets WHERE widget_type IN ('fantasy_yahoo', 'predictions');

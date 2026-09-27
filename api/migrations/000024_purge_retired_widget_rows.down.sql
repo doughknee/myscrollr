@@ -1,0 +1,3 @@
+-- No-op: the up migration deletes data (retired fantasy_yahoo/predictions
+-- widget rows), and deleted rows cannot be un-deleted. There is nothing to
+-- restore.
