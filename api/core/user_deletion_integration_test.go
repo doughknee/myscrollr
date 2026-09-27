@@ -48,8 +48,7 @@ func setupIntegrationDB(t *testing.T) {
 	}
 	_, err := platform.DBPool.Exec(context.Background(), `
 		TRUNCATE TABLE product_analytics_enrollments, user_widgets, user_preferences, stripe_customers,
-		               stripe_webhook_events, user_deletion_requests,
-		               yahoo_user_leagues, yahoo_users, yahoo_leagues CASCADE
+		               stripe_webhook_events, user_deletion_requests CASCADE
 	`)
 	if err != nil {
 		t.Fatalf("truncate test tables: %v", err)
@@ -167,9 +166,9 @@ func queryCount(t *testing.T, sql string, args ...any) int {
 }
 
 // seedPurgeableUser inserts the full set of rows the purge cascade
-// touches: channel config, preferences, Stripe record, Yahoo OAuth +
-// league mapping, and a pending deletion request safely past both the
-// grace window and the 24h floor guard.
+// touches: channel config, preferences, Stripe record, and a pending
+// deletion request safely past both the grace window and the 24h floor
+// guard.
 func seedPurgeableUser(t *testing.T, sub string, lifetime bool) {
 	t.Helper()
 	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, config) VALUES ($1, 'finance', '{}')`, sub)
@@ -179,11 +178,6 @@ func seedPurgeableUser(t *testing.T, sub string, lifetime bool) {
 	testsupport.MustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime)
 	             VALUES ($1, $2, $3, 'canceled', $4)`,
 		sub, "cus_"+sub, map[bool]string{true: "lifetime", false: "monthly"}[lifetime], lifetime)
-	testsupport.MustExec(t, `INSERT INTO yahoo_leagues (league_key, name, game_code, season, data)
-	             VALUES ('nfl.l.12345', 'Test League', 'nfl', '2025', '{}')
-	             ON CONFLICT (league_key) DO NOTHING`)
-	testsupport.MustExec(t, `INSERT INTO yahoo_users (guid, logto_sub, refresh_token) VALUES ($1, $2, 'refresh-token')`, "guid-"+sub, sub)
-	testsupport.MustExec(t, `INSERT INTO yahoo_user_leagues (guid, league_key) VALUES ($1, 'nfl.l.12345')`, "guid-"+sub)
 	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
 	             VALUES ($1, now() - interval '31 days', now() - interval '1 day', 'pending')`, sub)
 }
@@ -210,14 +204,10 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
-		{"yahoo_users", `SELECT count(*) FROM yahoo_users WHERE logto_sub = $1`},
 	} {
 		if n := queryCount(t, q.sql, sub); n != 0 {
 			t.Errorf("%s rows after purge = %d, want 0", q.name, n)
 		}
-	}
-	if n := queryCount(t, `SELECT count(*) FROM yahoo_user_leagues WHERE guid = $1`, "guid-"+sub); n != 0 {
-		t.Errorf("yahoo_user_leagues rows after purge = %d, want 0", n)
 	}
 
 	// The request row is marked purged with a timestamp.
@@ -282,7 +272,6 @@ func TestIntegrationPurgeAbortsWhenLogtoFails(t *testing.T) {
 		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
-		{"yahoo_users", `SELECT count(*) FROM yahoo_users WHERE logto_sub = $1`},
 	} {
 		if n := queryCount(t, q.sql, sub); n != 1 {
 			t.Errorf("%s rows after failed purge = %d, want 1 (untouched)", q.name, n)

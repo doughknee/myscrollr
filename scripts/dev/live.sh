@@ -14,7 +14,6 @@
 #            or inning; after the sport's length they go 'final'.
 #   trades   every price drifts a little; the sparkline gains the point; the
 #            day range widens to hold it.
-#   markets  implied probabilities drift a point or two.
 #   caches   core's Redis caches are dropped, so the next dashboard poll
 #            serves what is now in the database.
 # Nothing is fabricated from nothing: every row that changes was already in
@@ -183,12 +182,6 @@ UPDATE trades t SET
   ) || to_jsonb(m.np),
   last_updated = now()
 FROM moved m WHERE t.id = m.id;
-
--- 5. Odds drift a point or two, and remember where they were.
-UPDATE markets SET
-  prev_yes_price = yes_price,
-  yes_price = greatest(0, least(100, yes_price + (floor(random()*5)::int - 2)))
-WHERE status = 'active' AND random() < 0.3;
 SQL
 )
 
