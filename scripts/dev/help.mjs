@@ -43,8 +43,8 @@ for (const [group, targets] of groups) {
 out.push("");
 out.push("  First time?  make setup  &&  make up");
 out.push("");
-out.push("  Ports  core 18080 | fantasy 8084 | postgres 5432 | redis 6379");
-out.push("         finance 3001 | sports 3002 | rss 3004 | predictions 3005");
+out.push("  Ports  core 18080 | postgres 5432 | redis 6379");
+out.push("         finance 3001 | sports 3002 | rss 3004");
 out.push("         web 3000 and the desktop app run natively, not in Docker");
 out.push("");
 console.log(out.join("\n"));

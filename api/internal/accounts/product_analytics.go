@@ -25,9 +25,11 @@ type ProductAnalyticsConsent struct {
 	EnrolledAt string `json:"enrolled_at,omitempty"`
 }
 
+// "fantasy" and "predictions" are no longer accepted (SCROLLR-239): the
+// product_activity_daily columns stay (expand/contract, no drop) but never
+// receive a new true value.
 var productCategories = map[string]struct{}{
-	"sports": {}, "markets": {}, "news": {}, "fantasy": {},
-	"predictions": {}, "utilities": {},
+	"sports": {}, "markets": {}, "news": {}, "utilities": {},
 }
 
 func decodeStrict(body []byte, dst any) error {

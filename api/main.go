@@ -29,7 +29,7 @@ func envOr(key, fallback string) string {
 
 // @title Scrollr API
 // @version 2.0
-// @description Core API for Scrollr — serves the widget catalog, widget CRUD, reads, SSE, billing and accounts. Proxies the one remaining discovered service (fantasy).
+// @description Core API for Scrollr — serves the widget catalog, widget CRUD, reads, SSE, billing and accounts.
 // @host api.myscrollr.com
 // @BasePath /
 // @securityDefinitions.apikey LogtoAuth
@@ -80,9 +80,6 @@ func main() {
 
 	events.InitHub(ctx)
 	platform.InitAuth()
-
-	// Start Redis-based channel discovery (ctx-aware)
-	platform.StartDiscovery(ctx)
 
 	// Start GDPR purge worker — scans user_deletion_requests hourly for
 	// rows that have aged past their purge_at and cascades the permanent
@@ -139,7 +136,7 @@ func main() {
 	sig := <-quit
 	log.Printf("Received signal %v, shutting down...", sig)
 
-	// Cancel discovery goroutine
+	// Cancel background workers
 	cancel()
 
 	// Gracefully shut down Fiber

@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -23,7 +21,7 @@ import (
 
 // OverviewResponse is the unified read shape for GET /users/me/overview.
 // Single round-trip for the desktop account pane: identity, tier, billing,
-// widget summary, GDPR state, fantasy summary, and useful outbound links.
+// widget summary, GDPR state, and useful outbound links.
 //
 // The endpoint is cached per-user in Redis for 30s with singleflight in
 // front of the assemble path; cache invalidation hooks fire from the
@@ -34,7 +32,6 @@ type OverviewResponse struct {
 	Tier         OverviewTier                   `json:"tier"`
 	Subscription *platform.SubscriptionResponse `json:"subscription"`
 	Widgets      OverviewWidgets                `json:"widgets"`
-	Fantasy      *OverviewFantasy               `json:"fantasy"`
 	GDPR         OverviewGDPR                   `json:"gdpr"`
 	Links        OverviewLinks                  `json:"links"`
 }
@@ -73,17 +70,6 @@ type OverviewWidgetRow struct {
 	TickerEnabled bool   `json:"ticker_enabled"`
 }
 
-// OverviewFantasy is the optional fan-out result from the fantasy
-// channel's /users/me/yahoo-summary endpoint. nil when the user has no
-// enabled fantasy channel, when the channel hasn't registered, or when
-// the fan-out call fails (timeout, non-200, or transport error). The
-// account pane treats nil as "fantasy section hidden".
-type OverviewFantasy struct {
-	YahooConnected bool `json:"yahoo_connected"`
-	YahooSynced    bool `json:"yahoo_synced"`
-	LeagueCount    int  `json:"league_count"`
-}
-
 // OverviewGDPR mirrors the deletion-request row in a typed shape. Status
 // is one of "none" | "pending" | "canceled" | "purged". Timestamps are
 // RFC3339 strings (rather than time.Time) so JSON null is the natural
@@ -108,11 +94,6 @@ const (
 	// on every state-changing endpoint that affects the response, so
 	// the TTL is a safety net rather than the primary correctness lever.
 	OverviewCacheTTL = 30 * time.Second
-
-	// FantasyFanoutTimeout bounds the optional fantasy-channel call.
-	// The overview is a foreground request; we'd rather return without
-	// a fantasy block than hold the page on a slow channel.
-	FantasyFanoutTimeout = 1 * time.Second
 )
 
 // overviewGroup coalesces concurrent cache misses for the same user
@@ -200,67 +181,6 @@ func getWidgetSummary(ctx context.Context, userID string) (OverviewWidgets, erro
 		Enabled: enabled,
 		ByType:  byType,
 	}, nil
-}
-
-// ─── Fantasy fan-out ────────────────────────────────────────────────
-
-// fetchFantasySummary calls the fantasy channel's
-// GET /users/me/yahoo-summary endpoint with a tight timeout. Returns
-// nil on any failure path (channel not registered, timeout, non-200,
-// unmarshal error) so the overview gracefully degrades: the account
-// pane just hides the fantasy section.
-func fetchFantasySummary(ctx context.Context, userID string) *OverviewFantasy {
-	baseURL := getFantasyBaseURL()
-	if baseURL == "" {
-		return nil
-	}
-
-	url := strings.TrimRight(baseURL, "/") + "/users/me/yahoo-summary"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		log.Printf("[Overview] build fantasy request: %v", err)
-		return nil
-	}
-	// X-User-Sub is the same convention the proxy uses to forward
-	// identity into channel APIs (see proxy.go).
-	req.Header.Set("X-User-Sub", userID)
-
-	client := &http.Client{Timeout: FantasyFanoutTimeout}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("[Overview] fantasy fan-out failed (timeout/network): %v", err)
-		return nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("[Overview] fantasy fan-out non-200: %d", resp.StatusCode)
-		return nil
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("[Overview] fantasy fan-out read body: %v", err)
-		return nil
-	}
-
-	var out OverviewFantasy
-	if err := json.Unmarshal(body, &out); err != nil {
-		log.Printf("[Overview] fantasy fan-out unmarshal: %v", err)
-		return nil
-	}
-	return &out
-}
-
-// getFantasyBaseURL resolves the fantasy channel's internal base URL
-// via the discovery registry (Redis-backed). Returns "" if the channel
-// hasn't registered yet; callers treat that as "skip fan-out".
-func getFantasyBaseURL() string {
-	info := platform.GetChannel("fantasy")
-	if info == nil {
-		return ""
-	}
-	return info.InternalURL
 }
 
 // ─── GDPR ───────────────────────────────────────────────────────────
@@ -357,16 +277,13 @@ func buildAccountLinks() OverviewLinks {
 //
 //  1. Identity + tier — pure context reads, no I/O.
 //  2. Subscription — single DB query.
-//  3. Widgets — single DB query (also gates the fantasy fan-out).
+//  3. Widgets — single DB query.
 //  4. GDPR — single DB query.
-//  5. Fantasy — only when the user has an enabled fantasy widget; HTTP
-//     call with a 1s timeout so a slow fantasy API can't pin the
-//     overview.
 //
-// Failures in optional sections (subscription, GDPR, fantasy) degrade
-// gracefully to nil/none rather than failing the whole call. The
-// widgets query is the only one that can hard-fail — without it the
-// summary is meaningless.
+// Failures in optional sections (subscription, GDPR) degrade gracefully
+// to nil/none rather than failing the whole call. The widgets query is
+// the only one that can hard-fail — without it the summary is
+// meaningless.
 func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*OverviewResponse, error) {
 	identity := buildIdentityFromContext(c)
 	tier := buildTierFromContext(c)
@@ -379,36 +296,14 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 
 	gdpr := getDeletionStatusForOverview(ctx, userID)
 
-	var fantasy *OverviewFantasy
-	if hasFantasyWidget(widgets) {
-		fanCtx, cancel := context.WithTimeout(ctx, FantasyFanoutTimeout)
-		defer cancel()
-		fantasy = fetchFantasySummary(fanCtx, userID)
-	}
-
 	return &OverviewResponse{
 		Identity:     identity,
 		Tier:         tier,
 		Subscription: subscription,
 		Widgets:      widgets,
-		Fantasy:      fantasy,
 		GDPR:         gdpr,
 		Links:        buildAccountLinks(),
 	}, nil
-}
-
-// hasFantasyWidget returns true when the user has an enabled fantasy
-// widget — the only condition under which the fantasy fan-out is
-// worth the latency cost.
-func hasFantasyWidget(widgets OverviewWidgets) bool {
-	for _, c := range widgets.ByType {
-		// Match the fantasy SOURCE, not the literal — the widget row is
-		// "fantasy_yahoo" (post widget-split), never bare "fantasy".
-		if platform.DataSourceForWidget(c.Type) == "fantasy" && c.Enabled {
-			return true
-		}
-	}
-	return false
 }
 
 // ─── Handler ────────────────────────────────────────────────────────

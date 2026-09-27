@@ -670,37 +670,6 @@ var catalog = []WidgetDef{
 		},
 	},
 
-	// ── Fantasy, Predictions ───────────────────────────────────────────
-	{
-		// The tier gate was retired in v1.1.2 — the slot is the only lever.
-		ID: "fantasy_yahoo", Name: "Yahoo Fantasy", Category: "fantasy", Source: "fantasy",
-		Group: "Fantasy", AddedAt: addedV110,
-		Keywords: []string{"fantasy football", "league"},
-		Color:    "#6001d2", LogoURL: "https://icon.horse/icon/yahoo.com",
-		Description: "Your Yahoo Fantasy leagues, matchups, and standings.",
-		About:       "Your Yahoo Fantasy leagues in the ticker — live scoring, matchups, and standings without ever opening the app.",
-		Usage: []string{
-			"Connect your Yahoo account from the top bar.",
-			"Leagues, matchups, and standings sync automatically.",
-			"Live scoring updates while your players are on the field.",
-		},
-	},
-	{
-		// icon.horse returns a blank image for kalshi.com; pinned like UFC.
-		ID: "predictions", Name: "Kalshi", Category: "predictions", Source: "predictions",
-		Group: "Predictions", AddedAt: addedV110,
-		Keywords:    []string{"odds", "prediction market", "bets"},
-		Color:       "#1fc9a0",
-		LogoURL:     "https://icons.duckduckgo.com/ip3/kalshi.com.ico",
-		Description: "Live odds from the Kalshi prediction market.",
-		About:       "Live odds from Kalshi, the regulated US prediction market — a real-time read on elections, economic prints, and the events in the news.",
-		Usage: []string{
-			"Live market odds update as money moves.",
-			"Follow the events and questions you care about.",
-			"Display-only — Scrollr shows the market, it never places a trade.",
-		},
-	},
-
 	// ── Utilities — local-only, no data source, but still cost a slot ───
 	{
 		ID: "clock", Name: "Clock", Category: "utility", Color: "#6366f1",
@@ -776,7 +745,6 @@ func WidgetByID(id string) (WidgetDef, bool) {
 var widgetSourcePrefixes = map[string]string{
 	"sports_":  "sports",
 	"finance_": "finance",
-	"fantasy_": "fantasy",
 	"news_":    "rss",
 	"rss_":     "rss",
 }

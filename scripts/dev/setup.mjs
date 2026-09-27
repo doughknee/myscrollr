@@ -18,14 +18,13 @@ import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const FORCE = process.argv.includes("--force");
-const PREDICTIONS_ONLY = process.argv.includes("--predictions-only");
 const p = (...s) => path.join(ROOT, ...s);
 
 // ── Shared values ────────────────────────────────────────────────────
 // ENCRYPTION_KEY must be IDENTICAL across core and every channel: core
-// encrypts third-party tokens (Yahoo, Kalshi) and the channels decrypt
-// them. Generating it per-file would produce a stack that runs and then
-// fails to read its own data.
+// encrypts third-party tokens and the channels decrypt them. Generating
+// it per-file would produce a stack that runs and then fails to read
+// its own data.
 const DB = "postgres://scrollr:scrollr@localhost:5432/scrollr?sslmode=disable";
 const REDIS = "redis://localhost:6379";
 
@@ -94,17 +93,6 @@ API_SPORTS_KEY=
 PORT=3004
 ENCRYPTION_KEY=${enc}
 `,
-  "channels/fantasy/.env": `DATABASE_URL=${DB}
-REDIS_URL=${REDIS}
-PORT=8084
-ENCRYPTION_KEY=${enc}
-CHANNEL_URL=http://localhost:8084
-# Yahoo OAuth. Without these the fantasy widget cannot connect an account;
-# everything else in the stack runs fine.
-YAHOO_CLIENT_ID=
-YAHOO_CLIENT_SECRET=
-YAHOO_CALLBACK_URL=http://localhost:8084/yahoo/callback
-`,
   // The marketing site. Stripe price ids are the real test-mode ones from
   // .env.example — they're not secret and the pricing page needs them to
   // render. The publishable key is a placeholder; billing flows won't work
@@ -140,41 +128,7 @@ SENTRY_AUTH_TOKEN=
 `,
 });
 
-// ── Predictions (opt-in) ─────────────────────────────────────────────
-// The Kalshi private key is a multiline PEM that Docker's env_file cannot
-// parse, so it goes to its own file and the service reads a path instead.
-function writePredictions() {
-  const pem = p("secrets/kalshi-private-key.pem");
-  if (!existsSync(pem)) {
-    console.log("  skip  predictions   no Kalshi key yet (run: make kalshi-key)");
-    return;
-  }
-  mkdirSync(p("secrets"), { recursive: true });
-  const enc = existingKey("api/.env") ?? "";
-  const out = p("secrets/predictions.docker.env");
-  if (existsSync(out) && !FORCE) {
-    console.log("  keep  predictions   already configured");
-    return;
-  }
-  writeFileSync(
-    out,
-    `DATABASE_URL=postgres://scrollr:scrollr@postgres:5432/scrollr?sslmode=disable
-PORT=3005
-ENCRYPTION_KEY=${enc}
-KALSHI_API_KEY_ID=
-`,
-    "utf8",
-  );
-  console.log("  wrote predictions   secrets/predictions.docker.env");
-  console.log("        -> add your KALSHI_API_KEY_ID to that file");
-}
-
 // ── Main ─────────────────────────────────────────────────────────────
-if (PREDICTIONS_ONLY) {
-  writePredictions();
-  process.exit(0);
-}
-
 // Prompt only when there's a human attached. Piped or redirected stdin
 // (CI, `yes |`, a script) takes every default instead of hanging forever on
 // a question nobody will answer.
@@ -203,9 +157,7 @@ console.log(`
   data, you just won't be able to sign in until you fill them in.
 `);
 
-const enc =
-  existingKey("api/.env", "channels/fantasy/.env") ??
-  randomBytes(32).toString("hex");
+const enc = existingKey("api/.env") ?? randomBytes(32).toString("hex");
 
 const logto = {
   url: await ask("Logto URL (blank = no auth)", ""),
@@ -242,7 +194,6 @@ for (const [rel, body] of Object.entries(files(enc, logto))) {
   console.log(`  wrote ${rel}`);
   wrote++;
 }
-writePredictions();
 
 console.log(`
   ${wrote} file(s) written. ENCRYPTION_KEY is shared across all of them --

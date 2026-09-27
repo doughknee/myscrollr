@@ -1,0 +1,13 @@
+-- Fantasy (Yahoo) removal, backend half (SCROLLR-239 / SCROLLR-237).
+--
+-- Deletes every stored Yahoo OAuth refresh token now that nothing in the
+-- product connects a Yahoo account or syncs a fantasy league. Cascades onto
+-- yahoo_user_leagues (guid FK, ON DELETE CASCADE) so the per-user junction
+-- rows go with it. yahoo_leagues/yahoo_matchups/yahoo_rosters/yahoo_standings
+-- key on league_key, not guid, so this does not touch them -- they are
+-- cached league content, not a secret, and are left for SCROLLR-242 (the
+-- table-drop follow-up) alongside the tables themselves.
+--
+-- Expand/contract: no DROP TABLE here. Dropping the five yahoo_* tables is
+-- SCROLLR-237's 4/4 follow-up, once nothing still expects them to exist.
+DELETE FROM yahoo_users;

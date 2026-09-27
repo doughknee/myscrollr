@@ -21,7 +21,7 @@ Standalone bugs and ideas belong to the Scrollr team without a project until the
 
 ## Project Overview
 
-MyScrollr aggregates financial market data, sports scores, RSS feeds, and Yahoo Fantasy Sports. Tauri desktop app (primary product), React marketing website, Go gateway API, and independent channel services. Infrastructure: PostgreSQL, Redis, Logto (auth), Sequin (CDC), Stripe (billing). Deployed on DigitalOcean Kubernetes (DOKS) with images stored in DigitalOcean Container Registry (DOCR). See `k8s/` for manifests and `.github/workflows/deploy.yml` for the build-and-deploy pipeline.
+MyScrollr aggregates financial market data, sports scores, and RSS feeds. Tauri desktop app (primary product), React marketing website, Go gateway API, and independent channel services. Infrastructure: PostgreSQL, Redis, Logto (auth), Sequin (CDC), Stripe (billing). Deployed on DigitalOcean Kubernetes (DOKS) with images stored in DigitalOcean Container Registry (DOCR). See `k8s/` for manifests and `.github/workflows/deploy.yml` for the build-and-deploy pipeline.
 
 ## Ticker chips
 
@@ -38,9 +38,8 @@ Monorepo — each component is independently deployable with its own dependencie
 - `api/` — Core API (Go 1.25, Fiber v2). Internal packages under `api/internal/`; `api/core` wires them into one binary
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
-- The finance, sports, rss, and predictions Go APIs were folded into `api/internal/ingestread/` (ADR-0002); fantasy is the one remaining discovered channel service
-- `channels/{finance,sports,rss,predictions}/service/` — Rust ingestion services (independent crates, edition 2024; predictions holds the Kalshi credentials and WS sweep)
-- `channels/fantasy/api/` — Fantasy Go API (Yahoo OAuth2, Go-native sync, no Rust service)
+- The finance, sports, rss, and predictions Go APIs were folded into `api/internal/ingestread/` (ADR-0002); fantasy and predictions were removed outright (SCROLLR-239) — every widget source is now served in-process by core
+- `channels/{finance,sports,rss}/service/` — Rust ingestion services (independent crates, edition 2024)
 
 ## Running it locally
 
@@ -75,9 +74,7 @@ a user to install Go or Rust to run this project.
 |---|---|---|
 | Postgres, Redis | Docker | 5432, 6379 |
 | Core API | Docker | **18080** |
-| Fantasy API | Docker | 8084 |
 | finance / sports / rss ingesters | Docker | 3001 / 3002 / 3004 |
-| predictions ingester (opt-in) | Docker | 3005 |
 | Marketing site | native — `make web` | 3000 |
 | Desktop app | native — `make desktop` | — |
 
@@ -130,7 +127,7 @@ container: `make shell svc=core-api` then `go build ./...`, or
 - **Go**: All: `go test ./...`. File: `go test ./path/to/pkg`. Single: `go test -run TestName ./path/to/pkg`.
 - **Rust**: All: `cargo test`. Single: `cargo test test_name`.
 
-Go integration tests (GDPR purge cascade, Stripe webhook idempotency, fantasy's schema contract) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
+Go integration tests (GDPR purge cascade, Stripe webhook idempotency, the read-query schema contract) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
 
 ```sh
 TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go test ./...
@@ -138,7 +135,7 @@ TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disab
 
 ### CI
 
-- `.github/workflows/backend-tests.yml` — three job groups: `go-tests` (api, fantasy), `rust-tests` (the four channel service crates), and `desktop-rust-tests` (`desktop/src-tauri`, added 2026-07-24 — that crate was in no matrix and its 18 tests ran nowhere). Triggers on `api/**`, `channels/**/*.{go,rs}`, and `desktop/src-tauri/**`. The Go and channel jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the integration tests run for real. `desktop-rust-tests` needs no database but does need the webkit dev headers to link, which is why it's its own job.
+- `.github/workflows/backend-tests.yml` — three job groups: `go-tests` (`api` — the only Go module since SCROLLR-239 deleted the last other one), `rust-tests` (the three channel service crates), and `desktop-rust-tests` (`desktop/src-tauri`, added 2026-07-24 — that crate was in no matrix and its 18 tests ran nowhere). Triggers on `api/**`, `channels/**/*.{go,rs}`, and `desktop/src-tauri/**`. The Go and channel jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the integration tests run for real. `desktop-rust-tests` needs no database but does need the webkit dev headers to link, which is why it's its own job.
 - `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
 - `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
   **A `preflight` job gates the build**: it skips when the version in `tauri.conf.json` already has a *published* release, because `tauri-action` would otherwise upload into it and silently replace the live binaries. So a push to `main` touching `desktop/` usually builds nothing — that's correct, not a failure. To actually cut a release, bump the version.
@@ -203,12 +200,10 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 - `gofmt` formatting. No custom linter. Go 1.25 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
-- Two Go modules: `api/` (core, incl. the folded widget sources) and `channels/fantasy/api/`. No shared packages between them — fantasy keeps the HTTP-only contract (ADR-0002 retired the old five-module duplication rule).
+- One Go module: `api/` (core, incl. every folded widget source). `channels/fantasy/api/` was the only other module and was deleted outright (SCROLLR-239) rather than folded — no shared packages, no HTTP-only contract to preserve.
 - Core API: internal packages under `api/internal/` (`platform`, `events`, `widgets`, `ingestread`, `accounts`, `billing`, `support`, plus `testsupport` for test helpers) wired by `api/core`. One binary. `platform` is the leaf — package-level `DBPool`/`Rdb` live there; `core` is the only package that imports everything. Widget sources register in `LocalSources` (`api/internal/ingestread/sources.go`).
-- Fantasy API: flat `main` package, `App` struct holding deps (`db *pgxpool.Pool`, `rdb *redis.Client`).
 - Naming: PascalCase exports, camelCase unexported, short receivers (`s *Server`, `a *App`), `snake_case` JSON tags. Constants are PascalCase, grouped with `=====` comment separators.
 - Error handling: `if err != nil` returns. `fmt.Errorf("context: %w", err)` wrapping. `log.Printf("[Context] message: %v", err)` with bracketed prefixes. `log.Fatalf` for startup failures. HTTP errors via `ErrorResponse` struct.
-- Registration: fantasy self-registers in Redis with 30s TTL, 20s heartbeat.
 - **Keep `api/internal/accounts/extension_auth.go` and `/extension/token` routes** — the desktop app uses these for PKCE auth despite the legacy naming.
 
 ## Code Style — Rust
@@ -235,9 +230,9 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 (Reshaped by [ADR-0002](docs/adr/0002-consolidate-widget-read-apis.md), July 2026.)
 
-1. **Widget read APIs live in core.** Finance, sports, rss, and predictions are served natively from `api/internal/ingestread/` behind the `localSource` seam (`sources.go`): native routes registered ahead of the dynamic proxy, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a file in `ingestread` + a catalog entry + (usually) a Rust ingester. See `api/CHANNELS.md`.
-2. **Ingestion is isolated.** Each source's poller is a separate Rust service with its own schedule, quota blast radius, and rollout cadence (fantasy ingests in-process in Go). Core reaches ingesters only via `INTERNAL_{SOURCE}_URL` health probes, plus the predictions candlesticks pass-through.
-3. **Fantasy is the one proxied channel service.** It self-registers in Redis (30s TTL heartbeat), is discovered and proxied dynamically, and trusts the `X-User-Sub` header core injects after JWT validation — it never sees tokens. The HTTP-only contract and module isolation still apply to it.
+1. **Widget read APIs live in core.** Finance, sports, and rss are served natively from `api/internal/ingestread/` behind the `localSource` seam (`sources.go`): native routes registered ahead of any legacy proxy path, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a file in `ingestread` + a catalog entry + (usually) a Rust ingester. See `api/CHANNELS.md`.
+2. **Ingestion is isolated.** Each source's poller is a separate Rust service with its own schedule, quota blast radius, and rollout cadence. Core reaches ingesters only via `INTERNAL_{SOURCE}_URL` health probes.
+3. **No proxied channel service remains.** Fantasy was the last one (SCROLLR-239); Redis service discovery and the dynamic proxy it fed (`platform/discovery.go`, `core/proxy.go`) were deleted with it. Every widget source is now either a local source in `ingestread` or does not exist.
 4. **Topic-based CDC PubSub**: Core maps CDC events to topics in-process and dispatches via Redis PubSub (O(1) per event); every replica fans out to its own SSE clients (ADR-0001).
 5. **Desktop is the primary product.** The website serves marketing, auth, and billing only.
 
@@ -252,10 +247,8 @@ Every component has Sentry wired in. **Privacy is the hard constraint** — the 
 | `myscrollr.com/` | `@sentry/react` | `scrollr-web` |
 | `desktop/` (webview, both windows) | `@sentry/react` | `scrollr-desktop` (tagged `runtime=webview`, `window=ticker|app`) |
 | `desktop/src-tauri/` (Rust core) | `sentry@0.42` crate | `scrollr-desktop` (tagged `runtime=rust-core`) |
-| `api/` (core Go) | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-core-api` |
-| `channels/fantasy/api/` | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-fantasy-api` (finance/sports/rss/predictions report under `scrollr-core-api` since ADR-0002) |
+| `api/` (core Go) | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-core-api` (finance/sports/rss report here since ADR-0002; fantasy and predictions were removed, SCROLLR-239) |
 | `channels/{finance,sports,rss}/service/` | `sentry@0.42` + `sentry-anyhow@0.42` Rust crates | `scrollr-{name}-svc` |
-| `channels/predictions/service/` | same wiring as the other ingesters | none yet — `PREDICTIONS_*_SENTRY_DSN` env vars exist but are unset (no Sentry project created) |
 
 ### Adding a new error capture site
 
@@ -297,8 +290,8 @@ This section is the whole contract — the rollout plan that used to hold a long
 ## Database Migrations
 
 **core-api owns every shared table. It is the only thing that migrates.**
-(VISION §4.3, landed 2026-07-20.) The four Rust ingesters and the fantasy Go
-API are pure writers: they connect and write, and run no migrations at all.
+(VISION §4.3, landed 2026-07-20.) The three Rust ingesters are pure
+writers: they connect and write, and run no migrations at all.
 
 | | |
 |---|---|
@@ -331,9 +324,6 @@ so each writer carries its own guard:
 - **Rust ingesters** — sqlx is the intended guard (compile-time `query!`
   macros, so a mismatch fails the build). Not yet adopted; see the deferred
   note in ROLLOUT Phase 2.
-- **Fantasy (Go)** — `channels/fantasy/api/schema_contract_test.go` asserts
-  every `yahoo_*` column the service reads or writes still exists. Add to it
-  when you add a column to a query there.
 
 ### Rules
 
@@ -354,7 +344,7 @@ Branch off `main`: `git checkout -b <prefix>/short-description`. PR back into `m
 
 `make setup` generates every `.env` file — do not hand-assemble them, and do not tell a user to copy a root `.env.example` (there isn't one; it was a Coolify-era fossil, deleted 2026-07-24).
 
-Per-component templates that DO exist: `api/`, `channels/{finance,sports,rss,fantasy}/`, `desktop/`, `myscrollr.com/`, `scripts/`. `api/.env.example` documents the 16 vars needed locally; the API reads ~65 in total, but the rest drive production-only integrations that all degrade gracefully when unset.
+Per-component templates that DO exist: `api/`, `channels/{finance,sports,rss}/`, `desktop/`, `myscrollr.com/`, `scripts/`. `api/.env.example` documents the 16 vars needed locally; the API reads ~65 in total, but the rest drive production-only integrations that all degrade gracefully when unset.
 
 `ENCRYPTION_KEY` must be **identical** across `api/.env` and every `channels/*/.env` — core encrypts third-party tokens and the channels decrypt them. `make setup` generates one value and writes it everywhere.
 

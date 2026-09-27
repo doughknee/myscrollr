@@ -69,11 +69,4 @@ func TestReadQueriesMatchTheSchema(t *testing.T) {
 		getUserRSSFeedURLs(ctx, noSuchUser)
 		queryRSSItems(ctx, []string{"https://example.com/feed.xml"})
 	})
-
-	t.Run("predictions", func(t *testing.T) {
-		if _, err := queryMarkets(ctx); err != nil {
-			t.Errorf("queryMarkets: %v", err)
-		}
-		queryMarketsForUser(ctx, []string{"KXPROBE"}, []string{"Politics"})
-	})
 }

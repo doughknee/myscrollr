@@ -6,7 +6,7 @@ This is the authoritative product reference for support replies. Anything stated
 
 Current desktop version: **1.6.8**.
 
-<!-- source: desktop/package.json @ 8efbd7672e22 -->
+<!-- source: desktop/package.json @ ae1e38f33c82 -->
 
 ## Policies
 
@@ -93,7 +93,7 @@ and leave program details to the partner.
 
 ## What Scrollr is
 
-<!-- source: docs/VISION.md @ 7b0107185ac8 -->
+<!-- source: docs/VISION.md @ 63c15aa0abc1 -->
 ### 1. What Scrollr is
 
 > **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads or data sales; analytics are limited and controllable.**
@@ -106,7 +106,7 @@ Three load-bearing commitments, true at every layer:
 
 ## Plans and limits
 
-<!-- source: api/internal/widgets/tier_limits.go (GET /tier-limits) @ 5e3132252d8cc9b5 -->
+<!-- source: api/internal/widgets/tier_limits.go (GET /tier-limits) @ 3fd0005fd88bf47d -->
 The widget cap is the only per-plan limit. Plan names and wording are in Policies.
 
 | Plan id | Widgets at once |
@@ -119,8 +119,8 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ d4f798c6ab1b0c0c -->
-58 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ 7c42dc11c7d36312 -->
+56 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
 
@@ -180,14 +180,6 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 - **The Hill** (World) — Congress, campaigns and Washington policy. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **Reason** (World) — Libertarian reporting and commentary on politics and policy. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **Custom RSS** — Follow any RSS or Atom feed by pasting its URL. *Off the add grid.* *How to use:* Paste any RSS or Atom feed URL in the Feeds view. Add as many feeds as you like — they merge into one stream. Perfect for niche blogs, newsletters, or subreddits with a feed.
-
-### Fantasy
-
-- **Yahoo Fantasy** (Fantasy) — Your Yahoo Fantasy leagues, matchups, and standings. *How to use:* Connect your Yahoo account from the top bar. Leagues, matchups, and standings sync automatically. Live scoring updates while your players are on the field.
-
-### Predictions
-
-- **Kalshi** (Predictions) — Live odds from the Kalshi prediction market. *How to use:* Live market odds update as money moves. Follow the events and questions you care about. Display-only — Scrollr shows the market, it never places a trade.
 
 ### Utility
 
@@ -264,7 +256,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ bca297a98e7c -->
+<!-- source: docs/CHIP_DESIGN.md @ 87188af523df -->
 *The short version of the ticker chip rules. Read this first; the exact spec with every
 number, class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -384,10 +376,6 @@ which of them, in what order, how far back or ahead it looks, or how the rotatio
 Those are fixed per kind of thing, chosen once from real data, and they never appear as
 a setting. If a user could set them, a user could get them wrong.
 
-One leftover from before this rule: the fantasy widget still has an Essential / Standard
-/ Everything dial for its ticker. It's a selection control, and it will be reconciled
-when fantasy is rebuilt (REL-184). Followed players stay, since that's an input.
-
 ### What goes on the bar
 
 The bar isn't the feed. It has one rule per kind of thing, and there are no settings for
@@ -484,7 +472,7 @@ someone's pin to make room for a new one.
 
 ### Still to do
 
-Predictions, fantasy and GitHub chips haven't been rebuilt on these rules yet (REL-184).
+GitHub chips haven't been rebuilt on these rules yet (REL-184).
 
 ## The settings model
 
@@ -573,7 +561,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Release history
 
-<!-- source: docs/ROADMAP.md @ 88b41ac3a60c -->
+<!-- source: docs/ROADMAP.md @ 7ae19a452146 -->
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | v1.1.1 | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |

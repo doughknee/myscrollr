@@ -131,31 +131,18 @@ jobs:
           fi
           exit 1
 
-  # ── Go tests (5 independent jobs, run in parallel) ─────────────
+  # ── Go tests ────────────────────────────────────────────────────
+  # api/ is the only Go module now (SCROLLR-239 deleted the last other one).
   go-tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # `dir` is where tests run; `modroot` is the module root holding
-          # go.mod/go.sum. The core API's packages live under api/core and
-          # api/internal/*, so tests run from the module root.
-          - dir: api
-            modroot: api
-            module: github.com/brandon-relentnet/myscrollr/api
-          - dir: channels/fantasy/api
-            modroot: channels/fantasy/api
-            module: github.com/brandon-relentnet/scrollr-fantasy
-
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ matrix.dir }}
+        working-directory: api
 
-    # Real Postgres for integration tests (currently only the api module
-    # has them — the GDPR purge cascade and Stripe webhook idempotency).
-    # Tests gate on TEST_DATABASE_URL and skip when it's unset, so
-    # `go test ./...` still works locally without a database.
+    # Real Postgres for integration tests — the GDPR purge cascade and
+    # Stripe webhook idempotency. Tests gate on TEST_DATABASE_URL and skip
+    # when it's unset, so `go test ./...` still works locally without a
+    # database.
     services:
       postgres:
         image: postgres:16
@@ -170,45 +157,30 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-      # Real Redis for the Yahoo OAuth callback tests. The handler
-      # consumes its CSRF state with GETDEL, and faking that would mean
-      # faking the replay protection those tests exist to check. Gated
-      # like Postgres: the tests skip when TEST_REDIS_URL is unset, so
-      # `go test ./...` still works locally without it.
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
 
     steps:
       - uses: actions/checkout@v6
 
-      # Read the Go version from each module's go.mod instead of pinning
-      # it here. setup-go@v6 defaults GOTOOLCHAIN=local, so a stale pin
-      # fails hard ("go.mod requires go >= X") rather than silently
-      # auto-downloading the right toolchain like v5 did.
+      # Read the Go version from go.mod instead of pinning it here.
+      # setup-go@v6 defaults GOTOOLCHAIN=local, so a stale pin fails hard
+      # ("go.mod requires go >= X") rather than silently auto-downloading
+      # the right toolchain like v5 did.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: ${{ matrix.modroot }}/go.mod
+          go-version-file: api/go.mod
           cache: true
-          cache-dependency-path: ${{ matrix.modroot }}/go.sum
+          cache-dependency-path: api/go.sum
 
-      # -v so SKIPs are visible. Several tests here gate on a service
-      # being present (TEST_DATABASE_URL, TEST_REDIS_URL) and skip
-      # silently otherwise, and without -v a fully-skipped suite is
-      # indistinguishable from a passing one — which is exactly how a
-      # missing service goes unnoticed.
+      # -v so SKIPs are visible. Several tests here gate on
+      # TEST_DATABASE_URL being present and skip silently otherwise, and
+      # without -v a fully-skipped suite is indistinguishable from a
+      # passing one — which is exactly how a missing service goes
+      # unnoticed.
       - run: go test -v ./...
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
-          TEST_REDIS_URL: redis://localhost:6379/0
 
-  # ── Rust tests (4 independent jobs, run in parallel) ───────────
+  # ── Rust tests (3 independent jobs, run in parallel) ───────────
   rust-tests:
     strategy:
       fail-fast: false
@@ -217,7 +189,6 @@ jobs:
           - dir: channels/finance/service
           - dir: channels/sports/service
           - dir: channels/rss/service
-          - dir: channels/predictions/service
 
     runs-on: ubuntu-latest
     defaults:

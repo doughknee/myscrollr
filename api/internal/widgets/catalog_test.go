@@ -55,18 +55,18 @@ func TestHandleGetCatalogServesFullCatalog(t *testing.T) {
 
 	// Spot-check that identity actually crosses the wire — the whole point
 	// is that the client no longer owns this data.
-	var kalshi bool
+	var stocks bool
 	for _, w := range body.Widgets {
-		if w.ID != "predictions" {
+		if w.ID != "finance_stocks" {
 			continue
 		}
-		kalshi = true
-		if w.Name != "Kalshi" || w.Source != "predictions" || w.Color == "" || w.About == "" {
-			t.Errorf("predictions entry lost identity over the wire: %+v", w)
+		stocks = true
+		if w.Name != "Stocks" || w.Source != "finance" || w.Color == "" || w.About == "" {
+			t.Errorf("finance_stocks entry lost identity over the wire: %+v", w)
 		}
 	}
-	if !kalshi {
-		t.Error("predictions/Kalshi missing from the served catalog")
+	if !stocks {
+		t.Error("finance_stocks missing from the served catalog")
 	}
 
 	// The directory's shelf, search aliases and "new" tag all ride these

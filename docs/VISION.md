@@ -2,6 +2,7 @@
 
 > A charter for making Scrollr **coherent**, not rebuilt. Reality sections are audited fact (5-subsystem audit, 2026-07-20). Target sections are decisions taken collaboratively; each is dated in the Decision Log (§7).
 > **Last updated:** 2026-07-20.
+> **Note (2026-09-26, SCROLLR-239):** Fantasy (Yahoo) and Predictions (Kalshi) were removed from the product outright. Every mention of them below — including the discovery/proxy carve-out and the 5-ingester counts — describes the pre-removal architecture and is historical, not current.
 
 ---
 

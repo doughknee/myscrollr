@@ -119,10 +119,6 @@ which of them, in what order, how far back or ahead it looks, or how the rotatio
 Those are fixed per kind of thing, chosen once from real data, and they never appear as
 a setting. If a user could set them, a user could get them wrong.
 
-One leftover from before this rule: the fantasy widget still has an Essential / Standard
-/ Everything dial for its ticker. It's a selection control, and it will be reconciled
-when fantasy is rebuilt (REL-184). Followed players stay, since that's an input.
-
 ## What goes on the bar
 
 The bar isn't the feed. It has one rule per kind of thing, and there are no settings for
@@ -219,4 +215,4 @@ someone's pin to make room for a new one.
 
 ## Still to do
 
-Predictions, fantasy and GitHub chips haven't been rebuilt on these rules yet (REL-184).
+GitHub chips haven't been rebuilt on these rules yet (REL-184).

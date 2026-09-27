@@ -94,7 +94,6 @@ func widgetUserCacheKeys(userSub string) []string {
 		// widget-page games list and the fair-shared dashboard preview.
 		"cache:sports:dash:" + userSub,
 		"cache:rss:" + userSub,
-		"cache:predictions:" + userSub,
 	}
 }
 

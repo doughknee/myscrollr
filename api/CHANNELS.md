@@ -12,7 +12,7 @@
 One user-facing primitive, one price lever:
 
 ```
-Source  (invisible plumbing: finance, sports, rss, predictions, fantasy)
+Source  (invisible plumbing: finance, sports, rss)
    └─ Widget   (the ONLY thing a user picks: "NFL", "Crypto", "BBC News")
         └─ costs exactly 1 slot
 ```
@@ -88,25 +88,18 @@ Two artifacts ride along, both generated and both guarded by a Go test:
 ## Schema
 
 **core-api owns every shared table and is the only thing that migrates**
-(`api/migrations/`). The four Rust ingesters and the fantasy Go API are
-pure writers. No per-service migration directory, no version band, no
-`_sqlx_migrations` coordination. Details in AGENTS.md → "Database
-Migrations".
+(`api/migrations/`). The Rust ingesters are pure writers. No per-service
+migration directory, no version band, no `_sqlx_migrations` coordination.
+Details in AGENTS.md → "Database Migrations".
 
-## What "channel" still means
+## What "channel" used to mean
 
-The word survives in exactly one place, legitimately: **service discovery
-and the dynamic proxy**.
-
-- `api/internal/platform/discovery.go` — services register in Redis under
-  `channel:*` with a 30s TTL heartbeat.
-- `api/core/proxy.go` — core proxies their declared routes.
-
-Today this serves **fantasy only**, which stays a separately deployed
-service because of its Yahoo OAuth + sync loop. `ChannelInfo`,
-`ChannelRoute` and `channel_lifecycle` name *that* concept — a discovered
-backend service — not a widget. They are not legacy and should not be
-renamed to "widget".
+The word no longer names a live concept. It used to mean **service
+discovery and the dynamic proxy** — a channel service (fantasy) that
+self-registered in Redis under `channel:*` and had its declared routes
+proxied by core. Fantasy was the last service on that path
+(SCROLLR-239); `platform/discovery.go` and `core/proxy.go` were deleted
+with it, since nothing else ever used dynamic discovery.
 
 Everything else that once used this path (finance, sports, rss,
 predictions) was folded into core by
@@ -139,8 +132,6 @@ this bit us during the `visible` → `ticker_enabled` rename.
 | `api/internal/widgets/catalog.go` | `GET /catalog` |
 | `api/internal/widgets/widgets.go` | Widget CRUD (`/users/me/widgets`) |
 | `api/internal/ingestread/sources.go` | `LocalSources` seam: health, dashboard, lifecycle |
-| `api/internal/platform/discovery.go` | Redis service discovery (fantasy) |
-| `api/core/proxy.go` | Dynamic proxy for discovered services |
 | `api/internal/events/` | SSE hub, topic registry, CDC webhook |
 | `api/cmd/gents/` | TS wire-type generator |
 | `desktop/src/marketplace.ts` | Client view over the fetched catalog |

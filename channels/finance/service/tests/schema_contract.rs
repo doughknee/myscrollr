@@ -14,7 +14,7 @@
 //!
 //! Skips without TEST_DATABASE_URL, matching the Go integration tests. CI
 //! provides one; the test applies core's migrations itself when the database
-//! is empty, the same way channels/fantasy/api/schema_contract_test.go does.
+//! is empty, the same way api/internal/ingestread/schema_contract_test.go does.
 //!
 //! Add a column to a query in this service, add it here too.
 

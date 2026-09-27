@@ -13,7 +13,7 @@ package ingestread
 // guarantees ONE row per pinned subject it does not already carry:
 // sports = live game, else next fixture, else last result, unbounded by
 // the horizon; finance = the symbol's latest quote; rss = the feed's
-// newest item; predictions = the market's latest state.
+// newest item.
 //
 // These rows are merged AFTER the per-user dashboard cache, not into it.
 // That keeps cache:dashboard:<sub> on one key -- the key every
@@ -46,10 +46,9 @@ const maxPinSubjectLen = 512
 // pin's subject (CHIP_SPEC 8.5). A game is about both teams, so sports
 // has two.
 var pinSubjectFields = map[string][]string{
-	"sports":      {"home_team_name", "away_team_name"},
-	"finance":     {"symbol"},
-	"rss":         {"feed_url"},
-	"predictions": {"ticker"},
+	"sports":  {"home_team_name", "away_team_name"},
+	"finance": {"symbol"},
+	"rss":     {"feed_url"},
 }
 
 // ParsePinnedSubjects reads the `pins` query parameter: a JSON array of
@@ -172,8 +171,6 @@ func pinnedRow(ctx context.Context, source, subject string, leagues []string) in
 		return trades[0]
 	case "rss":
 		return pinnedRSSItem(ctx, subject)
-	case "predictions":
-		return pinnedMarket(ctx, subject)
 	}
 	return nil
 }
@@ -245,25 +242,6 @@ func pinnedRSSItem(ctx context.Context, feedURL string) interface{} {
 		return nil
 	}
 	return item
-}
-
-// pinnedMarket returns a pinned market's latest state -- deliberately
-// without marketsLiveWhere. A market that left the sweep or settled is
-// exactly the case the user pinned to keep watching, and the client
-// already renders a resolved market as resolved rather than as live.
-func pinnedMarket(ctx context.Context, ticker string) interface{} {
-	rows, err := platform.DBPool.Query(ctx, `
-		SELECT`+marketsSelectList+`
-		FROM markets
-		WHERE ticker = $1
-		ORDER BY COALESCE(updated_at, created_at) DESC
-		LIMIT 1
-	`, ticker)
-	markets := scanMarkets(rows, err)
-	if len(markets) == 0 {
-		return nil
-	}
-	return markets[0]
 }
 
 func containsString(list []string, want string) bool {

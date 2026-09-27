@@ -73,7 +73,7 @@ describe("TIER_LIMITS table", () => {
   // ever comes back, this fires and the field has to be mirrored again.
   it("the retired depth caps are still null on every tier in the snapshot", () => {
     for (const [tier, t] of Object.entries(snapshot.tiers)) {
-      for (const key of ["symbols", "feeds", "custom_feeds", "leagues", "fantasy"] as const) {
+      for (const key of ["symbols", "feeds", "custom_feeds", "leagues"] as const) {
         expect(t[key], `${tier}.${key}`).toBeNull();
       }
     }

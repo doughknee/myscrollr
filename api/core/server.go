@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
@@ -68,16 +65,11 @@ func NewServer() *Server {
 	return server
 }
 
-// Setup configures middleware, registers all routes, and sets up channel
-// proxying based on Redis discovery.
+// Setup configures middleware and registers all routes.
 func (s *Server) Setup() {
 	billing.InitStripe()
 	s.setupMiddleware()
 	s.setupRoutes()
-
-	// Setup dynamic catch-all proxy for channel routes.
-	// MUST be last — Fiber matches in registration order, so core routes take priority.
-	SetupDynamicProxy(s.App)
 }
 
 // setupMiddleware attaches security headers, CORS, and rate limiting.
@@ -148,7 +140,6 @@ func (s *Server) setupMiddleware() {
 		"/webhooks/discord/interactions":     true, // Discord retries on rate-limit and we want them to succeed
 		"/webhooks/github/pr-closed":         true, // GitHub Action calls this when a PR with [fixes #N] tags merges
 		"/webhooks/github/release-published": true, // Announce Release workflow calls this when a desktop release publishes
-		"/channels":                          true,
 		"/catalog":                           true,
 		"/tier-limits":                       true,
 		"/extension/token":                   true,
@@ -161,23 +152,6 @@ func (s *Server) setupMiddleware() {
 	// ("oauth:"-prefixed vs bare IP) within the shared prefix.
 	limiterStorage := platform.NewRedisLimiterStorage("ratelimit:")
 
-	// Stricter rate limiter for OAuth initiation endpoints (e.g. /yahoo/start).
-	// Applied BEFORE the general rate limiter so it runs first.
-	oauthRateLimitPaths := map[string]bool{
-		"/yahoo/start": true,
-	}
-	s.App.Use(limiter.New(limiter.Config{
-		Max:        platform.OAuthRateLimitMax,
-		Expiration: platform.OAuthRateLimitExpiration,
-		Storage:    limiterStorage,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return "oauth:" + c.IP()
-		},
-		Next: func(c *fiber.Ctx) bool {
-			return !oauthRateLimitPaths[c.Path()]
-		},
-	}))
-
 	s.App.Use(limiter.New(limiter.Config{
 		Max:        platform.RateLimitMax,
 		Expiration: platform.RateLimitExpiration,
@@ -186,33 +160,18 @@ func (s *Server) setupMiddleware() {
 			return c.IP()
 		},
 		Next: func(c *fiber.Ctx) bool {
-			path := c.Path()
-			// Always exempt core paths
-			if coreExemptPaths[path] {
-				return true
-			}
-			// Dynamically check channel routes (handles late-discovered channels)
-			for _, entry := range platform.GetChannelRoutes() {
-				if !entry.Route.Auth {
-					if _, ok := matchRoute(entry.Route.Path, path); ok {
-						return true
-					}
-				}
-			}
-			return false
+			return coreExemptPaths[c.Path()]
 		},
 	}))
 }
 
 // setupRoutes mounts core public and protected routes.
-// Channel-specific routes are handled by SetupDynamicProxy.
 func (s *Server) setupRoutes() {
 	// Local widget sources (ADR-0002) — served in-process, registered
 	// ahead of the dynamic proxy so they win over any still-registered
 	// legacy channel service during cutover.
 	ingestread.RegisterFinanceRoutes(s.App)
 	ingestread.RegisterSportsRoutes(s.App)
-	ingestread.RegisterPredictionsRoutes(s.App)
 	ingestread.RegisterRSSRoutes(s.App)
 
 	// --- Public Routes ---
@@ -234,7 +193,6 @@ func (s *Server) setupRoutes() {
 	s.App.Options("/extension/token/refresh", accounts.HandleExtensionAuthPreflight)
 	s.App.Post("/extension/token/refresh", accounts.HandleExtensionTokenRefresh)
 
-	s.App.Get("/channels", s.listChannels)
 	// The widget catalog — the single authority clients render from.
 	s.App.Get("/catalog", widgets.HandleGetCatalog)
 	// "Request it" from the catalog's zero-match card: one row per user
@@ -425,38 +383,6 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 			res.Redis = "healthy"
 		}
 
-		httpClient := &http.Client{Timeout: platform.HealthCheckTimeout}
-		var healthTargets []*platform.ChannelInfo
-		for _, intg := range platform.GetAllChannels() {
-			if ingestread.IsLocalSource(intg.Name) {
-				continue
-			}
-			if intg.HasCapability("health_checker") {
-				healthTargets = append(healthTargets, intg)
-			}
-		}
-
-		var mu sync.Mutex
-		var wg sync.WaitGroup
-		wg.Add(len(healthTargets))
-		for _, intg := range healthTargets {
-			go func(ch *platform.ChannelInfo) {
-				defer wg.Done()
-				targetURL := ch.InternalURL + "/internal/health"
-				resp, err := httpClient.Get(targetURL)
-				mu.Lock()
-				defer mu.Unlock()
-				if err != nil || resp.StatusCode != http.StatusOK {
-					res.Services[ch.Name] = "down"
-					res.Status = "degraded"
-				} else {
-					res.Services[ch.Name] = "healthy"
-					resp.Body.Close()
-				}
-			}(intg)
-		}
-		wg.Wait()
-
 		// Local widget sources (ADR-0002) report in-process.
 		for name, h := range ingestread.LocalHealth(context.Background()) {
 			res.Services[name] = h.Status
@@ -561,55 +487,6 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 			}
 		}
 
-		// 3. Fetch dashboard data from each enabled channel via HTTP (parallel)
-		dashboardClient := &http.Client{Timeout: platform.HealthCheckTimeout}
-		var targets []*platform.ChannelInfo
-		for _, intg := range platform.GetAllChannels() {
-			if ingestread.IsLocalSource(intg.Name) {
-				continue
-			}
-			if enabledSources[intg.Name] && intg.HasCapability("dashboard_provider") {
-				targets = append(targets, intg)
-			}
-		}
-
-		type channelResult struct {
-			data map[string]interface{}
-		}
-		results := make([]channelResult, len(targets))
-		var wg sync.WaitGroup
-		wg.Add(len(targets))
-		for i, intg := range targets {
-			go func(idx int, ch *platform.ChannelInfo) {
-				defer wg.Done()
-				url := fmt.Sprintf("%s/internal/dashboard?user=%s", ch.InternalURL, userID)
-				resp, err := dashboardClient.Get(url)
-				if err != nil {
-					log.Printf("[Dashboard] %s fetch error: %v", ch.Name, err)
-					return
-				}
-				body, err := io.ReadAll(resp.Body)
-				resp.Body.Close()
-				if err != nil || resp.StatusCode != 200 {
-					log.Printf("[Dashboard] %s returned status %d", ch.Name, resp.StatusCode)
-					return
-				}
-				var data map[string]interface{}
-				if err := json.Unmarshal(body, &data); err != nil {
-					log.Printf("[Dashboard] %s unmarshal error: %v", ch.Name, err)
-					return
-				}
-				results[idx] = channelResult{data: data}
-			}(i, intg)
-		}
-		wg.Wait()
-
-		for _, r := range results {
-			for k, v := range r.data {
-				res.Data[k] = v
-			}
-		}
-
 		// Local widget sources (ADR-0002) contribute in-process.
 		for k, v := range ingestread.LocalDashboard(context.Background(), userID, enabledSources) {
 			res.Data[k] = v
@@ -656,20 +533,6 @@ func withPinnedRows(body []byte, userID string, pins map[string][]string) []byte
 	return merged
 }
 
-// listChannels returns all discovered channels and their capabilities.
-func (s *Server) listChannels(c *fiber.Ctx) error {
-	channels := platform.GetAllChannels()
-	infos := make([]fiber.Map, 0, len(channels))
-	for _, ch := range channels {
-		infos = append(infos, fiber.Map{
-			"name":         ch.Name,
-			"display_name": ch.DisplayName,
-			"capabilities": ch.Capabilities,
-		})
-	}
-	return c.JSON(infos)
-}
-
 // landingPage returns basic API info.
 func (s *Server) landingPage(c *fiber.Ctx) error {
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -683,7 +546,6 @@ func (s *Server) landingPage(c *fiber.Ctx) error {
 		"status":  "operational",
 		"links": fiber.Map{
 			"health":   "/health",
-			"channels": "/channels",
 			"frontend": frontendURL,
 			"status":   frontendURL + "/status",
 		},

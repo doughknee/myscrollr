@@ -41,8 +41,6 @@ jobs:
       finance-service: ${{ steps.manual.outputs.finance-service || steps.changes.outputs.finance-service }}
       sports-service: ${{ steps.manual.outputs.sports-service || steps.changes.outputs.sports-service }}
       rss-service: ${{ steps.manual.outputs.rss-service || steps.changes.outputs.rss-service }}
-      fantasy-api: ${{ steps.manual.outputs.fantasy-api || steps.changes.outputs.fantasy-api }}
-      predictions-service: ${{ steps.manual.outputs.predictions-service || steps.changes.outputs.predictions-service }}
       k8s: ${{ steps.manual.outputs.k8s || steps.changes.outputs.k8s }}
     steps:
       - uses: actions/checkout@v6
@@ -68,7 +66,7 @@ jobs:
           # website, and only for `desktop-v*` tags. Other releases (none
           # exist today, but future-proof) are ignored.
           if [ "${{ github.event_name }}" = "release" ]; then
-            for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service k8s; do
+            for svc in core-api website finance-service sports-service rss-service k8s; do
               echo "${svc}=false" >> $GITHUB_OUTPUT
             done
 
@@ -88,14 +86,14 @@ jobs:
             exit 0
           fi
 
-          for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service k8s; do
+          for svc in core-api website finance-service sports-service rss-service k8s; do
             echo "${svc}=false" >> $GITHUB_OUTPUT
           done
 
           services="$(printf '%s' '${{ inputs.services }}' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
           if [ -z "$services" ] || [ "$services" = "all" ]; then
-            for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service k8s; do
+            for svc in core-api website finance-service sports-service rss-service k8s; do
               echo "${svc}=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -104,7 +102,7 @@ jobs:
           IFS=',' read -r -a selected <<< "$services"
           for svc in "${selected[@]}"; do
             case "$svc" in
-              core-api|website|finance-service|sports-service|rss-service|fantasy-api|predictions-service|k8s)
+              core-api|website|finance-service|sports-service|rss-service|k8s)
                 echo "${svc}=true" >> $GITHUB_OUTPUT
                 ;;
               *)
@@ -129,10 +127,6 @@ jobs:
               - 'channels/sports/service/**'
             rss-service:
               - 'channels/rss/service/**'
-            fantasy-api:
-              - 'channels/fantasy/api/**'
-            predictions-service:
-              - 'channels/predictions/service/**'
             k8s:
               - 'k8s/**'
 
@@ -164,14 +158,6 @@ jobs:
             context: ./channels/rss/service
             dockerfile: ./channels/rss/service/Dockerfile
             changed: ${{ needs.detect-changes.outputs.rss-service }}
-          - service: fantasy-api
-            context: ./channels/fantasy/api
-            dockerfile: ./channels/fantasy/api/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.fantasy-api }}
-          - service: predictions-service
-            context: ./channels/predictions/service
-            dockerfile: ./channels/predictions/service/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.predictions-service }}
     steps:
       - name: Skip unchanged service
         if: matrix.changed != 'true'
@@ -369,7 +355,7 @@ jobs:
       - name: Record live image tags
         run: |
           : > /tmp/live-images.env
-          for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service; do
+          for svc in core-api website finance-service sports-service rss-service; do
             img="$(kubectl get deployment/${svc} -n scrollr \
               -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
             # Preserve anything that is not the `:latest` placeholder: the
@@ -394,8 +380,6 @@ jobs:
           kubectl apply -f k8s/finance-service.yaml
           kubectl apply -f k8s/sports-service.yaml
           kubectl apply -f k8s/rss-service.yaml
-          kubectl apply -f k8s/predictions-service.yaml
-          kubectl apply -f k8s/fantasy-api.yaml
           kubectl apply -f k8s/core-api.yaml
           kubectl apply -f k8s/website.yaml
           kubectl apply -f k8s/ingress.yaml
@@ -432,9 +416,6 @@ jobs:
                 echo "600s"
                 ;;
               rss-service)
-                echo "300s"
-                ;;
-              predictions-service)
                 echo "300s"
                 ;;
               *)
@@ -518,8 +499,6 @@ jobs:
           rollout_if_needed finance-service "${{ needs.detect-changes.outputs.finance-service }}"
           rollout_if_needed sports-service "${{ needs.detect-changes.outputs.sports-service }}"
           rollout_if_needed rss-service "${{ needs.detect-changes.outputs.rss-service }}"
-          rollout_if_needed fantasy-api "${{ needs.detect-changes.outputs.fantasy-api }}"
-          rollout_if_needed predictions-service "${{ needs.detect-changes.outputs.predictions-service }}"
 
       # Post-deploy smoke test. Fails the workflow if any service's
       # readiness endpoint (the same one k8s probes) does not return 200.

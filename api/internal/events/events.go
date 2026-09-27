@@ -215,8 +215,6 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 		platform.TopicPrefixFinance+"*",
 		platform.TopicPrefixSports+"*",
 		platform.TopicPrefixRSS+"*",
-		platform.TopicPrefixFantasy+"*",
-		platform.TopicPrefixPredictions+"*",
 		platform.TopicPrefixCore+"*",
 		platform.TopicSSEControlResubscribe,
 		platform.TopicSupportAdmin,
@@ -225,9 +223,9 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 
 	ch := pubsub.Channel()
 
-	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* %s* %s* + %s",
+	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* + %s",
 		platform.TopicPrefixFinance, platform.TopicPrefixSports, platform.TopicPrefixRSS,
-		platform.TopicPrefixFantasy, platform.TopicPrefixPredictions, platform.TopicPrefixCore, platform.TopicSSEControlResubscribe)
+		platform.TopicPrefixCore, platform.TopicSSEControlResubscribe)
 
 	for {
 		select {
@@ -517,8 +515,6 @@ func TopicForRSSFeed(feedURL string) string {
 // subscribeUserToTopics reads the user's widget subscriptions from the DB
 // and registers them in the Hub's topic registry.
 func subscribeUserToTopics(userID string) {
-	ctx := context.Background()
-
 	// Core user-specific topics (user_preferences, user_widgets) are handled
 	// by direct dispatch in listenToTopics -- no registry entry needed.
 
@@ -558,47 +554,8 @@ func subscribeUserToTopics(userID string) {
 				globalHub.registry.subscribe(userID, TopicForRSSFeed(feedURL))
 			}
 
-		case "fantasy":
-			leagueKeys, err := getUserFantasyLeagues(ctx, userID)
-			if err != nil {
-				log.Printf("[EventHub] Failed to load fantasy leagues for %s: %v", userID, err)
-				continue
-			}
-			for _, lk := range leagueKeys {
-				globalHub.registry.subscribe(userID, platform.TopicPrefixFantasy+lk)
-			}
-
-		case "predictions":
-			// v1 channel-wide broadcast: every enabled predictions user
-			// subscribes to the single "all" topic. No per-entity config.
-			globalHub.registry.subscribe(userID, platform.TopicPrefixPredictions+"all")
 		}
 	}
-}
-
-// getUserFantasyLeagues returns the Yahoo league keys a user has imported.
-// Uses yahoo_user_leagues junction table (yahoo_leagues.guid was removed).
-func getUserFantasyLeagues(ctx context.Context, userID string) ([]string, error) {
-	rows, err := platform.DBPool.Query(ctx, `
-		SELECT yul.league_key
-		FROM yahoo_user_leagues yul
-		INNER JOIN yahoo_users yu ON yu.guid = yul.guid
-		WHERE yu.logto_sub = $1
-	`, userID)
-	if err != nil {
-		return nil, fmt.Errorf("query fantasy leagues: %w", err)
-	}
-	defer rows.Close()
-
-	var keys []string
-	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			continue
-		}
-		keys = append(keys, key)
-	}
-	return keys, nil
 }
 
 // ===== The staff console's stream (REL-261) =======================

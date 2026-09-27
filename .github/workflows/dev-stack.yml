@@ -68,7 +68,7 @@ jobs:
         run: |
           missing=0
           for f in api/.env channels/finance/.env channels/sports/.env \
-                   channels/rss/.env channels/fantasy/.env \
+                   channels/rss/.env \
                    myscrollr.com/.env desktop/.env; do
             if [ -f "$f" ]; then echo "  ok   $f"; else echo "  MISSING $f"; missing=1; fi
           done
@@ -192,7 +192,7 @@ jobs:
         run: |
           node scripts/dev/setup.mjs
           for f in api/.env channels/finance/.env channels/sports/.env \
-                   channels/rss/.env channels/fantasy/.env \
+                   channels/rss/.env \
                    myscrollr.com/.env desktop/.env; do
             test -f "$f" || { echo "MISSING $f"; exit 1; }
           done

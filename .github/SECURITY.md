@@ -42,11 +42,11 @@ These are in scope and we want to hear about them:
 - Remote code execution, command injection, SQL injection,
   deserialization bugs.
 - Broken access control on `/users/me/*` or `/admin/*` endpoints.
-- Leaks of Stripe IDs, Yahoo refresh tokens, Logto `sub` values, or
-  other personally identifying data.
+- Leaks of Stripe IDs, Logto `sub` values, or other personally
+  identifying data.
 - Account takeover through password reset, invite flow, or OAuth.
 - SSRF, cache poisoning, or cross-tenant data access in any channel
-  ingestion service (finance / sports / rss / fantasy).
+  ingestion service (finance / sports / rss).
 - Supply-chain compromises in our published desktop binaries.
 
 These are **not** in scope — please don't send reports about them:

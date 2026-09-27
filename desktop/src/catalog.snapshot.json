@@ -1,5 +1,5 @@
 {
-    "version": "d4f798c6ab1b0c0c",
+    "version": "7c42dc11c7d36312",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -1415,60 +1415,13 @@
             "added_at": "2026-07-02"
         },
         {
-            "id": "fantasy_yahoo",
-            "name": "Yahoo Fantasy",
-            "description": "Your Yahoo Fantasy leagues, matchups, and standings.",
-            "source": "fantasy",
-            "category": "fantasy",
-            "color": "#6001d2",
-            "logo_url": "https://icon.horse/icon/yahoo.com",
-            "required_tier": "free",
-            "about": "Your Yahoo Fantasy leagues in the ticker — live scoring, matchups, and standings without ever opening the app.",
-            "usage": [
-                "Connect your Yahoo account from the top bar.",
-                "Leagues, matchups, and standings sync automatically.",
-                "Live scoring updates while your players are on the field."
-            ],
-            "order": 50,
-            "group": "Fantasy",
-            "keywords": [
-                "fantasy football",
-                "league"
-            ],
-            "added_at": "2026-07-02"
-        },
-        {
-            "id": "predictions",
-            "name": "Kalshi",
-            "description": "Live odds from the Kalshi prediction market.",
-            "source": "predictions",
-            "category": "predictions",
-            "color": "#1fc9a0",
-            "logo_url": "https://icons.duckduckgo.com/ip3/kalshi.com.ico",
-            "required_tier": "free",
-            "about": "Live odds from Kalshi, the regulated US prediction market — a real-time read on elections, economic prints, and the events in the news.",
-            "usage": [
-                "Live market odds update as money moves.",
-                "Follow the events and questions you care about.",
-                "Display-only — Scrollr shows the market, it never places a trade."
-            ],
-            "order": 51,
-            "group": "Predictions",
-            "keywords": [
-                "odds",
-                "prediction market",
-                "bets"
-            ],
-            "added_at": "2026-07-02"
-        },
-        {
             "id": "clock",
             "name": "Clock",
             "description": "Local time and world clocks",
             "category": "utility",
             "color": "#6366f1",
             "required_tier": "free",
-            "order": 52,
+            "order": 50,
             "group": "Desk",
             "keywords": [
                 "time",
@@ -1484,7 +1437,7 @@
             "category": "utility",
             "color": "#f59e0b",
             "required_tier": "free",
-            "order": 53,
+            "order": 51,
             "group": "Desk",
             "keywords": [
                 "pomodoro",
@@ -1500,7 +1453,7 @@
             "category": "utility",
             "color": "#0ea5e9",
             "required_tier": "free",
-            "order": 54,
+            "order": 52,
             "group": "Desk",
             "keywords": [
                 "forecast",
@@ -1516,7 +1469,7 @@
             "category": "utility",
             "color": "#06b6d4",
             "required_tier": "free",
-            "order": 55,
+            "order": 53,
             "group": "Dev",
             "keywords": [
                 "cpu",
@@ -1534,7 +1487,7 @@
             "color": "#10b981",
             "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
             "required_tier": "free",
-            "order": 56,
+            "order": 54,
             "group": "Dev",
             "keywords": [
                 "kuma",
@@ -1551,7 +1504,7 @@
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
             "required_tier": "free",
-            "order": 57,
+            "order": 55,
             "group": "Dev",
             "keywords": [
                 "actions",

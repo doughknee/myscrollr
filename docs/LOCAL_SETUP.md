@@ -37,9 +37,7 @@ anything missing.
 |---|---|---|
 | Postgres, Redis | Docker | 5432, 6379 |
 | Core API | Docker | **18080** |
-| Fantasy API (Go) | Docker | 8084 |
 | finance / sports / rss ingesters (Rust) | Docker | 3001 / 3002 / 3004 |
-| predictions ingester (Rust, opt-in) | Docker | 3005 |
 | Marketing site | Native (Vite) | 3000 |
 | Desktop app | Native (Tauri) | — |
 
@@ -58,12 +56,12 @@ WSL2 with `--no-distribution` adds only ~150 MB -- it is not the expensive part.
 Two levers if that matters:
 
 - `make up svc=core-api` starts one service and whatever it depends on,
-  instead of all seven. Each Rust ingester you skip is ~2 GB of build cache
+  instead of all six. Each Rust ingester you skip is ~2 GB of build cache
   you never create.
 - `make reset` wipes the caches (and your database) when they go stale.
 
-The four Rust services share one `cargo_registry` volume, so overlapping
-crate sources are downloaded once rather than four times.
+The three Rust services share one `cargo_registry` volume, so overlapping
+crate sources are downloaded once rather than three times.
 
 ## Editing backend code
 
@@ -101,8 +99,8 @@ an empty one. `make seed` fills it.
 make seed
 ```
 
-That loads `scripts/dev/seed.sql.gz`, a committed snapshot of the ten content
-tables (trades, games, standings, teams, markets, rss items and the tracked_*
+That loads `scripts/dev/seed.sql.gz`, a committed snapshot of the content
+tables (trades, games, standings, teams, rss items and the tracked_*
 config). It makes **no upstream API requests**, and it is idempotent — re-run
 it whenever you want a clean dataset back.
 
@@ -115,10 +113,9 @@ across every league. Seeding gives you the same app without spending any of it.
 
 Loading also rebases timestamps, because several read paths are
 time-relative: RSS articles older than 7 days are deleted by the ingester,
-prediction markets only show while `close_time` is in the future, and the RSS
-janitor disables curated feeds that look stale. A snapshot restored months
-later would be present in the database and invisible in the app. `seed.sh`
-documents which shift belongs to which query.
+and the RSS janitor disables curated feeds that look stale. A snapshot
+restored months later would be present in the database and invisible in the
+app. `seed.sh` documents which shift belongs to which query.
 
 - `make down` stops everything and **keeps** your data.
 - `make reset` wipes the database, Redis and the build caches. Re-seed after.
@@ -134,7 +131,7 @@ SOURCE_DATABASE_URL=postgres://... make seed-capture # from a read-only replica
 
 The second form costs **zero** upstream requests — production already paid
 for that data. Point it at a `kubectl port-forward` with
-`host.docker.internal` as the host. Only the ten content tables are read;
+`host.docker.internal` as the host. Only the content tables are read;
 nothing containing user data (`yahoo_*`, `user_*`, `stripe_*`, `support_*`)
 is touched, which is what makes the snapshot safe to commit. Commit the
 regenerated `scripts/dev/seed.sql.gz`.
@@ -167,26 +164,6 @@ powershell -File scripts/dev/capture-window.ps1 -Title "Scrollr Ticker" -Out tic
 `make screenshots` chains the two to re-shoot every ticker screenshot on the
 website (theme × density × channel) from the running app, then runs the site's
 optimizer. It puts your prefs and bar back afterwards. Windows only.
-
-## Predictions (Kalshi) — optional
-
-Off unless you have a key, and you probably do not need one: `make seed`
-populates the predictions widget along with everything else.
-
-The credential in the cluster is the **live, real-money** Kalshi key, so
-`make kalshi-key` refuses to copy it unless you ask by name:
-
-```bash
-make kalshi-key prod=1
-```
-
-Prefer your own Kalshi **demo** credentials — put the key id and
-`KALSHI_ENV=demo` in `secrets/predictions.docker.env` and the PEM at
-`secrets/kalshi-private-key.pem`. Everything else runs fine without any of it.
-
-Its private key is a multiline PEM, which Docker's `env_file` cannot parse —
-hence the separate file mounted at `/run/secrets/kalshi.pem` and the
-`KALSHI_PRIVATE_KEY_PATH` var.
 
 ## The Windows "run this .exe?" prompt
 

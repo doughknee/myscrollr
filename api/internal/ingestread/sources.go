@@ -15,8 +15,7 @@ import (
 
 // A localSource is a first-party widget data source served in-process by
 // core instead of a proxied channel service (ADR-0002). Each fold
-// (finance, sports, rss, predictions) registers one entry in
-// localSources; fantasy stays a discovered channel service. Discovered
+// (finance, sports, rss) registers one entry in localSources. Discovered
 // channels whose name matches a local source are skipped by the /health
 // and /dashboard aggregators so a still-registered legacy service can't
 // double-report during the cutover window.
@@ -46,10 +45,9 @@ type localSource struct {
 // localSources is keyed by data-source name (the values returned by
 // DataSourceForWidget).
 var LocalSources = map[string]localSource{
-	"finance":     financeSource,
-	"sports":      sportsSource,
-	"predictions": predictionsSource,
-	"rss":         rssSource,
+	"finance": financeSource,
+	"sports":  sportsSource,
+	"rss":     rssSource,
 }
 
 // isLocalSource reports whether a discovered channel name is served
@@ -125,9 +123,9 @@ func DispatchLifecycle(source, event, userSub string, config, oldConfig map[stri
 		// so the desktop's post-create refetch got a cache HIT with no MLS
 		// games in it, and nothing refetched again (the query has a
 		// staleTime and no interval). The widget stayed empty until some
-		// unrelated add invalidated the key. Same for finance and
-		// predictions; rss was unaffected only because it has its own
-		// lifecycle hook that already handled "created".
+		// unrelated add invalidated the key. rss was unaffected only
+		// because it has its own lifecycle hook that already handled
+		// "created".
 		src.invalidateUser(userSub)
 	}
 	return true

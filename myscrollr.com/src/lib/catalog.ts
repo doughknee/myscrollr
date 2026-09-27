@@ -70,8 +70,6 @@ export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
     ['news_thehill', 'The Hill', 'news', '#16447e', 'Congress, campaigns and Washington policy.'],
     ['news_reason', 'Reason', 'news', '#d13b1f', 'Libertarian reporting and commentary on politics and policy.'],
     ['rss_custom', 'Custom RSS', 'news', '#ee802f', 'Follow any RSS or Atom feed by pasting its URL.'],
-    ['fantasy_yahoo', 'Yahoo Fantasy', 'fantasy', '#6001d2', 'Your Yahoo Fantasy leagues, matchups, and standings.'],
-    ['predictions', 'Kalshi', 'predictions', '#1fc9a0', 'Live odds from the Kalshi prediction market.'],
     ['clock', 'Clock', 'utility', '#6366f1', 'Local time and world clocks'],
     ['timer', 'Timer', 'utility', '#f59e0b', 'Pomodoro, countdown, and stopwatch tools'],
     ['weather', 'Weather', 'utility', '#0ea5e9', 'Current conditions for your locations'],
@@ -100,8 +98,6 @@ export const CATEGORY_ACCENT: Record<string, string> = {
   sports: '#ff4757',
   news: '#00d4ff',
   finance: '#34d399',
-  fantasy: '#fbbf24',
-  predictions: '#a855f7',
 }
 
 export function widgetAccent(w: CatalogWidget): string {
@@ -160,8 +156,6 @@ export const WIDGET_ABBR: Record<string, string> = {
   news_thehill: 'RSS—HILL',
   news_reason: 'RSS—RSN',
   rss_custom: 'RSS—YOU',
-  fantasy_yahoo: 'FAN—YH',
-  predictions: 'PRD—KL',
   clock: 'UTL—CK',
   timer: 'UTL—TM',
   weather: 'UTL—WX',
@@ -180,8 +174,6 @@ export const CATEGORY_ORDER: Array<{ id: string; label: string }> = [
   { id: 'news', label: 'NEWS & FEEDS' },
   { id: 'finance', label: 'FINANCE' },
   { id: 'utility', label: 'UTILITIES' },
-  { id: 'fantasy', label: 'FANTASY' },
-  { id: 'predictions', label: 'PREDICTION MARKETS' },
 ]
 
 export function categoryCounts(

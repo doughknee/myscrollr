@@ -53,12 +53,6 @@ export interface HealthResponse {
   services: Record<string, string>;
 }
 
-export interface OverviewFantasy {
-  yahoo_connected: boolean;
-  yahoo_synced: boolean;
-  league_count: number;
-}
-
 export interface OverviewGDPR {
   deletion_status: string;
   requested_at: string | null;
@@ -81,7 +75,6 @@ export interface OverviewResponse {
   tier: OverviewTier;
   subscription: SubscriptionResponse | null;
   widgets: OverviewWidgets;
-  fantasy: OverviewFantasy | null;
   gdpr: OverviewGDPR;
   links: OverviewLinks;
 }
@@ -205,7 +198,6 @@ export interface WidgetLimits {
   feeds: number | null;
   custom_feeds: number | null;
   leagues: number | null;
-  fantasy: number | null;
   max_ticker_rows: number;
   max_ticker_customization: boolean;
 }

@@ -1,0 +1,2 @@
+-- No-op: the up migration deletes data (Yahoo OAuth refresh tokens), and a
+-- deleted secret cannot be un-deleted. There is nothing to restore.

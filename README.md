@@ -2,15 +2,15 @@
 
 **A pinned, always-on-top ticker for the things you actually care about.**
 
-Live market quotes, fantasy matchups, game scores, and RSS feeds —
-streaming into a compact bar that floats on top of whatever you're
-working on. Multi-monitor aware. No ads or data sales; analytics are limited and controllable.
+Live market quotes, game scores, and RSS feeds — streaming into a compact
+bar that floats on top of whatever you're working on. Multi-monitor aware.
+No ads or data sales; analytics are limited and controllable.
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)
 ![Desktop](https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 [![Status](https://img.shields.io/badge/status-live-brightgreen)](https://myscrollr.com/status)
 
-![Scrollr home view — live feed across Finance, Sports, and Fantasy](./docs/images/scrollr-home.png)
+![Scrollr home view — live feed across Finance, Sports, and News](./docs/images/scrollr-home.png)
 
 - **Marketing site** — <https://myscrollr.com>
 - **Desktop download** — <https://myscrollr.com/download>
@@ -26,8 +26,8 @@ pinned ticker streams the same data across the top of your screen.
 |---|---|
 | ![Sports — live scores, schedules, and standings across MLB, NBA, NHL, NFL, F1](./docs/images/scrollr-sports.png) | ![Finance — 30+ tracked symbols with live quotes and movement](./docs/images/scrollr-finance.png) |
 | **Sports.** Scores, schedules, and standings across MLB, NBA, NHL, NFL, and F1, all live. | **Finance.** Stocks, ETFs, and crypto with live quotes from TwelveData. |
-| ![Fantasy — Yahoo Fantasy matchups, standings, and roster injuries](./docs/images/scrollr-fantasy.png) | ![News — Hacker News and your custom RSS feeds, categorized and deduped](./docs/images/scrollr-news.png) |
-| **Fantasy.** Yahoo Fantasy matchups, weekly scoring, roster injuries — across every league you play. | **News.** Hacker News plus any RSS/Atom feed you throw at it. Categorized, deduped, sorted. |
+| ![News — Hacker News and your custom RSS feeds, categorized and deduped](./docs/images/scrollr-news.png) | |
+| **News.** Hacker News plus any RSS/Atom feed you throw at it. Categorized, deduped, sorted. | |
 
 ## What's in this repo
 
@@ -42,8 +42,6 @@ exists to feed it.
 | [`channels/finance/`](./channels/finance/) | Market-data ingester (TwelveData) | Rust |
 | [`channels/sports/`](./channels/sports/) | Scores + schedules ingester (api-sports.io) | Rust |
 | [`channels/rss/`](./channels/rss/) | RSS/Atom ingester | Rust |
-| [`channels/predictions/`](./channels/predictions/) | Prediction-market ingester (Kalshi) | Rust |
-| [`channels/fantasy/`](./channels/fantasy/) | Yahoo Fantasy (OAuth + sync) | Go |
 | [`k8s/`](./k8s/) | Production manifests | Kubernetes on DigitalOcean |
 | [`scripts/`](./scripts/) | Dev + ops tooling: `make` helpers, smoke tests, osTicket plugin | Node, Shell, PHP |
 | [`docs/`](./docs/) | Charter, ADRs, roadmap, runbooks — [indexed here](./docs/README.md) | Markdown |
@@ -64,14 +62,11 @@ exists to feed it.
    │  /users/me/widgets   widget CRUD        │
    │  /dashboard /events  reads + SSE        │
    │  /checkout           billing            │
-   │  finance · sports · rss · predictions   │  ← served in-process
-   └──┬───────────────────────────────┬──────┘
-      │ writes                        │ proxied, X-User-Sub
-      │                               ▼
-      │                            Fantasy (Go)
-      │                            Yahoo OAuth + sync
+   │  finance · sports · rss                 │  ← served in-process
+   └──┬────────────────────────────────────┘
+      │ writes
       ▼
-   shared Postgres  ◀── Rust ingesters: finance · sports · rss · predictions
+   shared Postgres  ◀── Rust ingesters: finance · sports · rss
       │                 (pure writers — they run no migrations)
       └── Sequin CDC → Redis pub/sub → SSE → ticker
 ```
@@ -83,10 +78,12 @@ exists to feed it.
   renders generically, so adding a widget that reuses an existing renderer
   is a server-only change — no client release. The marketing site does not
   fetch it; its widget counts are hardcoded and updated by hand.
-- **Only fantasy is still a proxied service.** Finance, sports, rss and
-  predictions were folded into core by
-  [ADR-0002](./docs/adr/0002-consolidate-widget-read-apis.md); Redis
-  service discovery survives for fantasy alone.
+- **No proxied channel service remains.** Finance, sports and rss were
+  folded into core by
+  [ADR-0002](./docs/adr/0002-consolidate-widget-read-apis.md); fantasy was
+  the last separately-deployed service and was removed outright
+  (SCROLLR-239), along with the Redis service discovery and dynamic proxy
+  that only it used.
 - **Data flows back via CDC.** Sequin streams Postgres changes to Redis
   topics; every core replica fans them out to connected desktops over
   SSE ([ADR-0001](./docs/adr/0001-sse-multi-replica.md)).
@@ -134,8 +131,8 @@ make check   # both TypeScript suites — the ones that run without a toolchain
   `make shell svc=rss-service` then `cargo test`. Installing Go or Rust on
   the host also works, but nothing here needs it.
 
-Integration tests (GDPR purge cascade, Stripe webhook idempotency,
-fantasy's schema contract) need a real Postgres and skip without it, so
+Integration tests (GDPR purge cascade, Stripe webhook idempotency, the
+read-query schema contract) need a real Postgres and skip without it, so
 `go test ./...` is always safe. To run them, point `TEST_DATABASE_URL` at a
 scratch database — never one with real data:
 
@@ -143,8 +140,8 @@ scratch database — never one with real data:
 TEST_DATABASE_URL="postgres://scrollr:scrollr@postgres:5432/scrollr?sslmode=disable" go test ./...
 ```
 
-CI runs all of it: `.github/workflows/backend-tests.yml` covers Go
-(`api`, fantasy), the four Rust ingesters, and `desktop/src-tauri`;
+CI runs all of it: `.github/workflows/backend-tests.yml` covers Go (`api`
+— the only Go module), the three Rust ingesters, and `desktop/src-tauri`;
 `frontend-tests.yml` runs both Vitest suites;
 `desktop-release.yml` builds and releases desktop binaries — though a
 preflight job skips the build unless the version in `tauri.conf.json` is
@@ -220,8 +217,6 @@ please read the [`CODE_OF_CONDUCT.md`](./.github/CODE_OF_CONDUCT.md) and the
 - Desktop app powered by [Tauri](https://tauri.app).
 - Market data from [TwelveData](https://twelvedata.com).
 - Sports data from [api-sports.io](https://api-sports.io).
-- Fantasy data from [Yahoo Fantasy Sports API](https://developer.yahoo.com/fantasysports/).
 - Auth by [Logto](https://logto.io).
 - Billing by [Stripe](https://stripe.com).
-- Prediction markets from [Kalshi](https://kalshi.com).
 - Infrastructure on [DigitalOcean](https://digitalocean.com) Kubernetes.

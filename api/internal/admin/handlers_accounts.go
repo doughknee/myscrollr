@@ -49,7 +49,6 @@ type AccountRow struct {
 	Lifetime bool    `json:"lifetime"`
 	Widgets  int     `json:"widgets"`
 	OnTicker int     `json:"on_ticker"`
-	Fantasy  bool    `json:"fantasy"`
 	Tickets  int     `json:"tickets"`
 
 	// SignedUpAt and LastSignInAt come from Logto and mean what they say.
@@ -85,7 +84,6 @@ func localAccountRows(ctx context.Context, subs []string) map[string]AccountRow 
 		       (SELECT count(*) FROM user_widgets w WHERE w.logto_sub = u.sub),
 		       (SELECT count(*) FROM user_widgets w
 		         WHERE w.logto_sub = u.sub AND w.ticker_enabled),
-		       EXISTS (SELECT 1 FROM yahoo_users y WHERE y.logto_sub = u.sub),
 		       (SELECT count(*) FROM support_cases c WHERE c.logto_sub = u.sub),
 		       p.updated_at,
 		       (SELECT d.status FROM user_deletion_requests d
@@ -105,7 +103,7 @@ func localAccountRows(ctx context.Context, subs []string) map[string]AccountRow 
 		var a AccountRow
 		var lastUsed *time.Time
 		if err := rows.Scan(&a.LogtoSub, &a.Plan, &a.Status, &a.Lifetime,
-			&a.Widgets, &a.OnTicker, &a.Fantasy, &a.Tickets, &lastUsed,
+			&a.Widgets, &a.OnTicker, &a.Tickets, &lastUsed,
 			&a.DeletionState); err != nil {
 			log.Printf("[Admin] scan account: %v", err)
 			continue
