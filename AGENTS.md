@@ -219,7 +219,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ### Desktop Tauri (`desktop/src-tauri/`)
 
-- Edition 2021 (not 2024). `lib.rs` is the entry point (~280 lines); commands live under `src/commands/`, the Kalshi client under `src/kalshi/`, and the Wayland shims under `src/compositor/`.
+- Edition 2021 (not 2024). `lib.rs` is the entry point (~280 lines); commands live under `src/commands/` and the Wayland shims under `src/compositor/`.
 - Commands: `#[tauri::command]`, `Result<(), String>` + `.map_err(|e| format!("context: {e}"))`.
 - State: custom structs via `app.manage()`. Two windows: `ticker` (always-on-top, 1920x228) and `main` (960x640 default). Close hides instead of destroying.
 - **`desktop/src/App.tsx` runs once per ticker window, not once per app.** Since v1.6.0 `sync_ticker_windows` builds one ticker per chosen monitor (`ticker`, `ticker-2`, …) and `main.tsx` renders `App` in every one of them. Anything in `App` that is not per-window therefore happens N times. Per-window is fine (`position_ticker`, `pin_window`, `set_ticker_visible`, show/hide). Process-wide is not: the SSE connection is a single Rust task (`start_sse` cancels the previous one, `stop_sse` kills it and broadcasts `disconnected` to every window), and a shared pref flipped from each window's own cache cancels itself out with an even number of windows — both were live bugs (REL-237). Gate anything process-wide behind `desktop/src/lib/windowRole.ts` (`isPrimaryTicker` / `ownsSharedConnection`) and put the lifecycle in a hook the main window shares, as `hooks/useSharedSSE.ts` does; non-owner windows still listen to `sse-status` and still consume CDC events.
