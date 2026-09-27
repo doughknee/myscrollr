@@ -590,8 +590,20 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.8 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.9 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.9 — Trimmed down, Linux sign-in fixed (`desktop-v1.6.9`, 2026-09-27)
+
+#### Removed
+
+- **Fantasy and Predictions are gone for now.** Yahoo shut off the API our Fantasy widget depended on, and Predictions never earned its place on the bar. Both are out of the directory and off the ticker. If you had either one, the app tells you once on next launch and the rest of your bar is untouched. We are spending the next while polishing News, Sports, the utilities and Finance instead of adding widgets; these two come back only if they can be done properly.
+
+#### Fixes
+
+- **Linux AppImage: sign-in opens your browser.** On the AppImage build, clicking sign in left you on "Signing you in…" with no browser window, because the AppImage's own environment leaked into the browser it tried to launch. The handoff now runs with a clean environment. And if a browser still does not appear, the sign-in screen has a **Copy the sign-in link** button so you can paste it anywhere and finish.
+
+Update from the app or at https://myscrollr.com/download.
 
 ### Scrollr 1.6.8 — The ticker scrolls again (`desktop-v1.6.8`, 2026-09-22)
 
@@ -712,26 +724,3 @@ If your sign-in expired in the background, every change you made failed with a v
 
 - Baseball statuses that arrive as a code now read as an inning in every chip, and a postponed game reads "PPD".
 - Error messages for widget changes now say what actually went wrong.
-
-### Scrollr 1.6.1 — Under your eyes (`desktop-v1.6.1`, 2026-09-07)
-
-A small release about one promise the bar makes and had quietly been breaking: nothing on it changes while you are looking at it.
-
-#### 👀 Under your eyes
-
-**A chip keeps what it is showing until it has scrolled off screen.** The bar takes turns through everything that is eligible, and a chip was always meant to swap to its next game only after it had left the viewport. It was not quite doing that: every time fresh data arrived, which is every fifteen seconds during live games, the bar could reassign which game belonged to which chip, so the score you were reading became a different game mid-pass. We watched the bar on live data for an hour with a logger attached to every chip, found the swaps, fixed the cause, and watched another hour with zero swaps. A chip now holds its game until its turn, and its turn only comes off screen.
-
-**What still moves on a visible chip, on purpose:** a score flashes when it changes, a live cap pulses, prices and the clock tick. Those are the chip staying true, not the chip changing its mind.
-
-#### ⚾ Innings, not codes
-
-**Baseball reads "8th", not "IN8".** The live feed sends innings as a code and the chip had been printing it as-is. It now reads 1st through 9th, "10th" and beyond for extras, and "LIVE" for the moment before the first pitch settles. **Finals read "Final" in every sport** instead of the soccer-flavoured "FT". A postponed game reads "PPD", a delayed one "Delay".
-
-#### 🛰️ Behind the bar, no update needed
-
-These went live on the server over the weekend and reach every version of the app:
-
-- **Fourteen more leagues in the catalog**: Bundesliga, Serie A, Ligue 1, EuroLeague, KHL and NPB, plus Six Nations, Super Rugby, Premiership Rugby, and the handball and volleyball competitions the feed already tracked.
-- **Live scores poll every fifteen seconds**, paced to what the data provider allows, so a busy Saturday no longer throttles the whole feed.
-- **Games that were stuck live are finalised.** A provider stall on Saturday night left a few MLB games showing an early inning for hours after they ended. The feed now re-checks any game that stops moving and, for MLB, confirms the result against the league's own scoreboard.
-- **Standings on a live game no longer blink out** between refreshes.
