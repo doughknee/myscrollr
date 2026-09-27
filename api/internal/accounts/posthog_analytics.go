@@ -146,9 +146,9 @@ func loadPostHogAnalyticsExport(ctx context.Context, userID string) (map[string]
 	return result, rows.Err()
 }
 
+// "fantasy" and "predictions" are no longer accepted (SCROLLR-239).
 var postHogFeatures = map[string]struct{}{
-	"sports": {}, "markets": {}, "news": {}, "fantasy": {},
-	"predictions": {}, "utilities": {},
+	"sports": {}, "markets": {}, "news": {}, "utilities": {},
 }
 
 func decodePostHogDesktopEvent(body []byte) (postHogDesktopEvent, error) {

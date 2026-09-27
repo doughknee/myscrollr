@@ -182,49 +182,20 @@ func TestGetChannelSummary_MixedEnabledStates(t *testing.T) {
 	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, ticker_enabled) VALUES
 		($1, 'finance', true, true),
 		($1, 'sports', true, true),
-		($1, 'rss', true, false),
-		($1, 'fantasy', false, false)`, userID)
+		($1, 'rss', true, false)`, userID)
 
 	got, err := getWidgetSummary(context.Background(), userID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.Total != 4 {
-		t.Errorf("total: want 4, got %d", got.Total)
+	if got.Total != 3 {
+		t.Errorf("total: want 3, got %d", got.Total)
 	}
 	if got.Enabled != 3 {
 		t.Errorf("enabled: want 3, got %d", got.Enabled)
 	}
-	if len(got.ByType) != 4 {
-		t.Errorf("by_type len: want 4, got %d", len(got.ByType))
-	}
-}
-
-// ─── hasFantasyWidget ──────────────────────────────────────────────
-
-func TestHasFantasyChannel(t *testing.T) {
-	cases := []struct {
-		name string
-		in   OverviewWidgets
-		want bool
-	}{
-		{"no rows", OverviewWidgets{}, false},
-		// The row is "fantasy_yahoo" — resolved through the catalog's source,
-		// never by matching a bare "fantasy" literal.
-		{"fantasy_yahoo enabled", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy_yahoo", Enabled: true}}}, true},
-		{"fantasy_yahoo disabled", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy_yahoo", Enabled: false}}}, false},
-		// A hypothetical second fantasy provider routes by source prefix.
-		{"fantasy_espn enabled", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy_espn", Enabled: true}}}, true},
-		{"only finance", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "finance_stocks", Enabled: true}}}, false},
-		// The pre-split coarse type is no longer a valid widget id.
-		{"legacy coarse fantasy is not a widget", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy", Enabled: true}}}, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := hasFantasyWidget(tc.in); got != tc.want {
-				t.Errorf("hasFantasyWidget: want %v, got %v", tc.want, got)
-			}
-		})
+	if len(got.ByType) != 3 {
+		t.Errorf("by_type len: want 3, got %d", len(got.ByType))
 	}
 }
 

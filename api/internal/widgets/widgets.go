@@ -1,25 +1,17 @@
 package widgets
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
-
-var lifecycleClient = &http.Client{
-	Timeout: 10 * time.Second,
-}
 
 // CountEnabledWidgets returns how many enabled widgets a user
 // currently has — the "slots in use" for the widget/slot model. Used by
@@ -32,64 +24,18 @@ func CountEnabledWidgets(ctx context.Context, logtoSub string) (int, error) {
 	return n, err
 }
 
-// callWidgetLifecycle sends a widget lifecycle event to the backing service
-// if it has the channel_lifecycle capability (wire name unchanged).
+// callWidgetLifecycle delivers a widget lifecycle event to its backing
+// local source (ADR-0002; every source is in-process now). Most sources
+// only need per-user cache invalidation — the one live behavior of the
+// retired HTTP lifecycle contract (Appendix A); rss provides a full
+// lifecycle hook because it also syncs custom feeds into the
+// polling-target tables.
 func callWidgetLifecycle(ctx context.Context, widgetType, event, userSub string, config, oldConfig map[string]interface{}, enabled *bool) {
 	// Resolve to the backing data source so widget types (e.g. "news") reach
-	// the right service's lifecycle hook (rss). Legacy coarse types map to
+	// the right source's lifecycle hook (rss). Legacy coarse types map to
 	// themselves.
 	source := platform.DataSourceForWidget(widgetType)
-
-	// Local widget sources (ADR-0002): most sources only need per-user
-	// cache invalidation (the one live behavior of the HTTP lifecycle
-	// contract — Appendix A); rss provides a full lifecycle hook because
-	// it also syncs custom feeds into the polling-target tables.
-	if ingestread.DispatchLifecycle(source, event, userSub, config, oldConfig, enabled) {
-		return
-	}
-
-	ch := platform.GetChannel(source)
-	if ch == nil || !ch.HasCapability("channel_lifecycle") {
-		return
-	}
-
-	body := map[string]interface{}{
-		"event":  event,
-		"user":   userSub,
-		"config": config,
-	}
-	if oldConfig != nil {
-		body["old_config"] = oldConfig
-	}
-	if enabled != nil {
-		body["enabled"] = *enabled
-	}
-
-	reqBody, err := json.Marshal(body)
-	if err != nil {
-		log.Printf("[Widgets] Failed to marshal lifecycle request: %v", err)
-		return
-	}
-
-	url := ch.InternalURL + "/internal/channel-lifecycle"
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		log.Printf("[Widgets] Failed to create lifecycle request: %v", err)
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := lifecycleClient.Do(req)
-	if err != nil {
-		log.Printf("[Widgets] Lifecycle call to %s/%s failed: %v", ch.Name, event, err)
-		return
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
-
-	if resp.StatusCode != 200 {
-		log.Printf("[Widgets] Lifecycle call to %s/%s returned status %d", ch.Name, event, resp.StatusCode)
-	}
+	ingestread.DispatchLifecycle(source, event, userSub, config, oldConfig, enabled)
 }
 
 // GetWidgets returns all widgets for the authenticated user.
@@ -146,13 +92,13 @@ func CreateWidget(c *fiber.Ctx) error {
 	// The catalog is the only authority on what a widget is.
 	//
 	// This used to also accept anything registered in Redis service discovery
-	// — a different concept entirely, and a set of BACKEND SERVICES. It let
-	// widget_type "fantasy" through (the service registers under that name)
-	// while the catalog id is "fantasy_yahoo", producing a row with no catalog
-	// entry: it consumed a slot, resolved to no source, subscribed to no SSE
-	// topic, fired no lifecycle event, and could not render. The OR was added
-	// so coarse types ("sports") kept working during the widget/slot
-	// transition; that transition is over and those types no longer exist.
+	// — a different concept entirely, and a set of BACKEND SERVICES. It let a
+	// coarse legacy widget_type through even though the catalog only knew the
+	// split id, producing a row with no catalog entry: it consumed a slot,
+	// resolved to no source, subscribed to no SSE topic, fired no lifecycle
+	// event, and could not render. The OR was added so coarse types
+	// ("sports") kept working during the widget/slot transition; that
+	// transition is over and those types no longer exist.
 	if !platform.IsKnownWidgetType(req.WidgetType) {
 		log.Printf("[Widgets] create rejected for %s: unknown widget type %q", userID, req.WidgetType)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{

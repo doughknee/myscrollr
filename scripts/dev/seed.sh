@@ -103,13 +103,11 @@ src_psql() {
 TABLES='
 tracked_symbols|
 tracked_leagues|
-tracked_markets|
 tracked_feeds|WHERE is_default = true
 trades|
 games|
 standings|
 teams|
-markets|ORDER BY close_time DESC NULLS LAST LIMIT 500
 rss_items|WHERE feed_url IN (SELECT url FROM tracked_feeds WHERE is_default = true) ORDER BY published_at DESC NULLS LAST LIMIT 500
 '
 
@@ -205,8 +203,6 @@ capture() {
 #                 was captured on had almost certainly let the janitor run and
 #                 switch the curated feeds off, and capturing that state ships
 #                 a dataset whose RSS catalog is silently empty.
-#   markets       predictions only returns close_time > now()
-#                 (api/internal/ingestread/predictions.go:89).
 #   games         no filter — purely cosmetic, so that 'pre' games are still
 #                 in the future and the ticker looks like a real day.
 #
@@ -244,8 +240,8 @@ DO \$\$
 DECLARE t text; seq text; mx bigint;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'tracked_symbols','tracked_leagues','tracked_markets','tracked_feeds',
-    'trades','games','standings','teams','markets','rss_items'
+    'tracked_symbols','tracked_leagues','tracked_feeds',
+    'trades','games','standings','teams','rss_items'
   ] LOOP
     -- Check the column exists FIRST. pg_get_serial_sequence RAISES on a
     -- missing column rather than returning NULL, and one raise aborts the
@@ -271,10 +267,6 @@ UPDATE games SET start_time = start_time + (now() - (SELECT max(updated_at) FROM
 
 UPDATE rss_items SET published_at = published_at + (now() - (SELECT max(updated_at) FROM games))
   WHERE published_at IS NOT NULL
-    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
-
-UPDATE markets SET close_time = close_time + (now() - (SELECT max(updated_at) FROM games))
-  WHERE close_time IS NOT NULL
     AND (SELECT max(updated_at) FROM games) IS NOT NULL;
 
 -- Runs LAST on purpose: the shifts above anchor on
@@ -333,7 +325,6 @@ trades|day_high|the trade chip day-range rail
 games|start_time|every sports surface
 games|state|the ticker live/upcoming/final split
 rss_items|published_at|headline ordering and the freshness pill
-markets|close_time|prediction chip countdowns
 '
 
 # Columns known to be empty because the feature that fills them has not

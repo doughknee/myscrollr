@@ -414,7 +414,7 @@ func TestSearchLooksAtEveryFieldAReaderCanSee(t *testing.T) {
 			t.Errorf("search %q should have matched", q)
 		}
 	}
-	if matchesSearch(r, "kalshi") {
+	if matchesSearch(r, "nonexistent") {
 		t.Error("search matched something that is not there")
 	}
 }

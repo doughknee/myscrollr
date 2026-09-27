@@ -70,19 +70,15 @@ func TestDataSourceForWidget(t *testing.T) {
 		{"news_bbc", "rss"},
 		{"news_hackernews", "rss"},
 		{"rss_custom", "rss"},
-		{"fantasy_yahoo", "fantasy"},
-		{"predictions", "predictions"},
 		// Dynamic via source prefix (an id the catalog doesn't enumerate).
 		{"sports_premier_league", "sports"},
 		{"finance_forex", "finance"},
-		{"fantasy_espn", "fantasy"},
 		// The pre-split coarse types are gone (VISION §7.10): the catalog is
 		// the authority and it has no "finance"/"sports"/"news" entry, so
 		// they resolve to nothing and CreateWidget rejects them.
 		{"finance", ""},
 		{"sports", ""},
 		{"rss", ""},
-		{"fantasy", ""},
 		{"news", ""},
 		// Utilities have no data source.
 		{"clock", ""},
@@ -103,7 +99,7 @@ func TestIsKnownWidgetType(t *testing.T) {
 	known := []string{
 		"sports_nfl", "finance_stocks", "finance_crypto",
 		"news_bbc", "rss_custom",
-		"fantasy_yahoo", "predictions", "clock", "github",
+		"clock", "github",
 		"sports_premier_league", // dynamic league, resolved by prefix
 	}
 	for _, w := range known {

@@ -167,9 +167,8 @@ func migrateURL(dbURL, table, schema string) string {
 
 // Main is the shared TestMain body. It switches a package into integration
 // mode when TEST_DATABASE_URL is set: the repo's real migrations are
-// applied (core plus the fantasy channel's — the GDPR purge cascade
-// deletes from yahoo_* tables, which the fantasy service owns in the
-// shared production database), platform.DBPool points at the test
+// applied (core-api owns every shared table, including the yahoo_* tables
+// the GDPR purge cascade deletes from), platform.DBPool points at the test
 // database, and platform.Rdb at an in-process miniredis. Tests that gate
 // on DBPool/Rdb being non-nil then run instead of skipping. Without the
 // variable both stay nil and unit tests behave as before.

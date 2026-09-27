@@ -22,17 +22,16 @@ func TestDefaultTierLimits_Exact(t *testing.T) {
 		feeds                  *int
 		customFeeds            *int
 		leagues                *int
-		fantasy                *int
 		maxTickerRows          int
 		maxTickerCustomization bool
 	}{
 		// Per-feature depth caps retired 2026-07-02 — nil (unlimited) on every
 		// tier. Only max_widgets (slot lever) + ticker rows still vary.
-		{"free", intPtr(3), nil, nil, nil, nil, nil, 1, false},
-		{"uplink", intPtr(6), nil, nil, nil, nil, nil, 2, false},
-		{"uplink_pro", intPtr(12), nil, nil, nil, nil, nil, 3, false},
-		{"uplink_ultimate", nil, nil, nil, nil, nil, nil, 3, true},
-		{"super_user", nil, nil, nil, nil, nil, nil, 3, true},
+		{"free", intPtr(3), nil, nil, nil, nil, 1, false},
+		{"uplink", intPtr(6), nil, nil, nil, nil, 2, false},
+		{"uplink_pro", intPtr(12), nil, nil, nil, nil, 3, false},
+		{"uplink_ultimate", nil, nil, nil, nil, nil, 3, true},
+		{"super_user", nil, nil, nil, nil, nil, 3, true},
 	}
 
 	for _, c := range cases {
@@ -46,7 +45,6 @@ func TestDefaultTierLimits_Exact(t *testing.T) {
 		assertIntPtrEq(t, c.tier+".feeds", c.feeds, got.Feeds)
 		assertIntPtrEq(t, c.tier+".custom_feeds", c.customFeeds, got.CustomFeeds)
 		assertIntPtrEq(t, c.tier+".leagues", c.leagues, got.Leagues)
-		assertIntPtrEq(t, c.tier+".fantasy", c.fantasy, got.Fantasy)
 		if got.MaxTickerRows != c.maxTickerRows {
 			t.Errorf("%s.max_ticker_rows: want %d, got %d", c.tier, c.maxTickerRows, got.MaxTickerRows)
 		}
@@ -151,14 +149,14 @@ func TestPartitionWidgetsForCap(t *testing.T) {
 		w("finance_stocks", true),
 		w("news_bbc", false), // user-disabled — passes through untouched
 		w("sports_nba", true),
-		w("predictions", true),
-		w("fantasy_yahoo", true),
+		w("news_hackernews", true),
+		w("rss_custom", true),
 	}
 
 	kept, pruned := partitionWidgetsForCap(channels, 3)
 
 	wantKept := []string{"sports_nfl", "finance_stocks", "sports_nba"}
-	wantPruned := []string{"predictions", "fantasy_yahoo"}
+	wantPruned := []string{"news_hackernews", "rss_custom"}
 	if got := widgetNames(kept); !equalStrings(got, wantKept) {
 		t.Errorf("kept = %v, want %v", got, wantKept)
 	}

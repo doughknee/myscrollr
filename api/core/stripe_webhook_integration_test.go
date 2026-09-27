@@ -225,7 +225,7 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 	seedStripeCustomer(t, sub, "cus_del_1", "ultimate_monthly", "active", false)
 	// Five widgets on Ultimate (unlimited slots) — two over the free
 	// slot cap of three. Staggered created_at pins the prune order.
-	widgets := []string{"sports_nfl", "finance_stocks", "news_bbc", "sports_nba", "predictions"}
+	widgets := []string{"sports_nfl", "finance_stocks", "news_bbc", "sports_nba", "rss_custom"}
 	for i, w := range widgets {
 		testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, config, created_at)
 		             VALUES ($1, $2, true, '{}', now() + make_interval(secs => $3))`, sub, w, i)
@@ -266,7 +266,7 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 		"finance_stocks": true,
 		"news_bbc":       true,
 		"sports_nba":     false,
-		"predictions":    false,
+		"rss_custom":     false,
 	}
 	if len(got) != len(want) {
 		t.Errorf("widget rows after prune = %d (%v), want %d — prune must disable, not delete", len(got), got, len(want))

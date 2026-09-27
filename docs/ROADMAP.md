@@ -4,6 +4,10 @@
 first-pass runthrough of the live release. Versions are intent, not promises — releases
 can merge or split as work reveals itself.*
 
+**Note (2026-09-26, SCROLLR-239):** Fantasy (Yahoo) and Predictions (Kalshi) were removed
+from the product outright. Shipped-release entries below that mention them (Kalshi Grows
+Up, the fantasy tier gate, etc.) are historical record and are left as shipped.
+
 **The through-line:** v1.1.0 shipped the widget *model*; these releases make every
 surface actually behave like it.
 
@@ -68,7 +72,9 @@ Not a release — the v1.1.0 loose ends:
   (forced-row-touch test observed on `cdc:predictions:all`). The earlier silence was
   write *sparsity*, not a broken sink: the service no longer creates untracked
   markets, so off-peak updates arrive minutes apart.
-- [ ] Archive the old $399 Stripe price; delete the downloaded Kalshi key file.
+- [ ] Archive the old $399 Stripe price.
+- [x] Delete the downloaded Kalshi key file — moot: predictions (Kalshi) was removed
+  outright (SCROLLR-239); the pull script and its `secrets/*.docker.env` are gone.
 
 ---
 

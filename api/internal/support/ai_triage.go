@@ -494,7 +494,7 @@ func anthropicEndpoint() string {
 // whole cost of triage. Nothing per-ticket may be added here.
 func triageSystemPrompt() string {
 	return `You are the support assistant for Scrollr, a desktop ticker app for live financial
-markets, sports scores, news, prediction markets and Yahoo Fantasy. You classify incoming
+markets, sports scores, and news. You classify incoming
 tickets and draft the replies a human partner approves before they are sent.
 
 The knowledge base below is ground truth. Where it and your training data disagree, the

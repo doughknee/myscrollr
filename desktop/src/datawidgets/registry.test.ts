@@ -48,7 +48,7 @@ describe("datawidget registry", () => {
 
   it("surfaces data widgets in every category of the catalog", () => {
     const byCategory = new Set(getCatalogItems().map((it) => it.category));
-    for (const c of ["finance", "sports", "news", "fantasy", "predictions"]) {
+    for (const c of ["finance", "sports", "news"]) {
       expect(byCategory.has(c as never), `category "${c}" has no catalog items`).toBe(true);
     }
   });

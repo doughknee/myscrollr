@@ -52,7 +52,7 @@ type liveFixture struct {
 
 // bannedInReplies is everything a user must never read, from POLICIES plus
 // the data-provider names and quotas the brief singles out.
-var bannedInReplies = regexp.MustCompile(`(?i)\b(sequin|logto|coolify|kubernetes|k8s|digitalocean|osticket|redis|postgres|api-sports|api-football|twelvedata|kalshi api|rate limit|quota|super user)\b`)
+var bannedInReplies = regexp.MustCompile(`(?i)\b(sequin|logto|coolify|kubernetes|k8s|digitalocean|osticket|redis|postgres|api-sports|api-football|twelvedata|rate limit|quota|super user)\b`)
 
 var dashOrDollar = regexp.MustCompile(`[—–]|\$\d`)
 

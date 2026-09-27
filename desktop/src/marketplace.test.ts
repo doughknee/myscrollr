@@ -29,7 +29,7 @@ describe("bundled snapshot", () => {
   it("resolves widgets to their renderer source, not a user-facing group", () => {
     expect(sourceForWidget("sports_nfl")).toBe("sports");
     expect(sourceForWidget("news_bbc")).toBe("rss");
-    expect(sourceForWidget("predictions")).toBe("predictions");
+    expect(sourceForWidget("finance_stocks")).toBe("finance");
     // Utilities have no data source.
     expect(sourceForWidget("clock")).toBeUndefined();
     expect(sourceForWidget("nope_not_real")).toBeUndefined();
@@ -46,20 +46,20 @@ describe("bundled snapshot", () => {
     const items = getCatalogItems();
     expect(items.length).toBeGreaterThan(0);
 
-    const kalshi = catalogItemById("predictions");
-    expect(kalshi).toBeDefined();
+    const stocks = catalogItemById("finance_stocks");
+    expect(stocks).toBeDefined();
     // Identity comes from the server…
-    expect(kalshi!.name).toBe("Kalshi");
-    expect(kalshi!.hex).toBe("#1fc9a0");
-    expect(kalshi!.category).toBe("predictions");
+    expect(stocks!.name).toBe("Stocks");
+    expect(stocks!.hex).toBe("#16a34a");
+    expect(stocks!.category).toBe("finance");
     // …the renderer comes from the client.
-    expect(kalshi!.icon).toBeDefined();
+    expect(stocks!.icon).toBeDefined();
   });
 
   it("orders by the server's declaration order", () => {
     const order = canonicalOrder();
     expect(order.indexOf("finance_stocks")).toBeLessThan(order.indexOf("clock"));
-    expect(order).toContain("predictions");
+    expect(order).toContain("finance_stocks");
   });
 });
 

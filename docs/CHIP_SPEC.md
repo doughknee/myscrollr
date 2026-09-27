@@ -447,7 +447,6 @@ shrinks or jumps as a slate fills.
 |---|---|
 | All | Which widgets are on the ticker (`widgetsOnTicker`); which subjects are pinned to the fixed zone (§8.5) |
 | Finance | `config.symbols` (the watchlist, in the user's order) |
-| Predictions | starred markets (`predictionsWatchlist`) |
 | Sports | `config.favoriteTeams[league]` |
 | News | `config.feeds` (custom RSS) |
 | Clock | `localTime`, `showTimezones`, `excludedTimezones`, zones |
@@ -473,13 +472,6 @@ widget contributes; which eligible items appear; their order; the horizon or flo
 rotation cadence or slot count. The one such control ever added (sports "N on the
 bar", 2026-09-04) was removed the same day.
 
-**Documented exception, to be reconciled:** fantasy's `tickerMode` dial (essential /
-standard / everything) is a selection control that predates this rule. Its per-item
-venue toggles and the 14 venue prefs behind them went in REL-208 (2026-09-06); each
-dial position is now a fixed set built in the fantasy ticker source. When fantasy is
-rebuilt (REL-184), the dial becomes the fixed `standard` rule; followed players remain,
-since they are an input.
-
 ### 8.1 Per-source constants (not settings)
 
 | Source | Eligible (horizon) | Floor | Slots | Pool order | Reserve |
@@ -489,10 +481,8 @@ since they are an input.
 Every pool above is first stripped of the widget's pinned subjects (`dropPinned`, §8.5).
 | News | items within `TICKER_RSS_HOURS = 6` | newest per feed if within `TICKER_RSS_FLOOR_HOURS = 48`; undated counts as current | `TICKER_RSS_SLOTS = 3` | newest first, **interleaved by feed** (round-robin, feeds ordered by their newest item) | longest `plainText(title)` per class |
 | Finance | the widget's `symbols` | — | `TICKER_FINANCE_SLOTS = 4` | watchlist order; unlisted rows trail alphabetically | none |
-| Predictions | stars if any (drop `in_sweep===false` unless resolved); else top `TICKER_FALLBACK_LIMIT = 15` rank-1 by trailing volume | — | `TICKER_PREDICTIONS_SLOTS = 4` | `sortPredictions(..., "trending")` | none |
 | Uptime / GitHub | all items | — | `CAPPED_WIDGET_SLOTS = 4` (in `ScrollrTicker.tsx`) | item order | none |
 | Clock / Timer / Weather / Sysmon | all items in one chip | — | n/a | config order | n/a |
-| Fantasy | bounded by the fantasy ticker dial | — | n/a | as built | n/a |
 
 Sports favourites (`config.favoriteTeams[league].teamName` matching either team name)
 are **exempt from the slot count**: every one is on the rail, keyed `spo-<tab>-<gameId>`.

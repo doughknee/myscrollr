@@ -6,7 +6,6 @@
       "feeds": null,
       "custom_feeds": null,
       "leagues": null,
-      "fantasy": null,
       "max_ticker_rows": 1,
       "max_ticker_customization": false
     },
@@ -16,7 +15,6 @@
       "feeds": null,
       "custom_feeds": null,
       "leagues": null,
-      "fantasy": null,
       "max_ticker_rows": 2,
       "max_ticker_customization": false
     },
@@ -26,7 +24,6 @@
       "feeds": null,
       "custom_feeds": null,
       "leagues": null,
-      "fantasy": null,
       "max_ticker_rows": 3,
       "max_ticker_customization": false
     },
@@ -36,7 +33,6 @@
       "feeds": null,
       "custom_feeds": null,
       "leagues": null,
-      "fantasy": null,
       "max_ticker_rows": 3,
       "max_ticker_customization": true
     },
@@ -46,7 +42,6 @@
       "feeds": null,
       "custom_feeds": null,
       "leagues": null,
-      "fantasy": null,
       "max_ticker_rows": 3,
       "max_ticker_customization": true
     }

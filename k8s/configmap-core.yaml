@@ -22,7 +22,6 @@ data:
   LOGTO_JWKS_URL: "https://auth.myscrollr.com/oidc/jwks"
   LOGTO_ENDPOINT: "https://auth.myscrollr.com"
   LOGTO_M2M_RESOURCE: "https://default.logto.app/api"
-  YAHOO_CALLBACK_URL: "https://api.myscrollr.com/yahoo/callback"
 
   # CORS
   ALLOWED_ORIGINS: "https://myscrollr.com,https://api.myscrollr.com"
@@ -33,7 +32,6 @@ data:
   INTERNAL_FINANCE_URL: "http://finance-service:3001"
   INTERNAL_SPORTS_URL: "http://sports-service:3002"
   INTERNAL_RSS_URL: "http://rss-service:3004"
-  INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
 
   # Logto role IDs (not secret, just config)
   LOGTO_UPLINK_ROLE_ID: "x8qz9zmdthw19n10dqnr5"

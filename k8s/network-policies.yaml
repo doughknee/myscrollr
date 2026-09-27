@@ -8,11 +8,9 @@
 #
 #   ingress-nginx ──► website:3000
 #   ingress-nginx ──► core-api:8080
-#   core-api      ──► fantasy-api:8084  (the one remaining channel service)
-#   core-api      ──► {finance,sports,rss,predictions}-service  (3001/3002/
-#                     3004/3005 — the widget read APIs folded into core,
-#                     ADR-0002; health probes + /{source}/health +
-#                     predictions candlesticks)
+#   core-api      ──► {finance,sports,rss}-service  (3001/3002/3004 — the
+#                     widget read APIs folded into core, ADR-0002; health
+#                     probes + /{source}/health)
 #
 # Everything else inbound is denied by the namespace-wide default-deny.
 # Egress is intentionally unrestricted (policyTypes: [Ingress] everywhere) —
@@ -83,48 +81,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-core-to-fantasy-api
-  namespace: scrollr
-spec:
-  podSelector:
-    matchLabels:
-      app: fantasy-api
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: core-api
-      ports:
-        - protocol: TCP
-          port: 8084
----
-# predictions-api was folded into core-api (ADR-0002, REL-15) — core now
-# probes predictions-service directly (health + candlesticks pass-through).
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-core-to-predictions-service
-  namespace: scrollr
-spec:
-  podSelector:
-    matchLabels:
-      app: predictions-service
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: core-api
-      ports:
-        - protocol: TCP
-          port: 3005
 ---
 # finance-api was folded into core-api (ADR-0002, REL-14) — core now
 # probes finance-service directly.

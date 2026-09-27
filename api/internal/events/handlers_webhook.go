@@ -152,19 +152,6 @@ func topicForRecord(table string, record map[string]interface{}) string {
 		}
 		return TopicForRSSFeed(feedURL)
 
-	// Fantasy: route by league key (all 4 tables have league_key)
-	case "yahoo_leagues", "yahoo_standings", "yahoo_matchups", "yahoo_rosters":
-		leagueKey, ok := record["league_key"].(string)
-		if !ok || leagueKey == "" {
-			return ""
-		}
-		return platform.TopicPrefixFantasy + leagueKey
-
-	// Predictions: v1 channel-wide broadcast — every market update goes to
-	// the single "all" topic that every predictions subscriber listens on.
-	case "markets":
-		return platform.TopicPrefixPredictions + "all"
-
 	default:
 		return ""
 	}

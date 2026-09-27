@@ -105,34 +105,10 @@ services:
       INTERNAL_FINANCE_URL: "http://finance-service:3001"
       INTERNAL_SPORTS_URL: "http://sports-service:3002"
       INTERNAL_RSS_URL: "http://rss-service:3004"
-      INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
     volumes:
       - ../api:/app
       - core_build:/build
     ports: ["18080:8080"]
-    depends_on: *needs-db-redis
-    restart: unless-stopped
-
-  # ── Fantasy (Go — the one remaining separate service) ──────────────
-  # YAHOO_CALLBACK_URL in its .env points at http://localhost:8084/fantasy/
-  # callback, published below, so the browser OAuth redirect lands.
-  fantasy-api:
-    build:
-      context: ../channels/fantasy/api
-      target: dev
-    container_name: scrollr-fantasy-api
-    env_file: [../channels/fantasy/.env]
-    environment:
-      PORT: "8084"
-      DATABASE_URL: *db-url
-      REDIS_URL: *redis-url
-      CHANNEL_URL: "http://fantasy-api:8084"
-      GOCACHE: /build/go-cache
-      GOMODCACHE: /build/go-mod
-    volumes:
-      - ../channels/fantasy/api:/app
-      - fantasy_build:/build
-    ports: ["8084:8084"]
     depends_on: *needs-db-redis
     restart: unless-stopped
 
@@ -185,31 +161,6 @@ services:
       - cargo_registry:/cargo
     ports: ["3004:3004"]
 
-  # Opt-in: needs a Kalshi key. `make kalshi-key` pulls one, `make setup`
-  # generates the env file. Without it the profile stays off and the rest
-  # of the stack runs fine.
-  predictions-service:
-    <<: *rust-ingester
-    build:
-      context: ../channels/predictions/service
-      target: dev
-    container_name: scrollr-predictions-svc
-    profiles: ["predictions"]
-    # The Kalshi private key is a multiline PEM that Docker's env_file
-    # cannot parse, so `make setup` writes it to a file mounted below and
-    # the service reads KALSHI_PRIVATE_KEY_PATH instead of an inline var.
-    env_file: [../secrets/predictions.docker.env]
-    environment:
-      <<: *rust-env
-      PORT: "3005"
-      KALSHI_PRIVATE_KEY_PATH: "/run/secrets/kalshi.pem"
-    volumes:
-      - ../channels/predictions/service:/app
-      - predictions_build:/build
-      - cargo_registry:/cargo
-      - ../secrets/kalshi-private-key.pem:/run/secrets/kalshi.pem:ro
-    ports: ["3005:3005"]
-
 volumes:
   # Names match the pre-unification compose files — an existing local
   # database survives the switch.
@@ -218,8 +169,6 @@ volumes:
   # Build caches. Wiped by `make reset`, never by `make down`.
   cargo_registry:
   core_build:
-  fantasy_build:
   finance_build:
   sports_build:
   rss_build:
-  predictions_build:

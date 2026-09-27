@@ -35,14 +35,10 @@ endif
 # else already owns 5432/6379, extra mounts, whatever your box needs.
 COMPOSE_OVERRIDE := $(wildcard docker/compose.override.yml)
 COMPOSE      := docker compose -f docker/compose.yml $(if $(COMPOSE_OVERRIDE),-f $(COMPOSE_OVERRIDE))
-COMPOSE_PRED := $(COMPOSE) --profile predictions
-# Predictions is opt-in: it needs a Kalshi key. The profile turns on only
-# once `make setup` (or `make kalshi-key`) has produced its env file.
-COMPOSE_AUTO  = $(shell [ -f secrets/predictions.docker.env ] && echo "$(COMPOSE_PRED)" || echo "$(COMPOSE)")
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor up down restart rebuild reset logs ps shell \
-        web desktop dev screenshots kalshi-key check kb
+        web desktop dev screenshots check kb
 
 # ── Help ─────────────────────────────────────────────────────────────
 # Targets are documented with `##<group>: description` and grouped below.
@@ -56,14 +52,6 @@ setup: ##setup: Generate every .env file (run this first)
 doctor: ##setup: Check Docker, ports and required tooling
 	@node scripts/dev/doctor.mjs
 
-# Predictions is optional and the cluster credential is a LIVE, real-money
-# Kalshi key, so this refuses to copy it unless you ask for it by name:
-# `make kalshi-key prod=1`. `make seed` gives you a working app without any
-# upstream credential.
-kalshi-key: ##setup: Pull the Kalshi key from the cluster (prod=1 to confirm; needs kubectl)
-	@$(SHELL) scripts/dev/pull-kalshi-key.sh $(if $(prod),--prod)
-	@node scripts/dev/setup.mjs --predictions-only
-
 # ── Run ──────────────────────────────────────────────────────────────
 up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	@node scripts/dev/doctor.mjs --quiet
@@ -71,26 +59,16 @@ up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	@$(COMPOSE) up -d --wait postgres redis
 	@if [ -n "$(svc)" ]; then \
 	  echo "[up] $(svc) only (compose pulls in what it depends on)..."; \
-	  $(COMPOSE_AUTO) up -d --build $(svc); \
+	  $(COMPOSE) up -d --build $(svc); \
 	else \
-	  if [ -f secrets/predictions.docker.env ]; then \
-	    echo "[up] all services (incl. predictions)..."; \
-	  else \
-	    echo "[up] all services (predictions off - run 'make kalshi-key' to enable)..."; \
-	  fi; \
-	  $(COMPOSE_AUTO) up -d --build --remove-orphans; \
+	  echo "[up] all services..."; \
+	  $(COMPOSE) up -d --build --remove-orphans; \
 	fi
 	@$(SHELL) scripts/dev/wait-healthy.sh
 	@$(COMPOSE) exec -T postgres psql -U scrollr -d scrollr -At -c "SELECT count(*) FROM trades" 2>/dev/null | grep -qx 0 && echo "[hint] no data yet - run 'make seed' to load the dev dataset." || true
 
-# COMPOSE_AUTO, not COMPOSE_PRED: naming the predictions profile makes
-# compose resolve that service, and it fails outright on the missing
-# secrets/predictions.docker.env when you have no Kalshi key. That left a
-# fresh checkout able to start the stack but not stop it. --remove-orphans
-# still clears a predictions container left over from a run that did have
-# a key.
 down: ##run: Stop the backend (keeps your database)
-	@$(COMPOSE_AUTO) down --remove-orphans
+	@$(COMPOSE) down --remove-orphans
 
 restart: down up ##run: Stop and start again
 
@@ -134,18 +112,18 @@ screenshots: ##run: Re-shoot the site's ticker screenshots from the running dev 
 # Editing Go/Rust source needs NO command here — the containers watch and
 # rebuild. `rebuild` is for dependency changes (go.mod, Cargo.toml).
 rebuild: ##iterate: Rebuild images after a dependency change (svc= for one)
-	@$(COMPOSE_AUTO) build $(svc)
-	@$(COMPOSE_AUTO) up -d --remove-orphans $(svc)
+	@$(COMPOSE) build $(svc)
+	@$(COMPOSE) up -d --remove-orphans $(svc)
 
 logs: ##iterate: Tail logs, all or one with svc=core-api
-	@$(COMPOSE_AUTO) logs -f --tail=80 $(svc)
+	@$(COMPOSE) logs -f --tail=80 $(svc)
 
 ps: ##iterate: Show what's running
-	@$(COMPOSE_AUTO) ps
+	@$(COMPOSE) ps
 
 shell: ##iterate: Open a shell in a service, svc=core-api
 	@test -n "$(svc)" || { echo "usage: make shell svc=core-api"; exit 1; }
-	@$(COMPOSE_AUTO) exec $(svc) sh
+	@$(COMPOSE) exec $(svc) sh
 
 # The support knowledge base is generated (api/cmd/kbgen) from the docs, the
 # settings copy, the widget catalog and the last eight GitHub releases, and
@@ -157,7 +135,7 @@ kb: ##iterate: Regenerate the support knowledge base (api/internal/support/kb)
 
 # ── Reset ────────────────────────────────────────────────────────────
 reset: ##reset: Stop and wipe the database, Redis and build caches
-	@$(COMPOSE_AUTO) down -v --remove-orphans
+	@$(COMPOSE) down -v --remove-orphans
 
 check: ##reset: Run the test suites that can run locally
 	@echo "-- desktop --"       && cd desktop        && npm test --silent

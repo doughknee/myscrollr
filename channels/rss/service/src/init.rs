@@ -6,7 +6,7 @@
 //! Kubernetes restarts the pod, or (b) flips `/health/ready` to return HTTP
 //! 503 so probes can detect the problem.
 //!
-//! Copied into each Rust ingester (`finance`, `sports`, `rss`, `predictions`)
+//! Copied into each Rust ingester (`finance`, `sports`, `rss`)
 //! rather than
 //! extracted as a shared crate, to match the existing isolation philosophy
 //! in AGENTS.md ("Module isolation is absolute. Each service owns its copy

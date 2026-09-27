@@ -21,7 +21,6 @@ type WidgetLimits struct {
 	Feeds                  *int `json:"feeds"`
 	CustomFeeds            *int `json:"custom_feeds"`
 	Leagues                *int `json:"leagues"`
-	Fantasy                *int `json:"fantasy"`
 	MaxTickerRows          int  `json:"max_ticker_rows"`          // 0 means "inherit free default of 1"
 	MaxTickerCustomization bool `json:"max_ticker_customization"` // per-row scroll mode/direction/speed overrides
 }
@@ -46,7 +45,7 @@ type TierLimitsResponse struct {
 //
 // MaxWidgets gates what POST /users/me/widgets accepts, so drift here is
 // unforgiving.
-// Per-feature depth caps (Symbols/Feeds/CustomFeeds/Leagues/Fantasy) were
+// Per-feature depth caps (Symbols/Feeds/CustomFeeds/Leagues) were
 // RETIRED 2026-07-02 — a nil pointer means unlimited, and every tier now has
 // unlimited depth inside a widget. MaxWidgets (the slot lever) is the only
 // per-tier gate; the ticker-row fields are kept for compatibility.

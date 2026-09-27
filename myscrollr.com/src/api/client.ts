@@ -137,7 +137,6 @@ export interface WidgetLimits {
   feeds: number | null
   custom_feeds: number | null
   leagues: number | null
-  fantasy: number | null
   max_ticker_rows: number
   max_ticker_customization: boolean
 }

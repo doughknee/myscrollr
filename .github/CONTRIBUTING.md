@@ -25,12 +25,11 @@ pull request. If you just want to run the project locally, the [root
 | Path | Purpose |
 |---|---|
 | `api/` | Core gateway API (Go / Fiber). The only service that validates JWTs; everything else trusts its `X-User-Sub` header. |
-| `channels/{finance,sports,rss,predictions}/service/` | Rust ingestion services (independent crates, edition 2024). Pure writers — they run no migrations and serve no app traffic; core reads their tables directly (ADR-0002). |
-| `channels/fantasy/api/` | The one remaining separate service (Go). Stays separate for its Yahoo OAuth session and sync loop; core proxies to it. |
+| `channels/{finance,sports,rss}/service/` | Rust ingestion services (independent crates, edition 2024). Pure writers — they run no migrations and serve no app traffic; core reads their tables directly (ADR-0002). |
 | `myscrollr.com/` | Marketing site, legal hub, billing portal (React + Vite + TanStack Router). |
 | `desktop/` | Tauri v2 desktop app — the primary product. React frontend in `desktop/src/`, Rust backend in `desktop/src-tauri/`. |
 | `k8s/` | Kubernetes manifests, applied to DOKS by `.github/workflows/deploy.yml`. |
-| `scripts/` | Dev + ops tooling: local-stack helpers, Kalshi key pull, smoke tests, osTicket bug triage, and the osTicket plugin source deployed to the support box. |
+| `scripts/` | Dev + ops tooling: local-stack helpers, smoke tests, osTicket bug triage, and the osTicket plugin source deployed to the support box. |
 | `docs/` | Everything else — see [`docs/README.md`](../docs/README.md) for the index and which docs are authoritative. |
 
 **Why `channels/` still says "channel."** Those folders hold *backend
@@ -49,9 +48,9 @@ ports).
 - Documentation improvements (typos, clearer wording, missing docs).
 - New widgets — see `api/CHANNELS.md`. Reusing an existing source is a
   server-only change: one entry in the catalog, no client release.
-- Test coverage. `go test ./...` runs in the two Go modules (`api/`,
-  `channels/fantasy/api/`) and `cargo test` in each Rust crate — there is no
-  workspace at the root for either. Vitest is the target for TS.
+- Test coverage. `go test ./...` runs in `api/` and `cargo test` in each
+  Rust crate — there is no workspace at the root for either. Vitest is the
+  target for TS.
 - Accessibility and i18n improvements.
 
 ## What we probably won't merge
@@ -145,7 +144,7 @@ We follow a loose conventional-commit style:
 ```
 
 Types we use: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
-`build`, `ci`. Scope is usually a package (`billing`, `fantasy`,
+`build`, `ci`. Scope is usually a package (`billing`, `accounts`,
 `desktop`, `channels`, etc.).
 
 Body paragraphs are wrapped at ~72 chars and explain the *why*. Bullet
@@ -169,7 +168,7 @@ per-service commands are in `AGENTS.md`. In short:
 ```sh
 cp .env.example .env                            # fill in real values
 npm install                                     # from website / desktop dirs
-go build ./... && go test ./...                 # from api/ or channels/fantasy/api/
+go build ./... && go test ./...                 # from api/
 cargo test                                      # from each Rust service
 ```
 

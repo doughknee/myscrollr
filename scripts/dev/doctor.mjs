@@ -57,17 +57,12 @@ const envFiles = [
   "channels/finance/.env",
   "channels/sports/.env",
   "channels/rss/.env",
-  "channels/fantasy/.env",
   "desktop/.env",
 ];
 const missing = envFiles.filter((f) => !existsSync(path.join(ROOT, f)));
 missing.length === 0
   ? ok("Env files", `${envFiles.length} present`)
   : fail("Env files", `${missing.length} missing: ${missing.join(", ")}`, "Run: make setup");
-
-existsSync(path.join(ROOT, "secrets/predictions.docker.env"))
-  ? ok("Predictions", "Kalshi key present")
-  : warn("Predictions", "no Kalshi key (that service stays off)", "Optional. Run `make kalshi-key` if you need it.");
 
 // ── Ports ────────────────────────────────────────────────────────────
 // Only flag a port if something ELSE holds it. Our own containers holding
@@ -79,7 +74,6 @@ const PORTS = [
   [5432, "postgres", "scrollr-postgres"],
   [6379, "redis", "scrollr-redis"],
   [18080, "core-api", "scrollr-core"],
-  [8084, "fantasy-api", "scrollr-fantasy-api"],
   [3001, "finance", "scrollr-finance-svc"],
   [3002, "sports", "scrollr-sports-svc"],
   [3004, "rss", "scrollr-rss-svc"],
