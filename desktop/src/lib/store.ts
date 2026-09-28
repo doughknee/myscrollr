@@ -9,10 +9,10 @@
  *   - `getStore()` reads synchronously from the in-memory Map.
  *   - `setStore()` updates the Map immediately, then writes to disk
  *     asynchronously (fire-and-forget).
- *   - `onStoreChange()` listens for changes from the *other* window
+ *   - `onStoreChange()` listens for changes from the *other* windows
  *     via the plugin's built-in cross-webview broadcast. An equality
  *     guard prevents the writing window from re-triggering its own
- *     callback, avoiding infinite loops.
+ *     callbacks, avoiding infinite loops.
  *
  * On first run after the migration, `initStore()` automatically reads
  * any existing `scrollr:*` keys from localStorage, writes them to the
@@ -114,42 +114,58 @@ function logWriteError(err: unknown): void {
   console.error("[Scrollr] Store write failed:", err);
 }
 
+/**
+ * Read a key straight from the Rust-side store, bypassing this window's
+ * cache. Every webview shares that one store, so this is what the OTHER
+ * windows last wrote even if their change event has not reached us yet.
+ * Deliberately does not touch the cache: the cache moves only on this
+ * window's own writes and on change events, so `onStoreChange`'s equality
+ * guard still sees every cross-window change.
+ */
+export async function readStoreShared<T>(key: string): Promise<T | undefined> {
+  return store.get<T>(key);
+}
+
 // ── Cross-window change listener ────────────────────────────────
 
+// One plugin listener per key, fanned out to every subscriber. Registering
+// a plugin listener per subscriber made the first one win: its equality
+// guard wrote the cache, so every later subscriber to the same key in the
+// same window compared equal and never fired (SCROLLR-248; the same trap
+// silently killed ticker-2's prefs sync in REL-237).
+const subscribers = new Map<string, Set<(value: unknown) => void>>();
+
 /**
- * Subscribe to changes for a specific key. The callback fires only
- * when the value actually differs from the local cache (i.e. when
- * the *other* window wrote a new value). Returns an unsubscribe fn.
+ * Subscribe to changes for a specific key. Subscribers fire only when the
+ * value actually differs from the local cache (i.e. when *another* window
+ * wrote a new value), and all of them fire. Returns an unsubscribe fn.
  */
 export function onStoreChange<T>(
   key: string,
   callback: (newValue: T) => void,
 ): () => void {
-  let unlisten: (() => void) | null = null;
-  let disposed = false;
-
-  store.onKeyChange<T>(key, (newValue) => {
-    if (disposed) return;
-
-    // Equality guard: skip if the value matches what we already have.
-    // This prevents the window that wrote the value from re-triggering
-    // its own handler and avoids infinite update loops.
-    const current = cache.get(key);
-    if (stableStringify(current) === stableStringify(newValue)) return;
-
-    cache.set(key, newValue);
-    callback(newValue as T);
-  }).then((fn) => {
-    if (disposed) {
-      fn();
-    } else {
-      unlisten = fn;
-    }
-  });
-
+  let set = subscribers.get(key);
+  if (!set) {
+    const listeners = new Set<(value: unknown) => void>();
+    subscribers.set(key, listeners);
+    set = listeners;
+    // ponytail: the plugin listener lives for the process; keys are a
+    // fixed handful, so there is nothing to leak.
+    void store.onKeyChange<unknown>(key, (newValue) => {
+      // Equality guard: skip if the value matches what we already have.
+      // This prevents the window that wrote the value from re-triggering
+      // its own handlers and avoids infinite update loops.
+      if (stableStringify(cache.get(key)) === stableStringify(newValue)) return;
+      cache.set(key, newValue);
+      for (const listener of [...listeners]) listener(newValue);
+    }).catch(() => {
+      // Only fails with no Tauri runtime at all (unit tests importing auth).
+    });
+  }
+  const listener = callback as (value: unknown) => void;
+  set.add(listener);
   return () => {
-    disposed = true;
-    unlisten?.();
+    set.delete(listener);
   };
 }
 

@@ -15,11 +15,12 @@ import { listen } from "@tauri-apps/api/event";
 import { fetch } from "@tauri-apps/plugin-http";
 import {
   getStore,
-  setStore,
-  removeStore,
+  onStoreChange,
+  readStoreShared,
   setStorePersisted,
   removeStorePersisted,
 } from "./lib/store";
+import { ownsSharedConnection } from "./lib/windowRole";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -286,19 +287,22 @@ export function getLastLoginError(): string | null {
 
 /**
  * Proactively refresh the access token before it expires.
- * Self-sustaining: on success, saveAuth() re-schedules the next refresh.
- * On network failure, retries every 30s until auth is cleared or
- * refresh succeeds.
  *
- * Per-window jitter: the desktop app runs two windows (main + ticker)
- * each with its own JS context. Without jitter, both windows compute
- * the same refresh-target time and fire setTimeout simultaneously,
- * causing a refresh-token rotation race against Logto. Adding 0-15s
- * of random jitter to the refresh moment makes the windows fire
- * staggered, so when window A's refresh saves new tokens to the
- * shared store, window B sees them via onStoreChange + the pre-send
- * race check in doRefresh and skips its own (now-redundant) refresh.
+ * Every window (each ticker, the main window) is its own JS context running
+ * this module, but a refresh token can be spent once: Logto rotates it and
+ * refuses the old one after a grace of a couple of seconds ("refresh token
+ * already used"). So only the window that owns the shared connection
+ * refreshes on a timer (SCROLLR-248), and it does so a minute BEFORE any
+ * window's on-demand threshold in getValidToken(), so the others normally
+ * find the new token already stored and never call Logto at all. The old
+ * scheme — a timer in every window, staggered by random jitter — is what
+ * put a second window on the wire seconds after the first.
+ *
+ * Self-sustaining: saveAuth() and every cross-window change to the session
+ * re-schedule it. On network failure the owner retries every 30s.
  */
+const PROACTIVE_LEAD_MS = 2 * REFRESH_BUFFER_MS;
+
 function scheduleRefresh(): void {
   if (refreshTimer !== null) {
     clearTimeout(refreshTimer);
@@ -308,30 +312,26 @@ function scheduleRefresh(): void {
   const auth = loadAuth();
   if (!auth || !auth.refreshToken) return;
 
-  const baseMs = auth.expiresAt - Date.now() - REFRESH_BUFFER_MS;
-  // Up to 15s of randomized jitter; keeps the two windows from firing
-  // their refresh setTimeout at the exact same wall-clock moment.
-  const jitterMs = Math.floor(Math.random() * 15_000);
-  const msUntilRefresh = baseMs + jitterMs;
-
   const performRefresh = async () => {
-    const token = await getValidToken();
+    const current = loadAuth();
+    if (!current?.refreshToken) return;
+    // A non-owner leaves its spent timer in place so getValidToken does not
+    // re-arm it; the owner's refresh reaches us as a store change, which does.
+    if (!(await ownsSharedConnection())) return;
+    refreshTimer = null;
+    const token = await refresh(current.refreshToken);
     // If refresh failed but we still have a refresh token (network
     // error), retry in 30s.
-    if (!token && loadAuth()?.refreshToken) {
+    if (!token && loadAuth()?.refreshToken && refreshTimer === null) {
       refreshTimer = setTimeout(performRefresh, 30_000);
     }
-    // If succeeded, saveAuth() → scheduleRefresh() was already
-    // called with the new expiry.
+    // If it succeeded, saveAuth() or the store change already re-scheduled.
   };
 
-  if (msUntilRefresh <= 0) {
-    // Already past the refresh point — refresh immediately
-    // (no jitter when we're already late).
-    performRefresh();
-  } else {
-    refreshTimer = setTimeout(performRefresh, msUntilRefresh);
-  }
+  refreshTimer = setTimeout(
+    performRefresh,
+    Math.max(0, auth.expiresAt - Date.now() - PROACTIVE_LEAD_MS),
+  );
 }
 
 // ── Public API ───────────────────────────────────────────────────
@@ -513,6 +513,9 @@ export async function getValidToken(forceRefresh = false): Promise<string | null
 
   // Token still valid (with buffer) — skip if forced
   if (!forceRefresh && auth.expiresAt - Date.now() > REFRESH_BUFFER_MS) {
+    // After a restart the store loads after this module, so the first
+    // token read is where the proactive timer gets armed.
+    if (refreshTimer === null) scheduleRefresh();
     return auth.accessToken;
   }
 
@@ -522,9 +525,13 @@ export async function getValidToken(forceRefresh = false): Promise<string | null
     return null;
   }
 
-  // Mutex: only one refresh at a time
+  return refresh(auth.refreshToken);
+}
+
+/** One refresh at a time within this window. */
+function refresh(refreshToken: string): Promise<string | null> {
   if (!refreshPromise) {
-    refreshPromise = doRefresh(auth.refreshToken).finally(() => {
+    refreshPromise = doRefresh(refreshToken).finally(() => {
       refreshPromise = null;
     });
   }
@@ -532,26 +539,21 @@ export async function getValidToken(forceRefresh = false): Promise<string | null
 }
 
 async function doRefresh(refreshToken: string): Promise<string | null> {
-  // ── Pre-send race check ─────────────────────────────────────────
-  // Multiple Tauri windows share auth state via the store but each
-  // window has its own `refreshPromise` mutex. If both windows fire
-  // scheduleRefresh() at roughly the same time, they both end up here
-  // sending the SAME refresh token to Logto. Logto has
-  // rotateRefreshToken=true: the first request rotates, the second
-  // arrives with the now-invalidated token and gets 4xx.
-  //
-  // Before sending, re-read the store. If another window has already
-  // rotated to a fresh refresh token (and the access token is still
-  // valid for at least the buffer window), short-circuit and return
-  // the fresh access token without making the doomed network call.
-  const stored = loadAuth();
-  if (
-    stored &&
-    stored.refreshToken &&
-    stored.refreshToken !== refreshToken &&
-    stored.expiresAt - Date.now() > REFRESH_BUFFER_MS
-  ) {
-    return stored.accessToken;
+  // ── Pre-send check against the SHARED store ─────────────────────
+  // This window's cache can lag the store every window shares (it only
+  // moves on our own writes and on change events), and until SCROLLR-248
+  // the main window's never moved at all. Sending a token another window
+  // has already rotated is exactly the "refresh token already used" in
+  // Logto's audit log. So ask the shared store what the session is now.
+  const stored = await readStoreShared<AuthState>(STORAGE_KEY);
+  if (!stored?.refreshToken) return null; // signed out elsewhere
+  if (stored.refreshToken !== refreshToken) {
+    // Another window already rotated: use its token, and only spend the
+    // current refresh token if even that access token is near expiry.
+    if (stored.expiresAt - Date.now() > REFRESH_BUFFER_MS) {
+      return stored.accessToken;
+    }
+    refreshToken = stored.refreshToken;
   }
 
   try {
@@ -570,9 +572,6 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
     // hold the OLD refresh token while in-memory had the new one. On
     // next launch the stale on-disk token would be sent to Logto,
     // tripping refresh-token reuse detection → 400 → forced logout.
-    // Awaiting setStorePersisted (inside saveAuth) closes that
-    // window: by the time this line returns, the disk fsync has
-    // completed and the new token is durably stored.
     await saveAuth(authState);
     return authState.accessToken;
   } catch (err) {
@@ -581,25 +580,15 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
     // can retry.
     const message = (err as Error).message ?? "";
     if (/Token refresh failed: 4\d\d/.test(message)) {
-      // ── Post-failure race check ─────────────────────────────────
-      // A 4xx here might mean a real auth failure (refresh token
-      // genuinely revoked / expired)... OR it might mean we lost the
-      // race against another window. Re-read the store: if a
-      // newer-than-ours refresh token exists AND the access token is
-      // currently valid, we lost the race and the user is still
-      // authenticated. Return the fresh access token instead of
-      // clearing auth.
-      const fresh = loadAuth();
-      if (
-        fresh &&
-        fresh.refreshToken &&
-        fresh.refreshToken !== refreshToken &&
-        fresh.expiresAt > Date.now()
-      ) {
-        return fresh.accessToken;
+      // A refusal ends the session only if the refused token is the one
+      // the shared store still holds. If another window rotated while
+      // ours was in flight we merely lost a race — clearing here would
+      // sign every window out of a session that is fine.
+      const now = await readStoreShared<AuthState>(STORAGE_KEY);
+      if (now?.refreshToken && now.refreshToken !== refreshToken) {
+        return now.expiresAt > Date.now() ? now.accessToken : null;
       }
-
-      await clearAuth();
+      if (now) await clearAuth();
     }
     return null;
   }
@@ -710,3 +699,7 @@ export function notifySessionExpired(): void {
 // If the app restarts with existing auth, this ensures the refresh
 // timer is set up immediately rather than waiting for the first API call.
 scheduleRefresh();
+
+// Another window signed in, refreshed or signed out: this window's cache
+// has already moved (lib/store), so re-arm the timer against the new expiry.
+onStoreChange(STORAGE_KEY, () => scheduleRefresh());
