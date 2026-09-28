@@ -10,6 +10,7 @@ logic; see `docker/compose.dev-remote.yml`).
 
 ```bash
 make setup DEV_API=remote   # writes desktop/.env + myscrollr.com/.env pointing at it
+make setup DEV_API=local    # point them back at localhost:18080 (other settings kept)
 make desktop                # or: make web
 ```
 

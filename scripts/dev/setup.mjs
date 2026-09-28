@@ -198,6 +198,20 @@ for (const [rel, body] of Object.entries(files(enc, logto))) {
   if (REMOTE && !/^(desktop|myscrollr\.com)\//.test(rel)) continue;
   const dest = p(rel);
   if (existsSync(dest) && !FORCE) {
+    // An explicit DEV_API=remote|local is a request to switch, so the API
+    // base of an existing front-end .env is rewritten in place; everything
+    // else in the file (Logto, analytics, …) is kept. Without DEV_API the
+    // old rule holds: never touch an existing file.
+    if (process.env.DEV_API && /^(desktop|myscrollr\.com)\//.test(rel)) {
+      const cur = readFileSync(dest, "utf8");
+      const next = cur.replace(/^VITE_API_URL=.*$/m, `VITE_API_URL=${API}`);
+      if (next !== cur) {
+        writeFileSync(dest, next, "utf8");
+        console.log(`  point ${rel.padEnd(24)} VITE_API_URL -> ${API}`);
+        wrote++;
+        continue;
+      }
+    }
     console.log(`  keep  ${rel.padEnd(24)} exists (--force to overwrite)`);
     continue;
   }
@@ -210,7 +224,7 @@ for (const [rel, body] of Object.entries(files(enc, logto))) {
 if (REMOTE) {
   console.log(`
   ${wrote} file(s) written. Front-ends will call ${API} -- no Docker needed.
-  Existing .env files are kept; delete one to regenerate it.
+  Other settings in existing .env files are kept. Back to local: make setup DEV_API=local
 
   Next:  make desktop   (or make web)
 `);
