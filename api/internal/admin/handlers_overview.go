@@ -355,7 +355,6 @@ func demandTile(ctx context.Context) DemandTile {
 var ingestTables = []struct{ Table, Column string }{
 	{"games", "updated_at"},
 	{"trades", "last_updated"},
-	{"markets", "updated_at"},
 	{"rss_items", "updated_at"},
 }
 
