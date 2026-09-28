@@ -23,7 +23,10 @@
 # `wsl --install --no-distribution` leaves it that way). The failure looks
 # nothing like a shell problem.
 ifeq ($(OS),Windows_NT)
-  SHELL := C:/Program Files/Git/bin/bash.exe
+  # 8.3 short name on purpose: MSYS2 builds of make (e.g. the one devkitPro
+  # puts on PATH) split an unquoted SHELL at the space and die with
+  # `make: C:/Program: No such file`. Both MSYS2 and ezwinports make run this.
+  SHELL := C:/PROGRA~1/Git/bin/bash.exe
 else
   SHELL := /bin/bash
 endif
