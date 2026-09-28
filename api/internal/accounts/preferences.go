@@ -19,11 +19,12 @@ func GetOrCreatePreferences(logtoSub string, roles ...[]string) (*platform.UserP
 
 	err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT logto_sub, feed_mode, feed_position, feed_behavior, feed_enabled,
-		        enabled_sites, disabled_sites, subscription_tier, updated_at
+		        enabled_sites, disabled_sites, subscription_tier, default_widgets_applied, updated_at
 		 FROM user_preferences WHERE logto_sub = $1`, logtoSub,
 	).Scan(
 		&prefs.LogtoSub, &prefs.FeedMode, &prefs.FeedPosition, &prefs.FeedBehavior,
-		&prefs.FeedEnabled, &enabledSites, &disabledSites, &prefs.SubscriptionTier, &updatedAt,
+		&prefs.FeedEnabled, &enabledSites, &disabledSites, &prefs.SubscriptionTier,
+		&prefs.DefaultWidgetsApplied, &updatedAt,
 	)
 
 	if err != nil {
@@ -34,11 +35,12 @@ func GetOrCreatePreferences(logtoSub string, roles ...[]string) (*platform.UserP
 			 VALUES ($1)
 			 ON CONFLICT (logto_sub) DO UPDATE SET logto_sub = EXCLUDED.logto_sub
 			 RETURNING logto_sub, feed_mode, feed_position, feed_behavior, feed_enabled,
-			           enabled_sites, disabled_sites, subscription_tier, updated_at`,
+			           enabled_sites, disabled_sites, subscription_tier, default_widgets_applied, updated_at`,
 			logtoSub,
 		).Scan(
 			&prefs.LogtoSub, &prefs.FeedMode, &prefs.FeedPosition, &prefs.FeedBehavior,
-			&prefs.FeedEnabled, &esBytes, &dsBytes, &prefs.SubscriptionTier, &insertedAt,
+			&prefs.FeedEnabled, &esBytes, &dsBytes, &prefs.SubscriptionTier,
+			&prefs.DefaultWidgetsApplied, &insertedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -167,9 +169,17 @@ func HandleUpdatePreferences(c *fiber.Ctx) error {
 			})
 		}
 	}
+	if v, ok := body["default_widgets_applied"]; ok {
+		if _, isBool := v.(bool); !isBool {
+			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
+				Status: "error",
+				Error:  "default_widgets_applied must be a boolean",
+			})
+		}
+	}
 
 	query := `
-		INSERT INTO user_preferences (logto_sub, feed_mode, feed_position, feed_behavior, feed_enabled, enabled_sites, disabled_sites, updated_at)
+		INSERT INTO user_preferences (logto_sub, feed_mode, feed_position, feed_behavior, feed_enabled, enabled_sites, disabled_sites, default_widgets_applied, updated_at)
 		VALUES ($1,
 			COALESCE($2, 'comfort'),
 			COALESCE($3, 'bottom'),
@@ -177,22 +187,24 @@ func HandleUpdatePreferences(c *fiber.Ctx) error {
 			COALESCE($5, true),
 			COALESCE($6, '[]'::jsonb),
 			COALESCE($7, '[]'::jsonb),
+			COALESCE($8, false),
 			now()
 		)
 		ON CONFLICT (logto_sub) DO UPDATE SET
-			feed_mode      = COALESCE($2, user_preferences.feed_mode),
-			feed_position  = COALESCE($3, user_preferences.feed_position),
-			feed_behavior  = COALESCE($4, user_preferences.feed_behavior),
-			feed_enabled   = COALESCE($5, user_preferences.feed_enabled),
-			enabled_sites  = COALESCE($6, user_preferences.enabled_sites),
-			disabled_sites = COALESCE($7, user_preferences.disabled_sites),
-			updated_at     = now()
+			feed_mode               = COALESCE($2, user_preferences.feed_mode),
+			feed_position           = COALESCE($3, user_preferences.feed_position),
+			feed_behavior           = COALESCE($4, user_preferences.feed_behavior),
+			feed_enabled            = COALESCE($5, user_preferences.feed_enabled),
+			enabled_sites           = COALESCE($6, user_preferences.enabled_sites),
+			disabled_sites          = COALESCE($7, user_preferences.disabled_sites),
+			default_widgets_applied = COALESCE($8, user_preferences.default_widgets_applied),
+			updated_at              = now()
 		RETURNING logto_sub, feed_mode, feed_position, feed_behavior, feed_enabled,
-		          enabled_sites, disabled_sites, updated_at
+		          enabled_sites, disabled_sites, default_widgets_applied, updated_at
 	`
 
 	var feedMode, feedPosition, feedBehavior *string
-	var feedEnabled *bool
+	var feedEnabled, defaultWidgetsApplied *bool
 	var enabledSitesJSON, disabledSitesJSON []byte
 
 	if v, ok := body["feed_mode"].(string); ok {
@@ -215,6 +227,9 @@ func HandleUpdatePreferences(c *fiber.Ctx) error {
 		b, _ := json.Marshal(v)
 		disabledSitesJSON = b
 	}
+	if v, ok := body["default_widgets_applied"].(bool); ok {
+		defaultWidgetsApplied = &v
+	}
 
 	var prefs platform.UserPreferences
 	var esBytes, dsBytes []byte
@@ -222,10 +237,10 @@ func HandleUpdatePreferences(c *fiber.Ctx) error {
 
 	err := platform.DBPool.QueryRow(context.Background(), query,
 		userID, feedMode, feedPosition, feedBehavior, feedEnabled,
-		enabledSitesJSON, disabledSitesJSON,
+		enabledSitesJSON, disabledSitesJSON, defaultWidgetsApplied,
 	).Scan(
 		&prefs.LogtoSub, &prefs.FeedMode, &prefs.FeedPosition, &prefs.FeedBehavior,
-		&prefs.FeedEnabled, &esBytes, &dsBytes, &updatedAt,
+		&prefs.FeedEnabled, &esBytes, &dsBytes, &prefs.DefaultWidgetsApplied, &updatedAt,
 	)
 	if err != nil {
 		log.Printf("[Preferences] Error updating preferences for %s: %v", userID, err)

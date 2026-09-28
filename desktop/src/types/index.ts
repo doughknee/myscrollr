@@ -129,6 +129,10 @@ export interface DashboardResponse {
     disabled_sites: string[];
     subscription_tier?:
       "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
+    // Once-only marker for the first-sign-in default widget (SCROLLR-246):
+    // true once `news_npr` has been offered to this account, so App.tsx
+    // never re-adds it after the user removes it.
+    default_widgets_applied: boolean;
     updated_at: string;
   };
   // Generated from the Go struct — the row shape is the server's to define.

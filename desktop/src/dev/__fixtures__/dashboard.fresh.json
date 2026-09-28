@@ -1,0 +1,17 @@
+{
+  "_note": "SCROLLR-246 fresh: a brand-new signed-in account, zero user_widgets rows and `default_widgets_applied: false` — the exact server state the desktop app treats as eligible for the first-run NPR default. The shim's POST/PUT stubs don't simulate the add (see ticker-shim.html's `reply()`), so this fixture only proves the client side of the contract: an eligible fresh account never renders the 'no sources yet' CTA, even though the add itself can't complete in this harness. `dashboard.default.json` (which already carries a `news_npr` row) is what covers 'the ticker actually shows NPR chips'.",
+  "_captured_at": "2026-09-02T12:00:00Z",
+  "data": {},
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "free",
+    "default_widgets_applied": false,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": []
+}

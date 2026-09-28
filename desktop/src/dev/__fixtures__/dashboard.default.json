@@ -713,6 +713,7 @@
     "enabled_sites": [],
     "disabled_sites": [],
     "subscription_tier": "uplink_pro",
+    "default_widgets_applied": true,
     "updated_at": "2026-09-01T00:00:00Z"
   },
   "widgets": [

@@ -49,7 +49,14 @@ type UserPreferences struct {
 	EnabledSites     []string `json:"enabled_sites"`
 	DisabledSites    []string `json:"disabled_sites"`
 	SubscriptionTier string   `json:"subscription_tier"`
-	UpdatedAt        string   `json:"updated_at"`
+	// DefaultWidgetsApplied is the once-only marker for the first-sign-in
+	// default widget (SCROLLR-246): set true the moment the desktop app adds
+	// `news_npr` for a zero-widget account, so removing it later never
+	// brings it back — on this device, another device, or after a
+	// sign-out/in. false only for an account that has never been offered
+	// the default yet.
+	DefaultWidgetsApplied bool   `json:"default_widgets_applied"`
+	UpdatedAt             string `json:"updated_at"`
 }
 
 // Widget represents a user's widget subscription — one row of the
