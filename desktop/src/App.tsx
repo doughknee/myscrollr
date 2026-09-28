@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import * as Sentry from "@sentry/react";
 import { setCrashReports } from "./sentry";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,8 @@ import { usePinnedSubjectsSync } from "./hooks/usePinnedSubjectsSync";
 import { useSharedSSE } from "./hooks/useSharedSSE";
 import { useProductActivity } from "./hooks/useProductActivity";
 import { usePostHogActivity } from "./hooks/usePostHogActivity";
-import { isPrimaryTicker } from "./lib/windowRole";
+import { isPrimaryTicker, ownsSharedConnection } from "./lib/windowRole";
+import { shouldOfferDefaultWidget, applyDefaultWidget } from "./lib/firstRunDefaultWidget";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
@@ -112,6 +114,33 @@ export default function App() {
     () => dashboard?.widgets ?? [],
     [dashboard?.widgets],
   );
+
+  // ── First-run default widget (SCROLLR-246) ──────────────────────────
+  //
+  // A fresh account's first signed-in ticker should scroll NPR headlines
+  // instead of the "no sources yet" CTA below. `awaitingDefaultWidget` is
+  // computed the same way in every window from the same broadcast
+  // dashboard, so the CTA stays suppressed everywhere while the add is
+  // decided/in flight — but the network call itself only runs from the
+  // window that owns the shared connection (the same election
+  // `useSharedSSE` uses for start_sse/stop_sse), so N ticker windows never
+  // race each other into N POSTs.
+  const awaitingDefaultWidget = shouldOfferDefaultWidget(authenticated, dashboard);
+  const defaultWidgetAttempted = useRef(false);
+  useEffect(() => {
+    if (!awaitingDefaultWidget || defaultWidgetAttempted.current) return;
+    defaultWidgetAttempted.current = true;
+    void (async () => {
+      if (!(await ownsSharedConnection())) return;
+      try {
+        await applyDefaultWidget();
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { feature: "first-run-default-widget" },
+        });
+      }
+    })();
+  }, [awaitingDefaultWidget]);
 
   const widgetTabs = useMemo(() => {
     if (widgets.length === 0) {
@@ -813,9 +842,18 @@ export default function App() {
             //                   itself; this just says "if you have
             //                   nothing, here's the recovery UI".
             //                   CTA -> per-widget chips.
+            //
+            // `awaitingDefaultWidget` additionally suppresses Sourceless
+            // for an eligible fresh account (SCROLLR-246): the moment we
+            // know we're about to (or already are) offering the NPR
+            // default, showing "no sources yet" first would be a flash of
+            // the wrong empty state, not a real one.
             const hasAnyPinnedWidget = prefs.widgets.pins.length > 0;
             const showSourcelessCTA =
-              authenticated && widgets.length === 0 && !hasAnyPinnedWidget;
+              authenticated &&
+              widgets.length === 0 &&
+              !hasAnyPinnedWidget &&
+              !awaitingDefaultWidget;
             const showInstalledOffCTA =
               authenticated &&
               installedWidgetsMeta.length > 0 &&

@@ -8,7 +8,7 @@
  */
 import { fetch } from "@tauri-apps/plugin-http";
 import { getValidToken, isSignedOut, notifySessionExpired } from "../auth";
-import type { Widget, HealthResponse } from "../types/api.generated";
+import type { Widget, HealthResponse, UserPreferences } from "../types/api.generated";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -372,6 +372,24 @@ export async function toggleDataWidgetVisibility(
   if (enabled !== undefined) payload.enabled = enabled;
   await dataWidgetsApi.update(widgetType, payload);
 }
+
+// ── Preferences API ────────────────────────────────────────────
+
+/**
+ * The generic `/users/me/preferences` row (shared with the website's feed
+ * overlay). The desktop app only ever writes `default_widgets_applied`
+ * here — the once-only marker for the first-sign-in default widget
+ * (SCROLLR-246) — and tolerates the other fields being feed-overlay ones
+ * it never reads.
+ */
+export const preferencesApi = {
+  update: (data: Partial<UserPreferences>) =>
+    authFetch<UserPreferences>("/users/me/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+};
 
 // ── Subscription Types & API ────────────────────────────────────
 

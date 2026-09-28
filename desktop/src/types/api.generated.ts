@@ -159,6 +159,7 @@ export interface UserPreferences {
   enabled_sites: string[];
   disabled_sites: string[];
   subscription_tier: string;
+  default_widgets_applied: boolean;
   updated_at: string;
 }
 
