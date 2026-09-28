@@ -209,6 +209,36 @@ labelled as current). Additions and removals honour the plan filter but carry
 no OS or version, so under those filters they are unavailable rather than
 unfiltered. Every percentage carries its sample count.
 
+## Week-1 return of new desktop signups (the News + first run exit metric)
+
+`GET /admin/week1-return` (SCROLLR-247). Not gated by the staff-exclusion
+toggle — this metric has to mean the same thing every time it is read, so
+staff and test accounts always come out, whatever the dashboard setting says.
+
+| | Definition |
+| -- | -- |
+| Signup | Logto user `createdAt`, `applicationId` = Scrollr Desktop |
+| Excluded | subs in `admin_users` and `POSTHOG_EXCLUDED_LOGTO_SUBS` |
+| Return | a desktop token exchange (`ExchangeTokenBy.RefreshToken` or `ExchangeTokenBy.AuthorizationCode`) that starts a session — at least 3 hours since that account's previous exchange — on UTC day 1 through 7 after the signup day |
+| Cohort | a Monday-Sunday UTC calendar week of signups |
+| Shown | the 4 most recently ended weekly cohorts; a cohort is reported only once day 7 has passed for its last possible member (today is on or after the week's Sunday + 8 days) |
+
+Immature cohorts render with their signup count (already known) but no
+return count or rate — `available`/`mature: false`, never a `0`. A matured
+cohort's return count is fixed forever (the audit-log window it depends on
+never grows or shrinks again), so it is cached in Redis with no expiry, keyed
+by the cohort's week-start date; an immature cohort is never cached and is
+recomputed cheaply from the already-cached Logto account list on every
+request. The return check itself is a per-user Logto audit-log scan
+(`accounts.UserReturnedWeek1`), never a single global log scan —
+`analyticsMaxPages` (20 pages of 100) is sized for one account's exchanges
+over one week, not for the whole log table.
+
+Baseline (28 Aug → 19 Sep 2026, from the four cohorts mature at the time):
+37% (30 of 82), weekly 29% / 31% / 39% / 31%. See the phase's project
+description for the exit criterion this metric decides (week-1 return ≥ 50%
+in two consecutive 4-week windows).
+
 ## Registered users
 
 * **Total** — Logto's user count minus excluded staff and test subs when the

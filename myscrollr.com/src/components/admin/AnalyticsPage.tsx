@@ -31,6 +31,7 @@ import type { ReactNode } from 'react'
 import type {
   AnalyticsApplication,
   SignupAnalytics,
+  Week1ReturnReport,
 } from '@/api/adminAnalytics'
 import type {
   Audience,
@@ -55,7 +56,7 @@ import type {
 import type { AnalyticsView } from '@/lib/adminFormat'
 import type { Verdict } from '@/lib/overviewVerdicts'
 import type { Report } from './ui'
-import { loadSignupAnalytics } from '@/api/adminAnalytics'
+import { loadSignupAnalytics, loadWeek1Return } from '@/api/adminAnalytics'
 import {
   loadAudience,
   loadDesktopUsage,
@@ -212,6 +213,15 @@ export default function AnalyticsPage() {
       [application, getToken, period, refresh],
     ),
   )
+  const week1Return = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadWeek1Return(getToken, signal)
+      },
+      [getToken, refresh],
+    ),
+  )
 
   // `?view=` names a place on the page now rather than a panel to swap in, so
   // the Overview's deep links keep landing where they always did.
@@ -244,6 +254,7 @@ export default function AnalyticsPage() {
             </h1>
             <PageStamp />
           </header>
+          <Week1ReturnContent report={week1Return} />
           <GrowthContent
             period={period}
             verdict={sectionVerdicts.growth}
@@ -286,6 +297,89 @@ function PageStamp() {
     <p className="text-sm text-base-content/50">
       {new Date().toLocaleString()}
     </p>
+  )
+}
+
+/**
+ * Week-1 return (SCROLLR-247): the News + first run phase's exit metric, on
+ * its own at the top of the page rather than folded into Growth — it decides
+ * whether the phase is done, everything else is context.
+ *
+ * No verdict here: `overviewVerdicts.ts` is untouched by design. A cohort
+ * younger than 7 days never renders a rate or a returned count, only its
+ * (already known) signup count — "not yet available", never 0.
+ */
+function Week1ReturnContent({ report }: { report: Report<Week1ReturnReport> }) {
+  return (
+    <Section
+      id="week1-return"
+      title="Week-1 return"
+      lede="Of new desktop signups, how many came back on their own in the week after signing up? The phase's exit metric."
+    >
+      <Loaded report={report} label="week-1 return">
+        {(data) => {
+          const matured = [...data.cohorts].reverse().find((c) => c.mature)
+          return (
+            <div className="space-y-3">
+              <Card title="Week-1 return" label="Most recently matured cohort">
+                {matured ? (
+                  <>
+                    <Big>
+                      {matured.rate_pct !== undefined
+                        ? `${Math.round(matured.rate_pct)}%`
+                        : '—'}
+                    </Big>
+                    <p className="mt-1 text-sm text-base-content/60">
+                      {num(matured.returned ?? 0)} of {num(matured.signups)}{' '}
+                      returned · week of {matured.week_start}
+                    </p>
+                  </>
+                ) : (
+                  <Unmeasurable note="No weekly cohort has matured yet — check back once the most recent cohort's day 7 has passed." />
+                )}
+              </Card>
+              <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+                <table className="w-full text-sm">
+                  <thead className="bg-base-200/40 text-xs font-semibold tracking-wide text-base-content/60 uppercase">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Week</th>
+                      <th className="px-3 py-2 text-right">Signups</th>
+                      <th className="px-3 py-2 text-right">Returned</th>
+                      <th className="px-3 py-2 text-right">Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.cohorts.map((cohort) => (
+                      <tr
+                        key={cohort.week_start}
+                        className="border-t border-base-300/40"
+                      >
+                        <td className="px-3 py-2">
+                          {cohort.week_start} – {cohort.week_end}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {num(cohort.signups)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {cohort.mature ? num(cohort.returned ?? 0) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {cohort.mature && cohort.rate_pct !== undefined
+                            ? `${Math.round(cohort.rate_pct)}%`
+                            : 'Not yet available'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Stamp at={data.generated_at} />
+              <DefinitionDisclosure>{data.definition}</DefinitionDisclosure>
+            </div>
+          )
+        }}
+      </Loaded>
+    </Section>
   )
 }
 

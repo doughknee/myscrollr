@@ -58,6 +58,40 @@ export async function loadSignupAnalytics(
   )
 }
 
+// ── Week-1 return of new desktop signups (SCROLLR-247) ─────────────
+//
+// The News + first run phase's exit metric. One row per Monday-Sunday UTC
+// weekly cohort, oldest first. `mature: false` means the cohort's day 7
+// has not fully passed yet: `returned`/`rate_pct` are absent then, never 0.
+
+export interface Week1ReturnCohort {
+  week_start: string
+  week_end: string
+  mature: boolean
+  signups: number
+  returned?: number
+  rate_pct?: number
+}
+
+export interface Week1ReturnReport {
+  generated_at: string
+  definition: string
+  cohorts: Array<Week1ReturnCohort>
+}
+
+export async function loadWeek1Return(
+  getToken: () => Promise<string | null>,
+  signal?: AbortSignal,
+): Promise<Week1ReturnReport> {
+  return loadBoundedAdminReport(
+    getToken,
+    '/admin/week1-return',
+    'Could not load week-1 return',
+    'Week-1 return took too long. Please retry.',
+    signal,
+  )
+}
+
 export async function loadBoundedAdminReport<T>(
   getToken: () => Promise<string | null>,
   path: string,

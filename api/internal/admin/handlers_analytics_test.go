@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
 	"github.com/gofiber/fiber/v2"
 )
@@ -172,6 +173,94 @@ func TestHandleGetAnalyticsTimesOutStalledColdRead(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", resp.StatusCode)
+	}
+}
+
+// TestRecentCompleteWeeksTilesMondaySundayExcludingTheCurrentWeek pins the
+// week-1-return cohort boundaries: fixed Monday-Sunday UTC weeks, most
+// recent first, never including the still-accumulating current week.
+func TestRecentCompleteWeeksTilesMondaySundayExcludingTheCurrentWeek(t *testing.T) {
+	now := time.Date(2026, 9, 28, 15, 0, 0, 0, time.UTC) // a Monday
+	weeks := recentCompleteWeeks(now, 4)
+	want := []cohortWeek{
+		{Start: time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC)},
+	}
+	if len(weeks) != len(want) {
+		t.Fatalf("weeks = %d, want %d", len(weeks), len(want))
+	}
+	for i, w := range weeks {
+		if !w.Start.Equal(want[i].Start) || !w.End.Equal(want[i].End) {
+			t.Fatalf("weeks[%d] = %+v, want %+v", i, w, want[i])
+		}
+	}
+}
+
+// TestLoadWeek1ReturnExcludesStaffAndTestSubsAndMarksImmatureCohortUnavailable
+// is the acceptance test: a staff sub never counts (and is never even asked
+// about a return), and a cohort younger than 7 days renders as unavailable
+// rather than 0.
+func TestLoadWeek1ReturnExcludesStaffAndTestSubsAndMarksImmatureCohortUnavailable(t *testing.T) {
+	if platform.DBPool == nil {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+	now := time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC) // a Monday
+	resetAdmins(t, "week1-staff@example.com")
+	testsupport.MustExec(t, `UPDATE admin_users SET logto_sub = 'staff-sub' WHERE email = 'week1-staff@example.com'`)
+	t.Setenv("POSTHOG_EXCLUDED_LOGTO_SUBS", "test-sub")
+	t.Setenv("LOGTO_EXTENSION_APP_ID", "desktop-app")
+
+	ms := func(at time.Time) int64 { return at.UnixMilli() }
+	withLogtoAccounts(t, 5, false,
+		// Sep 21-27 week: younger than 7 days as of "now" (Sep 28) — immature.
+		accounts.LogtoAccount{ID: "immature-a", ApplicationID: "desktop-app", CreatedAt: ms(time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC))},
+		// Sep 14-20 week: exactly matured as of "now".
+		accounts.LogtoAccount{ID: "user-a", ApplicationID: "desktop-app", CreatedAt: ms(time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC))},
+		accounts.LogtoAccount{ID: "user-b", ApplicationID: "desktop-app", CreatedAt: ms(time.Date(2026, 9, 16, 10, 0, 0, 0, time.UTC))},
+		accounts.LogtoAccount{ID: "staff-sub", ApplicationID: "desktop-app", CreatedAt: ms(time.Date(2026, 9, 15, 11, 0, 0, 0, time.UTC))},
+		accounts.LogtoAccount{ID: "test-sub", ApplicationID: "desktop-app", CreatedAt: ms(time.Date(2026, 9, 16, 11, 0, 0, 0, time.UTC))},
+	)
+
+	var checkedExcluded bool
+	previous := userReturnedWeek1
+	userReturnedWeek1 = func(_ context.Context, userID string, _ time.Time) (bool, error) {
+		if userID == "staff-sub" || userID == "test-sub" {
+			checkedExcluded = true
+		}
+		return userID == "user-a", nil
+	}
+	t.Cleanup(func() { userReturnedWeek1 = previous })
+
+	report, err := loadWeek1Return(context.Background(), now)
+	if err != nil {
+		t.Fatalf("loadWeek1Return: %v", err)
+	}
+	if checkedExcluded {
+		t.Fatal("a staff or test sub must never be checked for a return")
+	}
+	if len(report.Cohorts) != 4 {
+		t.Fatalf("cohorts = %d, want 4", len(report.Cohorts))
+	}
+
+	immature := report.Cohorts[3]
+	if immature.WeekStart != "2026-09-21" || immature.Mature || immature.Signups != 1 {
+		t.Fatalf("immature cohort = %+v", immature)
+	}
+	if immature.RatePct != nil {
+		t.Fatalf("immature cohort rate = %v, want unavailable not 0", *immature.RatePct)
+	}
+
+	mature := report.Cohorts[2]
+	if mature.WeekStart != "2026-09-14" || !mature.Mature {
+		t.Fatalf("mature cohort = %+v", mature)
+	}
+	if mature.Signups != 2 || mature.Returned != 1 {
+		t.Fatalf("mature cohort staff/test exclusion = %+v, want signups=2 returned=1", mature)
+	}
+	if mature.RatePct == nil || *mature.RatePct != 50 {
+		t.Fatalf("mature cohort rate = %v, want 50", mature.RatePct)
 	}
 }
 

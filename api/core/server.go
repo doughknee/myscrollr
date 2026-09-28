@@ -235,6 +235,9 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/admin/presence/live", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetPresenceLive)
 	s.App.Get("/admin/desktop-usage", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetDesktopUsage)
 	s.App.Get("/admin/audience", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAudience)
+	// The News + first run phase's exit metric (SCROLLR-247): week-1 return
+	// of new desktop signups, by weekly cohort.
+	s.App.Get("/admin/week1-return", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetWeek1Return)
 	s.App.Get("/admin/website", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetWebsite)
 	s.App.Get("/admin/revenue", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetRevenue)
 	s.App.Get("/admin/support/summary", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminSupportSummary)

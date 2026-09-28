@@ -212,6 +212,77 @@ func TestFetchSignupAnalyticsReturnsEmptyReasonArray(t *testing.T) {
 	}
 }
 
+// TestUserReturnedWeek1IgnoresContinuousHourlyRefreshesAcrossMidnight covers
+// the acceptance case: a session that just keeps silently refreshing its
+// token every hour, including across a UTC day boundary, never has a gap
+// wide enough to "start a session", so none of it counts as a return even
+// though several of the refreshes land on UTC day 1.
+func TestUserReturnedWeek1IgnoresContinuousHourlyRefreshesAcrossMidnight(t *testing.T) {
+	signupDay := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	login := signupDay.Add(10 * time.Hour) // day 0, the signup-flow exchange
+	entries := []map[string]any{
+		analyticsLog("login", "ExchangeTokenBy.AuthorizationCode", "Success", "", login.UnixMilli()),
+	}
+	// Hourly refreshes from day 0 through day 1, crossing UTC midnight; every
+	// gap is exactly 1h, never 3h.
+	for i := 1; i <= 20; i++ {
+		ts := login.Add(time.Duration(i) * time.Hour)
+		entries = append(entries, analyticsLog(fmt.Sprintf("r%d", i), "ExchangeTokenBy.RefreshToken", "Success", "", ts.UnixMilli()))
+	}
+	withAnalyticsLogto(t, map[int][]map[string]any{1: entries}, http.StatusOK, "")
+
+	returned, err := UserReturnedWeek1(context.Background(), "user-1", signupDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if returned {
+		t.Fatal("continuous hourly refreshes across midnight must not count as a return")
+	}
+}
+
+// TestUserReturnedWeek1CountsRelaunchAfterThreeHourGapOnDayThree covers the
+// other acceptance case: a real relaunch (a gap of at least 3h since the
+// previous exchange) landing on UTC day 3 counts.
+func TestUserReturnedWeek1CountsRelaunchAfterThreeHourGapOnDayThree(t *testing.T) {
+	signupDay := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	login := signupDay.Add(10 * time.Hour)
+	relaunch := signupDay.AddDate(0, 0, 3).Add(9 * time.Hour) // day 3, well past a 3h gap
+	entries := []map[string]any{
+		analyticsLog("login", "ExchangeTokenBy.AuthorizationCode", "Success", "", login.UnixMilli()),
+		analyticsLog("relaunch", "ExchangeTokenBy.RefreshToken", "Success", "", relaunch.UnixMilli()),
+	}
+	withAnalyticsLogto(t, map[int][]map[string]any{1: entries}, http.StatusOK, "")
+
+	returned, err := UserReturnedWeek1(context.Background(), "user-1", signupDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !returned {
+		t.Fatal("a relaunch after a 3h gap on day 3 must count as a return")
+	}
+}
+
+// TestUserReturnedWeek1IgnoresExchangesOutsideTheDayOneToSevenWindow covers
+// day 0 (signup day itself) and day 8+ never counting, even with a wide gap.
+func TestUserReturnedWeek1IgnoresExchangesOutsideTheDayOneToSevenWindow(t *testing.T) {
+	signupDay := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	dayZero := signupDay.Add(20 * time.Hour)
+	dayEight := signupDay.AddDate(0, 0, 8).Add(time.Hour)
+	entries := []map[string]any{
+		analyticsLog("day0", "ExchangeTokenBy.AuthorizationCode", "Success", "", dayZero.UnixMilli()),
+		analyticsLog("day8", "ExchangeTokenBy.RefreshToken", "Success", "", dayEight.UnixMilli()),
+	}
+	withAnalyticsLogto(t, map[int][]map[string]any{1: entries}, http.StatusOK, "")
+
+	returned, err := UserReturnedWeek1(context.Background(), "user-1", signupDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if returned {
+		t.Fatal("an exchange on day 0 or day 8+ must not count as a return")
+	}
+}
+
 func TestFetchSignupAnalyticsStopsWaitingForTokenWhenContextExpires(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/oidc/token" {
