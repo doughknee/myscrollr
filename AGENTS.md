@@ -363,7 +363,10 @@ Lessons the Home session learned running this repo; every worker reads them.
   the Yahoo tables in `api/internal/accounts/user_deletion.go` and a `markets`
   update in `scripts/dev/live.sh` (SCROLLR-242). Before any DROP TABLE, grep
   `api/ channels/ scripts/ k8s/ docker/` for the table names and check
-  `pg_publication_tables` on prod.
+  `pg_publication_tables` on prod. Two more readers hide from that grep's
+  obvious hits: `ingestTables` in `api/internal/admin/handlers_overview.go` (the
+  Overview freshness tile) and the TRUNCATE/COPY lists inside the gzipped
+  `scripts/dev/seed.sql.gz` (found by CI on #428).
 - **Sequin's sink table list is not in the repo.** Sequin is self-hosted
   (`sequin.myscrollr.com`, console login); removing a table from the sink is a
   console action. `docs/cdc-runbook.md` has the topology.
