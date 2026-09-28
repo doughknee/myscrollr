@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { loadSignupAnalytics } from './adminAnalytics'
+import { loadSignupAnalytics, loadWeek1Return } from './adminAnalytics'
 import type { SignupAnalytics } from './adminAnalytics'
 
 afterEach(() => {
@@ -220,5 +220,46 @@ describe('loadSignupAnalytics', () => {
 
     await oldAssertion
     expect(current).toMatchObject({ application: 'desktop', window_days: 30 })
+  })
+})
+
+describe('loadWeek1Return', () => {
+  it('fetches the week-1-return endpoint with no query params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          generated_at: '2026-09-28T12:00:00Z',
+          definition: 'Signup = ...',
+          cohorts: [
+            {
+              week_start: '2026-09-14',
+              week_end: '2026-09-20',
+              mature: true,
+              signups: 2,
+              returned: 1,
+              rate_pct: 50,
+            },
+            {
+              week_start: '2026-09-21',
+              week_end: '2026-09-27',
+              mature: false,
+              signups: 1,
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const report = await loadWeek1Return(() => Promise.resolve('staff-token'))
+
+    expect(report.cohorts).toHaveLength(2)
+    expect(report.cohorts[1].mature).toBe(false)
+    expect(report.cohorts[1].returned).toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/admin\/week1-return$/),
+      expect.objectContaining({ credentials: 'include' }),
+    )
   })
 })

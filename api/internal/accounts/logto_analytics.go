@@ -218,6 +218,17 @@ func signupAnalyticsAppID(application string) (string, error) {
 }
 
 func fetchSignupAnalyticsPage(ctx context.Context, appID string, page int) ([]logtoAnalyticsLog, error) {
+	return fetchLogtoLogsPage(ctx, url.Values{
+		"applicationId": {appID},
+		"page":          {strconv.Itoa(page)},
+		"page_size":     {strconv.Itoa(analyticsPageSize)},
+	})
+}
+
+// fetchLogtoLogsPage is the one place that calls Logto's /api/logs. Every
+// caller (the bounded signup-funnel scan and the per-user week-1-return
+// scan) shares it so there is one query-building/decoding path to trust.
+func fetchLogtoLogsPage(ctx context.Context, query url.Values) ([]logtoAnalyticsLog, error) {
 	cfg := getM2MConfig()
 	if cfg.Endpoint == "" {
 		return nil, fmt.Errorf("Logto endpoint is not configured")
@@ -225,11 +236,6 @@ func fetchSignupAnalyticsPage(ctx context.Context, appID string, page int) ([]lo
 	token, err := getM2MTokenContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get Logto management token: %w", err)
-	}
-	query := url.Values{
-		"applicationId": {appID},
-		"page":          {strconv.Itoa(page)},
-		"page_size":     {strconv.Itoa(analyticsPageSize)},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.Endpoint+"/api/logs?"+query.Encode(), nil)
 	if err != nil {
@@ -247,6 +253,83 @@ func fetchSignupAnalyticsPage(ctx context.Context, appID string, page int) ([]lo
 	var logs []logtoAnalyticsLog
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&logs); err != nil {
 		return nil, fmt.Errorf("decode Logto audit response")
+	}
+	return logs, nil
+}
+
+// =============================================================================
+// Week-1 return of new desktop signups (SCROLLR-247)
+// =============================================================================
+//
+// The phase's exit metric. A "return" is a desktop token exchange
+// (ExchangeTokenBy.RefreshToken or ExchangeTokenBy.AuthorizationCode) that
+// starts a session — at least 3h since that same user's previous exchange —
+// landing on UTC day 1 through 7 after the account's own signup day.
+//
+// analyticsMaxPages (20 pages of 100 = 2,000 logs) is far too small to scan
+// every log Logto holds, but it is one account's exchanges over one week, so
+// scanning per user instead of globally keeps it well inside that bound.
+
+const week1SessionGap = 3 * time.Hour
+
+var week1ExchangeKeys = map[string]struct{}{
+	"ExchangeTokenBy.RefreshToken":      {},
+	"ExchangeTokenBy.AuthorizationCode": {},
+}
+
+// UserReturnedWeek1 reports whether userID has a qualifying desktop token
+// exchange on UTC day 1..7 after signupDay (which must already be truncated
+// to a UTC calendar day). A gap is measured against the previous exchange
+// attempt regardless of whether that attempt succeeded; only a successful
+// exchange can itself count as the session start.
+func UserReturnedWeek1(ctx context.Context, userID string, signupDay time.Time) (bool, error) {
+	logs, err := fetchUserExchangeLogs(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	sort.Slice(logs, func(i, j int) bool { return logs[i].CreatedAt < logs[j].CreatedAt })
+
+	windowStart := signupDay.AddDate(0, 0, 1)
+	windowEnd := signupDay.AddDate(0, 0, 8) // exclusive: end of day 7
+
+	var prev int64
+	var havePrev bool
+	for _, entry := range logs {
+		gapOK := !havePrev || entry.CreatedAt-prev >= week1SessionGap.Milliseconds()
+		prev = entry.CreatedAt
+		havePrev = true
+		if entry.Payload.Result == "Error" || !gapOK {
+			continue
+		}
+		ts := time.UnixMilli(entry.CreatedAt).UTC()
+		if !ts.Before(windowStart) && ts.Before(windowEnd) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// fetchUserExchangeLogs pages one user's audit logs, keeping only the two
+// token-exchange keys the definition names.
+func fetchUserExchangeLogs(ctx context.Context, userID string) ([]logtoAnalyticsLog, error) {
+	var logs []logtoAnalyticsLog
+	for page := 1; page <= analyticsMaxPages; page++ {
+		pageLogs, err := fetchLogtoLogsPage(ctx, url.Values{
+			"userId":    {userID},
+			"page":      {strconv.Itoa(page)},
+			"page_size": {strconv.Itoa(analyticsPageSize)},
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range pageLogs {
+			if _, ok := week1ExchangeKeys[entry.Key]; ok {
+				logs = append(logs, entry)
+			}
+		}
+		if len(pageLogs) < analyticsPageSize {
+			break
+		}
 	}
 	return logs, nil
 }
