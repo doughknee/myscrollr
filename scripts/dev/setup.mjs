@@ -28,6 +28,15 @@ const p = (...s) => path.join(ROOT, ...s);
 const DB = "postgres://scrollr:scrollr@localhost:5432/scrollr?sslmode=disable";
 const REDIS = "redis://localhost:6379";
 
+// `make setup DEV_API=remote`: front-end-only work against the always-on dev
+// backend (docker/compose.dev-remote.yml). Only the two front-end .env files
+// are written -- there is no local backend to configure -- and their API base
+// points at it instead of localhost:18080. DEV_API_URL overrides the address.
+const REMOTE = process.env.DEV_API === "remote";
+const API = REMOTE
+  ? (process.env.DEV_API_URL || "https://dev-api.myscrollr.com").replace(/\/$/, "")
+  : "http://localhost:18080";
+
 function existingKey(...files) {
   for (const f of files) {
     if (!existsSync(p(f))) continue;
@@ -97,7 +106,7 @@ ENCRYPTION_KEY=${enc}
   // .env.example — they're not secret and the pricing page needs them to
   // render. The publishable key is a placeholder; billing flows won't work
   // until you supply a real pk_test_.
-  "myscrollr.com/.env": `VITE_API_URL=http://localhost:18080
+  "myscrollr.com/.env": `VITE_API_URL=${API}
 VITE_LOGTO_ENDPOINT=${logto.url}
 VITE_LOGTO_APP_ID=${logto.webAppId}
 VITE_LOGTO_RESOURCE=https://api.myscrollr.com
@@ -112,8 +121,8 @@ VITE_SENTRY_DSN=
 SENTRY_ORG=
 SENTRY_AUTH_TOKEN=
 `,
-  "desktop/.env": `# The desktop app talks to the LOCAL core API.
-VITE_API_URL=http://localhost:18080
+  "desktop/.env": `# The desktop app talks to ${REMOTE ? "the shared dev API" : "the LOCAL core API"}.
+VITE_API_URL=${API}
 VITE_AUTH_ENDPOINT=${logto.url}
 VITE_LOGTO_APP_ID=${logto.desktopAppId}
 # Logto only knows the resources it has registered, so the token is
@@ -160,10 +169,11 @@ console.log(`
 const enc = existingKey("api/.env") ?? randomBytes(32).toString("hex");
 
 const logto = {
-  url: await ask("Logto URL (blank = no auth)", ""),
+  url: await ask("Logto URL (blank = no auth)", REMOTE ? "https://auth.myscrollr.com" : ""),
   issuer: "",
   jwks: "",
-  appId: await ask("Logto extension app id", ""),
+  // Only core reads this (desktop sign-in exchange); a remote setup has no local core.
+  appId: REMOTE ? "" : await ask("Logto extension app id", ""),
   desktopAppId: await ask("Logto DESKTOP app id", ""),
   webAppId: await ask("Logto WEBSITE app id", ""),
 };
@@ -184,6 +194,8 @@ rl?.close();
 console.log("");
 let wrote = 0;
 for (const [rel, body] of Object.entries(files(enc, logto))) {
+  // Remote: front-ends only; api/ and channels/ configure a backend nobody runs.
+  if (REMOTE && !/^(desktop|myscrollr\.com)\//.test(rel)) continue;
   const dest = p(rel);
   if (existsSync(dest) && !FORCE) {
     console.log(`  keep  ${rel.padEnd(24)} exists (--force to overwrite)`);
@@ -193,6 +205,16 @@ for (const [rel, body] of Object.entries(files(enc, logto))) {
   writeFileSync(dest, body, "utf8");
   console.log(`  wrote ${rel}`);
   wrote++;
+}
+
+if (REMOTE) {
+  console.log(`
+  ${wrote} file(s) written. Front-ends will call ${API} -- no Docker needed.
+  Existing .env files are kept; delete one to regenerate it.
+
+  Next:  make desktop   (or make web)
+`);
+  process.exit(0);
 }
 
 console.log(`

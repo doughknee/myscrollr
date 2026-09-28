@@ -42,10 +42,19 @@ else
 fi
 LOCAL_DB="postgres://scrollr:scrollr@localhost:5432/scrollr?sslmode=disable"
 
-psql_in() { "${COMPOSE[@]}" exec -T postgres psql "$LOCAL_DB" -v ON_ERROR_STOP=1 "$@"; }
-redis_in() { "${COMPOSE[@]}" exec -T redis redis-cli "$@"; }
+# DIRECT mode: see seed.sh. docker/compose.dev-remote.yml's sidecar has psql and
+# redis-cli locally and no docker to exec through.
+DIRECT="${SCROLLR_DEV_DIRECT:-}"
+if [ -n "$DIRECT" ]; then
+  LOCAL_DB="$DATABASE_URL"
+  psql_in() { psql "$LOCAL_DB" -v ON_ERROR_STOP=1 "$@"; }
+  redis_in() { redis-cli -u "$REDIS_URL" "$@"; }
+else
+  psql_in() { "${COMPOSE[@]}" exec -T postgres psql "$LOCAL_DB" -v ON_ERROR_STOP=1 "$@"; }
+  redis_in() { "${COMPOSE[@]}" exec -T redis redis-cli "$@"; }
+fi
 
-if ! "${COMPOSE[@]}" ps --status running --services 2>/dev/null | grep -qx postgres; then
+if [ -z "$DIRECT" ] && ! "${COMPOSE[@]}" ps --status running --services 2>/dev/null | grep -qx postgres; then
   echo "[live] postgres is not running — start the stack first (make up)." >&2
   exit 1
 fi

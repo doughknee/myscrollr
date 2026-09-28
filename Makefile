@@ -46,8 +46,8 @@ help:
 	@node scripts/dev/help.mjs
 
 # ── Setup ────────────────────────────────────────────────────────────
-setup: ##setup: Generate every .env file (run this first)
-	@node scripts/dev/setup.mjs
+setup: ##setup: Generate every .env file (run this first; DEV_API=remote = front-end only, no Docker)
+	@DEV_API="$(DEV_API)" node scripts/dev/setup.mjs
 
 doctor: ##setup: Check Docker, ports and required tooling
 	@node scripts/dev/doctor.mjs
