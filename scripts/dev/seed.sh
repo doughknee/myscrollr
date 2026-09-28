@@ -27,16 +27,24 @@ COMPOSE=(docker compose -f "$ROOT/docker/compose.yml")
 # case (run once with real keys, snapshot the result) needs no arguments.
 LOCAL_DB="postgres://scrollr:scrollr@localhost:5432/scrollr?sslmode=disable"
 
+# DIRECT mode: docker/compose.dev-remote.yml's sidecar runs this with psql and
+# redis-cli installed in its own container, so there is no `docker compose exec`
+# to go through. DATABASE_URL / REDIS_URL name that stack's own services.
+DIRECT="${SCROLLR_DEV_DIRECT:-}"
+[ -n "$DIRECT" ] && LOCAL_DB="$DATABASE_URL"
+
 # psql runs inside the postgres container — no host Postgres client required,
 # which is the whole point of the containerized stack. A remote
 # SOURCE_DATABASE_URL is resolved from inside that container: use
 # host.docker.internal for a `kubectl port-forward` on the host.
 psql_in() {
   local url="$1"; shift
+  if [ -n "$DIRECT" ]; then psql "$url" -v ON_ERROR_STOP=1 "$@"; return; fi
   "${COMPOSE[@]}" exec -T postgres psql "$url" -v ON_ERROR_STOP=1 "$@"
 }
 
 redis_in() {
+  if [ -n "$DIRECT" ]; then redis-cli -u "$REDIS_URL" "$@"; return; fi
   "${COMPOSE[@]}" exec -T redis redis-cli "$@"
 }
 
@@ -464,7 +472,7 @@ backfill_derived() {
 load() {
   [ -f "$SEED_FILE" ] || { echo "[seed] no dataset at $SEED_FILE (run: make seed-capture)" >&2; exit 1; }
 
-  if ! "${COMPOSE[@]}" ps --status running --services 2>/dev/null | grep -qx postgres; then
+  if [ -z "$DIRECT" ] && ! "${COMPOSE[@]}" ps --status running --services 2>/dev/null | grep -qx postgres; then
     echo "[seed] postgres is not running — start the stack first (make up)." >&2
     exit 1
   fi

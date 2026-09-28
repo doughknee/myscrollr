@@ -1,5 +1,38 @@
 # Local development
 
+## Front-end only: no Docker
+
+Working in `desktop/` or `myscrollr.com/` and not touching Go or Rust? Skip the
+local backend. A permanent, keyless dev backend runs at
+`https://dev-api.myscrollr.com` (core + finance/sports/rss ingesters, its own
+Postgres and Redis, seeded and kept "live" by the same `make seed` / `make live`
+logic; see `docker/compose.dev-remote.yml`).
+
+```bash
+make setup DEV_API=remote   # writes desktop/.env + myscrollr.com/.env pointing at it
+make desktop                # or: make web
+```
+
+You need Node 22+ and make; **no Docker**. Setup asks for the Logto app ids
+(desktop and website) and defaults the Logto URL to the shared tenant. Existing
+`.env` files are kept, so delete `desktop/.env` first if you had a local-stack one.
+
+What to know:
+
+- It is shared and keyless. Data is the dev snapshot, moved by a clock, never
+  real quotes. Do not expect data to persist across a redeploy of the stack.
+- No Sequin, so SSE / CDC live pushes do not flow (identical to the local stack).
+- Sign-in uses the shared Logto tenant. The desktop dev build's localhost
+  redirect works as-is; the website needs `http://localhost:3000/callback`
+  allowed on its Logto app.
+- CORS allows `localhost:3000`, `:5174` and `:5180` (the browser shim).
+- To edit Go or Rust, use the Docker loop below; the remote stack runs published
+  `main` images, not your working tree.
+
+Operating it (Coolify, secrets, redeploys): the compose file's header comment.
+
+## Full local stack
+
 Three commands from a fresh clone:
 
 ```bash

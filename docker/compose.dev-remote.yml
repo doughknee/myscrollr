@@ -1,0 +1,184 @@
+# MyScrollr — the shared, always-on dev backend (SCROLLR-249).
+#
+# This is NOT the file `make up` uses (that is docker/compose.yml, which builds
+# the hot-reload `dev` stages from source). This one is deployed once, as a
+# Coolify docker-compose app, and serves https://dev-api.myscrollr.com so that
+# front-end work (`npm run dev` in desktop/ or myscrollr.com/) needs no local
+# Docker at all:  make setup DEV_API=remote
+#
+# What it is:
+#   - the SAME production runtime images deploy.yml pushes to DOCR (pulled,
+#     never built — the box is small and already runs Sequin + Logto);
+#   - its own Postgres 16 and Redis, on their own volumes, sharing nothing with
+#     production;
+#   - KEYLESS: no TwelveData / api-sports / Stripe / Sentry key of any kind.
+#     The ingesters boot and serve what is in Postgres, exactly like `make up`;
+#   - seeded by scripts/dev/seed.sh on FIRST boot only, and kept moving by
+#     scripts/dev/live.sh (games kick off, scores change, prices drift) in the
+#     `dev-clock` sidecar.
+# There is no Sequin here, so SSE/CDC live pushes do not flow (same as local).
+#
+# Nothing secret is in git. Every secret below is a Coolify environment
+# variable, generated fresh for this stack -- NEVER copied from scrollr-secrets:
+#   POSTGRES_PASSWORD   (required)
+#   ENCRYPTION_KEY      (required; must be the same for core and the ingesters)
+# Non-secret settings (all optional, defaults below) are overridable the same way:
+#   DOCR_REGISTRY, CORE_API_TAG, FINANCE_TAG, SPORTS_TAG, RSS_TAG
+#       image tags; default `latest`, or pin a deploy.yml tag such as
+#       sha-<short>-<run>-1
+#   LOGTO_URL, LOGTO_JWKS_URL, LOGTO_EXTENSION_APP_ID (the DESKTOP app),
+#   LOGTO_WEB_APP_ID, LOGTO_*_ROLE_ID
+#       the shared Logto tenant; public client identifiers, not credentials
+#   DEV_REPO_URL, DEV_REPO_REF
+#       where the dev-clock sidecar fetches scripts/dev/* from (default: main)
+#
+# The compose file itself is not parameterised for a domain: Coolify attaches
+# the FQDN to `core-api` (port 8080) in its own UI/API.
+#
+# Operating it (Coolify app `scrollr-dev-api`, project "Scrollr Infra"):
+#   - Prerequisite: the Coolify host must be logged in to DOCR read-only
+#     (`docker login registry.digitalocean.com`, run once in the server terminal
+#     with a read-only DOCR token). Without it every pull is a 401.
+#   - Refresh: redeploy the app in Coolify. `pull_policy: always` re-pulls
+#     `latest`; volumes (and so the seeded, moved data) survive.
+#   - Full reset: delete the app's volumes, then redeploy (it re-seeds).
+#   - The app tracks branch `main`. Keep it there.
+name: scrollr-dev-remote
+
+x-db-url: &db-url "postgres://scrollr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}@postgres:5432/scrollr?sslmode=disable"
+x-redis-url: &redis-url "redis://redis:6379"
+
+# Rust ingesters are identical apart from image, name and port.
+x-rust-ingester: &rust-ingester
+  restart: unless-stopped
+  pull_policy: always
+  depends_on:
+    core-api:
+      condition: service_healthy   # core owns the migrations; ingesters only write
+  environment: &rust-env
+    DATABASE_URL: *db-url
+    ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in Coolify}
+    # `development` is what makes a missing third-party key "boot anyway, do
+    # not poll" rather than fatal. Deliberate: this stack is keyless.
+    ENVIRONMENT: development
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scrollr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}
+      POSTGRES_DB: scrollr
+    volumes:
+      - dev_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrollr -d scrollr"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - dev_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  core-api:
+    image: ${DOCR_REGISTRY:-registry.digitalocean.com/scrollr}/core-api:${CORE_API_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      DATABASE_URL: *db-url
+      REDIS_URL: *redis-url
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in Coolify}
+      ENVIRONMENT: development
+      STRIPE_DISABLED: "true"
+      # Only ever the OIDC `resource` / `aud`, not an address: Logto issues
+      # tokens for the resource it has registered, which is production's.
+      API_URL: https://api.myscrollr.com
+      FRONTEND_URL: http://localhost:3000
+      # The three dev servers (website 3000, desktop Vite 5174, browser shim
+      # 5180) plus the Tauri webview origins.
+      ALLOWED_ORIGINS: ${DEV_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5174,http://localhost:5180,tauri://localhost,http://tauri.localhost}
+      LOGTO_URL: ${LOGTO_URL:-https://auth.myscrollr.com/oidc}
+      LOGTO_JWKS_URL: ${LOGTO_JWKS_URL:-https://auth.myscrollr.com/oidc/jwks}
+      LOGTO_EXTENSION_APP_ID: ${LOGTO_EXTENSION_APP_ID:-}
+      LOGTO_WEB_APP_ID: ${LOGTO_WEB_APP_ID:-}
+      LOGTO_UPLINK_ROLE_ID: ${LOGTO_UPLINK_ROLE_ID:-}
+      LOGTO_PRO_ROLE_ID: ${LOGTO_PRO_ROLE_ID:-}
+      LOGTO_ULTIMATE_ROLE_ID: ${LOGTO_ULTIMATE_ROLE_ID:-}
+      LOGTO_SUPER_USER_ROLE_ID: ${LOGTO_SUPER_USER_ROLE_ID:-}
+      INTERNAL_FINANCE_URL: "http://finance-service:3001"
+      INTERNAL_SPORTS_URL: "http://sports-service:3002"
+      INTERNAL_RSS_URL: "http://rss-service:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Listening means migrations are done (they run in ConnectDB before the
+    # server starts). Deliberately NOT /health: that is `degraded` until the
+    # ingesters are up, and they wait for this check -- a deadlock.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/app/min-version >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  finance-service:
+    <<: *rust-ingester
+    image: ${DOCR_REGISTRY:-registry.digitalocean.com/scrollr}/finance-service:${FINANCE_TAG:-latest}
+    environment:
+      <<: *rust-env
+      PORT: "3001"
+      TWELVEDATA_API_KEY: ""
+
+  sports-service:
+    <<: *rust-ingester
+    image: ${DOCR_REGISTRY:-registry.digitalocean.com/scrollr}/sports-service:${SPORTS_TAG:-latest}
+    environment:
+      <<: *rust-env
+      PORT: "3002"
+      API_SPORTS_KEY: ""
+
+  rss-service:
+    <<: *rust-ingester
+    image: ${DOCR_REGISTRY:-registry.digitalocean.com/scrollr}/rss-service:${RSS_TAG:-latest}
+    environment:
+      <<: *rust-env
+      PORT: "3004"
+
+  # First-boot seed + the dataset's clock. Fetches scripts/dev/* from the public
+  # repo at start (so a redeploy picks up script changes without an image) and
+  # runs scripts/dev/remote-sidecar.sh. Idempotent: it only seeds an EMPTY
+  # database, and live.sh re-anchoring on restart is a no-op by design.
+  dev-clock:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      core-api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: *db-url
+      REDIS_URL: *redis-url
+      SCROLLR_DEV_DIRECT: "1"
+      TICK: ${DEV_TICK:-15}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        apk add --no-cache bash git redis >/dev/null
+        && rm -rf /work
+        && git clone --quiet --depth 1 --branch ${DEV_REPO_REF:-main} ${DEV_REPO_URL:-https://github.com/doughknee/myscrollr.git} /work
+        && exec bash /work/scripts/dev/remote-sidecar.sh
+
+volumes:
+  dev_pg:
+  dev_redis:
