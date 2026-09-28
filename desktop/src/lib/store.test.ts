@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
+const keyListeners = vi.hoisted(() => new Map<string, ((v: unknown) => void)[]>());
+
 // The store module imports @tauri-apps/plugin-store, which crashes outside a
 // Tauri webview. Stub it out before loading the module under test.
 vi.mock("@tauri-apps/plugin-store", () => {
@@ -13,14 +15,36 @@ vi.mock("@tauri-apps/plugin-store", () => {
       return true;
     }
     async save(): Promise<void> {}
-    async onKeyChange<T>(_k: string, _cb: (v: T) => void): Promise<() => void> {
+    async onKeyChange<T>(k: string, cb: (v: T) => void): Promise<() => void> {
+      keyListeners.set(k, [...(keyListeners.get(k) ?? []), cb as (v: unknown) => void]);
       return () => {};
     }
   }
   return { LazyStore };
 });
 
-import { stableStringify } from "./store";
+import { getStore, onStoreChange, stableStringify } from "./store";
+
+// ── onStoreChange fan-out (SCROLLR-248) ─────────────────────────
+
+describe("onStoreChange", () => {
+  it("fires every subscriber to a key, not just the first", () => {
+    const a = vi.fn();
+    const b = vi.fn();
+    onStoreChange("k:fanout", a);
+    const unsubB = onStoreChange("k:fanout", b);
+    // Another window wrote the key: the plugin delivers it once per listener.
+    for (const cb of keyListeners.get("k:fanout") ?? []) cb({ v: 1 });
+    expect(a).toHaveBeenCalledWith({ v: 1 });
+    expect(b).toHaveBeenCalledWith({ v: 1 });
+    expect(getStore("k:fanout", null)).toEqual({ v: 1 });
+
+    unsubB();
+    for (const cb of keyListeners.get("k:fanout") ?? []) cb({ v: 2 });
+    expect(a).toHaveBeenCalledTimes(2);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+});
 
 // ── stableStringify ─────────────────────────────────────────────
 

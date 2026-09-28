@@ -87,10 +87,9 @@ export function useSharedSSE({ tickerShown }: { tickerShown: boolean }): SharedS
   useTauriListener("ticker-reposition", () => void elect());
 
   // Mount, and every time the bar is shown or hidden (tray, Ctrl+T, the
-  // settings row, the context menu). `tickerShown` is a prop rather than a
-  // second `scrollr:settings` subscription: `onStoreChange`'s equality guard
-  // writes the cache in the first callback, so a second subscriber to the
-  // same key in the same window never fires.
+  // settings row, the context menu). `tickerShown` is a prop: App.tsx already
+  // follows `scrollr:settings`, so a second subscription here would only
+  // duplicate it.
   useEffect(() => {
     void elect();
   }, [tickerShown, elect]);
