@@ -14,7 +14,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 export SCROLLR_DEV_DIRECT=1
 
-rows="$(psql "$DATABASE_URL" -At -c "SELECT (SELECT count(*) FROM games) + (SELECT count(*) FROM trades) + (SELECT count(*) FROM rss_items)")"
+# Only seed-owned tables count. rss_items is filled by the keyless rss
+# ingester on its own within seconds of boot, so counting it made the very
+# first boot skip the seed (found on the first Coolify deploy, SCROLLR-249).
+rows="$(psql "$DATABASE_URL" -At -c "SELECT (SELECT count(*) FROM games) + (SELECT count(*) FROM trades)")"
 if [ "$rows" = "0" ]; then
   echo "[dev-clock] empty database - seeding"
   bash scripts/dev/seed.sh load
