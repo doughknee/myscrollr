@@ -34,6 +34,15 @@
 #
 # The compose file itself is not parameterised for a domain: Coolify attaches
 # the FQDN to `core-api` (port 8080) in its own UI/API.
+#
+# Operating it (Coolify app `scrollr-dev-api`, project "Scrollr Infra"):
+#   - Prerequisite: the Coolify host must be logged in to DOCR read-only
+#     (`docker login registry.digitalocean.com`, run once in the server terminal
+#     with a read-only DOCR token). Without it every pull is a 401.
+#   - Refresh: redeploy the app in Coolify. `pull_policy: always` re-pulls
+#     `latest`; volumes (and so the seeded, moved data) survive.
+#   - Full reset: delete the app's volumes, then redeploy (it re-seeds).
+#   - The app tracks branch `main`. Keep it there.
 name: scrollr-dev-remote
 
 x-db-url: &db-url "postgres://scrollr:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}@postgres:5432/scrollr?sslmode=disable"
