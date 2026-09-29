@@ -107,6 +107,10 @@ src_psql() {
 # (yahoo_*, user_*, stripe_*, support_*, business_leads, osticket_*) is
 # excluded by not being here.
 #
+# rss_items keeps the newest 8 PER FEED, not the newest 500 overall: a global
+# cap is filled by the chattiest feeds (Yahoo Sports, Drudge) and starves the
+# first-run default, NPR, to zero (SCROLLR-256).
+#
 # Order matters on load: rss_items has an FK onto tracked_feeds(url).
 TABLES='
 tracked_symbols|
@@ -116,7 +120,7 @@ trades|
 games|
 standings|
 teams|
-rss_items|WHERE feed_url IN (SELECT url FROM tracked_feeds WHERE is_default = true) ORDER BY published_at DESC NULLS LAST LIMIT 500
+rss_items|WHERE id IN (SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY feed_url ORDER BY published_at DESC NULLS LAST) AS rn FROM rss_items WHERE feed_url IN (SELECT url FROM tracked_feeds WHERE is_default = true)) ranked WHERE rn <= 8)
 '
 
 # Read into an array once, up front. A `while read` loop fed by a pipe or
