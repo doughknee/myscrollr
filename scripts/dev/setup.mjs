@@ -174,8 +174,11 @@ const logto = {
   jwks: "",
   // Only core reads this (desktop sign-in exchange); a remote setup has no local core.
   appId: REMOTE ? "" : await ask("Logto extension app id", ""),
-  desktopAppId: await ask("Logto DESKTOP app id", ""),
-  webAppId: await ask("Logto WEBSITE app id", ""),
+  // Remote mode talks to the real tenant, whose client ids are public (they
+  // ship inside the app bundle and the website), so default them; a blank
+  // id is what left web mode unable to sign in on a fresh clone.
+  desktopAppId: await ask("Logto DESKTOP app id", REMOTE ? "6y2wqgvkdqmulthvose81" : ""),
+  webAppId: await ask("Logto WEBSITE app id", REMOTE ? "4wktntz580tq7y2ve02mo" : ""),
 };
 // Everything below hangs off the tenant URL — derive rather than ask
 // four times. The bare URL is what the Logto SDKs want (they append
