@@ -15,6 +15,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5174",
+    "web": "vite --port 5190 --strictPort --open /web.html",
     "build": "vite build && tsc --noEmit",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
