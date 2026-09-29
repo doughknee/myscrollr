@@ -216,6 +216,19 @@ capture() {
 #
 # trades, standings, teams and the tracked_* config tables carry no
 # time-relative read, so they are restored as-is.
+# The shift, in one place. A WHOLE number of days, not the raw gap:
+#
+#   round((now - anchor) / 1 day) days
+#
+# The raw gap moved every kickoff by an arbitrary number of hours, so a game
+# that really kicks off at 13:00 landed at 01:53 AM local and "Sunday 1 PM"
+# fixtures floated to odd hours of odd weekdays (SCROLLR-256: one NFL game
+# loaded as "Mon Oct 5, 1:53 AM"). Shifting by whole days keeps every
+# kickoff's real clock time; only the date moves, and the error against true
+# "now" is at most 12 hours. The anchor is untouched by the shift, so this
+# expression evaluates identically in every statement below.
+SHIFT_SQL="make_interval(days => round(extract(epoch FROM (now() - (SELECT max(updated_at) FROM games))) / 86400)::int)"
+
 REBASE_SQL="
 -- ONE delta for everything, taken from the freshest WRITE in the snapshot.
 --
@@ -269,11 +282,13 @@ BEGIN
 END
 \$\$;
 
-UPDATE games SET start_time = start_time + (now() - (SELECT max(updated_at) FROM games))
+UPDATE games SET start_time = start_time + $SHIFT_SQL
   WHERE start_time IS NOT NULL
     AND (SELECT max(updated_at) FROM games) IS NOT NULL;
 
-UPDATE rss_items SET published_at = published_at + (now() - (SELECT max(updated_at) FROM games))
+-- LEAST(..., now()): rounding up can carry the newest articles up to 12 h into the
+-- future, which the UI would render as 'in 11 hours'.
+UPDATE rss_items SET published_at = LEAST(published_at + $SHIFT_SQL, now())
   WHERE published_at IS NOT NULL
     AND (SELECT max(updated_at) FROM games) IS NOT NULL;
 

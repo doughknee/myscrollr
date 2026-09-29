@@ -207,6 +207,12 @@ nothing containing user data (`yahoo_*`, `user_*`, `stripe_*`, `support_*`)
 is touched, which is what makes the snapshot safe to commit. Commit the
 regenerated `scripts/dev/seed.sql.gz`.
 
+`make seed-capture-prod` (`seed.sh capture --from-cluster`) records from production and
+needs only `kubectl`. Rebasing shifts every timestamp by a whole number of days, so
+kickoffs keep their real clock times. To reseed the shared dev backend, commit the new
+file to `main` and redeploy the Coolify app: the `dev-clock` sidecar records the sha256 of
+the seed it loaded and reloads when it changes (no volume wipe).
+
 ## Driving the app from a script
 
 The dev build listens for commands from the dev server, so a script (or an
