@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scrollr</title>
+    <!-- SCROLLR-254: bundled fonts, fetched before CSS parse. crossorigin is
+         required on font preloads even same-origin, or the preload is wasted. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-400.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-500.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-600.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/plus-jakarta-sans-latin.woff2" />
     <script>
       // Pre-paint theme resolution for the ticker window. Mirrors the
       // pre-paint script in app.html — both windows share the same

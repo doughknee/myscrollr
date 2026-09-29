@@ -7,8 +7,8 @@ The CSP lives in `tauri.conf.json` under `app.security.csp`.
 ```
 default-src 'self';
 script-src 'self';
-style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-font-src 'self' https://fonts.gstatic.com;
+style-src 'self' 'unsafe-inline';
+font-src 'self';
 connect-src 'self' https://*;
 img-src 'self' data: blob: https://*;
 worker-src 'self' blob:;

@@ -15,6 +15,7 @@ import {
 } from "motion/react";
 import "./api/fetchOverride";
 import { initStore } from "./lib/store";
+import { fontsReady } from "./lib/fonts";
 import { createQueryClient } from "./query";
 import App from "./App";
 import { startDevBus } from "./dev/bus";
@@ -39,7 +40,8 @@ const queryClient = createQueryClient();
 // dev bus addresses each by its own label.
 startDevBus(getCurrentWindow().label, { qc: queryClient });
 
-initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
+// SCROLLR-254: mount once, with final font metrics (see lib/fonts.ts).
+initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => fontsReady()).then(() => {
   // SCROLLR-255: dev-only ticker jump detector. Dynamic import behind DEV so
   // a release bundle contains none of it.
   if (import.meta.env.DEV) void import("./dev/jumpDetector").then((m) => m.startJumpDetector(getCurrentWindow().label));
