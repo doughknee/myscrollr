@@ -6,17 +6,15 @@
 // is milliseconds; the timeout only guards a webview that never answers, and
 // never rejects, so a font problem costs a reflow, not a blank bar.
 const FACES = [
-  '400 12px "IBM Plex Mono"',
-  '500 12px "IBM Plex Mono"',
-  '600 12px "IBM Plex Mono"',
-  '400 12px "Plus Jakarta Sans"',
+  "400 12px \"IBM Plex Mono\"",
+  "500 12px \"IBM Plex Mono\"",
+  "600 12px \"IBM Plex Mono\"",
+  "400 12px \"Plus Jakarta Sans\"",
 ];
 
 export function fontsReady(timeoutMs = 1500): Promise<void> {
-  if (typeof document === "undefined" || !document.fonts) return Promise.resolve();
-  const loaded = Promise.all(FACES.map((f) => document.fonts.load(f))).then(
-    () => document.fonts.ready,
-  );
+  if (!document.fonts) return Promise.resolve();
+  const loaded = Promise.all(FACES.map((f) => document.fonts.load(f)));
   const timeout = new Promise<void>((r) => setTimeout(r, timeoutMs));
   return Promise.race([loaded, timeout]).then(
     () => undefined,

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import * as Sentry from "@sentry/react";
 import { setCrashReports } from "./sentry";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,8 +10,9 @@ import { usePinnedSubjectsSync } from "./hooks/usePinnedSubjectsSync";
 import { useSharedSSE } from "./hooks/useSharedSSE";
 import { useProductActivity } from "./hooks/useProductActivity";
 import { usePostHogActivity } from "./hooks/usePostHogActivity";
-import { isPrimaryTicker, ownsSharedConnection } from "./lib/windowRole";
-import { shouldOfferDefaultWidget, applyDefaultWidget } from "./lib/firstRunDefaultWidget";
+import { isPrimaryTicker } from "./lib/windowRole";
+import { useFirstRunDefaultWidget } from "./lib/firstRunDefaultWidget";
+import { emit } from "@tauri-apps/api/event";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
@@ -121,26 +121,18 @@ export default function App() {
   // instead of the "no sources yet" CTA below. `awaitingDefaultWidget` is
   // computed the same way in every window from the same broadcast
   // dashboard, so the CTA stays suppressed everywhere while the add is
-  // decided/in flight — but the network call itself only runs from the
-  // window that owns the shared connection (the same election
-  // `useSharedSSE` uses for start_sse/stop_sse), so N ticker windows never
-  // race each other into N POSTs.
-  const awaitingDefaultWidget = shouldOfferDefaultWidget(authenticated, dashboard);
-  const defaultWidgetAttempted = useRef(false);
-  useEffect(() => {
-    if (!awaitingDefaultWidget || defaultWidgetAttempted.current) return;
-    defaultWidgetAttempted.current = true;
-    void (async () => {
-      if (!(await ownsSharedConnection())) return;
-      try {
-        await applyDefaultWidget();
-      } catch (err) {
-        Sentry.captureException(err, {
-          tags: { feature: "first-run-default-widget" },
-        });
-      }
-    })();
-  }, [awaitingDefaultWidget]);
+  // decided/in flight; the hook (lib/firstRunDefaultWidget.ts) only runs the
+  // network call in the owning window, and stops suppressing on failure.
+  // On success, refetch here and tell the main window to do the same: its
+  // next CDC merge would otherwise re-broadcast a copy without the widget.
+  const awaitingDefaultWidget = useFirstRunDefaultWidget(
+    authenticated,
+    dashboard,
+    () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      void emit("dashboard-invalidate").catch(() => {});
+    },
+  );
 
   const widgetTabs = useMemo(() => {
     if (widgets.length === 0) {

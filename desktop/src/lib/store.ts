@@ -144,11 +144,9 @@ export function onStoreChange<T>(
   key: string,
   callback: (newValue: T) => void,
 ): () => void {
-  let set = subscribers.get(key);
-  if (!set) {
-    const listeners = new Set<(value: unknown) => void>();
+  const listeners = subscribers.get(key) ?? new Set<(value: unknown) => void>();
+  if (!subscribers.has(key)) {
     subscribers.set(key, listeners);
-    set = listeners;
     // ponytail: the plugin listener lives for the process; keys are a
     // fixed handful, so there is nothing to leak.
     void store.onKeyChange<unknown>(key, (newValue) => {
@@ -163,9 +161,9 @@ export function onStoreChange<T>(
     });
   }
   const listener = callback as (value: unknown) => void;
-  set.add(listener);
+  listeners.add(listener);
   return () => {
-    set.delete(listener);
+    listeners.delete(listener);
   };
 }
 

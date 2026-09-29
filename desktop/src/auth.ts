@@ -303,6 +303,13 @@ export function getLastLoginError(): string | null {
  */
 const PROACTIVE_LEAD_MS = 2 * REFRESH_BUFFER_MS;
 
+/**
+ * Exported as `rearmRefresh` for the election: a window that just BECAME the
+ * owner still holds the spent, non-null timer of its non-owner days, so
+ * nothing else would re-arm it.
+ */
+export { scheduleRefresh as rearmRefresh };
+
 function scheduleRefresh(): void {
   if (refreshTimer !== null) {
     clearTimeout(refreshTimer);
