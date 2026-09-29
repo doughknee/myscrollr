@@ -567,6 +567,10 @@ function RootLayout() {
   // gives a returning one its bar back, and falls back to the primary
   // when none of the chosen screens is present.
   useTauriListener("monitors-changed", () => syncTickerWindows(prefs.window.tickerMonitors));
+  // The ticker just applied the first-run default widget (SCROLLR-257).
+  useTauriListener("dashboard-invalidate", () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+  });
 
   useEffect(() => {
     isAutostartEnabled().then(setAutostartOn).catch(() => {});

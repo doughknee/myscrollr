@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTauriListener } from "./useTauriListener";
 import { ownsSharedConnection } from "../lib/windowRole";
-import { getValidToken } from "../auth";
+import { getValidToken, rearmRefresh } from "../auth";
 import { loadPref } from "../preferences";
 import { API_BASE, DEMO } from "../config";
 import type { DeliveryMode } from "../types";
@@ -76,7 +76,12 @@ export function useSharedSSE({ tickerShown }: { tickerShown: boolean }): SharedS
     const owns = await ownsSharedConnection();
     if (owns === ownsRef.current) return;
     ownsRef.current = owns;
-    if (owns) await startSSE();
+    if (owns) {
+      // Proactive refresh is owner-only, so a window that just took over
+      // (ticker destroyed on a monitor change, main taking over) arms it now.
+      rearmRefresh();
+      await startSSE();
+    }
     else activeRef.current = false;
   }, [startSSE]);
 

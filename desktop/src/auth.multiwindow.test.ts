@@ -231,6 +231,31 @@ describe("SCROLLR-248: the session survives restarts, many windows and sleep", (
     expect(h.logto.errors).toEqual([]);
   });
 
+  it("a non-owner's spent timer is re-armed when the window becomes owner (rearmRefresh)", async () => {
+    // Only main is open here, but a ticker exists, so main does not own the
+    // connection: its proactive timer fires once and must NOT refresh.
+    h.labels = ["ticker", "main"];
+    const t = issueTokens();
+    h.disk.set("scrollr:store-migrated", true);
+    h.disk.set("scrollr:auth", {
+      accessToken: t.access_token,
+      refreshToken: t.refresh_token,
+      expiresAt: Date.now() + HOUR,
+      userSub: "u1",
+    });
+    const main = await openWindow("main");
+    await tick(HOUR - 60_000); // past the proactive lead, before expiry
+    expect(h.logto.successes).toBe(0);
+
+    // The ticker is destroyed (monitor change); main takes over and the
+    // election calls rearmRefresh.
+    h.labels = ["main"];
+    main.auth.rearmRefresh();
+    await tick(LOGTO_LATENCY_MS + IPC_EVENT_MS);
+    expect(h.logto.successes).toBe(1);
+    expect(h.logto.errors).toEqual([]);
+  });
+
   it("still signs out when Logto refuses the token that is actually stored", async () => {
     const [ticker, , main] = await restartApp(["ticker", "ticker-2", "main"]);
     // The refresh token dies server-side (expired, revoked).

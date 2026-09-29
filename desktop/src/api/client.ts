@@ -382,14 +382,13 @@ export async function toggleDataWidgetVisibility(
  * (SCROLLR-246) — and tolerates the other fields being feed-overlay ones
  * it never reads.
  */
-export const preferencesApi = {
-  update: (data: Partial<UserPreferences>) =>
-    authFetch<UserPreferences>("/users/me/preferences", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }),
-};
+export function updatePreferences(data: Partial<UserPreferences>) {
+  return authFetch<UserPreferences>("/users/me/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
 
 // ── Subscription Types & API ────────────────────────────────────
 

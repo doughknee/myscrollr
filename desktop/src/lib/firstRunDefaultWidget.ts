@@ -7,7 +7,10 @@
  * `ownsSharedConnection()` so N ticker windows never race each other into
  * N POSTs (see the effect in App.tsx).
  */
-import { dataWidgetsApi, preferencesApi } from "../api/client";
+import { useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/react";
+import { dataWidgetsApi, updatePreferences } from "../api/client";
+import { ownsSharedConnection } from "./windowRole";
 import type { DashboardResponse } from "../types";
 
 export const FIRST_RUN_DEFAULT_WIDGET = "news_npr";
@@ -51,6 +54,56 @@ export function shouldOfferDefaultWidget(
  * widget, re-adding it right back.
  */
 export async function applyDefaultWidget(): Promise<void> {
-  await preferencesApi.update({ default_widgets_applied: true });
+  await updatePreferences({ default_widgets_applied: true });
   await dataWidgetsApi.create(FIRST_RUN_DEFAULT_WIDGET, {});
+}
+
+/** One retry after a failed apply; never more (see useFirstRunDefaultWidget). */
+export const DEFAULT_WIDGET_RETRY_MS = 30_000;
+
+/**
+ * Runs the first-run default for this window and returns `awaiting`: true
+ * while the empty-state CTA should stay suppressed. The call itself only
+ * runs from the window that owns the shared connection, so N ticker windows
+ * never race into N POSTs.
+ *
+ * If the apply throws (offline, 5xx) the CTA stops being suppressed at once,
+ * so a failed first run degrades to the normal "no sources yet" state, and
+ * exactly ONE retry is scheduled after DEFAULT_WIDGET_RETRY_MS. There is no
+ * loop: after the retry the account simply keeps the CTA.
+ */
+export function useFirstRunDefaultWidget(
+  authenticated: boolean,
+  dashboard: Parameters<typeof shouldOfferDefaultWidget>[1],
+  onApplied: () => void,
+): boolean {
+  const eligible = shouldOfferDefaultWidget(authenticated, dashboard);
+  const [failed, setFailed] = useState(false);
+  const started = useRef(false);
+  const onAppliedRef = useRef(onApplied);
+  onAppliedRef.current = onApplied;
+
+  useEffect(() => {
+    if (!eligible || started.current) return;
+    started.current = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = async (isRetry: boolean) => {
+      if (!(await ownsSharedConnection())) return;
+      try {
+        await applyDefaultWidget();
+        setFailed(false);
+        onAppliedRef.current();
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { feature: "first-run-default-widget" },
+        });
+        setFailed(true);
+        if (!isRetry) timer = setTimeout(() => void attempt(true), DEFAULT_WIDGET_RETRY_MS);
+      }
+    };
+    void attempt(false);
+    return () => clearTimeout(timer);
+  }, [eligible]);
+
+  return eligible && !failed;
 }
