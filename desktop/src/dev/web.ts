@@ -29,6 +29,12 @@
  *                  never leave auth.ts. The fixed 127.0.0.1:19284 redirect
  *                  is swapped for that URL in the two places it travels:
  *                  the authorize URL (open_external) and the code exchange.
+ *                  Popups blocked (embedded browsers), or `web.html?auth=
+ *                  same-tab`: the tab itself goes to Logto, so the login()
+ *                  that was waiting is gone. /callback stashes the answer,
+ *                  the PKCE randomness was stashed on the way out, and the
+ *                  main frame replays login() with that randomness and feeds
+ *                  it the stashed answer. auth.ts runs unchanged.
  *   events         in-window listener table + a BroadcastChannel to the
  *                  other window; `emit_to` delivers only to its label.
  *   window, tray,  logged no-ops. Position/visibility of the bar are
@@ -47,6 +53,12 @@ const API_PROXY = "/__api";
 /** The redirect Logto knows for web mode; the dev server serves it. */
 export const WEB_REDIRECT_URI = `${location.origin}/callback`;
 
+// Same-tab sign-in hand-off (localStorage, so it survives the round trip).
+const PENDING_PKCE = "scrollr:web-pending-pkce";
+const PENDING_CALLBACK = "scrollr:web-pending-callback";
+const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+const unhex = (h: string) => Uint8Array.from(h.match(/../g) ?? [], (x) => parseInt(x, 16));
+
 /** Run on the /callback page: hand Logto's answer to the waiting window. */
 export function relayAuthCallback(): void {
   const q = new URLSearchParams(location.search);
@@ -56,6 +68,12 @@ export function relayAuthCallback(): void {
     error: q.get("error"),
     error_description: q.get("error_description"),
   };
+  if (localStorage.getItem(PENDING_PKCE)) {
+    // This tab left web.html for Logto: nobody is waiting, go back and resume.
+    localStorage.setItem(PENDING_CALLBACK, JSON.stringify(payload));
+    location.replace("/web.html");
+    return;
+  }
   new BroadcastChannel(CHANNEL).postMessage({ event: "auth-callback", payload });
   document.body.textContent = payload.code
     ? "Signed in. You can close this tab."
@@ -72,6 +90,24 @@ export function installWebAdapter(label: Label): void {
   const toPage = (msg: Record<string, unknown>) =>
     window.parent.postMessage({ scrollrWeb: label, ...msg }, location.origin);
   let nextId = 1;
+
+  // ── PKCE replay (same-tab sign-in) ────────────────────────────────
+  // login() keeps its verifier and state in locals, which a navigation
+  // destroys. Remember the last 64-/16-byte random draws (verifier, state),
+  // and on return hand them back to a fresh login() in the same order.
+  const drawn: Record<number, Uint8Array> = {};
+  let replay: Record<number, Uint8Array> | null = null;
+  let replayed: unknown = null; // the stashed callback, delivered instead of opening a tab
+  const realRandom = crypto.getRandomValues.bind(crypto);
+  crypto.getRandomValues = ((a: Uint8Array) => {
+    const n = a.length;
+    if (replay?.[n]) {
+      a.set(replay[n]);
+      delete replay[n];
+    } else realRandom(a);
+    if (n === 64 || n === 16) drawn[n] = new Uint8Array(a);
+    return a;
+  }) as typeof crypto.getRandomValues;
 
   // ── Events ────────────────────────────────────────────────────────
   const callbacks = new Map<number, (e: unknown) => void>();
@@ -220,7 +256,7 @@ export function installWebAdapter(label: Label): void {
     "position_ticker", "pin_window", "sync_ticker_windows", "set_ticker_visible",
     "show_app_window", "identify_monitors", "sync_tray_ticker", "set_hide_on_fullscreen",
     "quit_app", "configure_presence", "report_screen_state", "set_crash_reports",
-    "start_auth_server", "stop_auth_server",
+    "start_auth_server", "stop_auth_server", "collect_diagnostics",
   ]);
 
   async function invoke(cmd: string, args: Args = {}): Promise<unknown> {
@@ -310,10 +346,22 @@ export function installWebAdapter(label: Label): void {
         if (url.searchParams.get("redirect_uri") === REDIRECT_URI) {
           url.searchParams.set("redirect_uri", WEB_REDIRECT_URI);
         }
-        // Logto's page finishes on /callback in that tab, which relays to us.
-        if (!window.open(url, "_blank")) {
-          console.warn(`[web:${label}] popup blocked; allow popups for ${location.origin} or open:`, url.href);
+        if (replayed) {
+          emit("auth-callback", replayed); // resuming: Logto already answered
+          replayed = null;
+          return;
         }
+        const forced = new URLSearchParams(window.parent.location.search).get("auth") === "same-tab";
+        // Logto's page finishes on /callback in that tab, which relays to us.
+        if (!forced && window.open(url, "_blank")) {
+          localStorage.removeItem(PENDING_PKCE);
+          return;
+        }
+        localStorage.setItem(
+          PENDING_PKCE,
+          JSON.stringify({ verifier: hex(drawn[64]), state: url.searchParams.get("state") }),
+        );
+        window.top!.location.assign(url.href);
         return;
       }
 
@@ -380,4 +428,20 @@ export function installWebAdapter(label: Label): void {
   w.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: (_event: string, id: number) => listeners.delete(id),
   };
+
+  // Back from a same-tab sign-in: rerun login() with the stashed randomness.
+  const pkce = localStorage.getItem(PENDING_PKCE);
+  const answer = localStorage.getItem(PENDING_CALLBACK);
+  if (label === "main" && pkce && answer) {
+    localStorage.removeItem(PENDING_PKCE);
+    localStorage.removeItem(PENDING_CALLBACK);
+    const p = JSON.parse(pkce);
+    replay = { 64: unhex(p.verifier), 16: unhex(p.state) };
+    replayed = JSON.parse(answer);
+    void (async () => {
+      // The app's own store first, so saveAuth has somewhere to write.
+      await (await import("../lib/store")).initStore();
+      await (await import("../auth")).login();
+    })();
+  }
 }

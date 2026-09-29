@@ -45,8 +45,9 @@ two iframes that share one store, talking to whatever `VITE_API_URL` names
 In button: Logto opens in a new tab and hands back to
 `http://localhost:5190/callback`, which is registered on the desktop Logto app.
 The port is fixed for that reason, and the page must be opened as `localhost`,
-not `127.0.0.1`. Allow popups for `localhost:5190` if the tab does not open (the
-blocked link is printed in the console).
+not `127.0.0.1`. If the popup is blocked (embedded browsers such as the Claude
+desktop pane), sign-in falls back to this tab on its own; `web.html?auth=same-tab`
+forces that.
 
 `src/dev/web.ts` stands in for the Rust half; it is dev-only and not in any
 build. `node scripts/dev/devctl.mjs` works too, with
