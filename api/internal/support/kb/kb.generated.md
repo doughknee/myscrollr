@@ -6,7 +6,7 @@ This is the authoritative product reference for support replies. Anything stated
 
 Current desktop version: **1.6.9**.
 
-<!-- source: desktop/package.json @ 771806b91421 -->
+<!-- source: desktop/package.json @ 009bb6e3eb26 -->
 
 ## Policies
 

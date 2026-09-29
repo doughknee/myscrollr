@@ -32,6 +32,38 @@ What to know:
 
 Operating it (Coolify, secrets, redeploys): the compose file's header comment.
 
+### Web mode: the desktop app in a browser tab
+
+```bash
+cd desktop && npm run web   # http://localhost:5190/web.html
+```
+
+One page with the real ticker across the top and the real main window below,
+two iframes that share one store, talking to whatever `VITE_API_URL` names
+(the dev backend above, or `localhost:18080`). It needs `VITE_LOGTO_APP_ID` in
+`desktop/.env` (the desktop app id; setup asks for it). Sign in with the Sign
+In button: Logto opens in a new tab and hands back to
+`http://localhost:5190/callback`, which is registered on the desktop Logto app.
+The port is fixed for that reason, and the page must be opened as `localhost`,
+not `127.0.0.1`. Allow popups for `localhost:5190` if the tab does not open (the
+blocked link is printed in the console).
+
+`src/dev/web.ts` stands in for the Rust half; it is dev-only and not in any
+build. `node scripts/dev/devctl.mjs` works too, with
+`SCROLLR_DEV_URL=http://localhost:5190`.
+
+| Testable in web mode | Not testable (real app only: `npm run tauri:dev`) |
+|---|---|
+| Chips, ticker scrolling, rotation, widths, detailed/compact | Window placement, always-on-top, pinning, DPI |
+| Feed pages, catalog, settings, first run | Monitors: `list_monitors` returns one fake screen |
+| Sign-in, token refresh, sign-out (real Logto, real API) | Tray, autostart, updater, relaunch, quit |
+| Cross-window prefs (`onStoreChange`), one SSE owner (`windowRole.ts`) | Native context menus (the ticker's right-click) |
+| The SSE stream, when the backend has one (the dev backend has no Sequin) | Hide-on-fullscreen, presence, crash-report toggle, Identify |
+| Anything the webview fetches from the API (proxied via `/__api`) | Third-party fetches the app makes from Rust (browser CORS applies) |
+
+The store lives in this browser's `localStorage` (`tauri-store:*` keys);
+clear site data for `localhost:5190` to start from a fresh install.
+
 ## Full local stack
 
 Three commands from a fresh clone:

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
+import type { Plugin } from "vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -20,6 +21,36 @@ const pkg = JSON.parse(
   ),
 );
 
+/**
+ * Web mode (SCROLLR-250, `npm run web`, desktop/web.html). Dev server only:
+ * `/__api` proxies to VITE_API_URL, which sends no CORS headers for
+ * localhost, and `/callback` (Logto's web-mode redirect) serves web.html.
+ */
+function webMode(): Plugin {
+  return {
+    name: "scrollr-web-mode",
+    apply: "serve",
+    config: (_config, { mode }) => ({
+      server: {
+        proxy: {
+          "/__api": {
+            // Same fallback as src/config.ts DEFAULT_API.
+            target: loadEnv(mode, projectRoot, "VITE_").VITE_API_URL || "http://localhost:8080",
+            changeOrigin: true,
+            rewrite: (path) => path.slice("/__api".length),
+          },
+        },
+      },
+    }),
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url?.startsWith("/callback?")) req.url = `/web.html${req.url.slice("/callback".length)}`;
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     tanstackRouter({
@@ -32,6 +63,7 @@ export default defineConfig({
     tailwindcss(),
     // Dev only (apply: "serve"): lets scripts/dev/devctl.mjs run code in a window.
     devBus(),
+    webMode(),
     // Sentry plugin MUST be last so it sees the final bundle output.
     // Disabled automatically when SENTRY_AUTH_TOKEN isn't set (local builds).
     sentryVitePlugin({

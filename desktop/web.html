@@ -1,0 +1,69 @@
+<!--
+  web.html — WEB MODE (SCROLLR-250): the real ticker and the real main
+  window in one browser tab, signed in against a real backend.
+
+  `npm run web` (vite on http://localhost:5190, fixed: Logto knows exactly
+  that redirect) opens this page. One file, four roles by URL:
+
+    /web.html                the page: ticker frame on top, main below
+    /web.html?window=ticker  the ticker webview   (src/main.tsx)
+    /web.html?window=main    the main webview     (src/app-main.tsx)
+    /callback?code=…         Logto's redirect; relays to the windows, closes
+
+  src/dev/web.ts stands in for Tauri in each frame; read it for what maps
+  to what. Dev-only; not a build input (vite builds index/app/identify).
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scrollr — web mode</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #141420; }
+      #root { width: 100%; height: 100%; }
+      #web { display: flex; flex-direction: column; height: 100%; font: 12px system-ui, sans-serif; color: #9494a0; }
+      #web iframe { border: 0; width: 100%; display: block; }
+      #web .ticker { height: 48px; flex: none; }
+      #web .main { flex: 1; min-height: 0; border-top: 1px solid #282838; }
+      #web.bottom .ticker { order: 2; border-top: 1px solid #282838; }
+      #web .note { flex: none; order: 3; padding: 4px 12px; background: #1c1c2a; }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      const win = new URLSearchParams(location.search).get("window");
+      if (location.pathname === "/callback") {
+        const { relayAuthCallback } = await import("/src/dev/web.ts");
+        relayAuthCallback();
+      } else if (win === "ticker" || win === "main") {
+        document.body.innerHTML = '<div id="root"></div>';
+        const { installWebAdapter } = await import("/src/dev/web.ts");
+        installWebAdapter(win);
+        if (win === "ticker") await import("/src/main.tsx");
+        else await import("/src/app-main.tsx");
+      } else {
+        document.body.innerHTML = `
+          <div id="web">
+            <iframe class="ticker" title="Ticker window" src="/web.html?window=ticker"></iframe>
+            <iframe class="main" title="Main window" src="/web.html?window=main"></iframe>
+            <div class="note">
+              Web mode: the two webviews only. Not testable here: window placement,
+              monitors, DPI, always-on-top, tray, autostart, updater, native menus,
+              fullscreen hiding, presence. Those need <code>npm run tauri:dev</code>.
+            </div>
+          </div>`;
+        const page = document.getElementById("web");
+        const ticker = page.querySelector(".ticker");
+        // The ticker frame plays the ticker window: web.ts forwards
+        // position_ticker / set_ticker_visible here.
+        addEventListener("message", ({ origin, data }) => {
+          if (origin !== location.origin || data?.scrollrWeb !== "ticker") return;
+          if (typeof data.height === "number") ticker.style.height = `${data.height}px`;
+          if (data.position) page.classList.toggle("bottom", data.position === "bottom");
+          if (typeof data.visible === "boolean") ticker.style.display = data.visible ? "" : "none";
+        });
+      }
+    </script>
+  </body>
+</html>
