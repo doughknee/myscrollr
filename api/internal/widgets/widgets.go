@@ -13,6 +13,19 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// configOrDefault stores the catalog's DefaultConfig when a create carries no
+// config, so a row made without one (the first-run default widget posts {})
+// is still a working widget instead of an empty shell (SCROLLR-252).
+func configOrDefault(widgetType string, cfg map[string]interface{}) map[string]interface{} {
+	if len(cfg) > 0 {
+		return cfg
+	}
+	if def := platform.DefaultConfigFor(widgetType); def != nil {
+		return def
+	}
+	return map[string]interface{}{}
+}
+
 // CountEnabledWidgets returns how many enabled widgets a user
 // currently has — the "slots in use" for the widget/slot model. Used by
 // CreateWidget to gate new additions against the tier's MaxWidgets cap.
@@ -142,9 +155,7 @@ func CreateWidget(c *fiber.Ctx) error {
 		req.LocalWidgets = 0
 	}
 
-	if req.Config == nil {
-		req.Config = map[string]interface{}{}
-	}
+	req.Config = configOrDefault(req.WidgetType, req.Config)
 
 	tier := platform.TierFromRoles(platform.GetUserRoles(c))
 

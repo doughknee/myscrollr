@@ -32,3 +32,20 @@ func TestValidateURL(t *testing.T) {
 		})
 	}
 }
+
+// The catalog's DefaultConfig is Go-typed; DefaultConfigFor must hand back the
+// JSON-decoded shape ExtractFeedURLsFromConfig can read (SCROLLR-252).
+func TestDefaultConfigForIsExtractable(t *testing.T) {
+	got := ExtractFeedURLsFromConfig(DefaultConfigFor("news_npr"))
+	if len(got) != 1 || got[0] != "https://feeds.npr.org/1001/rss.xml" {
+		t.Fatalf("news_npr default feeds = %v", got)
+	}
+	// The typed literal itself does not match the extractor's assertions.
+	def, _ := WidgetByID("news_npr")
+	if raw := ExtractFeedURLsFromConfig(def.DefaultConfig); len(raw) != 0 {
+		t.Fatalf("typed DefaultConfig unexpectedly extractable: %v", raw)
+	}
+	if DefaultConfigFor("no_such_widget") != nil {
+		t.Error("unknown widget type should have no default config")
+	}
+}

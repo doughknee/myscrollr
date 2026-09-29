@@ -52,3 +52,20 @@ func TestExtractFeedURLsFromConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestWidgetFeedURLsFallsBackToCatalogDefault(t *testing.T) {
+	const npr = "https://feeds.npr.org/1001/rss.xml"
+	if got := widgetFeedURLs("news_npr", map[string]interface{}{}); len(got) != 1 || got[0] != npr {
+		t.Errorf("empty config = %v, want [%s]", got, npr)
+	}
+	if got := widgetFeedURLs("news_npr", nil); len(got) != 1 || got[0] != npr {
+		t.Errorf("nil config = %v, want [%s]", got, npr)
+	}
+	own := map[string]interface{}{"feeds": []interface{}{map[string]interface{}{"url": "https://a.example/rss"}}}
+	if got := widgetFeedURLs("news_npr", own); len(got) != 1 || got[0] != "https://a.example/rss" {
+		t.Errorf("own config = %v, want its own feed only", got)
+	}
+	if got := widgetFeedURLs("rss_custom", map[string]interface{}{}); len(got) != 0 {
+		t.Errorf("no catalog default = %v, want none", got)
+	}
+}
