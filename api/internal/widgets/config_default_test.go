@@ -21,3 +21,17 @@ func TestConfigOrDefault(t *testing.T) {
 		t.Errorf("no default = %v, want empty non-nil map", got)
 	}
 }
+
+// SCROLLR-259: adding Stocks/Crypto with no config must not leave an empty
+// widget. Symbols are already tracked in prod, so this costs no quota.
+func TestConfigOrDefaultStarterWatchlists(t *testing.T) {
+	for id, want := range map[string]string{
+		"finance_stocks": `{"asset_class":"stock","symbols":["AAPL","MSFT","NVDA","AMZN","TSLA"]}`,
+		"finance_crypto": `{"asset_class":"crypto","symbols":["BTC/USD","ETH/USD"]}`,
+	} {
+		stored, _ := json.Marshal(configOrDefault(id, map[string]interface{}{}))
+		if string(stored) != want {
+			t.Errorf("%s stored %s, want %s", id, stored, want)
+		}
+	}
+}

@@ -692,14 +692,14 @@ function UtilityTiles({
 // ── First run ───────────────────────────────────────────────────
 
 // News first (SCROLLR-246, still 3 to fit the grid below — not a
-// redesign): it's the one starter with something on the bar the instant
-// it's added, no setup required. finance_stocks ships with `symbols: []`
-// (api/internal/platform/widgets.go) and sports_nfl needs a live game
-// window, so their blurbs say when something will actually show instead
-// of promising it's already there.
+// redesign): news and stocks both have something on the bar the instant
+// they're added (finance_stocks ships five starter symbols in
+// api/internal/platform/widgets.go, SCROLLR-259). sports_nfl needs a live
+// game window, so its blurb says when something will actually show
+// instead of promising it's already there.
 const STARTERS: { id: string; blurb: string }[] = [
   { id: "news_npr", blurb: "Headlines start scrolling right away." },
-  { id: "finance_stocks", blurb: "Pick your tickers, then quotes stream live." },
+  { id: "finance_stocks", blurb: "Five big tickers stream live right away." },
   { id: "sports_nfl", blurb: "Scores the moment kickoff happens." },
 ];
 
