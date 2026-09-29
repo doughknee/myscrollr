@@ -379,7 +379,8 @@ Lessons the Home session learned running this repo; every worker reads them.
   Sequin, so polling only). Same bundle as the app; only `src/dev/web.ts` stands in
   for Rust. Anything in the Rust layer (windows, monitors, tray, autostart, DPI)
   still needs the real app. Signing in needs a human: the login page is the real
-  Logto, not a local host. The dev backend runs the image tags in its Coolify env
-  (`CORE_API_TAG`, `FINANCE_TAG`, `SPORTS_TAG`, `RSS_TAG`); `:latest` proved stale
-  on 29 Sep (SCROLLR-253), so after a prod deploy set the new `sha-…` tag there
-  first, then `POST $COOLIFY_URL/api/v1/deploy?uuid=nul3d5vffjhnie0mh3xvy7pj&force=true`.
+  Logto, not a local host. The dev backend reads image tags from its Coolify env
+  (`CORE_API_TAG`, `FINANCE_TAG`, `SPORTS_TAG`, `RSS_TAG`; any unset one falls back
+  to `:latest`, and only CORE and SPORTS are set as of 30 Sep); `:latest` proved
+  stale on 29 Sep (SCROLLR-253), so after a prod deploy create or PATCH the new
+  `sha-…` tag there first (PATCH 404s on a key that does not exist yet), then `POST $COOLIFY_URL/api/v1/deploy?uuid=nul3d5vffjhnie0mh3xvy7pj&force=true`.
