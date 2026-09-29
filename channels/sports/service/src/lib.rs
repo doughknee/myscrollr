@@ -367,12 +367,18 @@ pub async fn poll_schedule(
             continue;
         }
 
+        // Every date answered, and none had a fixture: the league is between
+        // rounds (an international break is 2-3 weeks, the window is 8 days).
+        let mut all_answered = true;
+        let mut fixtures_seen = 0usize;
+
         for date in &dates {
             if !rate_limiter.try_consume(&league.name) {
                 warn!("[{}] Skipping schedule poll — per-league budget exhausted (reserved={}, shared={})",
                     league.name,
                     rate_limiter.reserved(&league.name),
                     rate_limiter.shared_remaining(&league.sport_api));
+                all_answered = false;
                 break;
             }
 
@@ -383,6 +389,7 @@ pub async fn poll_schedule(
             // to once-per-league or `last_poll_error` will lag a recovered poll.
             match poll_league(client, league, date, rate_limiter).await {
                 Ok(games) => {
+                    fixtures_seen += games.len();
                     let (upserted, failed, _) = upsert_games(pool, league, games).await;
                     total_upserted += upserted;
                     total_failed += failed;
@@ -390,11 +397,35 @@ pub async fn poll_schedule(
                 }
                 Err(PollError::Throttled(backoff)) => {
                     // The next 30-min cycle covers the same dates; nothing to record.
+                    all_answered = false;
                     warn!("[{}] Schedule poll for {} throttled — per-minute limit; backing off {}s",
                         league.name, date, backoff.as_secs());
                 }
                 Err(PollError::Other(e)) => {
+                    all_answered = false;
                     error!("[{}] Schedule poll error for {}: {}", league.name, date, e);
+                    crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
+                }
+            }
+        }
+
+        // SCROLLR-260: an empty window is not an empty league. Ask the one
+        // question the window cannot: what is next? One request per empty
+        // league per cycle (football only: the other hosts have no `next`).
+        if all_answered && fixtures_seen == 0 && league.sport_api == "football"
+            && rate_limiter.try_consume(&league.name)
+        {
+            match fetch_games(client, league, &build_next_url(league, NEXT_FIXTURES), rate_limiter).await {
+                Ok(games) => {
+                    let (upserted, failed, _) = upsert_games(pool, league, games).await;
+                    total_upserted += upserted;
+                    total_failed += failed;
+                }
+                Err(PollError::Throttled(backoff)) => {
+                    warn!("[{}] Next-fixtures poll throttled; backing off {}s", league.name, backoff.as_secs());
+                }
+                Err(PollError::Other(e)) => {
+                    error!("[{}] Next-fixtures poll error: {}", league.name, e);
                     crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
                 }
             }
@@ -1386,9 +1417,16 @@ pub async fn fetch_games(
 ///   - `"calendar"`      — YYYY, always the current calendar year (MLB, MLS, F1)
 fn compute_current_season(season_format: &str) -> String {
     let now = Utc::now();
-    let year = now.year();
-    let month = now.month();
+    season_for(season_format, now.year(), now.month())
+}
 
+/// [`compute_current_season`] for a given date, so the rollover is testable.
+///
+/// A league's `season` in `leagues.json` must NOT pin a year (SCROLLR-260):
+/// five pins of `"2025"` went stale in August 2026 and api-sports answered
+/// every date with an empty list for a season that had ended. Only a
+/// one-off tournament (FIFA World Cup) may pin.
+fn season_for(season_format: &str, year: i32, month: u32) -> String {
     match season_format {
         "cross-year" => {
             if month >= 10 { format!("{}-{}", year, year + 1) }
@@ -1440,6 +1478,18 @@ fn games_endpoint(league: &TrackedLeague) -> &'static str {
             "/games"
         }
     }
+}
+
+/// How many upcoming fixtures the empty-window fallback asks for: one full
+/// round of the biggest league (20 clubs, 10 matches).
+const NEXT_FIXTURES: u32 = 10;
+
+/// The football host's `?next=N`: a league's next N fixtures, whenever they
+/// are. `poll_schedule` uses it when its date window is empty.
+fn build_next_url(league: &TrackedLeague, n: u32) -> String {
+    let default_season = compute_current_season(league.season_format.as_deref().unwrap_or("calendar"));
+    let season = league.season.as_deref().unwrap_or(&default_season);
+    api_url(league, &format!("{}?league={}&season={}&next={}", games_endpoint(league), league.league_id, season, n))
 }
 
 /// Build the correct API URL for one league on one date.
@@ -2419,6 +2469,47 @@ mod tests {
         let order: Vec<&str> = interleave_by_host(&leagues).iter().map(|l| l.name.as_str()).collect();
         assert_eq!(order, ["NFL", "MLB", "KHL", "NCAA Football", "NPB"]);
         assert_eq!(interleave_by_host(&[]).len(), 0);
+    }
+
+    #[test]
+    fn season_rolls_over_when_the_league_says_it_does() {
+        // SCROLLR-260: handball on a pinned "2025" got 0 games all of Sept 2026.
+        assert_eq!(season_for("fall-august", 2026, 9), "2026");
+        assert_eq!(season_for("fall-august", 2027, 3), "2026");
+        assert_eq!(season_for("fall-august", 2026, 7), "2025");
+        assert_eq!(season_for("fall-october", 2026, 10), "2026");
+        assert_eq!(season_for("fall-october", 2026, 9), "2025");
+        assert_eq!(season_for("cross-year", 2026, 10), "2026-2027");
+        assert_eq!(season_for("cross-year", 2026, 9), "2025-2026");
+        assert_eq!(season_for("calendar", 2026, 1), "2026");
+    }
+
+    #[test]
+    fn no_shipped_league_pins_a_season_except_the_one_off_tournament() {
+        let leagues: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../configs/leagues.json")).expect("leagues.json parses");
+        let pinned: Vec<&str> = leagues.iter()
+            .filter(|l| l.get("season").is_some())
+            .filter_map(|l| l["name"].as_str())
+            .collect();
+        assert_eq!(pinned, ["FIFA World Cup"], "a pinned season goes stale silently");
+        // api-sports wants a bare start year on every host but basketball.
+        for l in &leagues {
+            if l["sport_api"] != "basketball" {
+                assert_ne!(l["season_format"], "cross-year", "{} would send YYYY-YYYY", l["name"]);
+            }
+        }
+    }
+
+    #[test]
+    fn next_fixtures_url_asks_the_football_host_for_the_next_round() {
+        let mut pl = league("Premier League", "football");
+        pl.season = None;
+        pl.season_format = Some("fall-august".to_string());
+        pl.league_id = 39;
+        let url = build_next_url(&pl, NEXT_FIXTURES);
+        assert!(url.starts_with("https://v1.football.api-sports.io/fixtures?league=39&season="), "{url}");
+        assert!(url.ends_with("&next=10"), "{url}");
     }
 
     #[test]
