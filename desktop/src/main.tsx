@@ -40,6 +40,9 @@ const queryClient = createQueryClient();
 startDevBus(getCurrentWindow().label, { qc: queryClient });
 
 initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
+  // SCROLLR-255: dev-only ticker jump detector. Dynamic import behind DEV so
+  // a release bundle contains none of it.
+  if (import.meta.env.DEV) void import("./dev/jumpDetector").then((m) => m.startJumpDetector(getCurrentWindow().label));
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <Sentry.ErrorBoundary fallback={SentryFallback}>
