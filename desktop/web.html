@@ -20,6 +20,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scrollr — web mode</title>
     <link rel="icon" href="data:," />
+    <!-- SCROLLR-254: same font preloads as index.html. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-400.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-500.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-600.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/plus-jakarta-sans-latin.woff2" />
     <style>
       html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #141420; }
       #root { width: 100%; height: 100%; }

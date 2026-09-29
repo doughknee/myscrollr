@@ -194,7 +194,7 @@ The marketing site is **statically prerendered** via `@tanstack/react-start` in 
 
 Components are rendered at build time in a Node environment. Any module-scope access to `window`, `document`, `localStorage`, or `navigator` will crash the prerender step. Wrap such access in `typeof window !== 'undefined'` checks or move into `useEffect` / event handlers. Decorative randomness must use `src/lib/seededRandom.ts` (Mulberry32) — `Math.random()` at module scope or render time causes hydration mismatches.
 
-**Desktop-specific**: Multi-page build: two HTML entry points (`index.html` for ticker, `app.html` for main window). Dark mode via `data-theme` attribute (dark is default). Tailwind uses `@source` directives and `@utility` custom utilities. Google Fonts CDN. Root route (`__root.tsx`) contains the entire app shell, state management, and context provider.
+**Desktop-specific**: Multi-page build: two HTML entry points (`index.html` for ticker, `app.html` for main window). Dark mode via `data-theme` attribute (dark is default). Tailwind uses `@source` directives and `@utility` custom utilities. Fonts are self-hosted in `public/fonts/` (`font-display: block`, no CDN; `main.tsx` holds the ticker mount on `lib/fonts.ts`). Root route (`__root.tsx`) contains the entire app shell, state management, and context provider.
 
 ## Code Style — Go
 

@@ -15,10 +15,10 @@ export const FIXTURES = ["default", "busy", "longnames"] as const;
  * font, and park the mouse at the bottom of the viewport so the hover
  * factor (default `onHover: "slow"`) cannot touch the bar.
  *
- * The font wait is what makes width checks deterministic (SCROLLR-230):
- * style.css imports IBM Plex Mono from Google Fonts, so the first paint is
- * in Consolas and every chip grows ~6% when Plex lands 80-300 ms later.
- * A width sampled before that swap is compared against one after it.
+ * The font wait made width checks deterministic (SCROLLR-230): style.css
+ * used to import IBM Plex Mono from Google Fonts, so the first paint was in
+ * Consolas and every chip grew ~6% when Plex landed. The fonts are bundled
+ * now (SCROLLR-254) and the mount waits for them; the wait stays as a guard.
  */
 export async function openShim(page: Page, query = "") {
   await page.goto(`/ticker-shim.html${query}`);
