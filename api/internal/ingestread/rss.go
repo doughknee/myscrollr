@@ -435,7 +435,7 @@ func rssLifecycle(event, userSub string, config, oldConfig map[string]interface{
 // and a legacy coarse 'rss'/'news' row may still exist. Gather them all.
 func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT config FROM user_widgets
+		SELECT widget_type, config FROM user_widgets
 		WHERE logto_sub = $1
 		  AND (widget_type LIKE 'news\_%'
 		       OR widget_type LIKE 'rss\_%')
@@ -447,15 +447,16 @@ func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 	seen := make(map[string]bool)
 	var urls []string
 	for rows.Next() {
+		var widgetType string
 		var configJSON []byte
-		if err := rows.Scan(&configJSON); err != nil {
+		if err := rows.Scan(&widgetType, &configJSON); err != nil {
 			continue
 		}
 		var config map[string]interface{}
 		if err := json.Unmarshal(configJSON, &config); err != nil {
 			continue
 		}
-		for _, u := range platform.ExtractFeedURLsFromConfig(config) {
+		for _, u := range widgetFeedURLs(widgetType, config) {
 			if !seen[u] {
 				seen[u] = true
 				urls = append(urls, u)
@@ -463,6 +464,16 @@ func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 		}
 	}
 	return urls
+}
+
+// widgetFeedURLs is the feed URLs a widget row serves. A row whose config
+// carries none (the first-run default widget was created with {}, SCROLLR-252)
+// falls back to its catalog entry's DefaultConfig, so it still serves its feed.
+func widgetFeedURLs(widgetType string, config map[string]interface{}) []string {
+	if urls := platform.ExtractFeedURLsFromConfig(config); len(urls) > 0 {
+		return urls
+	}
+	return platform.ExtractFeedURLsFromConfig(platform.DefaultConfigFor(widgetType))
 }
 
 // queryRSSItems fetches the latest RSS items for the given feed URLs.

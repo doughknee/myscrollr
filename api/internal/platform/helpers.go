@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"encoding/json"
 	"os"
 	"regexp"
 	"strings"
@@ -104,4 +105,26 @@ func SetCORSHeaders(c *fiber.Ctx) {
 			break
 		}
 	}
+}
+
+// DefaultConfigFor returns the catalog's DefaultConfig for a widget type as
+// the JSON-decoded shape a stored config has (map[string]interface{} with
+// []interface{} lists), so the Extract* helpers can read it. The catalog
+// literals are Go-typed ([]map[string]string), which those helpers' type
+// assertions do not match, hence the round trip. Returns nil when the type has
+// no catalog entry or no default.
+func DefaultConfigFor(widgetType string) map[string]interface{} {
+	def, ok := WidgetByID(widgetType)
+	if !ok || len(def.DefaultConfig) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(def.DefaultConfig)
+	if err != nil {
+		return nil
+	}
+	var out map[string]interface{}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return nil
+	}
+	return out
 }
