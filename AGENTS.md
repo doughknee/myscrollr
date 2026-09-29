@@ -372,3 +372,12 @@ Lessons the Home session learned running this repo; every worker reads them.
   console action. `docs/cdc-runbook.md` has the topology.
 - **Kubernetes collapses `$$` to `$` in pod env values.** A psql script passed
   through `env` cannot use `DO $$ … $$` blocks; use plain SQL.
+- **Verify webview changes in web mode, not in the Tauri app** (SCROLLR-249/250,
+  29 Sep 2026): `make setup DEV_API=remote` then `cd desktop && npm run web` opens
+  `http://localhost:5190/web.html` with the real ticker and main window against the
+  always-on dev backend `https://dev-api.myscrollr.com` (keyless, seeded, moving; no
+  Sequin, so polling only). Same bundle as the app; only `src/dev/web.ts` stands in
+  for Rust. Anything in the Rust layer (windows, monitors, tray, autostart, DPI)
+  still needs the real app. Signing in needs a human: the login page is the real
+  Logto, not a local host. Redeploy the dev backend with
+  `POST $COOLIFY_URL/api/v1/deploy?uuid=nul3d5vffjhnie0mh3xvy7pj&force=true`.
