@@ -11,8 +11,8 @@
  * sort order) to work on the feed but not the ticker prior to this module.
  */
 import type { RssItem } from "../../types";
-import { rotateSlots, type RotationMemo } from "../ticker";
-import { plainText } from "../../utils/rssText";
+import { rotateSlots, widest, type RotationMemo, type TickerStatus } from "../ticker";
+import { plainText, sourceTab } from "../../utils/rssText";
 import { migrateRssDisplay, type RssDisplayPrefs } from "../../preferences";
 
 export type RssSortOrder = "newest" | "oldest";
@@ -117,6 +117,23 @@ export function selectRssForTicker(items: RssItem[], now: number = Date.now()): 
     for (const l of lists) if (i < l.length) out.push(l[i]);
   }
   return out;
+}
+
+/**
+ * What a news widget says when nothing it holds is inside the floor
+ * (SCROLLR-264, CHIP_SPEC §8.7). A feed cannot say when it will publish,
+ * so this only says what is true: nothing in the floor's window, or
+ * nothing at all yet. `name` is the feed (or widget) name for the tab.
+ */
+export function rssTickerStatus(items: RssItem[], name: string): TickerStatus {
+  const days = TICKER_RSS_FLOOR_HOURS / 24;
+  const quiet = `no headlines in the last ${days} days`;
+  const none = "no headlines yet";
+  return {
+    tab: sourceTab(name),
+    text: items.length > 0 ? quiet : none,
+    reserve: widest([quiet, none]),
+  };
 }
 
 /** One rail position for headlines. */

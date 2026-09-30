@@ -7,9 +7,13 @@ import {
   SPORTS_WINDOW_DEFAULTS,
   SPORTS_WINDOW_MAX_DAYS,
   SPORTS_WINDOW_MAX_DAYS_AHEAD,
+  sportsTickerStatus,
 } from "./view";
+import { statusDate, widestStatusDate } from "../ticker";
+import { leagueCode } from "../../utils/gameHelpers";
 import type { SportsDisplayConfig } from "./view";
 import type { Game } from "../../types";
+import type { LeagueMeta } from "../../api/queries";
 
 // ── Fixtures ────────────────────────────────────────────────────
 
@@ -580,5 +584,58 @@ describe("widestShortName", () => {
 
   it("is the empty string for an empty class", () => {
     expect(widestShortName([], (g) => g.home_team_name)).toBe("");
+  });
+});
+
+// ── Status chip (SCROLLR-264, CHIP_SPEC §8.7) ─────────────────────
+
+describe("sportsTickerStatus", () => {
+  const DAY = 86_400_000;
+  const T = NOW.getTime();
+  const meta = (o: Partial<LeagueMeta> = {}): LeagueMeta => ({
+    name: "Premier League",
+    is_offseason: false,
+    next_game: null,
+    polling_healthy: true,
+    ...o,
+  });
+  const at = (ms: number) => new Date(T + ms).toISOString();
+
+  it("names the next match past the floor, from sports_meta", () => {
+    const s = sportsTickerStatus([], [meta({ next_game: at(10 * DAY) })], ["Premier League"], T)!;
+    expect(s.tab).toBe(leagueCode("Premier League"));
+    expect(s.text).toBe(`next match ${statusDate(T + 10 * DAY, true)}`);
+  });
+
+  it("takes the sooner of meta and a payload row, and ignores a past date", () => {
+    const row = mk({ id: 1, league: "NFL", state: "pre", start_time: at(9 * DAY) });
+    const s = sportsTickerStatus([row], [meta({ name: "NFL", next_game: at(-2 * 3_600_000) })], ["NFL"], T)!;
+    expect(s.text).toBe(`next game ${statusDate(T + 9 * DAY, true)}`);
+  });
+
+  it("says the season start when every league is off-season", () => {
+    const s = sportsTickerStatus([], [meta({ name: "NBA", is_offseason: true, next_game: at(20 * DAY) })], ["NBA"], T)!;
+    expect(s.text).toBe(`season starts ${statusDate(T + 20 * DAY, false)}`);
+  });
+
+  it("says off-season and nothing more when no date is known", () => {
+    expect(sportsTickerStatus([], [meta({ name: "NBA", is_offseason: true })], ["NBA"], T)!.text).toBe("off-season");
+  });
+
+  it("in season with nothing scheduled invents no date", () => {
+    expect(sportsTickerStatus([], [meta()], ["Premier League"], T)!.text).toBe("no matches scheduled");
+    expect(sportsTickerStatus([], [meta({ name: "Formula 1" })], ["Formula 1"], T)!.text).toBe("no races scheduled");
+  });
+
+  it("reserves the widest message it can show, whatever it shows now", () => {
+    const quiet = sportsTickerStatus([], [meta({ is_offseason: true })], ["Premier League"], T)!;
+    const dated = sportsTickerStatus([], [meta({ next_game: at(10 * DAY) })], ["Premier League"], T)!;
+    expect(quiet.reserve).toBe(dated.reserve);
+    expect(quiet.reserve.length).toBeGreaterThanOrEqual(dated.text.length);
+    expect(quiet.reserve).toBe(`next match ${widestStatusDate(true)}`);
+  });
+
+  it("returns null for a widget with no league at all", () => {
+    expect(sportsTickerStatus([], [], [], T)).toBeNull();
   });
 });

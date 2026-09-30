@@ -3,7 +3,7 @@ import RssChip from "../../components/chips/RssChip";
 import { chipUrlForRss } from "../../utils/chipUrl";
 import type { TickerChip, TickerContext, TickerSource } from "../ticker";
 import { scopedRows, dropPinned } from "../ticker";
-import { selectRssForTicker, arrangeRssSlots } from "./view";
+import { selectRssForTicker, arrangeRssSlots, rssTickerStatus } from "./view";
 import { catalogItemById } from "../../marketplace";
 
 /**
@@ -81,6 +81,16 @@ export const rssTickerSource: TickerSource = {
         />
       ),
     };
+  },
+
+  status(raw: unknown, ctx: TickerContext) {
+    if (!Array.isArray(raw)) return null;
+    const config = ctx.dashboard?.widgets?.find((w) => w.widget_type === ctx.tab)
+      ?.config as { feeds?: Array<{ name?: string }> } | undefined;
+    const feeds = config?.feeds ?? [];
+    // One feed: its own name, as its headline chips tab it. Several: the widget's.
+    const name = (feeds.length === 1 && feeds[0].name) || catalogItemById(ctx.tab)?.name || ctx.tab;
+    return rssTickerStatus(scopedRows<RssItem>(raw, ctx), name);
   },
 
   subjects(raw: unknown, ctx: TickerContext) {

@@ -109,7 +109,58 @@ export interface TickerSource {
    * pin without a chip under the cursor (the widget page, the sidebar).
    */
   subjects?(raw: unknown, ctx: TickerContext): Array<{ subject: string; label: string }>;
+  /**
+   * What the widget says when `chips()` returned nothing (SCROLLR-264,
+   * CHIP_SPEC §8.7): why it is quiet and, when the data knows, when it
+   * will not be. Null when there is nothing honest to say.
+   */
+  status?(raw: unknown, ctx: TickerContext): TickerStatus | null;
 }
+
+/** The one status chip an empty widget puts on the rail (§8.7). */
+export interface TickerStatus {
+  /** The tab, as the widget's real chips name it (league code, feed tab). */
+  tab: string;
+  text: string;
+  /**
+   * The widest text this widget's status can ever show, so the chip holds
+   * one width from first render whichever message it is on (§4.1).
+   */
+  reserve: string;
+}
+
+/** The longest of several strings; status text is mono, so length is width. */
+export function widest(texts: readonly string[]): string {
+  return texts.reduce((a, b) => (b.length > a.length ? b : a), "");
+}
+
+const STATUS_DAY: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
+const STATUS_DAY_TIME: Intl.DateTimeFormatOptions = { ...STATUS_DAY, hour: "numeric", minute: "2-digit" };
+
+/**
+ * A date on a status chip, in the user's locale ("Sat 10 Oct, 12:30" /
+ * "Sat, Oct 10, 12:30 PM"). `withTime` adds the kick-off time.
+ */
+export function statusDate(ms: number, withTime: boolean): string {
+  return new Date(ms).toLocaleString(undefined, withTime ? STATUS_DAY_TIME : STATUS_DAY);
+}
+
+/**
+ * The widest `statusDate` this locale produces: every month and weekday,
+ * a two-digit day, a two-digit afternoon hour. Measured once per shape.
+ */
+export function widestStatusDate(withTime: boolean): string {
+  const key = withTime ? 1 : 0;
+  if (widestDates[key] === undefined) {
+    const samples: string[] = [];
+    for (let m = 0; m < 12; m++) {
+      for (let d = 22; d <= 28; d++) samples.push(statusDate(new Date(2026, m, d, 22, 59).getTime(), withTime));
+    }
+    widestDates[key] = widest(samples);
+  }
+  return widestDates[key]!;
+}
+const widestDates: [string?, string?] = [];
 
 /**
  * Drop pinned subjects from a pool before it rotates.

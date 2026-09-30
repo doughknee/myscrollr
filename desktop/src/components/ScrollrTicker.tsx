@@ -39,7 +39,9 @@ import {
 import { catalogItemById, sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
-import { rotateSlots, type RotationMemo } from "../datawidgets/ticker";
+import StatusChip from "./chips/StatusChip";
+import { rotateSlots, type RotationMemo, type TickerContext, type TickerStatus } from "../datawidgets/ticker";
+import { sourceTab } from "../utils/rssText";
 import { stepItemIndex } from "./tickerStep";
 import { advanceCycles, visibleSlots } from "./tickerRotation";
 import { WIDGET_ORDER } from "../widgets/registry";
@@ -267,11 +269,26 @@ const CAPPED_WIDGET_SLOTS = 4;
 
 /** Round-robin interleave across buckets:
  *  bucket0[0], bucket1[0], bucket2[0], bucket0[1], bucket1[1], ... */
-/** Sorted, deduplicated `data-widget` ids of the chips a screen renders. */
+/**
+ * The status of a source with no `status()` of its own (finance today):
+ * true, if unspecific. Sports and news say why and when (§8.7).
+ */
+function genericStatus(tab: string): TickerStatus {
+  const text = "nothing to show right now";
+  return { tab: sourceTab(catalogItemById(tab)?.name ?? tab), text, reserve: text };
+}
+
+/**
+ * Sorted, deduplicated `data-widget` ids of the chips a screen renders.
+ * A status chip (§8.7) does not count: the widget is on the bar, but it
+ * is not showing anything, which is what presence measures.
+ */
 export function displayedWidgetTypes(nodes: React.ReactNode[]): string[] {
   const ids = new Set<string>();
   for (const node of nodes) {
-    const id = (node as React.ReactElement<{ "data-widget"?: string }> | null)?.props?.["data-widget"];
+    const props = (node as React.ReactElement<{ "data-widget"?: string; "data-status"?: string }> | null)?.props;
+    if (props?.["data-status"] !== undefined) continue;
+    const id = props?.["data-widget"];
     if (typeof id === "string" && id !== "") ids.add(id);
   }
   return [...ids].sort();
@@ -426,7 +443,7 @@ export default function ScrollrTicker({
       const tickerSource = TICKER_SOURCES[effectiveSource];
       if (!tickerSource) continue;
 
-      for (const chip of tickerSource.chips(rawData, {
+      const ctx: TickerContext = {
         tab,
         source: effectiveSource,
         dashboard,
@@ -437,10 +454,39 @@ export default function ScrollrTicker({
         rotationMemo: rotationMemoRef.current,
         pinnedSubjects,
         onChipClick,
-      })) {
+      };
+      for (const chip of tickerSource.chips(rawData, ctx)) {
         bucket.push(
           wrap(tab, chip.key, chip.node, chip.rotateSlot, chip.subject, chip.pinLabel),
         );
+      }
+
+      // No silent empty widgets (SCROLLR-264, CHIP_SPEC §8.7): a widget
+      // with nothing on the tape and nothing in the fixed zone gets ONE
+      // status chip saying why. Only once the dashboard is in -- before
+      // that nothing is known -- and never a pin or a rotating slot.
+      if (bucket.length === 0 && dashboard && Array.isArray(rawData)) {
+        const pinShows = [...(pinnedSubjects ?? [])].some(
+          (subject) => !!tickerSource.pinnedChip?.(rawData, { ...ctx, pinnedSubject: subject }),
+        );
+        const status = pinShows
+          ? null
+          : tickerSource.status
+            ? tickerSource.status(rawData, ctx)
+            : genericStatus(tab);
+        if (status) {
+          bucket.push(
+            <div key={`status-${tab}`} className="py-1" data-chip="" data-widget={tab} data-status="">
+              <StatusChip
+                tab={status.tab}
+                text={status.text}
+                reserve={status.reserve}
+                comfort={comfort}
+                onClick={() => onChipClick?.(tab, tab)}
+              />
+            </div>,
+          );
+        }
       }
 
       // Only push a bucket that actually has chips in it.

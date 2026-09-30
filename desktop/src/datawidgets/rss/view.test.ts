@@ -7,6 +7,7 @@ import {
   TICKER_RSS_FLOOR_HOURS,
   TICKER_RSS_SLOTS,
   arrangeRssSlots,
+  rssTickerStatus,
 } from "./view";
 import type { RssItem } from "../../types";
 
@@ -297,5 +298,23 @@ describe("arrangeRssSlots", () => {
     expect(s0.reserveTitle).toBe("Tiny".length > "Short one".length ? "Tiny" : "Short one"); // class: 1, 4
     expect(s1.reserveTitle).toBe("The longest headline of the whole set, by some distance"); // class: 2, 5
     expect(s2.reserveTitle).toBe("Mid-length headline here"); // class: 3
+  });
+});
+
+// ── Status chip (SCROLLR-264, CHIP_SPEC §8.7) ─────────────────────
+
+describe("rssTickerStatus", () => {
+  it("says how long the feed has been quiet, from the floor constant", () => {
+    const s = rssTickerStatus([mk(1, "PBS")], "The Hollywood Reporter");
+    expect(s.tab).toBe("HOLLYWOOD");
+    expect(s.text).toBe(`no headlines in the last ${TICKER_RSS_FLOOR_HOURS / 24} days`);
+  });
+
+  it("says a feed that never published has nothing yet, at the same width", () => {
+    const none = rssTickerStatus([], "PBS NewsHour");
+    const quiet = rssTickerStatus([mk(1, "PBS")], "PBS NewsHour");
+    expect(none.text).toBe("no headlines yet");
+    expect(none.reserve).toBe(quiet.reserve);
+    expect(none.reserve).toBe(quiet.text);
   });
 });

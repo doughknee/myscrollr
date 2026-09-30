@@ -9,10 +9,12 @@ import {
   arrangeTickerSlots,
   gamesForTeam,
   widestShortName,
+  sportsTickerStatus,
   TICKER_SLOTS,
 } from "./view";
 import { teamShortName } from "../../utils/teamShortName";
 import { catalogItemById } from "../../marketplace";
+import type { LeagueMeta } from "../../api/queries";
 
 /**
  * Sports ticker chips.
@@ -108,6 +110,14 @@ export const sportsTickerSource: TickerSource = {
         />
       ),
     };
+  },
+
+  status(raw: unknown, ctx: TickerContext) {
+    if (!Array.isArray(raw)) return null;
+    const meta = (ctx.dashboard?.data?.sports_meta?.leagues ?? []) as LeagueMeta[];
+    const config = ctx.dashboard?.widgets?.find((w) => w.widget_type === ctx.tab)
+      ?.config as { leagues?: string[] } | undefined;
+    return sportsTickerStatus(scopedRows<Game>(raw, ctx), meta, config?.leagues ?? []);
   },
 
   subjects(raw: unknown, ctx: TickerContext) {

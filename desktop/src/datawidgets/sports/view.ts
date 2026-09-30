@@ -9,9 +9,18 @@
  * SINGLE SOURCE OF TRUTH for Sports display prefs.
  */
 import type { Game } from "../../types";
-import { isLive, isCloseGame } from "../../utils/gameHelpers";
+import { isLive, isCloseGame, leagueCode } from "../../utils/gameHelpers";
 import { teamShortName } from "../../utils/teamShortName";
-import { rotateSlots, type RotationMemo } from "../ticker";
+import { reservationFor } from "../../utils/sportsChipLayout";
+import {
+  rotateSlots,
+  statusDate,
+  widest,
+  widestStatusDate,
+  type RotationMemo,
+  type TickerStatus,
+} from "../ticker";
+import type { LeagueMeta } from "../../api/queries";
 import { migrateVenue } from "../../preferences";
 
 // ── Display prefs shape (mirrors server-side widget config.display) ─
@@ -461,4 +470,59 @@ export function gamesForTeam(
     // Upcoming: soonest first. Finals: most recent first.
     return bucket(a) === 2 ? at(b) - at(a) : at(a) - at(b);
   });
+}
+
+/**
+ * What a league widget says when the rail has nothing of it (SCROLLR-264,
+ * CHIP_SPEC §8.7): the next fixture past the floor, or why there is none.
+ *
+ * The date is `sports_meta.next_game` (the server's earliest `pre` for the
+ * league over the whole `games` table, not just the payload) or a `pre`
+ * row the payload carries, whichever is sooner and still ahead of `now`.
+ * Nothing known means no date: "off-season" when the league's calendar
+ * says so, otherwise "no games scheduled". Never an invented date.
+ */
+export function sportsTickerStatus(
+  rows: Game[],
+  meta: readonly LeagueMeta[],
+  leagues: readonly string[],
+  now: number = Date.now(),
+): TickerStatus | null {
+  const names = leagues.length > 0 ? leagues : [...new Set(rows.map((g) => g.league))];
+  if (names.length === 0) return null;
+  const mine = meta.filter((m) => names.includes(m.name));
+
+  const times = [
+    ...mine.map((m) => (m.next_game ? Date.parse(m.next_game) : NaN)),
+    ...rows.filter((g) => g.state === "pre").map((g) => Date.parse(g.start_time)),
+  ].filter((t) => Number.isFinite(t) && t > now);
+  const next = times.length > 0 ? Math.min(...times) : null;
+
+  // Every league the widget follows is between seasons by its own
+  // calendar, so the next fixture is the season start.
+  const offseason = mine.length > 0 && mine.every((m) => m.is_offseason);
+  const league = names[0];
+  const [noun, nouns] =
+    league === "Formula 1" ? ["race", "races"]
+    : reservationFor(league).draws ? ["match", "matches"]
+    : ["game", "games"];
+
+  const text =
+    next !== null
+      ? offseason
+        ? `season starts ${statusDate(next, false)}`
+        : `next ${noun} ${statusDate(next, true)}`
+      : offseason
+        ? "off-season"
+        : `no ${nouns} scheduled`;
+  return {
+    tab: leagueCode(league),
+    text,
+    reserve: widest([
+      text,
+      `next ${noun} ${widestStatusDate(true)}`,
+      `season starts ${widestStatusDate(false)}`,
+      `no ${nouns} scheduled`,
+    ]),
+  };
 }

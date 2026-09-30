@@ -128,7 +128,9 @@ it. Nothing on the ticker can be misconfigured because nothing on it is configur
    day; results from the last eighteen hours; headlines from the last six hours; your
    watchlist.
 2. **A quiet source still gets one chip** — its next fixture, its latest headline — as
-   long as that isn't stale. A dead source shows nothing.
+   long as that isn't stale. A source with nothing even then gets one grey chip saying
+   why and, when we know, when: "EPL · next match Sat 10 Oct", "NBA · off-season",
+   "PBS · no headlines in the last 2 days". Never a made-up date.
 3. **Each kind of thing gets a fixed number of places.** Four games per league, three
    headlines, four symbols. Those numbers are chosen once, from how wide the chip is and
    how much that source produces.

@@ -30,6 +30,7 @@ checklist) literally.
 | **horizon** | The per-source time rule deciding what is eligible. |
 | **floor** | What a quiet source still shows when nothing is inside its horizon — one item for most sources, the whole next matchday for Sports (§8.1). |
 | **palette** | The `ChipColors` object for a chip's colour mode and widget. |
+| **status chip** | The single grey chip a widget with nothing on the rail shows instead: why, and when if known (§8.7). |
 | **source** | A `TickerSource` in `desktop/src/datawidgets/<source>/ticker.tsx`, registered in `tickerRegistry.ts`. |
 
 ---
@@ -54,6 +55,7 @@ checklist) literally.
 | File | Exports you use | Purpose |
 |---|---|---|
 | `desktop/src/components/chips/chipColors.ts` | `getChipColors(mode, widget): ChipColors`, `chipShellClasses(colors, extra?)`, `chipBaseClasses(...)`, `stableNum(chars)`, `NUM_WIDTH` | Palettes and the shell. |
+| `desktop/src/components/chips/StatusChip.tsx` | `StatusChip({tab, text, reserve, comfort?, onClick?})` | The one chip an empty widget shows (§8.7). |
 | `desktop/src/components/chips/ChipCap.tsx` | `ChipCap`, `cappedChipClasses`, `CapTone` | Status cap for uptime/GitHub. |
 | `desktop/src/components/chips/Sparkline.tsx` | `Sparkline({points, height?, className?})` | viewBox 100×30, `preserveAspectRatio="none"`, `flex-1`, `stroke="currentColor"`. Draws nothing below 2 points. |
 | `desktop/src/components/chips/metricHistory.ts` | `recordMetric(id, value, now?)`, `__resetMetricHistory()` | Ring buffer for sysmon, 32 points, 500ms tick guard. |
@@ -91,7 +93,11 @@ export interface TickerContext {
   cycles?: Readonly<Record<string, number>>;   // per-slot lap counts
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
 }
-export interface TickerSource { chips(raw: unknown, ctx: TickerContext): TickerChip[]; }
+export interface TickerSource {
+  chips(raw: unknown, ctx: TickerContext): TickerChip[];
+  pinnedChip?(raw: unknown, ctx: TickerContext): TickerChip | null;   // §8.5
+  status?(raw: unknown, ctx: TickerContext): TickerStatus | null;     // §8.7
+}
 export function scopedRows<T>(raw: unknown, ctx: TickerContext): T[];   // widget-scoped rows
 export function rotateSlots<T, R>(
   pool: T[], slots: number, cycles: Readonly<Record<string, number>>,
@@ -629,6 +635,47 @@ there is no subject in it to translate to.
 
 - A short item sharing a slot with a long one carries the long one's width.
 - Full coverage takes `ceil(pool/slots)` laps.
+
+### 8.7 The status chip (no silent empty widgets)
+
+SCROLLR-264. A widget on the ticker that contributes nothing is invisible, and the user
+cannot tell "working, nothing now" from "broken". So it says so, once.
+
+**Trigger** (`ScrollrTicker.tsx`, data-widget branch): the tab's `chips()` returned `[]`,
+the dashboard has loaded (`dashboard != null`), the source's payload is an array, and none
+of the widget's pins resolves to a chip in the fixed zone. Then exactly ONE chip, keyed
+`status-${tab}`, wrapped with `data-chip data-widget={tab} data-status` and no
+`data-rotate-slot` / `data-pin-subject`. It is not a slot, it does not rotate, it is not a
+pin target, and `displayedWidgetTypes` does not count it (presence measures data shown).
+It disappears on the render where `chips()` returns anything. Utilities (clock, timer,
+weather, sysmon, uptime, GitHub) are out of scope: their emptiness is setup, not time.
+
+**Text** (`TickerSource.status(raw, ctx) → TickerStatus {tab, text, reserve}`):
+
+| Source | Tab | Text, first that applies |
+|---|---|---|
+| Sports (`sportsTickerStatus`) | `leagueCode(league)` | a future date from `sports_meta.next_game` or a payload `pre` row (sooner wins): every league off-season → `season starts <day>`, else `next match\|game\|race <day, time>`; no date, all off-season → `off-season`; else `no matches\|games\|races scheduled` |
+| News (`rssTickerStatus`) | `sourceTab(feed name)` (one feed) or the catalog name | rows but none in the floor → `no headlines in the last 2 days` (from `TICKER_RSS_FLOOR_HOURS`); no rows → `no headlines yet` |
+| Any other source | `sourceTab(catalog name)` | `nothing to show right now` |
+
+Noun: `race` for Formula 1, `match` where `reservationFor(league).draws`, else `game`. Dates
+are `statusDate` (`ticker.ts`): the user's locale, `weekday short, day, month short` plus
+`hour, 2-digit minute` for a kick-off. Never a fabricated value (§1.7): a league with no known
+fixture says "off-season" or "no … scheduled" and nothing more.
+
+**Chip** (`chips/StatusChip.tsx`): `chipShellClasses` + `grid max-w-[640px]
+grid-cols-[max-content_minmax(0,max-content)]`, rows as §3.3. Tab as §3.5 with the
+`subtle` palette's `divider`/`tabBg`/`text` in every colour mode, so it reads as the bar
+speaking, not as the widget's data. Text `font-mono text-[12px] font-medium leading-none`
++ `textDim`, `text-left`, `min-w-0 truncate`. No fixed right cell (nothing on it ticks) and
+no detail row content: detailed mode adds the empty 20px row, because anything there would
+restate the top row (§1.3).
+
+**Reservation**: `reserve` is the widest text that widget's status can show (every template,
+with `widestStatusDate` = the widest date the locale produces over all months and weekdays),
+rendered as a hidden sizer in column 2 (§4.1 rule 3). So the chip is one width from first
+render whichever message it is on; verified by `e2e/ticker/status.spec.ts` (`idle` fixture).
+Cost accepted: "off-season" carries the width of a dated message.
 
 ---
 

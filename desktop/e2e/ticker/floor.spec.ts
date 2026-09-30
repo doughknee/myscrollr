@@ -9,8 +9,8 @@ test.describe.configure({ retries: 0 });
  * CHIP_SPEC §8.1, the floors. With nothing inside any horizon the bar is
  * not empty: Sports shows the next matchday -- every `pre` on the local
  * calendar day of the soonest one within 7 days, and nothing else; News
- * shows a feed's newest item if it is under 48 h old, and nothing for a
- * feed whose newest is older.
+ * shows a feed's newest item if it is under 48 h old, and for a feed whose
+ * newest is older, no headline -- only its status chip (§8.7).
  *
  * The `quiet` fixture holds 4 games three days out, 4 the day after, one
  * eight days out; a Guardian feed whose newest is 30 h old and a PBS feed
@@ -47,6 +47,8 @@ test("[quiet] the bar shows the next matchday and the fresh feed's headline, not
   await expect(fresh).toHaveCount(1);
   await expect(fresh).toContainText(guardian[0].title.slice(0, 40));
 
-  await expect(page.locator('.ticker-item [data-widget="news_pbs"]')).toHaveCount(0);
-  expect(pbs.length).toBeGreaterThan(0); // the feed is in the fixture; the floor left it off
+  // The floor left PBS's headlines off; the widget says so instead (§8.7).
+  expect(pbs.length).toBeGreaterThan(0);
+  await expect(page.locator('.ticker-item [data-widget="news_pbs"]:not([data-status])')).toHaveCount(0);
+  await expect(page.locator('.ticker-item [data-status][data-widget="news_pbs"]')).toHaveCount(1);
 });
