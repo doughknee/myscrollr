@@ -590,8 +590,23 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.9 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.10 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.10 — Something on your bar from the first second (`desktop-v1.6.10`, 2026-09-30)
+
+#### New
+
+- **Your bar has something on it from the first second.** A brand-new account now starts with NPR headlines scrolling the moment you sign in, instead of an empty bar asking you to add a source. Remove it whenever you like; it won't come back.
+- **Stocks and Crypto work the moment you add them.** Stocks now starts with Apple, Microsoft, Nvidia, Amazon and Tesla, and Crypto with Bitcoin and Ethereum. Swap them for your own anytime.
+
+#### Fixes
+
+- **No more surprise sign-outs.** Some of you were being signed out every few days, especially with the bar on more than one monitor. The app's windows were racing each other to renew your session; now only one of them does it.
+- **The bar no longer jumps when it starts.** Scrollr's fonts now ship inside the app instead of loading from the internet, so the bar draws once, at the right size, even offline.
+- **European football is back.** Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and Champions League fixtures had disappeared during the international break; they're back, along with handball and rugby. (This one was fixed on our servers last night, so you already have it.)
+
+Update from the app or at https://myscrollr.com/download.
 
 ### Scrollr 1.6.9 — Trimmed down, Linux sign-in fixed (`desktop-v1.6.9`, 2026-09-27)
 
@@ -695,32 +710,3 @@ Two things stayed deliberately the same:
 - **Nothing changed about live games or recent results.** Live is always on the bar, finished games stay for eighteen hours, and anything kicking off within a day is on as before.
 
 There is no new setting for this. What appears on the bar is not something you configure, and this is a better rule rather than another dial.
-
-### Scrollr 1.6.2 — Pin what matters (`desktop-v1.6.2`, 2026-09-08)
-
-A release about three things that should have been simpler than they were: pinning, more than one monitor, and what happens when your session quietly dies.
-
-#### 📌 Pin what matters
-
-**A pin is one chip that stays put.** Pin your team and the fixed zone shows their game, live now or next up, even when it is days out and the tape would not carry it yet. Pin a symbol, a feed, a market or the clock the same way. A pinned thing leaves the scrolling tape, so it is never on the bar twice.
-
-**Two pins, on purpose.** We measured real chip widths against the narrowest bar we support, and two is what fits while leaving the tape room to scroll. Past two, a pin is refused rather than quietly evicting one of yours.
-
-**New widgets stop pinning themselves.** Until now a widget you added parked itself in the corner, which is why people asked where it went. It now joins the tape like everything else, and the app tells you what was added.
-
-**The pin control moved.** It used to be an icon that appeared when you hovered a chip that was scrolling past. It now lives on the bar's right-click menu, on each widget's own page, and on the sidebar row for single-chip widgets.
-
-One honest note: pins you had on a sports, finance or news widget as a whole are dropped by this update, because they meant "park this widget's first few chips" and froze the rest out of rotation. Pin the team or symbol you actually want instead.
-
-#### 🖥️ One live connection, however many monitors
-
-Since 1.6.0 each bar you put on a monitor was opening and closing the app's one live connection in turn, which is why some of you saw "Live updates paused" that never went away, and why the tray's Show ticker click did nothing with two bars up. One window owns the connection now, ownership hands over when a screen is added or removed, and the bar keeps streaming with the main window closed to the tray.
-
-#### 🔑 A dead session says so
-
-If your sign-in expired in the background, every change you made failed with a vague error while the app kept looking healthy, and the only way out was a reinstall. Now the app notices, tells you, and one click on Sign in puts you back where you were. No reinstall, nothing lost.
-
-#### 🐛 Fixes
-
-- Baseball statuses that arrive as a code now read as an inning in every chip, and a postponed game reads "PPD".
-- Error messages for widget changes now say what actually went wrong.
