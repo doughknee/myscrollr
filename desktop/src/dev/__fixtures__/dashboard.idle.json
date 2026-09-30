@@ -1,0 +1,138 @@
+{
+  "_note": "SCROLLR-264 idle: three on-ticker widgets that contribute no chip, so each must show ONE status chip (CHIP_SPEC §8.7). Premier League: its only fixture is 10 days out (the international-break shape SCROLLR-260 stores), past the 7-day floor; sports_meta.next_game names it. The fixture is REPRESENTATIVE, not a seed row: the seed holds no Premier League game (it was captured in a break); the teams and crest URLs are the seed's teams rows. NBA: off-season by the seed's tracked_leagues offseason_months {7,8,9}, no game in the seed, next_game null, so the chip says 'off-season' and no date. PBS NewsHour: the quiet fixture's verbatim seed rss_items, newest 60 h old (outside the 48 h floor). e2e/ticker/status.spec.ts moves the Premier League kickoff inside 24 h through the dev bus to check the status chip gives way to the game chip.",
+  "_captured_at": "2026-09-02T12:00:00Z",
+  "data": {
+    "sports": [
+      {
+        "id": 9026401,
+        "league": "Premier League",
+        "sport": "football",
+        "external_game_id": "1379001",
+        "link": "",
+        "home_team_name": "Manchester United",
+        "home_team_logo": "https://media.api-sports.io/football/teams/33.png",
+        "home_team_score": "",
+        "home_team_code": "MUN",
+        "away_team_name": "Burnley",
+        "away_team_logo": "https://media.api-sports.io/football/teams/44.png",
+        "away_team_score": "",
+        "away_team_code": "BUR",
+        "start_time": "2026-09-12T11:30:00Z",
+        "short_detail": "Not Started",
+        "state": "pre",
+        "status_short": "NS",
+        "status_long": "Not Started",
+        "updated_at": "2026-09-02T11:00:00Z"
+      }
+    ],
+    "sports_meta": {
+      "leagues": [
+        {
+          "name": "Premier League",
+          "is_offseason": false,
+          "next_game": "2026-09-12T11:30:00Z",
+          "polling_healthy": true
+        },
+        {
+          "name": "NBA",
+          "is_offseason": true,
+          "next_game": null,
+          "polling_healthy": true
+        }
+      ]
+    },
+    "rss": [
+      {
+        "id": 28947070,
+        "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "guid": "https://www.pbs.org/newshour/science/global-warming-will-exceed-1-5-degree-limit-un-says-in-report-that-maps-path-back-below-danger-zone",
+        "title": "Global warming will exceed 1.5-degree limit, UN says in report that maps path back below danger zone",
+        "link": "https://www.pbs.org/newshour/science/global-warming-will-exceed-1-5-degree-limit-un-says-in-report-that-maps-path-back-below-danger-zone",
+        "description": "",
+        "source_name": "PBS News Hour - The Latest",
+        "published_at": "2026-08-31T00:00:00Z",
+        "created_at": "2026-08-31T00:00:00Z",
+        "updated_at": "2026-08-31T00:00:00Z"
+      },
+      {
+        "id": 28944579,
+        "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "guid": "https://www.pbs.org/newshour/show/remembering-gloria-steinem-and-her-trailblazing-fight-for-womens-rights",
+        "title": "Remembering Gloria Steinem and her trailblazing fight for women's rights",
+        "link": "https://www.pbs.org/newshour/show/remembering-gloria-steinem-and-her-trailblazing-fight-for-womens-rights",
+        "description": "",
+        "source_name": "PBS News Hour - The Latest",
+        "published_at": "2026-08-30T22:00:00Z",
+        "created_at": "2026-08-30T22:00:00Z",
+        "updated_at": "2026-08-30T22:00:00Z"
+      },
+      {
+        "id": 28944580,
+        "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "guid": "https://www.pbs.org/newshour/politics/trump-appointees-advance-plans-for-lafayette-square-fencing-and-white-house-gates",
+        "title": "Trump appointees advance plans for Lafayette Square fencing and White House gates",
+        "link": "https://www.pbs.org/newshour/politics/trump-appointees-advance-plans-for-lafayette-square-fencing-and-white-house-gates",
+        "description": "",
+        "source_name": "PBS News Hour - The Latest",
+        "published_at": "2026-08-30T14:00:00Z",
+        "created_at": "2026-08-30T14:00:00Z",
+        "updated_at": "2026-08-30T14:00:00Z"
+      }
+    ]
+  },
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "uplink_pro",
+    "default_widgets_applied": true,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 1,
+      "widget_type": "sports_premierleague",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "Premier League"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "widget_type": "sports_nba",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "NBA"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "widget_type": "news_pbs",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "feeds": [
+          {
+            "name": "PBS NewsHour",
+            "url": "https://www.pbs.org/newshour/feeds/rss/headlines"
+          }
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ]
+}
