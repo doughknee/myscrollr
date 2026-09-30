@@ -518,11 +518,13 @@ export function sportsTickerStatus(
   return {
     tab: leagueCode(league),
     text,
+    // Templates first: `widest` keeps the first of equal lengths, so the
+    // reserve only changes if a real date is somehow longer than them all.
     reserve: widest([
-      text,
       `next ${noun} ${widestStatusDate(true)}`,
       `season starts ${widestStatusDate(false)}`,
       `no ${nouns} scheduled`,
+      text,
     ]),
   };
 }
