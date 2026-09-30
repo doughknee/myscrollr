@@ -1,5 +1,5 @@
 {
-    "version": "7c42dc11c7d36312",
+    "version": "894098f984fb1be8",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -10,7 +10,13 @@
             "color": "#16a34a",
             "default_config": {
                 "asset_class": "stock",
-                "symbols": []
+                "symbols": [
+                    "AAPL",
+                    "MSFT",
+                    "NVDA",
+                    "AMZN",
+                    "TSLA"
+                ]
             },
             "required_tier": "free",
             "about": "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",
@@ -40,7 +46,10 @@
             "color": "#f7931a",
             "default_config": {
                 "asset_class": "crypto",
-                "symbols": []
+                "symbols": [
+                    "BTC/USD",
+                    "ETH/USD"
+                ]
             },
             "required_tier": "free",
             "about": "Live crypto prices for the coins you track, streamed around the clock. From BTC and ETH to the long tail, your picks update the moment the market does.",

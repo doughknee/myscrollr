@@ -136,7 +136,7 @@ var catalog = []WidgetDef{
 		Keywords:      []string{"shares", "etf", "s&p", "nasdaq", "dow", "tickers"},
 		Color:         "#16a34a",
 		Description:   "Live stock & ETF prices with a watchlist you control.",
-		DefaultConfig: map[string]any{"symbols": []string{}, "asset_class": "stock"},
+		DefaultConfig: map[string]any{"symbols": []string{"AAPL", "MSFT", "NVDA", "AMZN", "TSLA"}, "asset_class": "stock"},
 		About:         "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",
 		Usage: []string{
 			"Open Watchlist, then search the full stock catalog to add or remove symbols.",
@@ -150,7 +150,7 @@ var catalog = []WidgetDef{
 		Keywords:      []string{"bitcoin", "btc", "eth", "ethereum", "solana", "coins"},
 		Color:         "#f7931a",
 		Description:   "Live crypto prices with a watchlist you control.",
-		DefaultConfig: map[string]any{"symbols": []string{}, "asset_class": "crypto"},
+		DefaultConfig: map[string]any{"symbols": []string{"BTC/USD", "ETH/USD"}, "asset_class": "crypto"},
 		About:         "Live crypto prices for the coins you track, streamed around the clock. From BTC and ETH to the long tail, your picks update the moment the market does.",
 		Usage: []string{
 			"Open Watchlist, then search the full crypto catalog to add or remove coins.",
