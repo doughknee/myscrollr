@@ -44,6 +44,8 @@ export const TIP_IDS = {
   TICKER_RIGHT_CLICK: "ticker-right-click",
   /** First time the user closes the main window while the app is still running. */
   TRAY_STILL_RUNNING: "tray-still-running",
+  /** New install: Scrollr was set to start with the computer (SCROLLR-263). */
+  AUTOSTART_DEFAULT: "autostart-default",
 } as const;
 
 export type TipId = (typeof TIP_IDS)[keyof typeof TIP_IDS];

@@ -70,6 +70,7 @@ import {
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
+import { applyAutostartDefault } from "../lib/autostartDefault";
 import { hydrateProductAnalyticsConsent } from "../lib/productAnalyticsConsent";
 
 // Types
@@ -572,8 +573,17 @@ function RootLayout() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
   });
 
+  // New install: start with the computer by default (SCROLLR-263). Main
+  // window only, once per process; then read back the real plugin state.
   useEffect(() => {
-    isAutostartEnabled().then(setAutostartOn).catch(() => {});
+    applyAutostartDefault(prefs, persistPrefs, () =>
+      navigate({ to: "/customize", search: { page: "startup" } }),
+    )
+      .catch((err) => console.error("[Scrollr] Autostart default failed:", err))
+      .then(() => isAutostartEnabled().then(setAutostartOn))
+      .catch(() => {});
+    // Mount only: the marker is consumed once and the prefs are the loaded ones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Navigation handlers ─────────────────────────────────────

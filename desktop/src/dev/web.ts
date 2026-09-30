@@ -392,7 +392,14 @@ export function installWebAdapter(label: Label): void {
       case "plugin:updater|check":
         return null; // no update
       case "plugin:autostart|is_enabled":
-        return false;
+        return localStorage.getItem("web:autostart") === "1";
+      case "plugin:autostart|enable":
+      case "plugin:autostart|disable":
+        // Logged like the rest of the no-ops; kept so Settings › Startup
+        // reads back what the first-run default (SCROLLR-263) did.
+        log(cmd, args);
+        localStorage.setItem("web:autostart", cmd.endsWith("|enable") ? "1" : "0");
+        return null;
     }
 
     if (cmd === "position_ticker") toPage({ height: args.height, position: args.position });

@@ -23,6 +23,9 @@ import { LazyStore } from "@tauri-apps/plugin-store";
 // ── Singleton store instance ────────────────────────────────────
 
 const store = new LazyStore("scrollr.json");
+
+/** Set by `initStore` on a brand-new install; consumed by lib/autostartDefault. */
+export const FRESH_INSTALL_KEY = "scrollr:fresh-install";
 const cache = new Map<string, unknown>();
 let initialized = false;
 
@@ -42,9 +45,16 @@ export async function initStore(): Promise<void> {
     cache.set(key, value);
   }
 
-  // One-time migration from localStorage
+  // One-time migration from localStorage. A store with no migration
+  // marker AND nothing to migrate is a brand-new install (SCROLLR-263):
+  // leave a marker for the one-time first-run defaults to consume.
   if (!cache.has("scrollr:store-migrated")) {
-    migrateFromLocalStorage();
+    if (migrateFromLocalStorage() === 0) {
+      // ponytail: two windows can both see a fresh store and both write
+      // this; the consumer clears it seconds later, long after both inits.
+      cache.set(FRESH_INSTALL_KEY, true);
+      store.set(FRESH_INSTALL_KEY, true).catch(logWriteError);
+    }
     await store.save();
   }
 
@@ -169,7 +179,8 @@ export function onStoreChange<T>(
 
 // ── localStorage migration ──────────────────────────────────────
 
-function migrateFromLocalStorage(): void {
+/** Returns how many legacy keys it moved (0 = nothing to migrate). */
+function migrateFromLocalStorage(): number {
   const keysToRemove: string[] = [];
 
   for (let i = 0; i < localStorage.length; i++) {
@@ -209,6 +220,7 @@ function migrateFromLocalStorage(): void {
   // Mark migration as complete
   cache.set("scrollr:store-migrated", true);
   store.set("scrollr:store-migrated", true);
+  return keysToRemove.length;
 }
 
 // ── Utilities ───────────────────────────────────────────────────
