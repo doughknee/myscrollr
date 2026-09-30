@@ -32,7 +32,10 @@ if (!token) {
   process.exit(1)
 }
 
-const url = `https://api.motion.dev/registry?package=motion-plus&version=latest&token=${token}`
+// Pinned, never `latest`: motion-plus 3.0.0 (30 Sep 2026) needs motion ^13 and broke
+// every website build overnight. Keep in step with desktop/package.json (2.11.0).
+const MOTION_PLUS_VERSION = '2.11.0'
+const url = `https://api.motion.dev/registry?package=motion-plus&version=${MOTION_PLUS_VERSION}&token=${token}`
 console.log('[ensure-motion-plus] installing motion-plus (--no-save)…')
 
 // Invoking npm portably is fiddlier than it looks on Windows:
