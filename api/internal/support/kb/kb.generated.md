@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.6.9**.
+Current desktop version: **1.6.10**.
 
-<!-- source: desktop/package.json @ 009bb6e3eb26 -->
+<!-- source: desktop/package.json @ 62d221ccb614 -->
 
 ## Policies
 
