@@ -55,8 +55,9 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   { fixture: "default", width: 1920, live: true },
   // SCROLLR-292, every page is full. One widget, one page, so a lap is one page: three laps measure three dwells.
   // `full`: the fixture has enough to fill, so every page must have a column per item.
-  { fixture: "nflthursday", width: 1920, laps: 3, live: true, full: true }, // TNF + Sunday (your Bears lead the fill, on every lap)
-  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 5 columns: four pages of 4 (the whole week, SCROLLR-293)
+  // 16 games at 6 columns (SCROLLR-296 round 2: fewer, roomier game cells) split evenly 6/5/5: `unfilled` holds, "a column per item" cannot.
+  { fixture: "nflthursday", width: 1920, laps: 3, live: true }, // TNF + Sunday (your Bears lead, on every lap)
+  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 4 columns: four pages of 4 (the whole week, SCROLLR-293)
   { fixture: "googl", width: 1920, laps: 3, full: true }, // GOOGL + popular fills
   { fixture: "sparsenews", width: 1280, laps: 3 }, // 9 headlines over 3 days: all of them now (SCROLLR-293), 5 pages at 2 columns
   // SCROLLR-293: a 30-headline feed, the whole of it. One widget, so a lap is one visit (one page, SCROLLR-294).

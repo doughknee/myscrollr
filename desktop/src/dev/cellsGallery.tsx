@@ -219,6 +219,7 @@ function States() {
     ...QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} />]),
     ["popular fill", <QuoteCell key="fill" trade={fin("NVDA")} fill />] as [string, ReactNode],
   ];
+  const quotesRange = QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} range />]);
   return (
     <>
       <div className="px-4 pt-6 font-mono text-[10px] tracking-[0.06em] text-fg-4">EVERY STATE AT THE BAR&apos;S REAL COLUMN WIDTHS (SCROLLR-295)</div>
@@ -231,6 +232,7 @@ function States() {
       <Board name="news-pin" tab="news_npr" width={NEWS_PIN_W}>{news(NEWS_PIN_W, true)}</Board>
       <Board name="quote-1280" tab="finance_stocks" width={col(1280, QUOTE_MIN_COL)}>{quotes}</Board>
       <Board name="quote-1920" tab="finance_stocks" width={col(1920, QUOTE_MIN_COL)}>{quotes}</Board>
+      <Board name="quote-1920 · with the range row (variant)" tab="finance_stocks" width={col(1920, QUOTE_MIN_COL)}>{quotesRange}</Board>
     </>
   );
 }
@@ -268,6 +270,7 @@ function Gallery() {
       <Strip name="game-stacked" width={gameMinCol("NFL")}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
       <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <Strip name="quote-range" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} range />])}</Strip>
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
       <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}

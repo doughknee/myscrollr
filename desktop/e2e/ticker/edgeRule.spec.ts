@@ -43,14 +43,14 @@ test("1280: a game pin beside clocks and weather leaves every family its columns
   await expect.poll(async () => (await measure(page)).pins).toBe(1);
   const m = await measure(page);
   expect(m.edge).toBeLessThanOrEqual(Math.floor(m.bar * 0.4));
-  // Pro games and quotes (212 each) keep 2 or more columns.
-  expect(Math.floor((m.bar - 112 - m.edge) / 212)).toBeGreaterThanOrEqual(2);
+  // Pro games (264) and quotes (260) keep 2 or more columns.
+  expect(Math.floor((m.bar - 112 - m.edge) / 264)).toBeGreaterThanOrEqual(2);
 });
 
 test("a shrinking window steps the newest pin back; widening brings it back", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 720 });
   await openShim(page, BASE + pins(CMD, TEX, BBC));
-  // 1920 holds two games (618 of 768) but not the headline as well.
+  // 1920 holds two games (722 of 768) but not the headline as well.
   await expect.poll(async () => (await measure(page)).pins).toBe(2);
 
   await page.setViewportSize({ width: 1280, height: 720 });

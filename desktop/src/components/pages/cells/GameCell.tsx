@@ -11,15 +11,16 @@ import { Crest } from "./parts";
 /** A column at least this wide lays the game out as one scoreboard line. */
 export const WIDE_GAME_PX = 430;
 /**
- * The clock box: a FIXED width, 7ch of its 12px face plus the 9px the live
- * dot sits in. Its widest lines are "12:00P" and a same-day countdown
- * "in 9h59" (ten hours or more out says "TODAY"). Never a min-width that
- * includes padding: that grew with "12:00P" and moved every name left of it
- * (e2e/ticker/cells.spec.ts).
+ * The clock box: a FIXED width, 7ch of its 12px face plus 14px of air in
+ * front, where the live dot sits (SCROLLR-296 round 2, Brandon: "the
+ * quarter and the time need more space to breathe"). Its widest lines are
+ * "12:00P" and a same-day countdown "in 9h59" (ten hours or more out says
+ * "TODAY"). Never a min-width that includes padding: that grew with
+ * "12:00P" and moved every name left of it (e2e/ticker/cells.spec.ts).
  */
-export const STATUS_WIDTH = "calc(7ch + 9px)";
-/** The same box between the scores of a wide cell: padded both sides, so the text centres. */
-export const STATUS_WIDE = "calc(7ch + 18px)";
+export const STATUS_WIDTH = "calc(7ch + 14px)";
+/** The same box between the scores of a wide cell: 14px each side, so the text centres. */
+export const STATUS_WIDE = "calc(7ch + 28px)";
 
 /**
  * The cell's three type sizes (SCROLLR-296: at most three, none under 12px):
@@ -33,17 +34,17 @@ const US_PRO = new Set(["NFL", "MLB", "NBA", "NHL", "MLS", "WNBA"]);
 
 /**
  * Narrowest column a game cell takes, for pagePlan's `columnsFor(…, minCol)`.
- * Measured in the gallery: at SCROLLR-296's type everything but the name
- * costs 146px (gutters of 16 and 12, the "@" hung in the left one; the
- * crest, an 18px score, the 12px clock), so 212 leaves a 14.5px nickname
- * 66px: "Patriots", "Cardinals", "Chargers" whole; "Seahawks",
- * "Commanders", "Buccaneers" lose a letter or two at the narrowest bars.
- * Leagues that show a city or college name get 244. Widening these costs a
- * column at 1920 and pushes the busiest lap past 60 s (pages.spec), so the
- * bigger type is paid for with tighter gutters instead.
+ * SCROLLR-296 round 2 (Brandon: "we don't need that many per page. I'd
+ * rather fit more of the names"): everything but the name costs 158px
+ * (16px gutters with the "@" hung in the left one, the crest, an 18px
+ * score, the clock with 14px of air), so 264 leaves a 14.5px name 106px:
+ * every US-pro nickname whole ("Commanders", "Timberwolves",
+ * "Diamondbacks"; "Golden Knights" loses its last letter), the full short
+ * name from ~340px. 264 still gives four games at 1280 with the Clock on the
+ * edge. Leagues that show a city or college name get 276.
  */
 export function gameMinCol(league: string): number {
-  return US_PRO.has(league) ? 212 : 244;
+  return US_PRO.has(league) ? 264 : 276;
 }
 const TWO_WORD = new Set([
   "Red Sox", "White Sox", "Blue Jays", "Trail Blazers", "Maple Leafs", "Golden Knights", "Blue Jackets", "Red Wings",
@@ -69,11 +70,11 @@ export function cellName(league: string, name: string, roomy: boolean): string {
  */
 export function nameRoom(width: number, scoreCh: number): number {
   if (width >= WIDE_GAME_PX) {
-    // gutters 28, four 12px gaps, the 68px clock, two 22px scores; then per
+    // gutters 32, four 12px gaps, the 78px clock, two 22px scores; then per
     // side the crest and its gap (and, at home, the "@").
-    return (width - 28 - 48 - 68.4 - 2 * scoreCh * 13.2) / 2 - 45;
+    return (width - 32 - 48 - 78.4 - 2 * scoreCh * 13.2) / 2 - 45;
   }
-  return width - 28 - 22 - 5 - 5 - scoreCh * 10.8 - 5 - 59.4;
+  return width - 32 - 22 - 6 - 6 - scoreCh * 10.8 - 6 - 64.4;
 }
 
 let ctx: CanvasRenderingContext2D | null | undefined;
@@ -212,16 +213,16 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
     <span
       data-part="status"
       className={clsx(
-        "relative flex shrink-0 flex-col justify-center gap-[5px] whitespace-nowrap pl-[9px] font-mono text-[12px] leading-none",
-        wide ? "items-center pr-[9px]" : "items-start",
+        "relative flex shrink-0 flex-col justify-center gap-[6px] whitespace-nowrap pl-[14px] font-mono text-[12px] leading-none",
+        wide ? "items-center pr-[14px]" : "items-start",
       )}
       style={{ width: wide ? STATUS_WIDE : STATUS_WIDTH }}
     >
       <span className={clsx("relative font-bold tracking-[0.02em]", live ? "text-live" : isFinal(g) ? "text-fg-3" : "text-fg-2")}>
-        {/* Always mounted, in the box's own 9px so it takes no room from the text. */}
+        {/* Always mounted, in the box's own air so it takes no room from the text. */}
         <span
           data-part="live-dot"
-          className={clsx("absolute right-full top-1/2 mr-1 h-[5px] w-[5px] -translate-y-1/2 rounded-full bg-live", !live && "invisible")}
+          className={clsx("absolute right-full top-1/2 mr-[5px] h-[5px] w-[5px] -translate-y-1/2 rounded-full bg-live", !live && "invisible")}
         />
         {top}
       </span>
@@ -238,7 +239,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
       data-live={live ? "" : undefined}
       data-mine={mine ? "" : undefined}
       data-close={close ? "" : undefined}
-      className="relative flex h-full w-full min-w-0 items-center gap-[5px] pl-4 pr-3 text-left transition-colors duration-700"
+      className="relative flex h-full w-full min-w-0 items-center gap-[6px] px-4 text-left transition-colors duration-700"
       style={{ background: flash ? "color-mix(in srgb, var(--color-live) 18%, transparent)" : undefined }}
     >
       {/* Both always mounted; transparent unless it is your team / a close game. */}
@@ -251,7 +252,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
       <span
         aria-hidden
         data-part="close"
-        className="absolute bottom-0 left-4 right-3 h-[2px] rounded-full"
+        className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full"
         style={{ background: close ? "var(--accent)" : "transparent" }}
       />
       {wide ? (
@@ -279,7 +280,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
         </span>
       ) : (
         <>
-          <span className="grid min-w-0 flex-1 grid-cols-[22px_minmax(0,1fr)_auto] grid-rows-[22px_22px] items-center gap-x-[5px] gap-y-[4px]">
+          <span className="grid min-w-0 flex-1 grid-cols-[22px_minmax(0,1fr)_auto] grid-rows-[22px_22px] items-center gap-x-[6px] gap-y-[4px]">
             <Crest src={g.away_team_logo} alt={g.away_team_name} size="lg" />
             {name("away", g.away_team_name, awayLeads)}
             {score("away", g.away_team_score, awayLeads)}

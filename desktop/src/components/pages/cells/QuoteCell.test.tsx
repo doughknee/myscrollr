@@ -34,6 +34,12 @@ describe("QuoteCell", () => {
     expect(container.querySelector('[data-part="change"]')!.classList.contains("text-down")).toBe(true);
   });
 
+  it("the price is the largest thing in the cell; no range row unless asked", () => {
+    const { container } = render(<QuoteCell trade={trade()} />);
+    expect(container.querySelector('[data-part="price"]')!.classList.contains("text-[20px]")).toBe(true);
+    expect(container.querySelector('[data-part="range"]')).toBeNull();
+  });
+
   it("the day's line spans the cell, in its own row under symbol, price and change", () => {
     const { container } = render(<QuoteCell trade={trade()} />);
     const spark = container.querySelector('[data-part="spark"]')!;
@@ -54,13 +60,13 @@ describe("QuoteCell", () => {
   });
 
   it("the day's range: low and high, and where the price sits", () => {
-    const { getByText } = render(<QuoteCell trade={trade()} />);
+    const { getByText } = render(<QuoteCell trade={trade()} range />);
     expect(getByText("253.39")).toBeTruthy();
     expect(getByText("257.63")).toBeTruthy();
   });
 
   it("no range: the track stays, the labels and marker do not guess", () => {
-    const { container } = render(<QuoteCell trade={trade({ day_low: 0, day_high: 0 })} />);
+    const { container } = render(<QuoteCell trade={trade({ day_low: 0, day_high: 0 })} range />);
     const range = container.querySelector('[data-part="range"]')!;
     expect(range.textContent).toBe("");
     expect(range.querySelector(".invisible")).toBeTruthy();
@@ -68,7 +74,7 @@ describe("QuoteCell", () => {
 
   it("width-stable: a one-digit and a two-digit move, a small and a large price, reserve the same", () => {
     const parts = (t: Trade) => {
-      const { container } = render(<QuoteCell trade={t} />);
+      const { container } = render(<QuoteCell trade={t} range />);
       const el = (p: string) => (container.querySelector(`[data-part="${p}"]`) as HTMLElement).style.minWidth;
       return [el("change"), el("price"), el("range-low"), el("range-high")];
     };

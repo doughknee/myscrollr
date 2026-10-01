@@ -38,8 +38,8 @@ describe("sports: the whole week, as the widget page shows it (SCROLLR-293)", ()
   it("every game in the week is in the pool: TNF, Sunday and MNF, nothing to fill", () => {
     expect(nfl.items).toHaveLength(thursday.data.sports.length);
     expect(nfl.fill).toEqual([]);
-    expect(plan.cols).toBe(8);
-    expect(plan.pages.map((p) => p.length)).toEqual([8, 8]);
+    expect(plan.cols).toBe(6);
+    expect(plan.pages.map((p) => p.length)).toEqual([6, 5, 5]);
   });
 
   it("the ladder: your team first (on every visit), then tonight, then soonest kick-off", () => {
@@ -123,7 +123,7 @@ describe("finance: popular symbols fill a short watchlist", () => {
   it("a watchlist as long as a page takes no fill, and neither does one longer than it", () => {
     const syms = ["GOOGL", "AAPL", "MSFT", "NVDA", "AMZN", "TSLA", "META", "SPY", "QQQ", "AVGO", "NFLX", "AMD"];
     const plan = planAll(buildPageWidgets(asDash(withWatchlist(syms)), ["finance_stocks"], now, [], quotes), 1920).get("finance_stocks")!;
-    expect(plan.cols).toBe(8);
+    expect(plan.cols).toBe(6);
     expect(plan.pages.flat().every((i) => !i.fill)).toBe(true);
     expect(plan.pages.map((p) => p.length)).toEqual([6, 6]);
   });

@@ -53,8 +53,8 @@ describe("cellName", () => {
   });
 
   it("a city or college name asks for a wider column than a nickname", () => {
-    expect(gameMinCol("NFL")).toBe(212);
-    expect(gameMinCol("NCAA Football")).toBe(244);
+    expect(gameMinCol("NFL")).toBe(264);
+    expect(gameMinCol("NCAA Football")).toBe(276);
   });
 });
 

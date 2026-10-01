@@ -51,8 +51,8 @@ once, at the release, with a one-time notice that Continuous is one click away i
   you can see there's more and that it comes round. A line along its bottom edge fills as
   the page runs out of time.
 - **The page** is one widget's items in equal columns that fill the bar. How many columns
-  is a matter of your screen width and how much room that kind of thing needs: five NFL
-  games on a 1280-pixel bar, eight on a 1920 one, but only two headlines, because a
+  is a matter of your screen width and how much room that kind of thing needs: four NFL
+  games on a 1280-pixel bar, six on a 1920 one, but only two headlines, because a
   headline needs 400 pixels to be readable. There are no cards or boxes, just the items,
   with a thin line between them.
 - **The edge** at the right holds the small things that should always be there. See below.
@@ -186,7 +186,7 @@ question you'd otherwise open the app for and never repeats the top.
 | Item | The top says | The second line adds |
 |---|---|---|
 | Game | who's playing, the score, the clock | where each team sits in the table (a chip also says where, before kick-off). A narrow page cell has no second line: it spends the room on bigger names and scores, with an @ on the home team |
-| Stock or coin | symbol, price, change | the day's range and a line |
+| Stock or coin | symbol, price, change | the day's line (a chip also shows the day's range) |
 | Headline | the headline, how old it is | the summary, or which feed it's from |
 | Clock | the time in each zone | the date: Tokyo may already be tomorrow |
 | Timer | time remaining | a bar draining down |

@@ -17,7 +17,8 @@ import { test, expect, type Page } from "@playwright/test";
 const PARTS: Record<string, [string, "box" | "left" | "right"][]> = {
   "game-stacked": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["mine", "box"], ["close", "box"], ["away-name", "left"], ["home-name", "left"]],
   "game-wide": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "right"], ["home-name", "left"]],
-  quote: [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-low", "box"], ["range-rail", "box"], ["range-high", "box"]],
+  quote: [["change", "box"], ["price", "box"], ["spark", "box"]],
+  "quote-range": [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-low", "box"], ["range-rail", "box"], ["range-high", "box"]],
   news: [["age", "box"], ["headline", "box"], ["summary", "left"]],
 };
 
