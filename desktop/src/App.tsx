@@ -18,6 +18,7 @@ import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
 import PagedBar from "./components/pages/PagedBar";
+import EmptyBar from "./components/EmptyBar";
 import { useToggleOnTicker } from "./hooks/useToggleOnTicker";
 import { isOnTicker } from "./utils/tickerMembership";
 import { pinTargetAt } from "./utils/pinTarget";
@@ -848,12 +849,28 @@ export default function App() {
               authenticated &&
               installedWidgetsMeta.length > 0 &&
               !hasAnyPinnedWidget;
-            // Widget pages (SCROLLR-272). Not offered in Settings until
-            // SCROLLR-274; the empty-state CTAs and the fixed zone stay
-            // with the chips bar until then (SCROLLR-273/274).
+            // Widget pages (SCROLLR-272), the default. They get the same two
+            // empty states as the chips bar (SCROLLR-274); the fixed edge
+            // zone arrives with SCROLLR-273.
             if (prefs.ticker.scrollMode === "pages") {
+              const emptyKind = showSourcelessCTA
+                ? "sourceless"
+                : showInstalledOffCTA && installedWidgetsMeta.length > 0
+                  ? "installedOff"
+                  : null;
               return (
                 <PagedBar
+                  empty={
+                    emptyKind && (
+                      <EmptyBar
+                        pages
+                        kind={emptyKind}
+                        installedWidgets={installedWidgetsMeta}
+                        onAddSources={handleAddSources}
+                        onOpenWidget={handleOpenWidget}
+                      />
+                    )
+                  }
                   dashboard={dashboard ?? null}
                   activeTabs={activeTabs}
                   chipColorMode={prefs.ticker.chipColors}
@@ -875,8 +892,6 @@ export default function App() {
                 mixMode={prefs.ticker.mixMode}
                 chipColorMode={prefs.ticker.chipColors}
                 widgetDisplay={prefs.widgetDisplay}
-                scrollMode={prefs.ticker.scrollMode}
-                stepPause={prefs.ticker.stepPause}
                 showSourcelessCTA={showSourcelessCTA}
                 onAddSources={handleAddSources}
                 showInstalledOffCTA={showInstalledOffCTA}

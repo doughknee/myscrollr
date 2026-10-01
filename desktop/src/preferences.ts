@@ -71,10 +71,10 @@ export function isThemeMode(value: unknown): value is ThemeMode {
 // `migrateTicker`.
 export type MixMode = "grouped" | "mixed";
 export type ChipColorMode = "widget" | "theme" | "subtle";
-/** Rotate ("flip") folded into Page 2026-09-06 (REL-204). "pages" is the
- *  widget-pages bar (SCROLLR-272): stored and honoured, but not offered in
- *  Settings until SCROLLR-274 (the ticker shim's `?pages=1` sets it). */
-export type ScrollMode = "continuous" | "page" | "pages";
+/** "pages" is the widget-pages bar and the default (SCROLLR-272/274);
+ *  "continuous" is the scrolling chips bar. The old step "page" mode and
+ *  "flip" were deleted in SCROLLR-274; `migrateTicker` maps them to pages. */
+export type ScrollMode = "continuous" | "pages";
 /** What the bar does under the mouse. Continuous: keep / slow to 30 % /
  *  stop. Page: keep advancing / hold the page (slow and pause alike). */
 export type HoverBehavior = "keep" | "slow" | "pause";
@@ -161,15 +161,12 @@ export interface TickerPrefs {
   mixMode: MixMode;
   chipColors: ChipColorMode;
   scrollMode: ScrollMode;
-  /** Seconds each page stays put; one of STEP_PAUSES (Page mode only). */
-  stepPause: number;
 }
 
 // The Ticker page offers presets, never raw numbers (SETTINGS_AUDIT §3).
 // The prefs stay numbers so nothing downstream changes; a value off the
 // list (an old slider position) is snapped to the nearest preset on load.
 export const TICKER_SPEEDS = { slow: 20, normal: 40, fast: 80 } as const;
-export const STEP_PAUSES = [3, 5, 8] as const;
 export const SCALE_PRESETS = [85, 100, 115, 130] as const;
 
 export function snapToPreset(
@@ -489,8 +486,7 @@ const DEFAULT_TICKER: TickerPrefs = {
   onHover: "slow",
   mixMode: "mixed",
   chipColors: "widget",
-  scrollMode: "continuous",
-  stepPause: 5,
+  scrollMode: "pages",
 };
 
 const DEFAULT_STARTUP: StartupPrefs = {
@@ -1072,7 +1068,7 @@ export function loadPrefs(): AppPreferences {
  *  - `pauseOnHover` + `hoverSpeed` → `onHover`
  *    (false → keep; true + 0 → pause; true otherwise → slow)
  *  - `tickerGap` (Spacing) and `tickerDirection` (Direction) → gone
- *  - `tickerSpeed` / `stepPause` snap to the nearest preset
+ *  - `tickerSpeed` snaps to the nearest preset
  *
  * SCROLLR-278: the compact/detailed density is gone; the bar has one
  * height. A stored `tickerMode` (any value) is ignored and dropped.
@@ -1081,7 +1077,10 @@ export function loadPrefs(): AppPreferences {
  * unrecognised falls back to the default:
  *  - mixMode     weave → mixed
  *  - chipColors  accent → theme, muted → subtle
- *  - scrollMode  step → page, and flip (Rotate, REL-204) → page
+ * SCROLLR-274: the step "page" mode and its `stepPause` are gone. Only an
+ * explicit "continuous" stays continuous; "pages", the old step spellings
+ * (page, step, flip), a missing value and anything unrecognised are Pages,
+ * which is also what a fresh install gets.
  */
 export function migrateTicker(raw: unknown): TickerPrefs {
   const saved = (raw && typeof raw === "object" ? raw : {}) as Omit<
@@ -1093,6 +1092,7 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     tickerGap?: unknown;
     tickerDirection?: unknown;
     scrollMode?: unknown;
+    stepPause?: unknown;
     tickerMode?: unknown;
     mixMode?: unknown;
     chipColors?: unknown;
@@ -1103,6 +1103,7 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     tickerGap: _gap,
     tickerDirection: _direction,
     scrollMode,
+    stepPause: _stepPause,
     tickerMode: _tickerMode,
     mixMode,
     chipColors,
@@ -1112,6 +1113,7 @@ export function migrateTicker(raw: unknown): TickerPrefs {
   void _gap;
   void _direction;
   void _tickerMode;
+  void _stepPause;
   const isHover = (v: unknown): v is HoverBehavior =>
     v === "keep" || v === "slow" || v === "pause";
   const migratedHover: HoverBehavior = isHover(onHover)
@@ -1132,18 +1134,12 @@ export function migrateTicker(raw: unknown): TickerPrefs {
         : chipColors === "subtle" || chipColors === "muted"
           ? "subtle"
           : "widget",
-    scrollMode:
-      scrollMode === "pages"
-        ? "pages"
-        : scrollMode === "page" || scrollMode === "step" || scrollMode === "flip"
-          ? "page"
-          : "continuous",
+    scrollMode: scrollMode === "continuous" ? "continuous" : "pages",
     tickerSpeed: snapToPreset(
       rest.tickerSpeed,
       Object.values(TICKER_SPEEDS),
       DEFAULT_TICKER.tickerSpeed,
     ),
-    stepPause: snapToPreset(rest.stepPause, STEP_PAUSES, DEFAULT_TICKER.stepPause),
   };
 }
 

@@ -70,7 +70,6 @@ checklist) literally.
 | `desktop/src/datawidgets/ticker.ts` | `TickerSource`, `TickerChip`, `TickerContext`, `scopedRows`, `rotateSlots`, `RotatingSlot` | The source contract and the rotation (§8). |
 | `desktop/src/datawidgets/tickerRegistry.ts` | `TICKER_SOURCES` | Register a new source here, one line. |
 | `desktop/src/components/tickerRotation.ts` | `visibleSlots(container)`, `advanceCycles(cycles, was, now)` | Off-screen detection (§8.5). |
-| `desktop/src/components/tickerStep.ts` | `stepItemIndex(step, count, direction)` | Step-mode measurement; do not touch. |
 
 ### 2.2 The source contract
 
@@ -461,7 +460,7 @@ shrinks or jumps as a slate fills.
 **The user controls presentation** (`TickerPrefs`): `showTicker`, `tickerSpeed`,
 `onHover` (keep / slow / pause),
 `mixMode` (grouped / mixed), `chipColors` (widget / theme / subtle),
-`scrollMode` (continuous / page), `stepPause`, `tickerPosition`,
+`scrollMode` (pages / continuous), `tickerPosition`,
 `hideOnFullscreen`.
 
 Pinning is deliberately NOT in either list above: a pin names a subject, so it is an

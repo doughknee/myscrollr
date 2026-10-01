@@ -123,8 +123,8 @@ export const SETTINGS_ROWS = {
     },
     scrollMode: {
       label: "Scroll mode",
-      description: "Scroll without stopping, or show a page at a time.",
-      keywords: "continuous page step",
+      description: "One whole widget per page, or chips that scroll without stopping.",
+      keywords: "pages page continuous scroll marquee step",
     },
     speed: {
       label: "Speed",
@@ -135,11 +135,6 @@ export const SETTINGS_ROWS = {
       label: "On hover",
       description: "What the bar does while your mouse is over it.",
       keywords: "pause slow down keep moving mouse",
-    },
-    stepPause: {
-      label: "Time per page",
-      description: "How long each page stays before the next one.",
-      keywords: "seconds dwell",
     },
     alwaysOnTop: {
       label: "Stay above other windows",

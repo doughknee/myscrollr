@@ -144,7 +144,6 @@ describe("searchSettings", () => {
       "scrollMode",
       "speed",
       "onHover",
-      "stepPause",
       "alwaysOnTop",
       "hideFullscreen",
       "itemOrder",

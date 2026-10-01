@@ -14,7 +14,8 @@
                       (default: "default"). An unknown name makes
                       /dashboard answer 500 and logs the failed path —
                       loud on purpose.
-    ?mode=page        scrollMode "page" (steps) instead of "continuous".
+    (scrollMode is "continuous" unless ?pages=1: the app's default is Pages
+                      since SCROLLR-274, but the older specs measure the marquee.)
     ?comfort=1        accepted and ignored: the bar has one height since
                       SCROLLR-278, so old links still open.
     ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
@@ -151,7 +152,7 @@
           ["scrollr:settings", {
             ticker: {
               showTicker: true,
-              scrollMode: params.get("pages") === "1" ? "pages" : params.get("mode") === "page" ? "page" : "continuous",
+              scrollMode: params.get("pages") === "1" ? "pages" : "continuous",
               chipColors: params.get("colors") || "widget",
               // Snaps to the nearest preset (20/40/80 px/s) on load.
               tickerSpeed: Number(params.get("speed")) || 40,

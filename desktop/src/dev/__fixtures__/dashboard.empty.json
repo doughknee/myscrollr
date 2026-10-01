@@ -1,0 +1,17 @@
+{
+  "_note": "SCROLLR-274 empty: a signed-in account with zero widgets that has already had its first-run default, so the bar draws the 'no sources yet' CTA (both bars).",
+  "_captured_at": "2026-09-02T12:00:00Z",
+  "data": {},
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "free",
+    "default_widgets_applied": true,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": []
+}

@@ -2,8 +2,8 @@
  * The settings search index — generated from the row copy in rows.ts,
  * so a search result always shows the words the page shows.
  *
- * Rows that come and go with preference state (Time per page only in
- * Page mode, Hide when fullscreen only on Windows) stay in the index:
+ * Rows that come and go with preference state (Speed only in
+ * Continuous mode, Hide when fullscreen only on Windows) stay in the index:
  * a search that could only find the settings you had already configured
  * your way into would be worse than useless. Rows that only exist with
  * or without an account are the exception — `when` filters them, so a
