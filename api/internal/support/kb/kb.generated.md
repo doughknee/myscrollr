@@ -254,7 +254,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 6a1735fb8ad9 -->
+<!-- source: docs/CHIP_DESIGN.md @ 48c652145ebf -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -341,8 +341,7 @@ A fixed block at the right end of the bar that doesn't swipe away.
   clock reading 12:00 and then 9:07 never shifts anything.
 - **Pins** sit after them (see "Pinning").
 - Clock and Weather don't use up one of your widget slots.
-- The edge never takes more than 40% of the bar, so the pages always have room *(lands
-  with SCROLLR-284)*.
+- The edge never takes more than 40% of the bar, so the pages always have room.
 
 #### The Also page
 
@@ -523,12 +522,12 @@ placeholder. The chip comes back when the team does.
 **A pinned thing isn't also on the pages or the tape.** It's in one place, not two. Under
 Pages that place is the edge.
 
-**There's a limit, and it says no.** Today it's two pins. Soon it's by width: the edge
-never takes more than 40% of the bar, so a pinned headline (one narrow line) costs less
-than a pinned game, and a small screen holds fewer pins than a big one. Pin one too many
-and it tells you why, naming what's in the way, rather than quietly dropping one of yours.
-If a screen gets smaller, the newest pins step back onto their normal pages until there's
-room, and come back when there is *(lands with SCROLLR-284)*.
+**There's a limit, and it says no.** It's by width: the edge never takes more than 40% of
+the bar (measured on the narrowest screen the ticker is on), so a pinned headline (one
+narrow line) costs less than a pinned game, and a small screen holds fewer pins than a big
+one. Pin one too many and it tells you why, naming what's in the way, rather than quietly
+dropping one of yours. If a screen gets smaller, the newest pins step back onto their
+normal pages until there's room, and come back when there is.
 
 **Pinning is not starring.** A star, a favourite, a watchlist entry all mean "always on,
 first in line". A pin means "out of the flow, parked". They're different jobs and they

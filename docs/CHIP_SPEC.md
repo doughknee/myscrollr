@@ -310,15 +310,20 @@ utilities, as one **cell at its family's minimum column** (`gameMinCol`, `QUOTE_
    does not show.
 4. **Right-click** works on the edge cell and on every page column through
    `data-pin-subject`, as on chips.
-5. **The cap on `main`** is the count, `MAX_PINS = 2` (`preferences.ts`; refused, never
-   evicted). **The rule it becomes** *(lands with SCROLLR-284)*: **the edge never takes more
-   than 40% of the bar width**, measured on the narrowest monitor the ticker is on. A pin
-   that would pass 40% is refused with a one-line message naming what fills the edge ("No
-   room on the edge at this screen size: unpin Chicago Bears first"); the width rule
-   replaces the count. When a screen shrinks and the pins pass 40%, the newest pins **step
-   back onto their normal pages** until there is room; they are not deleted and return when
-   there is room again. **A pinned headline is a narrow cell**: one line, ellipsis, about
-   260px, not a 400px news column; clicking it opens the article.
+5. **The limit is width, not a count** (`components/pages/edgeRule.ts`): **the edge never
+   takes more than 40% of the bar width** (utilities + pins + its 1px border), measured on
+   the narrowest ticker window. Every pages bar publishes `{bar, util}` (`lib/edgeMeasure.ts`)
+   so the main window and every ticker agree. A pin's width is its family's edge column
+   (`pinWidth`): a game `gameMinCol`, a quote 172, a headline 260. A pin that would pass 40%
+   is refused with a one-line message naming what fills the edge ("No room on the edge at
+   this screen size — unpin Chicago Bears first"), from every entry point: the ticker's
+   right-click item, a widget page's pin button, the sidebar row. When a screen shrinks and
+   the pins pass 40%, the newest pins **step back onto their normal pages** (`stepBack`)
+   until there is room; they stay in prefs and return when there is room again. **A pinned
+   headline is a narrow cell** (`NEWS_PIN_W = 260`, `NewsCell line`): one line, ellipsis,
+   the feed's name beneath, not a 400px news column; clicking it opens the article. With no
+   pages bar reporting a width (the Continuous ticker, none running) the old count,
+   `MAX_PINS = 2`, stands.
 6. Why: at 1280 with local time, 3 zones and weather on the edge, two college-game pins left
    486px (one column) and two headline pins left 174px (unreadable). At 1920 every case keeps
    three or more columns.
@@ -957,8 +962,7 @@ current chip.
 at its family's minimum column (§P.11). Rules 1 to 3 and 5 below hold for both
 presentations in spirit (one subject, one cell; bypasses the horizon; nothing to show shows
 nothing; on the bar once). Rule 4 (never scrolls or rotates) is satisfied by the edge being
-fixed. Rule 6 (the cap) is the 40% edge rule under Pages *(lands with SCROLLR-284)*, see
-§P.11. The rest of this section describes the Continuous implementation: `pinnedChip`,
+fixed. Rule 6 (the cap) is the 40% edge rule under Pages, see §P.11. The rest of this section describes the Continuous implementation: `pinnedChip`,
 `ctx.pinnedSubject`, the fixed zone, `dropPinned` before `rotateSlots`.
 
 `prefs.widgets.pins` is an ordered `WidgetPin[]` of `{widget, subject, side, row?}`.
