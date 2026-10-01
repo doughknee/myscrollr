@@ -25,7 +25,7 @@
  *    turn's seq, so they change only while a page swipes. Its measured
  *    width is frozen into each page with the bar's.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -142,6 +142,18 @@ function DwellLine({ seq, dwell, held, accent }: { seq: number; dwell: number; h
   );
 }
 
+/**
+ * Light or dark, live. `useTheme` writes `<family>-<light|dark>` to `<html data-theme>` on
+ * every pref change and every OS flip under Color mode "system" (the attribute the chips'
+ * CSS reads), so this follows it. `data-mode` is pre-paint only and goes stale.
+ */
+const themeIsDark = () => !document.documentElement.getAttribute("data-theme")?.endsWith("-light");
+function watchTheme(onChange: () => void) {
+  const mo = new MutationObserver(onChange);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => mo.disconnect();
+}
+
 function Cell({ widget, item, colW, mode, dark, onChipClick }: {
   widget: PageWidget;
   item: PageItem;
@@ -184,7 +196,7 @@ export default function PagedBar({
   const leader = useMemo(() => isPrimaryTicker(), []);
   const label = useMemo(() => getCurrentWindow().label, []);
   const reduced = useOsReducedMotion();
-  const dark = typeof document === "undefined" || document.documentElement.getAttribute("data-mode") !== "light";
+  const dark = useSyncExternalStore(watchTheme, themeIsDark, () => true);
 
   const widgets = useMemo(() => buildPageWidgets(dashboard, activeTabs, Date.now(), pins), [dashboard, activeTabs, pins]);
   const edge = useMemo(() => buildEdge(widgetData, pins, dashboard, activeTabs), [widgetData, pins, dashboard, activeTabs]);

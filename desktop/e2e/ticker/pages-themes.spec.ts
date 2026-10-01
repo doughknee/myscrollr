@@ -190,3 +190,23 @@ for (const family of THEME_FAMILIES) {
     });
   }
 }
+
+/**
+ * SCROLLR-286: the pages follow a LIVE light/dark switch. Color mode
+ * "system" tracks the OS (useTheme flips `data-theme` on <html> from a
+ * matchMedia listener); the pages' accent has to follow without a reload.
+ * The NFL navy is lifted on dark and drawn as-is on light.
+ */
+test("a live OS light/dark switch reaches the pages' accent colours, no reload", async ({ page }) => {
+  const accent = () => page.evaluate(() => getComputedStyle(document.querySelector("[data-page] [data-chip]")!).getPropertyValue("--accent").trim());
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/ticker-shim.html?pages=1&fixture=pages");
+  await page.locator("[data-page] [data-chip]").first().waitFor();
+  const light = await accent();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect.poll(accent, { message: "accent after the switch to dark" }).not.toBe(light);
+  const dark = await accent();
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect.poll(accent, { message: "accent after the switch back to light" }).toBe(light);
+  expect(dark).not.toBe(light);
+});
