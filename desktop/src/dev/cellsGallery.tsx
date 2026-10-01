@@ -6,6 +6,9 @@
  *
  *   /ticker-shim.html?cells=1[&theme=light|<family>-<light|dark>]
  *
+ * Below the strips, `data-board` rows put every state of a family side by
+ * side at the real column widths (SCROLLR-295's as-built canvas).
+ *
  * Every bar is one page as the canvas draws it, split by pagePlan.ts: a stand-in label (the real
  * one is the engine's), then equal columns. Data is dashboard.pages.json
  * with the clock pinned to its capture time. The `data-strip` rows at the
@@ -18,15 +21,17 @@ import "../style.css";
 import type { Game, RssItem, Trade } from "../types";
 import type { LeagueMeta } from "../api/queries";
 import { catalogItemById } from "../marketplace";
-import { isLive } from "../utils/gameHelpers";
+import { isLive, isCloseGame } from "../utils/gameHelpers";
 import { sportsTickerStatus } from "../datawidgets/sports/view";
 import { LABEL_W, columnsFor, contentWidth, paginate } from "../components/pages/pagePlan";
 import GameCell, { gameMinCol } from "../components/pages/cells/GameCell";
-import NewsCell, { NEWS_MIN_COL } from "../components/pages/cells/NewsCell";
+import NewsCell, { NEWS_MIN_COL, NEWS_PIN_W } from "../components/pages/cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "../components/pages/cells/QuoteCell";
 import AlsoCell, { ALSO_MIN_COL } from "../components/pages/cells/AlsoCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "../components/pages/cells/parts";
 import fixture from "./__fixtures__/dashboard.pages.json";
+import longnames from "./__fixtures__/dashboard.longnames.json";
+import nprFx from "./__fixtures__/dashboard.npr.json";
 
 const params = new URLSearchParams(location.search);
 // `light`, or a palette: `nord-light`, `rose-pine-dark` (e2e/ticker/pages-themes.spec.ts).
@@ -142,6 +147,91 @@ function Strip({ name, width, children }: { name: string; width: number; childre
   );
 }
 
+// ── Every state at the bar's real column widths (SCROLLR-295) ────
+// The design-pass canvas: one item per state, side by side at the width a
+// real page gives the family at 1280 and 1920, plus the roomy and wide
+// widths a split page reaches. Captioned per column. Not measured by any
+// spec (no data-strip); capture with `[data-board="…"]`.
+
+const byName = (n: string) => data.sports.find((g) => g.home_team_name === n || g.away_team_name === n)!;
+const liveGames = data.sports.filter(isLive);
+const close = liveGames.find((g) => isCloseGame(g) && !isMine(g));
+const notClose = liveGames.find((g) => !isCloseGame(g) && !isMine(g));
+const GAME_BOARD: [string, Game, boolean][] = [
+  ["pre · today", byName("Minnesota Vikings"), false],
+  ["pre · later day", byName("New Orleans Saints"), false],
+  ["live", notClose!, false],
+  ["live · close (tint)", close!, false],
+  ["live · yours", data.sports.find(isMine)!, true],
+  ["final · longest nickname", byName("Washington Commanders"), false],
+  ["postponed", { ...byName("Las Vegas Raiders"), state: "postponed", status_short: "PST" }, false],
+];
+const longRss = (longnames.data as unknown as { rss: RssItem[] }).rss;
+const nprRss = (nprFx.data as unknown as { rss: RssItem[] }).rss;
+const ago = (r: RssItem, h: number) => ({ ...r, published_at: new Date(NOW - h * 3_600_000).toISOString() });
+const NEWS_BOARD: [string, RssItem][] = [
+  ["9m · summary", { ...ago(nprRss[0], 0.15) }],
+  ["1d · summary", ago(nprRss[17], 26)],
+  ["5d · no summary", ago(nprRss[29], 120)],
+  ["long headline · no summary", ago(longRss[0], 2)],
+  ["long headline · summary", { ...ago(longRss[3], 3), description: nprRss[6].description }],
+  ["short headline · no summary", ago(nprRss[22], 4)],
+];
+const fin = (s: string) => data.finance.find((t) => t.symbol === s)!;
+const QUOTE_BOARD: [string, Trade][] = [
+  ["up", fin("JPM")],
+  ["down", fin("AAPL")],
+  ["flat", { ...fin("SPY"), percentage_change: 0 }],
+  ["5-digit price", fin("BTC/USD")],
+  ["crypto < $1", fin("DOGE/USD")],
+  ["no range, no change", { ...fin("MSFT"), percentage_change: "" as unknown as number, day_low: 0, day_high: 0 }],
+];
+
+/** Equal fixed columns, each captioned, wrapping to rows no wider than a 1920 bar's content. */
+function Board({ name, tab, width, children }: { name: string; tab: string; width: number; children: [string, ReactNode][] }) {
+  const hex = catalogItemById(tab)?.hex;
+  const per = Math.max(1, Math.floor(contentWidth(1920) / width));
+  const rows: [string, ReactNode][][] = [];
+  for (let i = 0; i < children.length; i += per) rows.push(children.slice(i, i + per));
+  return (
+    <figure className="m-0 flex shrink-0 flex-col gap-1 px-4" data-board={name}>
+      <figcaption className="font-mono text-[10px] tracking-[0.06em] text-fg-3">{name.toUpperCase()} · {width.toFixed(1)}PX COLUMNS</figcaption>
+      {rows.map((row, r) => (
+        <div key={r} className="flex flex-col">
+          <div className="grid" style={{ gridTemplateColumns: `repeat(${row.length}, ${width}px)` }}>
+            {row.map(([state]) => <span key={state} className="truncate px-3 font-mono text-[9.5px] text-fg-3">{state}</span>)}
+          </div>
+          <div className="flex h-16 items-stretch self-start border-b border-edge/50 bg-base-150" style={accentStyle(accentFor(hex, dark), inkFor(hex, dark))}>
+            <Columns width={width}>{row.map(([, node]) => node)}</Columns>
+          </div>
+        </div>
+      ))}
+    </figure>
+  );
+}
+
+const col = (viewport: number, minCol: number) => contentWidth(viewport) / columnsFor(contentWidth(viewport), minCol);
+
+function States() {
+  const games = (w: number): [string, ReactNode][] => GAME_BOARD.map(([s, g, m]) => [s, <GameCell key={s} game={g} width={w} mine={m} now={NOW} />]);
+  const news = (w: number, line?: boolean): [string, ReactNode][] => NEWS_BOARD.map(([s, r]) => [s, <NewsCell key={s} item={r} width={w} line={line} now={NOW} />]);
+  const quotes = QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} />]);
+  return (
+    <>
+      <div className="px-4 pt-6 font-mono text-[10px] tracking-[0.06em] text-fg-4">EVERY STATE AT THE BAR&apos;S REAL COLUMN WIDTHS (SCROLLR-295)</div>
+      <Board name="game-1280" tab="sports_nfl" width={col(1280, gameMinCol("NFL"))}>{games(col(1280, gameMinCol("NFL")))}</Board>
+      <Board name="game-1920" tab="sports_nfl" width={col(1920, gameMinCol("NFL"))}>{games(col(1920, gameMinCol("NFL")))}</Board>
+      <Board name="game-roomy" tab="sports_nfl" width={contentWidth(1920) / 5}>{games(contentWidth(1920) / 5)}</Board>
+      <Board name="game-wide" tab="sports_nfl" width={contentWidth(1920) / 4}>{games(contentWidth(1920) / 4)}</Board>
+      <Board name="news-1280" tab="news_npr" width={col(1280, NEWS_MIN_COL)}>{news(col(1280, NEWS_MIN_COL))}</Board>
+      <Board name="news-1920" tab="news_npr" width={col(1920, NEWS_MIN_COL)}>{news(col(1920, NEWS_MIN_COL))}</Board>
+      <Board name="news-pin" tab="news_npr" width={NEWS_PIN_W}>{news(NEWS_PIN_W, true)}</Board>
+      <Board name="quote-1280" tab="finance_stocks" width={col(1280, QUOTE_MIN_COL)}>{quotes}</Board>
+      <Board name="quote-1920" tab="finance_stocks" width={col(1920, QUOTE_MIN_COL)}>{quotes}</Board>
+    </>
+  );
+}
+
 function Gallery() {
   return (
     <div
@@ -176,6 +266,7 @@ function Gallery() {
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
       <Strip name="quote" width={200}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
+      <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}
       <div aria-hidden />
     </div>
