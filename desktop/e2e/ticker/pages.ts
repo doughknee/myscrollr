@@ -53,8 +53,16 @@ export interface Cut {
   id: string;
 }
 
+/** A page element entering the DOM: the moment a window starts turning to it (before its swipe). */
+export interface Turn {
+  t: number;
+  page: string;
+}
+
 export interface PagesTrace {
   enters: Enter[];
+  /** Every `[data-page]` element as it appears, swipe start. Needs no polling and no animation frame, so it is the clock for comparing two windows. */
+  turns: Turn[];
   moved: Moved[];
   cuts: Cut[];
   /** Frames seen while a swipe was in flight (real-rAF runs only). */
@@ -70,7 +78,7 @@ declare global {
 
 /** Self-contained (serialised into the page). Call after the first page is up. */
 export function installPagesRecorder(opts: { frames: boolean }) {
-  const r: NonNullable<Window["__pg"]> = { enters: [], moved: [], cuts: [], swipeFrames: 0, frameDts: [], running: true };
+  const r: NonNullable<Window["__pg"]> = { enters: [], turns: [], moved: [], cuts: [], swipeFrames: 0, frameDts: [], running: true };
   window.__pg = r;
   let installing = true;
   let cur: Element | null = null;
@@ -79,9 +87,15 @@ export function installPagesRecorder(opts: { frames: boolean }) {
   const isUp = (pages: NodeListOf<Element>) =>
     pages.length === 1 && getComputedStyle(pages[0]).transform === "none";
 
+  const seen = new WeakSet<Element>();
   const check = () => {
     if (!r.running) return;
     const pages = document.querySelectorAll("[data-page]");
+    for (const p of pages) {
+      if (seen.has(p)) continue;
+      seen.add(p);
+      r.turns.push({ t: performance.timeOrigin + performance.now(), page: p.getAttribute("data-page")! });
+    }
     if (!isUp(pages)) return;
     const el = pages[0];
     const t = performance.timeOrigin + performance.now();
@@ -130,6 +144,24 @@ export function installPagesRecorder(opts: { frames: boolean }) {
   }
 }
 
+/**
+ * Park the mouse just below the bar. A page under the pointer HOLDS (the bar
+ * stands still while hovered, SCROLLR-281), and a pointer that Chromium
+ * thinks is over the bar when the page opens freezes the leader's clock for
+ * the whole test: the bar sat on its first page for the full 40-60 s timeout
+ * in CI, then passed on rerun (SCROLLR-289). Call before `goto` and again
+ * after, as `openShim` does for the continuous bar.
+ */
+export async function parkMouse(page: Page) {
+  const vp = page.viewportSize()!;
+  await page.mouse.move(vp.width / 2, vp.height - 1);
+}
+
+/** What is under the pointer and held, for a failure message. */
+export function hoverReport(page: Page) {
+  return page.evaluate(() => `hover=[${[...document.querySelectorAll(":hover")].map((e) => e.tagName.toLowerCase() + (e.getAttribute("data-pages") !== null ? "[data-pages]" : "")).join(" ")}] pages=${[...document.querySelectorAll("[data-page]")].map((e) => e.getAttribute("data-page")).join(",")}`);
+}
+
 export async function startRecording(page: Page, frames = false) {
   await page.waitForSelector("[data-page]");
   await page.evaluate(() => document.fonts.ready);
@@ -146,7 +178,7 @@ export async function recordFromStart(page: Page, frames = false) {
 export function readTrace(page: Page): Promise<PagesTrace> {
   return page.evaluate(() => {
     const r = window.__pg!;
-    return { enters: r.enters, moved: r.moved, cuts: r.cuts, swipeFrames: r.swipeFrames, frameDts: r.frameDts };
+    return { enters: r.enters, turns: r.turns, moved: r.moved, cuts: r.cuts, swipeFrames: r.swipeFrames, frameDts: r.frameDts };
   });
 }
 
@@ -154,7 +186,7 @@ export function stopRecording(page: Page): Promise<PagesTrace> {
   return page.evaluate(() => {
     const r = window.__pg!;
     r.running = false;
-    return { enters: r.enters, moved: r.moved, cuts: r.cuts, swipeFrames: r.swipeFrames, frameDts: r.frameDts };
+    return { enters: r.enters, turns: r.turns, moved: r.moved, cuts: r.cuts, swipeFrames: r.swipeFrames, frameDts: r.frameDts };
   });
 }
 

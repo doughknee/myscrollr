@@ -70,8 +70,21 @@ jobs:
   # Browser checks against the ticker shim (SCROLLR-227): motion, chip
   # width, rotation over real laps. Not part of `npm test`; one expected
   # failure (reduced-motion scroll, SCROLLR-5) shows as such in the report.
+  #
+  # Three parallel slices (SCROLLR-289), split in playwright.config.ts
+  # (SPEC_SLICE): the real-time continuous-bar laps are the long poles, and
+  # `rest` is every other spec by complement, so nothing falls between slices.
+  # One serial job was ~20 min; each slice is its own runner, no extra load
+  # on the timing checks.
   browser:
+    name: browser (${{ matrix.slice }})
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [coverage, rail, rest]
     runs-on: ubuntu-latest
+    env:
+      SPEC_SLICE: ${{ matrix.slice }}
     defaults:
       run:
         working-directory: desktop
@@ -93,7 +106,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.slice }}
           path: |
             desktop/playwright-report/
             desktop/test-results/

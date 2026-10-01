@@ -1,5 +1,5 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { dwells, itemsPerLap, laps, lapStarts, mustSeeIds, readTrace, recordFromStart, startRecording, type PagesTrace } from "./pages";
+import { dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMouse, readTrace, recordFromStart, startRecording, type PagesTrace } from "./pages";
 
 /**
  * SCROLLR-275: the widget-pages bar (`?pages=1`), measured in a real layout.
@@ -107,20 +107,40 @@ test("two ticker windows turn pages together", async ({ page, context }) => {
   // Real time: the two windows talk over a BroadcastChannel in real time,
   // which a fake clock does not carry (each page's clock runs on its own).
   // Four turns of the leader's 6+ s dwell.
-  test.setTimeout(90_000);
+  //
+  // A turn is when a window's new `[data-page]` element appears (`turns`),
+  // not when its swipe lands (`enters`): that needs a 250 ms poll and an
+  // animation frame per window, so on a loaded runner the two windows'
+  // samples drifted by more than the bound with nothing wrong in the app
+  // (SCROLLR-289). Insertion time is the relay latency and nothing else.
+  //
+  // The pointer is parked below both bars (parkMouse): a hovered page holds,
+  // and a stray hover on either window froze the whole test.
+  test.setTimeout(120_000);
+  await parkMouse(page);
   await page.goto(url("pages"));
+  await parkMouse(page);
   const second = await context.newPage();
+  await parkMouse(second);
   await second.goto(url("pages", "&label=ticker-2"));
+  await parkMouse(second);
   await startRecording(page);
   await startRecording(second);
 
-  await page.waitForFunction(() => window.__pg!.enters.length >= 5, null, { timeout: 60_000, polling: 250 });
-  const lead = (await readTrace(page)).enters.slice(1, 5);
-  const follow = (await readTrace(second)).enters;
+  // turns[0] is the page already up when the recorder installed: no real time.
+  // Five turns of the longest dwell (12 s) fit well inside the timeout.
+  await page.waitForFunction(() => window.__pg!.turns.length >= 5, null, { timeout: 90_000, polling: 250 }).catch(async (e) => {
+    throw new Error(`the leader never turned: ${await hoverReport(page)} | follower ${await hoverReport(second)}\n${e}`);
+  });
+  const lead = (await readTrace(page)).turns.slice(1, 5);
+  // The follower may be a relay behind the leader's newest turn; wait for it, then measure.
+  await second.waitForFunction((pg) => window.__pg!.turns.some((x) => x.page === pg), lead[3].page, { timeout: 10_000, polling: 100 });
+  const follow = (await readTrace(second)).turns.slice(1);
 
   for (const e of lead) {
     const m = follow.find((x) => x.page === e.page && Math.abs(x.t - e.t) < 2000);
-    expect.soft(m, `second window showed ${e.page} (leader up at ${new Date(e.t).toISOString()})`).toBeTruthy();
+    expect.soft(m, `second window showed ${e.page} (leader turned at ${new Date(e.t).toISOString()})`).toBeTruthy();
     if (m) expect.soft(Math.abs(m.t - e.t), `skew on ${e.page} (ms)`).toBeLessThanOrEqual(SKEW_MS);
+    console.log(`[two windows] ${e.page} skew ${m ? Math.round(m.t - e.t) : "none"} ms`);
   }
 });

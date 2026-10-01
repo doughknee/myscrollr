@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { hoverReport, parkMouse } from "./pages";
 
 // Deterministic: selection, not timing.
 test.describe.configure({ retries: 0 });
@@ -41,8 +42,13 @@ test("[fresh] a zero-widget, not-yet-offered account never shows the sourceless 
 test("[fresh, pages] the first bar is an NPR page and a Stocks page, with the Clock on the edge", async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1920, height: 80 });
+  // The pointer below the bar: a hovered page holds, and the bar then never
+  // turns to Stocks (SCROLLR-289).
+  await parkMouse(page);
   // utils= (none): the Clock starts OFF, so seeing it proves the client turned it on.
   await page.goto("/ticker-shim.html?fixture=fresh&pages=1&utils=");
+
+  await parkMouse(page);
 
   // Pages swipe every 6 to 12 s; both starter widgets must come up within a lap.
   const seen = new Set<string>();
@@ -57,7 +63,10 @@ test("[fresh, pages] the first bar is an NPR page and a Stocks page, with the Cl
       },
       { timeout: 40_000, intervals: [500] },
     )
-    .toEqual(["finance_stocks", "news_npr"]);
+    .toEqual(["finance_stocks", "news_npr"])
+    .catch(async (e) => {
+      throw new Error(`${await hoverReport(page)}\n${e}`);
+    });
 
   // The Clock sits on the fixed edge, enabled by the client after the call.
   await expect(page.locator("[data-edge]")).toContainText(/\d{1,2}:\d{2}/);
