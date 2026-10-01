@@ -30,7 +30,7 @@ import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
-import type { ChipColorMode, WidgetPin } from "../../preferences";
+import type { WidgetPin } from "../../preferences";
 import { isPrimaryTicker } from "../../lib/windowRole";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
@@ -80,9 +80,6 @@ interface Props {
   widgetData?: WidgetTickerData;
   /** Pinned subjects: on the edge, off the pages. */
   pins?: WidgetPin[];
-  chipColorMode?: ChipColorMode;
-  /** Hold the page under the mouse (onHover "slow" and "pause" alike). */
-  holdOnHover?: boolean;
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
   /** Widgets with a page up this lap, for the presence check-in (the Also page does not count). */
   onDisplayedWidgetsChange?: (widgetIds: string[]) => void;
@@ -156,11 +153,10 @@ function watchTheme(onChange: () => void) {
   return () => mo.disconnect();
 }
 
-function Cell({ widget, item, colW, mode, dark, onChipClick }: {
+function Cell({ widget, item, colW, dark, onChipClick }: {
   widget: PageWidget;
   item: PageItem;
   colW: number;
-  mode: ChipColorMode;
   dark: boolean;
   onChipClick?: Props["onChipClick"];
 }) {
@@ -179,7 +175,7 @@ function Cell({ widget, item, colW, mode, dark, onChipClick }: {
     }
     case "also": {
       const a = item.data as AlsoItem;
-      return <AlsoCell code={a.code} text={a.text} accent={accentFor(mode, a.hex, dark)} onClick={() => onChipClick?.(a.tab, a.tab)} />;
+      return <AlsoCell code={a.code} text={a.text} accent={accentFor(a.hex, dark)} onClick={() => onChipClick?.(a.tab, a.tab)} />;
     }
   }
 }
@@ -189,8 +185,6 @@ export default function PagedBar({
   activeTabs,
   widgetData,
   pins = NO_PINS,
-  chipColorMode = "widget",
-  holdOnHover = true,
   onChipClick,
   onDisplayedWidgetsChange,
   empty,
@@ -245,8 +239,6 @@ export default function PagedBar({
   const nav = useRef(newNav());
   const localHover = useRef(false);
   const remoteHover = useRef(new Set<string>());
-  const holdRef = useRef(holdOnHover);
-  holdRef.current = holdOnHover;
 
   const show = useCallback((t: Turn | null) => {
     turnRef.current = t;
@@ -291,7 +283,7 @@ export default function PagedBar({
   }, [leader, turn, advance]);
 
   const updateHold = useCallback(() => {
-    const h = holdRef.current && (localHover.current || remoteHover.current.size > 0);
+    const h = localHover.current || remoteHover.current.size > 0;
     if (h === heldRef.current) return;
     heldRef.current = h;
     setHeld(h);
@@ -363,7 +355,7 @@ export default function PagedBar({
   const live = cur ? widgets.find((x) => x.tab === cur.widget.tab) : undefined;
   if (cur && live) cur.page = refreshPage(cur.page, live.items, keyOf);
 
-  const accent = accentFor(chipColorMode, cur?.widget.hex, dark);
+  const accent = accentFor(cur?.widget.hex, dark);
   const items = cur ? pageItems(cur.page) : [];
   const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: FADE_S, ease: "linear" as const } };
   const swipe = { initial: { x: "100%" }, animate: { x: "0%" }, exit: { x: "-100%" }, transition: { duration: SWIPE_S, ease: EASE } };
@@ -437,7 +429,7 @@ export default function PagedBar({
                 {items.map((item, i) => (
                   <div key={item.key} className="relative min-w-0" data-widget={cur.widget.tab} data-pin-subject={item.pin}>
                     {i > 0 && <Rule />}
-                    <Cell widget={cur.widget} item={item} colW={cur.colW} mode={chipColorMode} dark={dark} onChipClick={onChipClick} />
+                    <Cell widget={cur.widget} item={item} colW={cur.colW} dark={dark} onChipClick={onChipClick} />
                   </div>
                 ))}
               </motion.div>
@@ -446,7 +438,7 @@ export default function PagedBar({
         </>
       )}
       {/* The fixed edge: outside the page block, so it shows with no page at all. */}
-      <EdgeZone edge={edge} tick={turn?.seq ?? 0} reduced={reduced} mode={chipColorMode} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} onChipClick={onChipClick} />
+      <EdgeZone edge={edge} tick={turn?.seq ?? 0} reduced={reduced} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} onChipClick={onChipClick} />
     </div>
   );
 }

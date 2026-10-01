@@ -195,10 +195,6 @@ export default function SettingsSurface({
 
               {page === "startup" && (
                 <StartupPage
-                  startup={prefs.startup}
-                  onStartupChange={(startup) =>
-                    onPrefsChange({ ...prefs, startup })
-                  }
                   autostartEnabled={shell.autostartEnabled}
                   onAutostartChange={shell.onAutostartChange}
                 />

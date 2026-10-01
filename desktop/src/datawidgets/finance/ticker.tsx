@@ -49,7 +49,6 @@ export const financeTickerSource: TickerSource = {
       node: (
         <TradeChip
           trade={trade}
-          colorMode={ctx.chipColorMode}
           onClick={() => ctx.onChipClick?.("finance", trade.symbol, chipUrlForFinance(trade))}
         />
       ),
@@ -70,7 +69,6 @@ export const financeTickerSource: TickerSource = {
       node: (
         <TradeChip
           trade={trade}
-          colorMode={ctx.chipColorMode}
           onClick={() => ctx.onChipClick?.("finance", trade.symbol, chipUrlForFinance(trade))}
         />
       ),

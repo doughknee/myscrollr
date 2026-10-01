@@ -593,17 +593,15 @@ describe("dead prefs are shed on load (REL-208)", () => {
   });
 });
 
-describe("startup page folds (REL-206)", () => {
-  it("startInBackground defaults off — fresh install and pre-REL-206 blob alike", () => {
-    expect(loadPrefs().startup).toEqual({ startInBackground: false });
-    storeValues.set("scrollr:settings", { startup: { autoCheckUpdates: false } });
-    expect(loadPrefs().startup).toEqual({ startInBackground: false });
-  });
-
-  it("keeps a saved startInBackground and reset turns it back off", () => {
+describe("startup page folds (REL-206, SCROLLR-281)", () => {
+  /** The whole block is gone: a login launch is quiet, a user launch shows the window (lib.rs). */
+  it("has no startup prefs, and drops a saved startInBackground", () => {
+    expect(loadPrefs()).not.toHaveProperty("startup");
     storeValues.set("scrollr:settings", { startup: { startInBackground: true } });
-    expect(loadPrefs().startup.startInBackground).toBe(true);
-    expect(resetAll().startup.startInBackground).toBe(false);
+    expect(loadPrefs()).not.toHaveProperty("startup");
+    expect(resetAll()).not.toHaveProperty("startup");
+    savePrefs(loadPrefs());
+    expect(storeValues.get("scrollr:settings")).not.toHaveProperty("startup");
   });
 
   it("sheds autoCheckUpdates and the three interval prefs from what gets saved", () => {
@@ -619,7 +617,7 @@ describe("startup page folds (REL-206)", () => {
     const prefs = loadPrefs();
     savePrefs(prefs);
     const persisted = storeValues.get("scrollr:settings") as AppPreferences;
-    expect(persisted.startup).toEqual({ startInBackground: true });
+    expect(persisted).not.toHaveProperty("startup");
     expect(persisted.widgets.sysmon).toEqual({
       ticker: { cpu: true, memory: false, gpu: true, gpuPower: false },
     });
@@ -839,32 +837,34 @@ describe("appearance.units migration (REL-205)", () => {
 });
 
 describe("ticker values renamed to match their labels (REL-207)", () => {
-  it("maps every old spelling forward", () => {
-    const out = migrateTicker({
-      mixMode: "weave",
-      chipColors: "accent",
-      scrollMode: "step",
-    });
-    expect(out).toMatchObject({
-      mixMode: "mixed",
-      chipColors: "theme",
-      scrollMode: "pages",
-    });
-    expect(migrateTicker({ chipColors: "muted" }).chipColors).toBe("subtle");
+  it("maps the old scroll spellings forward", () => {
+    expect(migrateTicker({ scrollMode: "step" })).toMatchObject({ scrollMode: "pages" });
+    expect(migrateTicker({ scrollMode: "continuous" })).toMatchObject({ scrollMode: "continuous" });
   });
 
-  it("keeps the new spellings and defaults anything unknown", () => {
-    const out = migrateTicker({
-      mixMode: "grouped",
-      chipColors: "subtle",
-      scrollMode: "continuous",
-    });
-    expect(out).toMatchObject({
-      mixMode: "grouped",
-      chipColors: "subtle",
-      scrollMode: "continuous",
-    });
-    expect(migrateTicker({ chipColors: 3 })).toMatchObject({ chipColors: "widget" });
+  /** SCROLLR-281: Item order and Colors are gone; every stored value is dropped, whatever it was. */
+  it("drops a stored mixMode and chipColors, old spellings and junk alike", () => {
+    for (const mixMode of ["grouped", "mixed", "weave", 3]) {
+      expect(migrateTicker({ mixMode })).not.toHaveProperty("mixMode");
+    }
+    for (const chipColors of ["widget", "theme", "subtle", "accent", "muted", 3]) {
+      expect(migrateTicker({ chipColors })).not.toHaveProperty("chipColors");
+    }
+    storeValues.set("scrollr:settings", { ticker: { mixMode: "grouped", chipColors: "subtle" } });
+    savePrefs(loadPrefs());
+    const saved = (storeValues.get("scrollr:settings") as AppPreferences).ticker;
+    expect(saved).not.toHaveProperty("mixMode");
+    expect(saved).not.toHaveProperty("chipColors");
+  });
+
+  /** SCROLLR-281: the Font weight setting is gone; everyone gets normal. */
+  it("drops a stored appearance.fontWeight", () => {
+    for (const fontWeight of ["normal", "medium", "bold", 3]) {
+      storeValues.set("scrollr:settings", { appearance: { fontWeight, highContrast: true } });
+      const prefs = loadPrefs();
+      expect(prefs.appearance).not.toHaveProperty("fontWeight");
+      expect(prefs.appearance.highContrast).toBe(true);
+    }
   });
 
   /**
@@ -874,9 +874,9 @@ describe("ticker values renamed to match their labels (REL-207)", () => {
    */
   it("drops a stored tickerMode: compact, comfort, detailed or junk", () => {
     for (const tickerMode of ["compact", "comfort", "detailed", "huge", 3]) {
-      expect(migrateTicker({ tickerMode, mixMode: "grouped" })).not.toHaveProperty("tickerMode");
+      expect(migrateTicker({ tickerMode, scrollMode: "continuous" })).not.toHaveProperty("tickerMode");
     }
-    expect(migrateTicker({ tickerMode: "compact", mixMode: "grouped" }).mixMode).toBe("grouped");
+    expect(migrateTicker({ tickerMode: "compact", scrollMode: "continuous" }).scrollMode).toBe("continuous");
     storeValues.set("scrollr:settings", { ticker: { tickerMode: "compact" } });
     expect(loadPrefs().ticker).not.toHaveProperty("tickerMode");
   });

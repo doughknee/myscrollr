@@ -63,7 +63,7 @@ describe("buildEdge", () => {
   it("nothing at all: an empty edge, which renders nothing and so takes no width", () => {
     const edge = buildEdge(undefined, [], dash, TABS);
     expect(edge).toEqual({ utilities: [], pins: [] });
-    const { container } = render(<EdgeZone edge={edge} tick={3} reduced={false} mode="widget" dark edgeRef={() => {}} />);
+    const { container } = render(<EdgeZone edge={edge} tick={3} reduced={false} dark edgeRef={() => {}} />);
     expect(container.innerHTML).toBe("");
   });
 });
@@ -71,7 +71,7 @@ describe("buildEdge", () => {
 describe("EdgeZone (Cycle)", () => {
   const edge: Edge = buildEdge(data, [], dash, ["clock"]);
   const shown = (tick: number) => {
-    const { container, unmount } = render(<EdgeZone edge={edge} tick={tick} reduced={false} mode="widget" dark edgeRef={() => {}} />);
+    const { container, unmount } = render(<EdgeZone edge={edge} tick={tick} reduced={false} dark edgeRef={() => {}} />);
     const out = {
       item: container.querySelector("[data-item]")!.getAttribute("data-item"),
       sizers: [...container.querySelectorAll('[aria-hidden="true"]')].map((s) => s.textContent),

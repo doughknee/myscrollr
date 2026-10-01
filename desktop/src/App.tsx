@@ -366,7 +366,6 @@ export default function App() {
     themeFamily: prefs.appearance.themeFamily,
     themeMode: prefs.appearance.themeMode,
     uiScale: prefs.appearance.tickerScale,
-    fontWeight: prefs.appearance.fontWeight,
     highContrast: prefs.appearance.highContrast,
   });
 
@@ -884,8 +883,6 @@ export default function App() {
                   activeTabs={activeTabs}
                   widgetData={widgetData}
                   pins={prefs.widgets.pins}
-                  chipColorMode={prefs.ticker.chipColors}
-                  holdOnHover={prefs.ticker.onHover !== "keep"}
                   onChipClick={handleChipClick}
                   onDisplayedWidgetsChange={reportDisplayedWidgets}
                 />
@@ -900,8 +897,6 @@ export default function App() {
                 pins={prefs.widgets.pins}
                 speed={prefs.ticker.tickerSpeed}
                 onHover={prefs.ticker.onHover}
-                mixMode={prefs.ticker.mixMode}
-                chipColorMode={prefs.ticker.chipColors}
                 widgetDisplay={prefs.widgetDisplay}
                 showSourcelessCTA={showSourcelessCTA}
                 onAddSources={handleAddSources}

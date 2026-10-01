@@ -28,15 +28,13 @@ describe("AlsoCell", () => {
 });
 
 describe("accentFor", () => {
-  it("widget: the brand colour, lifted on dark only", () => {
-    expect(accentFor("widget", "#0b2265", false)).toBe("#0b2265");
-    expect(accentFor("widget", "#0b2265", true)).not.toBe("#0b2265");
-    expect(accentFor("widget", "#ffcc00", true)).toBe("#ffcc00");
+  it("the brand colour, lifted on dark only", () => {
+    expect(accentFor("#0b2265", false)).toBe("#0b2265");
+    expect(accentFor("#0b2265", true)).not.toBe("#0b2265");
+    expect(accentFor("#ffcc00", true)).toBe("#ffcc00");
   });
 
-  it("theme is the app's green; subtle, or no brand, is grey", () => {
-    expect(accentFor("theme", "#0b2265", true)).toBe("var(--color-primary)");
-    expect(accentFor("subtle", "#0b2265", true)).toBe("var(--color-fg-3)");
-    expect(accentFor("widget", undefined, true)).toBe("var(--color-fg-3)");
+  it("no brand is grey", () => {
+    expect(accentFor(undefined, true)).toBe("var(--color-fg-3)");
   });
 });

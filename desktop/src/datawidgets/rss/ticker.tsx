@@ -43,7 +43,6 @@ export const rssTickerSource: TickerSource = {
       node: (
         <RssChip
           item={item}
-          colorMode={ctx.chipColorMode}
           accent={accent}
           reserveTitle={reserveTitle}
           feedCountToday={perFeed.get(item.feed_url)}
@@ -72,7 +71,6 @@ export const rssTickerSource: TickerSource = {
       node: (
         <RssChip
           item={newest}
-          colorMode={ctx.chipColorMode}
           accent={catalogItemById(ctx.tab)?.hex}
           feedCountToday={today}
           onClick={() => ctx.onChipClick?.("rss", newest.id, chipUrlForRss(newest))}

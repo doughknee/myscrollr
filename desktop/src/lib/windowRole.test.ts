@@ -48,7 +48,7 @@ describe("ownsSharedConnection", () => {
   });
 
   it("keeps the ticker as owner when the main window is closed to tray", async () => {
-    // startup.startInBackground: main is hidden, the bar keeps streaming.
+    // A login launch (--autostart): main is hidden, the bar keeps streaming.
     labels = ["ticker", "ticker-2"];
     label = "ticker";
     expect(await ownsSharedConnection()).toBe(true);

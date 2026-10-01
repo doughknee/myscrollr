@@ -22,17 +22,13 @@ import { liftForTint } from "../../utils/chipAccent";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import TeamLogo from "../TeamLogo";
 import type { Game, TeamStanding } from "../../types";
-import type { ChipColorMode } from "../../preferences";
 
 // ── Props ───────────────────────────────────────────────────────
 
 interface GameChipProps {
   game: Game;
-  colorMode?: ChipColorMode;
   /**
-   * The league widget's catalog brand colour (#rrggbb). Used only in the
-   * "widget" colour mode; "theme" and "subtle" keep their shared palettes.
-   * Absent (no catalog yet, or a coarse legacy row) falls back to the
+   * The league widget's catalog brand colour (#rrggbb). Absent (no catalog yet, or a coarse legacy row) falls back to the
    * sports palette.
    */
   accent?: string;
@@ -73,17 +69,16 @@ const CHIP_MAX_PX = 640;
 const GameChip = memo(
   function GameChip({
     game,
-    colorMode = "widget",
     accent,
     reserveNames,
     onClick,
   }: GameChipProps) {
-    const c = getChipColors(colorMode, "sports");
+    const c = getChipColors("sports");
     // Brand tints derive from one CSS variable so the same 6% fill / 25%
     // border / 40% hover recipe every chip uses applies to a colour that is
     // only known at runtime. Tailwind cannot mint a class per hex, and a
     // variable keeps hover in CSS where it belongs.
-    const branded = colorMode === "widget" && !!accent;
+    const branded = !!accent;
     // Lifted, not raw: a navy brand tints invisibly on this surface.
     const accentStyle = branded ? ({ "--accent": liftForTint(accent) } as React.CSSProperties) : undefined;
     const live = isLive(game);
@@ -375,7 +370,6 @@ const GameChip = memo(
     );
   },
   (prev, next) =>
-    prev.colorMode === next.colorMode &&
     prev.onClick === next.onClick &&
     prev.reserveNames?.away === next.reserveNames?.away &&
     prev.reserveNames?.home === next.reserveNames?.home &&

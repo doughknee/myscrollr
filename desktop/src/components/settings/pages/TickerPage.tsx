@@ -7,10 +7,14 @@
  * numbers (`tickerSpeed`, `tickerScale`) so the bar reads
  * them unchanged; `loadPrefs` snaps anything off the list.
  *
- * Speed only moves the Continuous marquee (a page's dwell and swipe are
- * fixed by the pages bar, SCROLLR-272), so it only renders there.
+ * Speed and On hover only move the Continuous marquee (a page's dwell and
+ * swipe are fixed by the pages bar, SCROLLR-272, and a page always holds
+ * under the mouse), so they only render there (SCROLLR-281).
  * Hide-when-fullscreen only does anything on Windows, so it only
  * renders there.
+ *
+ * No colour or ordering settings (SCROLLR-281): every widget wears its own
+ * colour and the marquee weaves widgets together.
  *
  * Screen edge writes `window.tickerPosition`; App.tsx's pref subscriber
  * owns the reposition side effect, so this only has to set the pref.
@@ -23,9 +27,7 @@ import {
 } from "../../../preferences";
 import type {
   AppPreferences,
-  ChipColorMode,
   HoverBehavior,
-  MixMode,
   ScrollMode,
   TickerPosition,
   TickerPrefs,
@@ -55,12 +57,6 @@ const SIZE_OPTIONS = SCALE_PRESETS.map((v) => ({
   label: `${v}%`,
 }));
 
-const CHIP_COLOR_OPTIONS: { value: ChipColorMode; label: string }[] = [
-  { value: "widget", label: "Widget" },
-  { value: "theme", label: "Theme" },
-  { value: "subtle", label: "Subtle" },
-];
-
 const SCROLL_MODE_OPTIONS: { value: ScrollMode; label: string }[] = [
   { value: "pages", label: "Pages" },
   { value: "continuous", label: "Continuous" },
@@ -76,11 +72,6 @@ const HOVER_OPTIONS: { value: HoverBehavior; label: string }[] = [
   { value: "keep", label: "Keep moving" },
   { value: "slow", label: "Slow down" },
   { value: "pause", label: "Pause" },
-];
-
-const MIX_OPTIONS: { value: MixMode; label: string }[] = [
-  { value: "grouped", label: "By source" },
-  { value: "mixed", label: "Mixed" },
 ];
 
 interface TickerPageProps {
@@ -152,15 +143,6 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               }
             />
           </Row>
-          <Row id="chipColors">
-            <SegmentedRow
-              label={R.chipColors.label}
-              description={R.chipColors.description}
-              value={ticker.chipColors}
-              options={CHIP_COLOR_OPTIONS}
-              onChange={(v) => setTicker("chipColors", v)}
-            />
-          </Row>
         </RowList>
       </SettingsGroup>
 
@@ -186,19 +168,17 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               />
             </Row>
           )}
-          <Row id="onHover">
-            <SegmentedRow
-              label={R.onHover.label}
-              description={
-                paged
-                  ? "Whether the page holds still while your mouse is over it."
-                  : R.onHover.description
-              }
-              value={ticker.onHover}
-              options={HOVER_OPTIONS}
-              onChange={(v) => setTicker("onHover", v)}
-            />
-          </Row>
+          {!paged && (
+            <Row id="onHover">
+              <SegmentedRow
+                label={R.onHover.label}
+                description={R.onHover.description}
+                value={ticker.onHover}
+                options={HOVER_OPTIONS}
+                onChange={(v) => setTicker("onHover", v)}
+              />
+            </Row>
+          )}
         </RowList>
       </SettingsGroup>
 
@@ -222,15 +202,6 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               />
             </Row>
           )}
-          <Row id="itemOrder">
-            <SegmentedRow
-              label={R.itemOrder.label}
-              description={R.itemOrder.description}
-              value={ticker.mixMode}
-              options={MIX_OPTIONS}
-              onChange={(v) => setTicker("mixMode", v)}
-            />
-          </Row>
         </RowList>
       </SettingsGroup>
     </>

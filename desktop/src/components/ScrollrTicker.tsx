@@ -21,8 +21,6 @@ import type {
 } from "../types";
 import type {
   HoverBehavior,
-  MixMode,
-  ChipColorMode,
   WidgetPin,
   WidgetDisplayPrefs,
 } from "../preferences";
@@ -66,13 +64,8 @@ interface ScrollrTickerProps {
   speed?: number;
   /** Gap between chips in px (default 8) */
   gap?: number;
-  /** Continuous: keep / slow to 30 % / stop under the mouse.
-   *  Page: keep advancing, or hold the page (slow and pause alike). */
+  /** Keep / slow to 30 % / stop under the mouse (the pages bar always holds). */
   onHover?: HoverBehavior;
-  /** How items from different widgets are ordered */
-  mixMode?: MixMode;
-  /** Chip color scheme */
-  chipColorMode?: ChipColorMode;
   /** Per-widget display preferences (controls what data chips show) */
   widgetDisplay?: WidgetDisplayPrefs;
   /**
@@ -142,7 +135,6 @@ function widgetChipsFor(
   wt: keyof WidgetTickerData,
   items: WidgetTickerData[keyof WidgetTickerData],
   opts: {
-    chipColorMode?: ChipColorMode;
     onChipClick?: (type: string, id: string, url?: string) => void;
     /** Subjects of this widget that live in the fixed zone. */
     pinnedSubjects?: ReadonlySet<string>;
@@ -152,7 +144,7 @@ function widgetChipsFor(
     rotationMemo?: RotationMemo;
   },
 ): WidgetChip[] {
-  const { chipColorMode, onChipClick, pinnedSubjects, pinnedSubject, cycles, rotationMemo } = opts;
+  const { onChipClick, pinnedSubjects, pinnedSubject, cycles, rotationMemo } = opts;
   const widgetLabel = catalogItemById(wt)?.name ?? wt;
 
   // The four cell/gauge/spine utilities each render as ONE chip holding
@@ -166,7 +158,6 @@ function widgetChipsFor(
     if (pinnedSubject !== undefined && pinnedSubject !== wt) return [];
     if (pinnedSubject === undefined && pinnedSubjects?.has(wt)) return [];
     const shared = {
-      colorMode: chipColorMode,
       onClick: () => onChipClick?.(wt, wt),
     };
     const node =
@@ -180,7 +171,6 @@ function widgetChipsFor(
   const capped = items as Array<UptimeChipData | GitHubChipData>;
   const render = (item: UptimeChipData | GitHubChipData) => {
     const shared = {
-      colorMode: chipColorMode,
       onClick: () => onChipClick?.(wt, item.id),
     };
     return wt === "uptime" ? (
@@ -276,8 +266,6 @@ export default function ScrollrTicker({
   speed = 25,
   gap = 8,
   onHover = "slow",
-  mixMode = "grouped",
-  chipColorMode = "widget",
   widgetDisplay,
   showSourcelessCTA = false,
   onAddSources,
@@ -289,9 +277,8 @@ export default function ScrollrTicker({
   // Direction left the settings 2026-09-06 (REL-204): tickers go left.
   const effectiveDirection = "left" as const;
   const effectiveSpeed: number = speed;
-  const effectiveMixMode: MixMode = mixMode;
 
-  // Build chip arrays per widget, then combine based on mixMode.
+  // Build chip arrays per widget, then weave them together.
   // The chip builder resolves each tab through sourceForWidget(); without
   // subscribing, a server-added widget renders with no source and is skipped.
   const catalogVersion = useCatalog();
@@ -369,7 +356,6 @@ export default function ScrollrTicker({
           // failure impossible to pick out of the row, which is the
           // whole point of a status cap.
           const chipsForWidget = widgetChipsFor(wt, items, {
-            chipColorMode,
             onChipClick,
             pinnedSubjects,
             cycles,
@@ -400,7 +386,6 @@ export default function ScrollrTicker({
         tab,
         source: effectiveSource,
         dashboard,
-        chipColorMode,
         widgetDisplay,
         cycles,
         rotationMemo: rotationMemoRef.current,
@@ -445,10 +430,9 @@ export default function ScrollrTicker({
       continue;
     }
 
-    // Combine based on mix mode. Row filtering is handled upstream now,
-    // so no round-robin distribution here.
-    const allItems: React.ReactNode[] =
-      effectiveMixMode === "mixed" ? weave(buckets) : buckets.flat();
+    // Weave the widgets together, one item from each in turn (SCROLLR-281:
+    // the only order). Row filtering is handled upstream now.
+    const allItems: React.ReactNode[] = weave(buckets);
 
     return allItems;
   }, [
@@ -457,8 +441,6 @@ export default function ScrollrTicker({
     widgetData,
     onChipClick,
     pinnedByWidget,
-    effectiveMixMode,
-    chipColorMode,
     widgetDisplay,
     catalogVersion,
     cycles,
@@ -534,7 +516,6 @@ export default function ScrollrTicker({
       const items = widgetData?.[wt];
       if (!items?.length) continue;
       for (const { node, pinLabel } of widgetChipsFor(wt, items, {
-        chipColorMode,
         onChipClick,
         pinnedSubject: pin.subject,
       })) {
@@ -549,7 +530,6 @@ export default function ScrollrTicker({
       tab: pin.widget,
       source,
       dashboard,
-      chipColorMode,
       widgetDisplay,
       pinnedSubject: pin.subject,
       onChipClick,

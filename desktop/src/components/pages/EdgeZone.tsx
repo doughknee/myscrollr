@@ -34,7 +34,7 @@ import type {
   WeatherChipData,
   WidgetTickerData,
 } from "../../types";
-import type { ChipColorMode, WidgetPin } from "../../preferences";
+import type { WidgetPin } from "../../preferences";
 import { scopedRows, type TickerContext } from "../../datawidgets/ticker";
 import { gamesForTeam } from "../../datawidgets/sports/view";
 import { catalogItemById, sourceForWidget } from "../../marketplace";
@@ -249,14 +249,13 @@ function PinCell({ p, onChipClick }: { p: EdgePin; onChipClick?: (widgetType: st
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, mode, dark, edgeRef, onUtilWidth, onChipClick }: {
+export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick }: {
   edge: Edge;
   /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
   onUtilWidth?: (w: number) => void;
   /** The page turn's seq: the slots step on it. */
   tick: number;
   reduced: boolean;
-  mode: ChipColorMode;
   dark: boolean;
   edgeRef?: Ref<HTMLDivElement>;
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
@@ -280,7 +279,7 @@ export default function EdgeZone({ edge, tick, reduced, mode, dark, edgeRef, onU
     <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
       <div ref={strip} data-edge-utils="" className="flex h-full">
         {edge.utilities.map((u, i) => (
-          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(mode, u.hex, dark))}>
+          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark))}>
             {i > 0 && <Rule />}
             <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>
@@ -292,7 +291,7 @@ export default function EdgeZone({ edge, tick, reduced, mode, dark, edgeRef, onU
           className="relative h-full shrink-0"
           data-widget={p.widget}
           data-pin-subject={p.pin}
-          style={{ ...accentStyle(accentFor(mode, p.hex, dark)), width: p.width }}
+          style={{ ...accentStyle(accentFor(p.hex, dark)), width: p.width }}
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
           <PinCell p={p} onChipClick={onChipClick} />

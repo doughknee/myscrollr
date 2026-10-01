@@ -132,7 +132,7 @@ export function buildPageWidgets(
     const cat = catalogItemById(tab);
     const hex = cat?.hex;
     const pinnedSubjects = new Set(pins.filter((p) => p.widget === tab).map((p) => p.subject));
-    const ctx = { tab, source, dashboard, chipColorMode: "widget", pinnedSubjects } as TickerContext;
+    const ctx = { tab, source, dashboard, pinnedSubjects } as TickerContext;
     let pinnedAll = false;
     const config = dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as
       | { favoriteTeams?: Record<string, { teamName?: string }>; leagues?: string[]; symbols?: string[] }

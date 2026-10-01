@@ -15,9 +15,8 @@
  * a result may land you on a row that is currently hidden, which is the
  * honest outcome.
  *
- * Some pages override the description at render time (Speed and On
- * hover read differently in Page mode, the widget-slot row shows live
- * counts). The entry here is the resting copy search shows.
+ * Some pages override the description at render time (the widget-slot row
+ * shows live counts). The entry here is the resting copy search shows.
  */
 import type { SettingsPage } from "./pages";
 
@@ -48,11 +47,6 @@ export const SETTINGS_ROWS = {
       description: "Resize the main app window. The ticker has its own size.",
       keywords: "zoom scale ui display",
     },
-    fontWeight: {
-      label: "Font weight",
-      description: "Increase text thickness for readability",
-      keywords: "bold text",
-    },
     highContrast: {
       label: "High contrast text",
       description: "Brighten muted text for easier reading",
@@ -73,14 +67,10 @@ export const SETTINGS_ROWS = {
   startup: {
     autostart: {
       label: "Launch at login",
-      description: "Open Scrollr when you sign in to your computer",
-      keywords: "boot startup system autostart start automatically",
-    },
-    startInBackground: {
-      label: "Start in the background",
       description:
-        "Show only the ticker. Open the Scrollr window from the tray when you want it.",
-      keywords: "hidden minimized tray ticker only main window launch",
+        "Open Scrollr when you sign in to your computer. It starts quietly, with just the ticker; open the window from the tray.",
+      keywords:
+        "boot startup system autostart start automatically background hidden minimized tray ticker only main window",
     },
   },
 
@@ -116,11 +106,6 @@ export const SETTINGS_ROWS = {
       description: "Resize the bar. The app window has its own size.",
       keywords: "zoom scale ticker",
     },
-    chipColors: {
-      label: "Chip colors",
-      description: "Each widget's own color, the theme accent, or subtle grays.",
-      keywords: "widget theme subtle muted accent",
-    },
     scrollMode: {
       label: "Scroll mode",
       description: "One whole widget per page, or chips that scroll without stopping.",
@@ -145,11 +130,6 @@ export const SETTINGS_ROWS = {
       label: "Hide when an app goes fullscreen",
       description: "Get out of the way of games, videos and presentations.",
       keywords: "youtube games movie windows only",
-    },
-    itemOrder: {
-      label: "Item order",
-      description: "Keep each widget's items together, or mix them.",
-      keywords: "mix grouped mixed by source",
     },
   },
 

@@ -20,7 +20,7 @@
                       SCROLLR-278, so old links still open.
     ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
     ?pages=1          SCROLLR-272: scrollMode "pages", the widget-pages bar.
-    ?colors=<m>       chipColors: widget | theme | subtle.
+    ?hover=<h>        onHover: keep | slow | pause (default slow). SCROLLR-281.
     ?live=1           a live update every 4 s (src/dev/liveSim.ts): game
                       clocks run, a score changes, a third of prices move.
     ?label=<l>        this window's label (default "ticker"). Open a second
@@ -32,7 +32,7 @@
                       rose-pine-dark (cells=1 alone takes ?theme=light).
     ?cells=1          SCROLLR-271: the widget-page cells gallery
                       (src/dev/cellsGallery.tsx) instead of the ticker;
-                      with ?theme=light and ?colors=widget|theme|subtle.
+                      with ?theme=light.
     ?pin=<w>:<subj>   pin one subject to the fixed zone, repeatable
                       (e.g. ?pin=sports_mlb:Milwaukee Brewers). Only
                       the first ':' splits, so a feed url works.
@@ -185,7 +185,7 @@
             ticker: {
               showTicker: true,
               scrollMode: params.get("pages") === "1" ? "pages" : "continuous",
-              chipColors: params.get("colors") || "widget",
+              onHover: params.get("hover") || "slow",
               // Snaps to the nearest preset (20/40/80 px/s) on load.
               tickerSpeed: Number(params.get("speed")) || 40,
             },

@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 1c39ffaeb0c7 -->
+<!-- source: desktop/src/components/settings/rows.ts @ 7946266556dd -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -201,15 +201,13 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Appearance › Theme: Pick a color palette
 - Settings › Appearance › Color mode: Light, dark, or follow the system
 - Settings › Appearance › App size: Resize the main app window. The ticker has its own size.
-- Settings › Appearance › Font weight: Increase text thickness for readability
 - Settings › Appearance › High contrast text: Brighten muted text for easier reading
 - Settings › Appearance › Temperature: Used by Weather and System monitor
 - Settings › Appearance › Time: Used by Clock and the ticker
 
 ### Settings › Startup
 
-- Settings › Startup › Launch at login: Open Scrollr when you sign in to your computer
-- Settings › Startup › Start in the background: Show only the ticker. Open the Scrollr window from the tray when you want it.
+- Settings › Startup › Launch at login: Open Scrollr when you sign in to your computer. It starts quietly, with just the ticker; open the window from the tray.
 
 ### Settings › Shortcuts
 
@@ -221,13 +219,11 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Ticker › Monitors: Which screens show the ticker
 - Settings › Ticker › Screen edge: Which edge of the screen the ticker sits on.
 - Settings › Ticker › Size: Resize the bar. The app window has its own size.
-- Settings › Ticker › Chip colors: Each widget's own color, the theme accent, or subtle grays.
 - Settings › Ticker › Scroll mode: One whole widget per page, or chips that scroll without stopping.
 - Settings › Ticker › Speed: How fast the chips travel.
 - Settings › Ticker › On hover: What the bar does while your mouse is over it.
 - Settings › Ticker › Stay above other windows: Keep the ticker visible over whatever else is open.
 - Settings › Ticker › Hide when an app goes fullscreen: Get out of the way of games, videos and presentations.
-- Settings › Ticker › Item order: Keep each widget's items together, or mix them.
 
 ### Settings › Profile & plan
 
@@ -254,7 +250,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 5b7a2953b8f8 -->
+<!-- source: docs/CHIP_DESIGN.md @ 528e422b1a0a -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -325,7 +321,7 @@ your place under your cursor.
 - **The swipe takes 0.6 seconds.** If your system asks for reduced motion, it's a
   crossfade instead.
 - **Hover holds the page.** Put your mouse on the bar and it waits. There is no setting for
-  it under Pages *(lands with SCROLLR-281)*.
+  it under Pages.
 - **One visit per widget.** When the bar reaches a widget it shows the pages that have a
   live game or your team in them, every time, then two more pages of the rest in turn,
   then moves on. A busy Saturday of 56 college games takes a few laps to see everyone, but
@@ -427,9 +423,8 @@ saying, the line stays empty rather than getting filler.
   brighter tint in its own colour; it doesn't turn red. A red monitor is down. A red timer
   is in its last minute.
 - Dividers, tabs and text come from one shared palette. A cell never picks its own hue.
-- You pick a theme (ten palettes, light or dark). The separate "chip colors" choice
-  (widget, theme or subtle) is going away: every widget uses its own *(lands with
-  SCROLLR-281)*.
+- You pick a theme (ten palettes, light or dark). There is no separate
+  "chip colors" choice: every widget uses its own.
 
 ### Movement
 
@@ -570,7 +565,7 @@ GitHub chips haven't been rebuilt on these rules yet.
 
 ## The settings model
 
-<!-- source: docs/SETTINGS_AUDIT.md @ ef57081ad887 -->
+<!-- source: docs/SETTINGS_AUDIT.md @ 54203ceb168d -->
 Excerpt (sections 1–3) of the settings audit that shaped the 1.6.0 Settings rebuild. Its "Today" columns describe the app *before* that rebuild; the Settings section above is what the app shows now.
 
 ### 1. The shape is wrong before any row is
@@ -604,7 +599,7 @@ Row count goes from 24 settings to about 20, and three of the removed ones were 
 | **Theme** | Select with 10 palettes; three preview dots | **Rework** | a: fine. d: the dots preview the *active* palette, never the one you are about to pick, so the preview is decorative. Replace select+dots with a grid of 10 swatches (name + three dots each) so all palettes are visible at once and the choice *is* the preview. |
 | **Color mode** | Light / Dark / Auto | **Keep** | a: good. Fix: the Ctrl+Shift+T cycle order (dark→light→system in code) disagrees with the Shortcuts page (light→dark→auto). Pick the page's order. |
 | **Display size** | 85 / 100 / 115 / 130 % presets | **Keep**, rename **App size** | d: presets are right, and the reason the ticker's slider feels wrong is that this one already got it right. Fix: a stored value outside the four presets (old 75/90/150) leaves nothing selected — snap on load. |
-| **Font weight** | Normal / Medium / Bold | **Keep**, group as **Readability** with High contrast | b: rarely changed, but it is accessibility, and accessibility settings stay even when few use them. |
+| **Font weight** | Normal / Medium / Bold | **Removed** (SCROLLR-281; was: Keep, group as **Readability** with High contrast) | b: rarely changed, but it is accessibility, and accessibility settings stay even when few use them. |
 | **High contrast text** | switch | **Keep** under Readability | Fine as is. |
 | **Units & formats** | does not exist; °F/°C lives in the Weather bar *and again* in the Sysmon bar; 12h/24h lives in the Clock bar; each in an ad-hoc storage key outside prefs | **Add** | c: a person's temperature unit is not a per-widget opinion. One row pair here — Temperature (°F / °C), Time (12h / 24h) — read by Weather, Sysmon and Clock. The widget bars lose those controls. The ad-hoc keys move into `preferences.ts` so reset and export see them. |
 
@@ -631,7 +626,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 |---|---|---|---|
 | **Detail level** | Compact / Detailed | **Removed** (SCROLLR-278, 1 Oct 2026) | The bar has one height, today's detailed one; the choice and its `tickerMode` pref no longer exist. |
 | **Scale** | slider 75–150 % | **Rework** → **Size**, presets 85 / 100 / 115 / 130 % | d: the slider Brandon does not like. Same four presets as App size, same control, same word. The 75–150 range was never reachable for the app anyway. |
-| **Chip colors** | Widget / Theme / Subtle | **Keep** | b: real, visible effect. Values `widget/accent/muted`; align in the same migration. |
+| **Chip colors** | Widget / Theme / Subtle | **Removed** (SCROLLR-281; was: Keep) | b: real, visible effect. Values `widget/accent/muted`; align in the same migration. |
 | **Spacing** | Tight / Normal / Wide | **Fold** | b: gap between chips, 8/12/20 px. Nobody opens Settings to change chip gap. Keep one gap (the current default, tight, reads best with the redrawn chips) and delete the row. |
 
 #### Motion
@@ -650,7 +645,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 |---|---|---|---|
 | **Always on top** | Window & startup; also the right-click menu; also the tray | **Move** here as **Stay above other windows**; keep the right-click item; **drop the tray item** | c: one setting, three surfaces, plus a legacy mirror key. Settings + one quick path is enough. The tray is for when the app is hidden; it needs Show/Hide ticker, not this. |
 | **Hide when an app goes fullscreen** | Window & startup, "Windows" badge; shown and writable on macOS and Linux where it does nothing | **Move** here; **hide** it on platforms where it is inert | An inert control with a badge is still an inert control. |
-| **Item order** | By source / Mixed | **Keep** | Fine. Value `weave` → rename to match in the migration. |
+| **Item order** | By source / Mixed | **Removed** (SCROLLR-281; was: Keep) | Fine. Value `weave` → rename to match in the migration. |
 | **Reset ticker settings** (page button) | resets `ticker.*` only, so Screen edge and Size stay; toast says "Reset ticker style" | **Fix** | Reset everything on the page, and one name for the button, the toast and the undo. |
 
 ## Release history

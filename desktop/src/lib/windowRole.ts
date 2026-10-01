@@ -10,8 +10,8 @@
  *
  * Exactly one window is elected owner:
  *   - the primary ticker window (`ticker`) whenever it exists — it outlives
- *     the main window, which closes to the tray under
- *     `startup.startInBackground` while the bar keeps streaming;
+ *     the main window, which is hidden at
+ *     a login launch (`--autostart`) while the bar keeps streaming;
  *   - the main window when there is no ticker window at all (the webview
  *     failed to build — see "continuing without it" in `lib.rs`).
  */

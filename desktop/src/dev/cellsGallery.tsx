@@ -4,7 +4,7 @@
  * `?cells=1`, so the cells can be looked at, captured and measured in a
  * plain browser before the page engine (SCROLLR-272) exists.
  *
- *   /ticker-shim.html?cells=1[&theme=light|<family>-<light|dark>][&colors=widget|theme|subtle]
+ *   /ticker-shim.html?cells=1[&theme=light|<family>-<light|dark>]
  *
  * Every bar is one page as the canvas draws it, split by pagePlan.ts: a stand-in label (the real
  * one is the engine's), then equal columns. Data is dashboard.pages.json
@@ -16,7 +16,6 @@ import { StrictMode, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "../style.css";
 import type { Game, RssItem, Trade } from "../types";
-import type { ChipColorMode } from "../preferences";
 import type { LeagueMeta } from "../api/queries";
 import { catalogItemById } from "../marketplace";
 import { isLive } from "../utils/gameHelpers";
@@ -34,7 +33,6 @@ const params = new URLSearchParams(location.search);
 const themeParam = /^(?:([a-z-]+)-)?(light|dark)$/.exec(params.get("theme") ?? "");
 const dark = themeParam?.[2] !== "light";
 const dataTheme = `${themeParam?.[1] ?? "scrollr"}-${dark ? "dark" : "light"}`;
-const mode = (params.get("colors") ?? "widget") as ChipColorMode;
 const NOW = Date.parse(fixture._captured_at);
 // The shim pins html/body to the window for the bar; the gallery scrolls.
 for (const el of [document.documentElement, document.body]) Object.assign(el.style, { overflow: "auto", height: "auto" });
@@ -46,7 +44,7 @@ function firstPage<T>(items: T[], minCol: number, page = 0): T[] {
 }
 
 function Bar({ tab, code, sub, children, caption }: { tab: string; code: string; sub: string; children: ReactNode[]; caption: string }) {
-  const accent = accentFor(mode, catalogItemById(tab)?.hex, dark);
+  const accent = accentFor(catalogItemById(tab)?.hex, dark);
   return (
     <figure className="m-0 flex shrink-0 flex-col gap-1">
       <figcaption className="px-1 font-mono text-[10px] tracking-[0.06em] text-fg-4">{caption}</figcaption>
@@ -134,7 +132,7 @@ const NEWS_STATES: [string, RssItem][] = [
 
 function Strip({ name, width, children }: { name: string; width: number; children: [string, ReactNode][] }) {
   return (
-    <div className="flex h-16 shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={accentStyle(accentFor(mode, "#0b2265", dark))}>
+    <div className="flex h-16 shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={accentStyle(accentFor("#0b2265", dark))}>
       <Columns width={width}>
         {children.map(([state, node]) => (
           <div key={state} className="h-full" data-state={state}>{node}</div>
@@ -169,7 +167,7 @@ function Gallery() {
       </Bar>
       <Bar tab="quiet" code="ALSO" sub="NOTHING ON" caption="ALSO · WIDGETS WITH NOTHING ON">
         {firstPage(also, ALSO_MIN_COL).map((q) => (
-          <AlsoCell key={q.tab} code={q.code} text={q.text} accent={accentFor(mode, catalogItemById(q.tab)?.hex, dark)} />
+          <AlsoCell key={q.tab} code={q.code} text={q.text} accent={accentFor(catalogItemById(q.tab)?.hex, dark)} />
         ))}
       </Bar>
 

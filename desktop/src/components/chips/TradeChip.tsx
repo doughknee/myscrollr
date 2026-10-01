@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { clsx } from "clsx";
 import type { Trade } from "../../types";
-import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 import { formatPriceBare, formatChange } from "../../utils/format";
 import { Sparkline } from "./Sparkline";
@@ -10,17 +9,15 @@ import { DayRangeRail } from "./DayRangeRail";
 
 interface TradeChipProps {
   trade: Trade;
-  colorMode?: ChipColorMode;
   onClick?: () => void;
 }
 
 const TradeChip = memo(
   function TradeChip({
     trade,
-    colorMode = "widget",
     onClick,
   }: TradeChipProps) {
-    const c = getChipColors(colorMode, "finance");
+    const c = getChipColors("finance");
     // Direction comes from the signed percentage rather than the stored
     // `direction` string: it is the number actually rendered beside the
     // line, so the two can never disagree. Flat counts as up.
@@ -83,7 +80,6 @@ const TradeChip = memo(
     );
   },
   (prev, next) =>
-    prev.colorMode === next.colorMode &&
     prev.onClick === next.onClick &&
     prev.trade.symbol === next.trade.symbol &&
     prev.trade.price === next.trade.price &&

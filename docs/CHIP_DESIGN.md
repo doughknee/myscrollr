@@ -70,7 +70,7 @@ your place under your cursor.
 - **The swipe takes 0.6 seconds.** If your system asks for reduced motion, it's a
   crossfade instead.
 - **Hover holds the page.** Put your mouse on the bar and it waits. There is no setting for
-  it under Pages *(lands with SCROLLR-281)*.
+  it under Pages.
 - **One visit per widget.** When the bar reaches a widget it shows the pages that have a
   live game or your team in them, every time, then two more pages of the rest in turn,
   then moves on. A busy Saturday of 56 college games takes a few laps to see everyone, but
@@ -172,9 +172,8 @@ saying, the line stays empty rather than getting filler.
   brighter tint in its own colour; it doesn't turn red. A red monitor is down. A red timer
   is in its last minute.
 - Dividers, tabs and text come from one shared palette. A cell never picks its own hue.
-- You pick a theme (ten palettes, light or dark). The separate "chip colors" choice
-  (widget, theme or subtle) is going away: every widget uses its own *(lands with
-  SCROLLR-281)*.
+- You pick a theme (ten palettes, light or dark). There is no separate
+  "chip colors" choice: every widget uses its own.
 
 ## Movement
 
