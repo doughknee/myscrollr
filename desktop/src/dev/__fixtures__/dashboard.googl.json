@@ -1,0 +1,80 @@
+{
+  "_note": "SCROLLR-292: Stocks added from catalog search with only GOOGL. The page shows GOOGL plus popular symbols from /finance/public (market.json), which are not added to the watchlist.",
+  "_captured_at": "2026-09-30T20:55:00Z",
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "free",
+    "default_widgets_applied": true,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 2,
+      "widget_type": "finance_stocks",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "asset_class": "stock",
+        "symbols": [
+          "GOOGL"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ],
+  "data": {
+    "finance": [
+      {
+        "symbol": "GOOGL",
+        "price": 332.7157,
+        "previous_close": 334.6225,
+        "price_change": -1.9067999999999756,
+        "percentage_change": -0.5698361586563891,
+        "direction": "down",
+        "day_volume": 708409,
+        "last_updated": "2026-09-30T20:53:50.446651Z",
+        "link": "https://www.google.com/finance/quote/GOOGL:NASDAQ",
+        "sparkline": [
+          334.6225,
+          333.9586,
+          334.156,
+          334.4328,
+          334.6702,
+          334.6281,
+          333.4192,
+          334.4536,
+          333.1714,
+          332.0475,
+          332.2537,
+          332.9782,
+          332.5853,
+          333.597,
+          333.7,
+          333.9362,
+          333.1435,
+          332.8359,
+          331.8518,
+          331.5332,
+          332.061,
+          333.0171,
+          333.7138,
+          334.2605,
+          334.1921,
+          333.6493,
+          332.6739,
+          332.0823,
+          331.9842,
+          332.7157
+        ],
+        "day_low": 331.5332,
+        "day_high": 334.6702
+      }
+    ]
+  }
+}

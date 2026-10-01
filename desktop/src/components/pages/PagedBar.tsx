@@ -29,19 +29,23 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { WidgetPin } from "../../preferences";
+import { financeMarketOptions } from "../../api/queries";
+import { sourceForWidget } from "../../marketplace";
 import { isPrimaryTicker } from "../../lib/windowRole";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { LABEL_W, contentWidth, freezePage, pageItems, refreshPage, type FrozenPage } from "./pagePlan";
+import { LABEL_W, columnsFor, contentWidth, freezePage, pageItems, refreshPage, type FrozenPage } from "./pagePlan";
 import {
   ALSO_TAB,
   buildPageWidgets,
   followPage,
+  labelFact,
   newNav,
   nextTurn,
   planAll,
@@ -52,7 +56,7 @@ import {
 } from "./widgetPages";
 import GameCell from "./cells/GameCell";
 import NewsCell from "./cells/NewsCell";
-import QuoteCell from "./cells/QuoteCell";
+import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
@@ -98,6 +102,12 @@ interface Shown {
   index: number;
   count: number;
   colW: number;
+  /** Columns a full page has at this width, the widget's items over all its pages, and what it could have shown (the browser checks read all three). */
+  cols: number;
+  total: number;
+  avail: number;
+  /** Fewer items than columns even after filling: cells keep a full page's column width, left-aligned, instead of stretching (SCROLLR-292). */
+  short: boolean;
 }
 
 const NO_PINS: WidgetPin[] = [];
@@ -205,14 +215,31 @@ export default function PagedBar({
   const room = useEdgeRoom();
   const onEdge = useMemo(() => (room ? stepBack(pins, room) : pins), [pins, room]);
 
-  const widgets = useMemo(() => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge), [dashboard, activeTabs, onEdge]);
+  // Live width for the NEXT page; the page on screen keeps the width it froze with.
+  const widthRef = useRef(0);
+  const [width, setWidth] = useState(0);
+
+  // The whole market's quotes, only while a watchlist is shorter than a page
+  // (its empty columns fill with popular symbols, SCROLLR-292).
+  const quoteCols = columnsFor(contentWidth(width), QUOTE_MIN_COL);
+  const shortWatchlist = activeTabs.some((tab) => {
+    if (sourceForWidget(tab) !== "finance") return false;
+    const symbols = (dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as { symbols?: unknown } | undefined)?.symbols;
+    return !Array.isArray(symbols) || symbols.length < quoteCols;
+  });
+  const { data: market, isPending: marketPending } = useQuery({ ...financeMarketOptions(), enabled: shortWatchlist && !!dashboard });
+  // The first page waits for the market (or its failure) so a one-symbol
+  // watchlist never opens as one quote across the bar.
+  const awaitingMarket = shortWatchlist && !!dashboard && marketPending;
+
+  const widgets = useMemo(
+    () => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge, shortWatchlist ? market : undefined),
+    [dashboard, activeTabs, onEdge, market, shortWatchlist],
+  );
   const edge = useMemo(() => buildEdge(widgetData, onEdge, dashboard, activeTabs), [widgetData, onEdge, dashboard, activeTabs]);
   const widgetsRef = useRef(widgets);
   widgetsRef.current = widgets;
 
-  // Live width for the NEXT page; the page on screen keeps the width it froze with.
-  const widthRef = useRef(0);
-  const [width, setWidth] = useState(0);
   const [bar, setBar] = useState<HTMLDivElement | null>(null);
   usePublishEdge(label, width, utilW);
   useEffect(() => {
@@ -265,8 +292,8 @@ export default function PagedBar({
   useEffect(() => {
     // The ref, not the state: StrictMode runs this twice before the first
     // turn renders, and the second run must not skip page one.
-    if (leader && !turnRef.current && widgets.length > 0 && width > 0) advance();
-  }, [leader, turn, widgets.length, width, advance]);
+    if (leader && !turnRef.current && widgets.length > 0 && width > 0 && !awaitingMarket) advance();
+  }, [leader, turn, widgets.length, width, awaitingMarket, advance]);
 
   // The clock restarts only on a new turn, never on a data update, and
   // stands still while the page is held.
@@ -344,13 +371,20 @@ export default function PagedBar({
     if (w && plan && plan.pages.length > 0) {
       const index = followPage(turn, plan.pages.length);
       const items = plan.pages[index];
+      // Truly short (one page, fewer items than columns, nothing left to
+      // fill with): a full page's column width, not one item across the bar.
+      const short = plan.pages.length === 1 && items.length < plan.cols;
       shown.current = {
         seq: turn.seq,
         widget: w,
         page: freezePage(items, keyOf),
         index,
         count: plan.pages.length,
-        colW: contentWidth(planWidth, planEdge) / items.length,
+        colW: contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        short,
+        cols: plan.cols,
+        total: plan.pages.reduce((n, p) => n + p.length, 0),
+        avail: plan.avail,
       };
     }
   }
@@ -358,7 +392,8 @@ export default function PagedBar({
   // Values move in; keys, order and width do not. An item that left the
   // pool keeps its last value until the page leaves.
   const live = cur ? widgets.find((x) => x.tab === cur.widget.tab) : undefined;
-  if (cur && live) cur.page = refreshPage(cur.page, live.items, keyOf);
+  if (cur && live) cur.page = refreshPage(cur.page, [...live.items, ...live.fill], keyOf);
+  const fact = cur ? labelFact(live ?? cur.widget, plans.get(cur.widget.tab)) : "";
 
   const accent = accentFor(cur?.widget.hex, dark);
   const ink = inkFor(cur?.widget.hex, dark);
@@ -405,7 +440,7 @@ export default function PagedBar({
                 </span>
                 {/* fg-2, not fg-3: it sits on the label's tint, which costs contrast (SCROLLR-287). */}
                 <span className="flex items-center justify-between gap-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
-                  <span className="truncate">{(live ?? cur.widget).sub}</span>
+                  <span className="truncate">{fact}</span>
                   {cur.count > 5 && (
                     <span className="shrink-0 tabular-nums" style={{ color: "var(--accent-ink)" }}>
                       {cur.index + 1}/{cur.count}
@@ -430,12 +465,21 @@ export default function PagedBar({
               <motion.div
                 key={cur.seq}
                 data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`}
+                data-short={cur.short ? "" : undefined}
+                data-cols={cur.cols}
+                data-total={cur.total}
+                data-avail={cur.avail}
                 className="absolute inset-0 grid"
-                style={{ ...accentStyle(accent, ink), gridTemplateColumns: `repeat(${Math.max(1, items.length)}, minmax(0, 1fr))` }}
+                style={{
+                  ...accentStyle(accent, ink),
+                  gridTemplateColumns: cur.short
+                    ? `repeat(${items.length}, ${cur.colW}px)`
+                    : `repeat(${Math.max(1, items.length)}, minmax(0, 1fr))`,
+                }}
                 {...(reduced ? fade : swipe)}
               >
                 {items.map((item, i) => (
-                  <div key={item.key} className="relative min-w-0" data-widget={cur.widget.tab} data-pin-subject={item.pin}>
+                  <div key={item.key} className="relative min-w-0" data-widget={cur.widget.tab} data-pin-subject={item.pin} data-fill={item.fill ? "" : undefined}>
                     {i > 0 && <Rule />}
                     <Cell widget={cur.widget} item={item} colW={cur.colW} dark={dark} onChipClick={onChipClick} />
                   </div>

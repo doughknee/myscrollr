@@ -120,6 +120,17 @@ export function selectRssForTicker(items: RssItem[], now: number = Date.now()): 
 }
 
 /**
+ * Pages only (SCROLLR-292): headlines that may fill a page's empty columns
+ * past the 6 h horizon, newest first, down to the 48 h floor. Undated items
+ * are current and already in the pool; the caller skips anything that is.
+ */
+export function selectRssFill(items: RssItem[], now: number = Date.now()): RssItem[] {
+  const floorCutoff = now - TICKER_RSS_FLOOR_HOURS * 3_600_000;
+  const at = (it: RssItem) => new Date(it.published_at ?? it.created_at).getTime();
+  return items.filter((it) => at(it) >= floorCutoff).sort((a, b) => at(b) - at(a));
+}
+
+/**
  * What a news widget says when nothing it holds is inside the floor
  * (SCROLLR-264, CHIP_SPEC §8.7). A feed cannot say when it will publish,
  * so this only says what is true: nothing in the floor's window, or

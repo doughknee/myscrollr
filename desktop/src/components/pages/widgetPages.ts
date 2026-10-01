@@ -18,10 +18,10 @@ import type { TickerContext } from "../../datawidgets/ticker";
 import { dropPinned, scopedRows } from "../../datawidgets/ticker";
 import type { WidgetPin } from "../../preferences";
 import { TICKER_SOURCES } from "../../datawidgets/tickerRegistry";
-import { getSportsDisplayConfig, selectSportsForTicker } from "../../datawidgets/sports/view";
-import { selectRssForTicker } from "../../datawidgets/rss/view";
-import { selectFinanceForTicker } from "../../datawidgets/finance/view";
-import { catalogItemById, sourceForWidget } from "../../marketplace";
+import { getSportsDisplayConfig, selectSportsFill, selectSportsForTicker } from "../../datawidgets/sports/view";
+import { selectRssFill, selectRssForTicker } from "../../datawidgets/rss/view";
+import { selectFinanceFill, selectFinanceForTicker } from "../../datawidgets/finance/view";
+import { addConfigForWidget, assetClassForWidget, catalogItemById, sourceForWidget } from "../../marketplace";
 import { isLive, isPre, leagueCode } from "../../utils/gameHelpers";
 import { teamShortName } from "../../utils/teamShortName";
 import { sourceTab } from "../../utils/rssText";
@@ -35,6 +35,7 @@ import {
   contentWidth,
   dwellFor,
   planWidget,
+  topUp,
   visitPages,
   type Tier,
   type WidgetPlan,
@@ -60,6 +61,8 @@ export interface PageItem {
   mine?: boolean;
   /** `data-pin-subject` JSON for the right-click menu (utils/pinTarget). */
   pin?: string;
+  /** Not the user's own: a popular symbol filling a short watchlist's page (SCROLLR-292). */
+  fill?: boolean;
 }
 
 export interface PageWidget {
@@ -75,6 +78,12 @@ export interface PageWidget {
   /** Narrowest column, from the cell family (never a local default). */
   minCol: number;
   items: PageItem[];
+  /**
+   * What may fill the last page's empty columns, in order (SCROLLR-292): the
+   * next games, older headlines, popular symbols. `planAll` takes only as
+   * many as the bar's width leaves empty.
+   */
+  fill: PageItem[];
 }
 
 export const ALSO_TAB = "also";
@@ -120,6 +129,8 @@ export function buildPageWidgets(
   activeTabs: readonly string[],
   now: number = Date.now(),
   pins: readonly WidgetPin[] = [],
+  /** Every tracked symbol's latest quote (`/finance/public`), for a short watchlist's fills. */
+  market: readonly Trade[] = [],
 ): PageWidget[] {
   const out: PageWidget[] = [];
   const also: PageItem[] = [];
@@ -157,19 +168,28 @@ export function buildPageWidgets(
         const ordered = [...mine, ...live, ...rest];
         const league = config?.leagues?.[0] ?? ordered[0].league;
         const liveCount = ordered.filter(isLive).length;
+        const item = (g: Game, tier: Tier): PageItem => ({
+          key: `g:${g.id}`,
+          tier,
+          data: g,
+          mine: isMine(g),
+          // As on the chip: the home team is the subject a right-click offers.
+          pin: pinOf(tab, g.home_team_name, teamShortName(g.league, g.home_team_name)),
+        });
+        const inPool = new Set(pool.map((g) => g.id));
+        // Your team's games lead the fill (the ladder: live, yours, soonest), then kick-off order.
+        const later = selectSportsFill(rows, getSportsDisplayConfig(dashboard, tab), now)
+          .filter((g) => !inPool.has(g.id))
+          .sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
         widget = {
           tab, kind: "sports", hex,
           code: leagueCode(league),
           sub: liveCount ? `${liveCount} LIVE` : dayLabel(ordered[0].start_time),
           minCol: gameMinCol(leagueCode(ordered[0].league)),
-          items: ordered.map((g) => ({
-            key: `g:${g.id}`,
-            tier: gameTier(g, isMine(g), now),
-            data: g,
-            mine: isMine(g),
-            // As on the chip: the home team is the subject a right-click offers.
-            pin: pinOf(tab, g.home_team_name, teamShortName(g.league, g.home_team_name)),
-          })),
+          items: ordered.map((g) => item(g, gameTier(g, isMine(g), now))),
+          // Past the horizon, yours then soonest. The same ladder as the pool:
+          // your team's game is on every visit wherever it came from (§P.5).
+          fill: dropPinned(later, ctx, (g) => [g.home_team_name, g.away_team_name]).map((g) => item(g, gameTier(g, isMine(g), now))),
         };
       }
     } else if (source === "rss") {
@@ -178,17 +198,16 @@ export function buildPageWidgets(
       const items = dropPinned(pool, ctx, (r) => r.feed_url);
       pinnedAll = pool.length > 0 && items.length === 0;
       if (items.length) {
+        const item = (r: RssItem, tier: Tier): PageItem => ({ key: `n:${r.id}`, tier, data: r, pin: pinOf(tab, r.feed_url, r.source_name) });
+        const inPool = new Set(pool.map((r) => r.id));
+        const older = selectRssFill(rows, now).filter((r) => !inPool.has(r.id));
         widget = {
           tab, kind: "news", hex,
           code: sourceTab(rows[0]?.source_name ?? cat?.name ?? tab).split(" ")[0],
           sub: "HEADLINES",
           minCol: NEWS_MIN_COL,
-          items: items.map((r) => ({
-            key: `n:${r.id}`,
-            tier: newsTier(r, now),
-            data: r,
-            pin: pinOf(tab, r.feed_url, r.source_name),
-          })),
+          items: items.map((r) => item(r, newsTier(r, now))),
+          fill: dropPinned(older, ctx, (r) => r.feed_url).map((r) => item(r, TIER.quiet)),
         };
       }
     } else if (source === "finance") {
@@ -196,7 +215,13 @@ export function buildPageWidgets(
       const pool = selectFinanceForTicker(scopedRows<Trade>(raw, ctx), config?.symbols ?? []);
       const items = dropPinned(pool, ctx, (t) => t.symbol);
       pinnedAll = pool.length > 0 && items.length === 0;
-      if (items.length) {
+      // A short watchlist's empty columns: popular symbols, never one of the
+      // user's, never added to the watchlist, never pinnable (not theirs).
+      const starters = addConfigForWidget(tab)?.symbols;
+      const popular = Array.isArray(raw) && !pinnedAll
+        ? selectFinanceFill(market, pool.map((t) => t.symbol).concat(config?.symbols ?? []), Array.isArray(starters) ? (starters as string[]) : [], assetClassForWidget(tab))
+        : [];
+      if (items.length || popular.length) {
         const up = items.filter((t) => !(Number(t.percentage_change) < 0)).length;
         widget = {
           tab, kind: "finance", hex,
@@ -212,6 +237,7 @@ export function buildPageWidgets(
             data: t,
             pin: pinOf(tab, t.symbol, t.symbol),
           })),
+          fill: popular.map((t) => ({ key: `f:${t.symbol}`, tier: TIER.quiet, data: t, fill: true })),
         };
       }
     }
@@ -231,15 +257,46 @@ export function buildPageWidgets(
   }
 
   if (also.length) {
-    out.push({ tab: ALSO_TAB, kind: "also", code: "ALSO", sub: "NOTHING ON", minCol: ALSO_MIN_COL, items: also });
+    out.push({ tab: ALSO_TAB, kind: "also", code: "ALSO", sub: "NOTHING ON", minCol: ALSO_MIN_COL, items: also, fill: [] });
   }
   return out;
 }
 
-/** Every widget's pages at this bar width. `edgeWidth` is the fixed edge zone's measured width (0 when it is empty). */
-export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0): Map<string, WidgetPlan<PageItem>> {
+/** A widget's pages at this bar width, how many columns a full page has, and how many items it could have shown. */
+export interface PagePlan extends WidgetPlan<PageItem> {
+  cols: number;
+  /** Its own items plus every fill it may use: a single page holds `min(cols, avail)` (the browser checks assert it). */
+  avail: number;
+}
+
+/**
+ * Every widget's pages at this bar width. `edgeWidth` is the fixed edge
+ * zone's measured width (0 when it is empty). Every page is full
+ * (SCROLLR-292): the pool is topped up from the widget's fill until the last
+ * page has a column for every item.
+ */
+export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0): Map<string, PagePlan> {
   const content = contentWidth(barWidth, edgeWidth);
-  return new Map(widgets.map((w) => [w.tab, planWidget(w.items, (i) => i.tier, columnsFor(content, w.minCol))]));
+  return new Map(
+    widgets.map((w) => {
+      const cols = columnsFor(content, w.minCol);
+      // Popular symbols fill a watchlist SHORTER than a page, never the tail of a long one
+      // (10 symbols at 9 columns are two pages of 5, not 9 of yours and 1 of yours + 8 of theirs).
+      const fill = w.kind === "finance" && w.items.length >= cols ? [] : w.fill;
+      return [w.tab, { ...planWidget(topUp(w.items, fill, cols), (i) => i.tier, cols), cols, avail: w.items.length + fill.length }];
+    }),
+  );
+}
+
+/**
+ * The label's fact for this plan. A watchlist filled with popular symbols
+ * says so, in the 11 characters the label has: "+4 POPULAR" (the rest are the
+ * user's own), or "10 POPULAR" when none is.
+ */
+export function labelFact(widget: PageWidget, plan: WidgetPlan<PageItem> | undefined): string {
+  const fills = plan ? plan.pages.reduce((n, p) => n + p.filter((i) => i.fill).length, 0) : 0;
+  if (!fills) return widget.sub;
+  return `${widget.items.length ? "+" : ""}${fills} POPULAR`;
 }
 
 /**

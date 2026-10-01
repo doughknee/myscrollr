@@ -279,6 +279,27 @@ function onTicker(games: Game[], now: number): Game[] {
   return upcoming.filter((g) => startOfLocalDay(at(g)) === matchday);
 }
 
+/**
+ * Pages only (SCROLLR-292, CHIP_SPEC §P.5): what may fill a page's empty
+ * columns once the ticker pool above has run out. Every upcoming game
+ * within TICKER_FLOOR_DAYS, soonest first, through the same day window; the
+ * caller skips any already in the pool. So a Thursday's NFL page is the
+ * Thursday-night game plus Sunday's soonest kick-offs, not one game
+ * stretched across the bar. Continuous never calls this: its slots and
+ * rotation keep the horizon.
+ */
+export function selectSportsFill(
+  games: Game[],
+  config: SportsDisplayConfig | null | undefined,
+  now: number = Date.now(),
+): Game[] {
+  const at = (g: Game) => new Date(g.start_time).getTime();
+  const limit = now + TICKER_FLOOR_DAYS * DAY_MS;
+  return withinDayWindow(games, config, now)
+    .filter((g) => g.state === "pre" && at(g) > now && at(g) <= limit)
+    .sort((a, b) => at(a) - at(b));
+}
+
 /** The day-window filter, shared by the ticker and the feed. */
 function withinDayWindow(
   games: Game[],

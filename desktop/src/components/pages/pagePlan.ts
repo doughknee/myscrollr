@@ -92,6 +92,20 @@ export function paginate<T>(items: readonly T[], cols: number): T[][] {
   return out;
 }
 
+/**
+ * Every page is full (SCROLLR-292). `items` (the widget's own pool, ranked)
+ * is topped up from `fill` (what lies past the horizon, in its own order)
+ * until the last page has as many items as there are columns: a short pool
+ * gains exactly the empty columns and never a whole extra page, so the
+ * visit rule and the lap are unchanged. With no fill left the pool stays
+ * short, and paginate's even split (or a short page, PagedBar) takes over.
+ */
+export function topUp<T>(items: readonly T[], fill: readonly T[], cols: number): T[] {
+  const c = Math.max(1, Math.floor(cols));
+  const want = Math.max(1, Math.ceil(items.length / c)) * c;
+  return [...items, ...fill.slice(0, Math.max(0, want - items.length))];
+}
+
 export interface WidgetPlan<T> {
   /** Items split into pages, tier order kept. */
   pages: T[][];

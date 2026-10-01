@@ -35,6 +35,10 @@ export interface Enter {
   count: number;
   items: SeenItem[];
   initial: boolean;
+  /** The page's `data-cols` / `data-total` / `data-avail` (PagedBar): a full page's columns, the widget's items over its pages, what it could have shown. */
+  cols: number;
+  total: number;
+  avail: number;
 }
 
 export interface Moved {
@@ -108,8 +112,10 @@ export function installPagesRecorder(opts: { frames: boolean }) {
       const [i, n] = pos.split("/").map(Number);
       cur = el;
       rects = new Map();
+      const num = (a: string) => Number(el.getAttribute(a));
       r.enters.push({
         t, page: label, tab, index: i - 1, count: n, initial: installing,
+        cols: num("data-cols"), total: num("data-total"), avail: num("data-avail"),
         items: cells.map((c) => ({ id: c.dataset.item!, live: c.hasAttribute("data-live"), mine: c.hasAttribute("data-mine") })),
       });
     }
@@ -240,6 +246,26 @@ export function mustSeeIds(fixture: string): string[] {
   return games
     .filter((g) => g.state === "in" || g.state === "in_progress" || mine.has(g.home_team_name) || mine.has(g.away_team_name))
     .map((g) => String(g.id));
+}
+
+/**
+ * Every page is full (SCROLLR-292). A widget on one page shows
+ * `min(columns, available)` items, where available is its own items plus
+ * every fill it may use; a widget on several pages shows a full page each
+ * time, unless its fill ran out (then the pages split evenly, never a
+ * lonely last page, and no page holds fewer than its share). Returns the
+ * pages that broke it.
+ */
+export function unfilled(enters: readonly Enter[]): string[] {
+  return enters.flatMap((e) => {
+    const n = e.items.length;
+    const want =
+      e.count === 1 ? Math.min(e.cols, e.avail)
+      : e.total === e.count * e.cols ? e.cols
+      : Math.floor(e.total / e.count);
+    const ok = e.count === 1 || e.total === e.count * e.cols ? n === want : n >= want && n <= e.cols;
+    return ok ? [] : [`${e.page}: ${n} items, want ${want} (cols ${e.cols}, total ${e.total}, avail ${e.avail})`];
+  });
 }
 
 /** Seconds on screen per widget, as a share of the run: the "widget share" criterion. */

@@ -256,6 +256,9 @@
         // server would: NPR + Stocks created, flag flipped.
         var fixture = loadFixture(fixturePath);
         var starterFixture = loadFixture("/src/dev/__fixtures__/dashboard.starter.json");
+        var market = loadFixture("/src/dev/__fixtures__/market.json").then(function (r) {
+          return [r[0], r[0] === 200 ? JSON.stringify(JSON.parse(r[1]).trades) : r[1]];
+        });
         // The writes the page made, "METHOD url" — specs read it to prove
         // exactly one starter call happened.
         window.__shimRequests = [];
@@ -276,6 +279,8 @@
               });
             });
           }
+          // The whole market (SCROLLR-292): what a short watchlist fills from.
+          if (/\/finance\/public/.test(url)) return market;
           if (/\/dashboard/.test(url) || /\/public\/feed/.test(url)) return fixture;
           if (/\/catalog/.test(url)) return Promise.resolve([200, '{"widgets":[]}']);
           if (/\/health/.test(url)) return Promise.resolve([200, '{"status":"healthy","database":"healthy","redis":"healthy","services":{}}']);
