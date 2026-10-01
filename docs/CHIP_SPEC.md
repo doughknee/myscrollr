@@ -364,8 +364,10 @@ status chip (§8.7); each cell says what the status chip would, in the same word
 - **Existing users switch to Pages once at the release**, with a one-time notice that
   Continuous is one click away *(lands with SCROLLR-277)*.
 - **A new account's first bar** is NPR + Stocks (`finance_stocks`, default watchlist) on
-  pages and the Clock on the edge *(lands with SCROLLR-283; on `main` it is NPR alone,
-  `lib/firstRunDefaultWidget.ts`)*.
+  pages and the Clock on the edge. The server applies NPR + Stocks in one transaction
+  (`POST /users/me/widgets/starter`, which also flips `default_widgets_applied`), so there is
+  never a half set; the owner window then turns the Clock on, only after that call succeeded
+  (`lib/firstRunDefaultWidget.ts`). Once per account: removing everything never brings it back.
 
 ### P.14 One clock, every monitor
 

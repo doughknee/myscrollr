@@ -330,6 +330,17 @@ export const dataWidgetsApi = {
       }),
     }),
 
+  /**
+   * The first-run set (SCROLLR-283): the server flips default_widgets_applied
+   * and creates NPR + Stocks in one transaction. `applied: false` = nothing
+   * to do (already offered, or the account already has widgets).
+   */
+  applyStarter: () =>
+    authFetch<{ applied: boolean; widgets: Array<DataWidgetRow> }>(
+      "/users/me/widgets/starter",
+      { method: "POST" },
+    ),
+
   update: (
     widgetType: WidgetId,
     data: {

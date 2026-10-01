@@ -254,7 +254,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 48c652145ebf -->
+<!-- source: docs/CHIP_DESIGN.md @ 5b7a2953b8f8 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -352,8 +352,7 @@ own empty page. All of them share one page at the very end: "EPL · next match S
 #### Colour and a new account
 
 Each page is painted in its widget's own colour. A new account starts with NPR, Stocks and
-a clock on the edge, so the bar shows news, markets and the time with no setup *(lands with
-SCROLLR-283)*.
+a clock on the edge, so the bar shows news, markets and the time with no setup.
 
 ---
 

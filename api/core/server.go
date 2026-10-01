@@ -337,6 +337,7 @@ func (s *Server) setupRoutes() {
 	// rename (VISION §4.4) — one name, no compat seam.
 	s.App.Get("/users/me/widgets", platform.LogtoAuth, widgets.GetWidgets)
 	s.App.Post("/users/me/widgets", platform.LogtoAuth, widgets.CreateWidget)
+	s.App.Post("/users/me/widgets/starter", platform.LogtoAuth, widgets.ApplyStarterWidgets)
 	s.App.Put("/users/me/widgets/:type", platform.LogtoAuth, widgets.UpdateWidget)
 	s.App.Delete("/users/me/widgets/:type", platform.LogtoAuth, widgets.DeleteWidget)
 
