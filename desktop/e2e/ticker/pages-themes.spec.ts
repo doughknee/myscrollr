@@ -26,7 +26,9 @@ import { THEME_FAMILIES } from "../../src/preferences";
  * ASSERTED in every theme, every reading (SCROLLR-287 emptied the table of
  * known misses): fg, fg-2 and fg-3 text, finals, the up/down change and the
  * live clock at 4.5; the label's name at 3; small text in the widget's
- * colour at 4.5; every hairline at 1.5. A theme that misses fails and names
+ * colour at 4.5; every hairline at 1.5. SCROLLR-290 adds the weather alert
+ * (the amber `warning` text on the edge, 4.5; the shim's `weather=alert` is
+ * one alerted city, alone so the slot never rotates away) and the empty bar's EMPTY label (3, it is large). A theme that misses fails and names
  * the group, the ratio and the text, so the fix lands in the palette token
  * or the cell rule that painted it.
  */
@@ -36,7 +38,7 @@ const LARGE_FLOOR = 3;
 const RULE_FLOOR = 1.5;
 
 /** Groups every theme must have measured, so a pass is never vacuous. */
-const MEASURED = ["fg", "fg-2", "fg-3", "label-name", "accent", "rule"];
+const MEASURED = ["fg", "fg-2", "fg-3", "label-name", "accent", "rule", "warning", "empty-label"];
 /** Parts every theme must have measured: the up/down change and the game clock (live, in the live colour). */
 const PARTS = ["change", "status"];
 
@@ -112,7 +114,8 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
           continue;
         }
         const own = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent!.trim()).map((n) => n.textContent!.trim()).join(" ");
-        if (!own) continue;
+        // A weather icon is a coloured emoji picture: the OS paints it, the CSS colour is not what you see.
+        if (!own || /^\p{Emoji_Presentation}+$/u.test(own)) continue;
         const px = parseFloat(cs.fontSize);
         const large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700);
         const part = el.closest("[data-part]")?.getAttribute("data-part") ?? (el.closest("[data-label]") ? (large ? "label-name" : "label-sub") : "text");
@@ -122,7 +125,7 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
           const v = cs.getPropertyValue(prop).trim();
           return !!v && same(solid, paint([{ color: v, alpha: 1 }]));
         };
-        const token = ["fg", "fg-2", "fg-3", "fg-4", "up", "down", "live"].find((t) => is(`--color-${t}`));
+        const token = ["fg", "fg-2", "fg-3", "fg-4", "up", "down", "live", "warning"].find((t) => is(`--color-${t}`));
         const group = part === "label-name" ? "label-name" : token ?? (is("--accent") || is("--accent-ink") ? "accent" : `other:${part}`);
         out.push({
           // Text drawn at reduced opacity is its own group.
@@ -140,6 +143,9 @@ async function readings(page: Page, url: string, root: string, ready: string): P
   await page.goto(url);
   await page.locator(ready).first().waitFor();
   await page.evaluate(() => document.fonts.ready);
+  // Colours are measured at rest: a theme applied after first paint transitions, and a mid-fade reading is not the palette's.
+  await page.waitForTimeout(100);
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => {}))));
   await page.evaluate(installContrast, { text: TEXT_FLOOR, large: LARGE_FLOOR, rule: RULE_FLOOR });
   return page.evaluate((root) => window.__contrast(root), root);
 }
@@ -150,9 +156,20 @@ for (const family of THEME_FAMILIES) {
   for (const mode of ["dark", "light"] as const) {
     const theme = `${family}-${mode}`;
     test(`${theme}: label, cell text and rules clear their contrast floor`, async ({ page }) => {
-      const bar = await readings(page, `/ticker-shim.html?pages=1&fixture=pages&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]");
+      // The edge zone carries a weather alert (the shim's `weather=alert` city, alone so the slot holds still), in the warning colour.
+      let bar = await readings(page, `/ticker-shim.html?pages=1&fixture=pages&utils=clock,weather&weather=alert&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]");
+      // The edge slot can be a beat behind the page's cells (slower on CI): read again until the alert is in.
+      for (let i = 0; i < 20 && !bar.some((r) => r.group === "warning"); i++) {
+        await page.waitForTimeout(250);
+        bar = await page.evaluate((root) => window.__contrast(root), ".ticker-container");
+      }
+      // SCROLLR-290: the empty bar's label (nothing installed, and everything off).
+      const empty = [
+        ...(await readings(page, `/ticker-shim.html?pages=1&fixture=empty&utils=&theme=${theme}`, "[data-label=empty]", "[data-label=empty]")),
+        ...(await readings(page, `/ticker-shim.html?pages=1&fixture=off&utils=&theme=${theme}`, "[data-label=empty]", "[data-label=empty]")),
+      ].map((r) => (r.group === "label-name" ? { ...r, group: "empty-label" } : r));
       const gallery = await readings(page, `/ticker-shim.html?cells=1&theme=${theme}`, "[data-bar], [data-strip]", "[data-bar] [data-chip]");
-      const all = [...bar, ...gallery];
+      const all = [...bar, ...gallery, ...empty];
       expect(all.length, "measured something").toBeGreaterThan(40);
 
       // Worst margin per group, and the offender, so a miss names what to fix.

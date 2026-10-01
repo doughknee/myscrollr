@@ -40,8 +40,10 @@
                       empty for none). SCROLLR-273's edge zone shows them.
     ?zones=<tz,…>     world clocks beside local time
                       (e.g. America/New_York,Europe/London,Asia/Tokyo).
-    ?weather=demo     three sample cities (no weather provider here),
+    ?weather=demo     three sample cities (Chicago carries a "Storm watch" alert),
                       and puts weather on the ticker.
+    ?weather=alert    only the alerted city, so the edge slot never rotates away
+                      from the alert (the contrast spec reads it at rest).
 
   What the seed does: scrollr:settings puts the bar on, continuous, with the local clock on the ticker; the fixture's `widgets`
   rows (enabled + ticker_enabled) supply the data widgets, so whatever a
@@ -160,13 +162,13 @@
         var fixtureName = params.get("fixture") || "default";
         var fixturePath = "/src/dev/__fixtures__/dashboard." + fixtureName + ".json";
         var utils = (params.has("utils") ? params.get("utils") : "clock").split(",").filter(Boolean);
-        var demoWeather = params.get("weather") === "demo";
+        var demoWeather = params.get("weather") === "demo" || params.get("weather") === "alert";
         if (demoWeather && utils.indexOf("weather") < 0) utils.push("weather");
         // Sample cities, labelled as such (CHIP_SPEC §10.2); London is at night.
-        function city(name, t, lo, hi, code, isDay) {
+        function city(name, t, lo, hi, code, isDay, alert) {
           return {
             location: { name: name, lat: 0, lon: 0, country: "" },
-            weather: { temperature: t, feelsLike: t, humidity: 50, windSpeed: 5, windDirection: 0, weatherCode: code, isDay: isDay, tempMin: lo, tempMax: hi },
+            weather: { temperature: t, feelsLike: t, humidity: 50, windSpeed: 5, windDirection: 0, weatherCode: code, isDay: isDay, tempMin: lo, tempMax: hi, alert: alert },
             lastFetched: Date.now(),
           };
         }
@@ -207,7 +209,7 @@
           ["scrollr:widget:clock:timezones", (params.get("zones") || "").split(",").filter(Boolean)],
           ["scrollr:widget:weather:cities", demoWeather
             // Celsius, as the provider sends it; the units pref converts.
-            ? [city("Chicago", 16, 11, 19, 2, true), city("London", 12, 9, 14, 61, false), city("Austin", 33, 22, 34, 0, true)]
+            ? [city("Chicago", 16, 11, 19, 2, true, "Storm watch"), city("London", 12, 9, 14, 61, false), city("Austin", 33, 22, 34, 0, true)].slice(0, params.get("weather") === "alert" ? 1 : 3)
             : []],
         ]);
 

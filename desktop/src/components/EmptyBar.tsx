@@ -125,16 +125,16 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
           data-label="empty"
           className="flex shrink-0 flex-col justify-center gap-[3px] pl-3.5 pr-2"
           style={{
-            ...accentStyle("var(--color-primary)"),
+            ...accentStyle("var(--color-primary)", "color-mix(in srgb, var(--color-primary) 50%, var(--color-fg))"),
             width: LABEL_W,
             background: mix(16),
             borderRight: `1px solid ${mix(40)}`,
           }}
         >
-          <span className="font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]" style={{ color: "var(--accent)" }}>
+          <span className="font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]" style={{ color: "var(--accent-ink)" }}>
             EMPTY
           </span>
-          <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-3">
+          <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
             {kind === "sourceless" ? "no sources" : "all off"}
           </span>
         </div>

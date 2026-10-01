@@ -37,6 +37,8 @@ export interface CurrentWeather {
    */
   tempMax?: number;
   tempMin?: number;
+  /** Active alert headline, when the provider reports one (the shim demo sets it). */
+  alert?: string;
 }
 
 export interface SavedCity {
