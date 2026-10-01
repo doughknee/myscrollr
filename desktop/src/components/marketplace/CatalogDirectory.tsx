@@ -18,6 +18,10 @@ import { WidgetBar } from "../widget-bar/Bar";
 import { Segmented } from "../widget-bar/Segmented";
 import EmptySection from "../layout/EmptySection";
 import CatalogCard from "./CatalogCard";
+import SymbolResults from "./SymbolResults";
+import type { SymbolResultsProps } from "./SymbolResults";
+import { symbolGroups } from "./symbolMatches";
+import type { TrackedSymbol } from "../../api/queries";
 import type { CatalogViewShared } from "./CatalogHub";
 import {
   CATEGORY_ORDER,
@@ -41,6 +45,10 @@ interface CatalogDirectoryProps extends CatalogViewShared {
   onKindChange: (kind: CatalogKind) => void;
   onSortChange: (sort: CatalogSort | undefined) => void;
   onOverview: () => void;
+  /** The finance symbol catalog the Stocks / Crypto watchlists search. */
+  symbols: readonly TrackedSymbol[];
+  /** Symbol rows' collaborators (see SymbolResults). */
+  symbolActions: Omit<SymbolResultsProps, "groups">;
 }
 
 interface Block {
@@ -229,6 +237,7 @@ export default function CatalogDirectory({
   addedIds,
   slots,
   capped,
+  planLine,
   onOpen,
   onAdd,
   onRemove,
@@ -244,13 +253,23 @@ export default function CatalogDirectory({
   onKindChange,
   onSortChange,
   onOverview,
+  symbols,
+  symbolActions,
 }: CatalogDirectoryProps) {
   // The field is its own source of truth while you type; the URL catches
   // up a tick later, and a rail click (which clears the query) resets it.
   const [draft, setDraft] = useState(query);
   useEffect(() => setDraft(query), [query]);
 
-  const { blocks, miss, summary, closest } = buildBlocks(items, kind, query, sort, addedIds);
+  const built = buildBlocks(items, kind, query, sort, addedIds);
+  const symbolHits = symbolGroups(items, symbols, query);
+  // A symbol hit answers the query, so the "no widget yet" card and the
+  // closest-group guesses step aside; real widget matches still show.
+  const answered = built.miss && symbolHits.length > 0;
+  const miss = built.miss && !answered;
+  const summary = answered ? "" : built.summary;
+  const blocks = answered ? [] : built.blocks;
+  const closest = built.closest;
 
   const rail = (["all", ...CATEGORY_ORDER] as CatalogKind[])
     .map((k) => ({
@@ -307,7 +326,7 @@ export default function CatalogDirectory({
             onClick={onUpgrade}
             className="cursor-pointer rounded-lg bg-warn/12 px-2.5 py-1 text-ui-chip font-semibold whitespace-nowrap text-warn hover:bg-warn/20"
           >
-            All {slots.max} slots used · remove one to swap, or upgrade
+            {planLine}
           </button>
         )}
         <div className="ml-auto">
@@ -400,7 +419,10 @@ export default function CatalogDirectory({
               onCustomRss={onCustomRss}
             />
           )}
-          {blocks.length === 0 && !miss && (
+          {symbolHits.length > 0 && (
+            <SymbolResults groups={symbolHits} {...symbolActions} />
+          )}
+          {blocks.length === 0 && !miss && symbolHits.length === 0 && (
             <EmptySection
               icon={Search}
               title="Nothing here"

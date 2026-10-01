@@ -85,7 +85,7 @@ describe("Sidebar slot chip", () => {
     renderSidebar({ tier: "free", sourceCount: 2 });
     expect(
       screen.getByRole("button", {
-        name: "2 of 3 slots used — add a widget",
+        name: "2 of 3 pages on your bar used — add a widget",
       }),
     ).toBeInTheDocument();
   });
@@ -94,7 +94,7 @@ describe("Sidebar slot chip", () => {
     renderSidebar({ tier: "free", sourceCount: 3 });
     expect(
       screen.getByRole("button", {
-        name: "All 3 slots used — get more slots",
+        name: "All 3 pages on your bar used — get more pages",
       }),
     ).toBeInTheDocument();
   });
@@ -113,7 +113,7 @@ describe("Sidebar slot chip", () => {
     });
     fireEvent.click(
       screen.getByRole("button", {
-        name: "2 of 3 slots used — add a widget",
+        name: "2 of 3 pages on your bar used — add a widget",
       }),
     );
     expect(onNavigateToMarketplace).toHaveBeenCalledOnce();

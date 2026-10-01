@@ -35,6 +35,8 @@ interface WidgetPanelProps {
   tierLocked: boolean;
   /** Slots full and this one isn't added — same. */
   slotLocked: boolean;
+  /** "Your bar has room for 3 pages on Free · Uplink fits 6". */
+  planLine: string;
   authenticated: boolean;
   /** Same category, this widget excluded, capped by the caller. */
   related: CatalogItem[];
@@ -114,6 +116,7 @@ export default function WidgetPanel({
   added,
   tierLocked,
   slotLocked,
+  planLine,
   authenticated,
   related,
   onClose,
@@ -263,7 +266,7 @@ export default function WidgetPanel({
                     >
                       {tierLocked
                         ? `Upgrade to ${item.requiredTier.replace(/_/g, " ")}`
-                        : "Upgrade for more slots"}
+                        : "Upgrade for more pages"}
                     </button>
                   ) : (
                     <button
@@ -276,6 +279,14 @@ export default function WidgetPanel({
                     </button>
                   )}
                 </div>
+                {slotLocked && !tierLocked && !added && (
+                  <p
+                    className="mt-2.5 text-ui-meta opacity-90"
+                    style={{ color: textOn }}
+                  >
+                    {planLine} · remove a page to swap
+                  </p>
+                )}
               </div>
 
               {/* ── Ticker preview ────────────────────────────── */}
@@ -287,8 +298,8 @@ export default function WidgetPanel({
               {/* ── Facts ─────────────────────────────────────── */}
               <div className="grid grid-cols-2 gap-2 px-5 pt-3.5">
                 <Fact
-                  label="Slot cost"
-                  value={item.freeSlot ? "Free · no slot" : "1 slot · unlimited items"}
+                  label="On your bar"
+                  value={item.freeSlot ? "Free · rides the edge" : "1 page · unlimited items"}
                 />
                 <Fact
                   label="Plan"
@@ -342,7 +353,7 @@ export default function WidgetPanel({
               {added && (
                 <div className="mx-5 mt-4 flex items-center justify-between gap-2.5 rounded-[10px] border border-edge/50 bg-surface-raised px-3 py-2.5">
                   <span className="text-ui-meta text-fg-4">
-                    {item.freeSlot ? "Remove it any time." : "Removing frees the slot instantly."}
+                    {item.freeSlot ? "Remove it any time." : "Removing frees the page instantly."}
                   </span>
                   <button
                     type="button"

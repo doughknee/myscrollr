@@ -20,6 +20,8 @@ export interface CatalogViewShared {
   addedIds: Set<string>;
   slots: SlotUsage;
   capped: boolean;
+  /** "Your bar has room for 3 pages on Free · Uplink fits 6". */
+  planLine: string;
   onOpen: (item: CatalogItem) => void;
   onAdd: (item: CatalogItem) => void;
   onRemove: (item: CatalogItem) => void;
@@ -55,8 +57,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function slotLine(slots: SlotUsage): string {
   return slots.finite
-    ? `${slots.used} of ${slots.max} slots used`
-    : `${slots.used} added · unlimited slots`;
+    ? `${slots.used} of ${slots.max} pages used`
+    : `${slots.used} added · unlimited pages`;
 }
 
 export default function CatalogHub({

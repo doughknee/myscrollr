@@ -93,7 +93,7 @@ export function LogoTile({
 function FreeTag() {
   return (
     <span
-      title="Free: doesn't use a widget slot"
+      title="Free: rides the edge, not a page on your bar"
       className="ml-1.5 rounded bg-accent/14 px-1 py-px align-middle text-ui-chip font-semibold normal-case tracking-normal text-accent"
     >
       Free

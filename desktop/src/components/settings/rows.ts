@@ -192,9 +192,9 @@ export const SETTINGS_ROWS = {
       when: "signedIn",
     },
     slots: {
-      label: "Widget slots",
+      label: "Pages on your bar",
       description: "Open the Catalog to add, remove, or swap widgets.",
-      keywords: "manage widgets catalog plan",
+      keywords: "slots manage widgets catalog plan",
       when: "signedIn",
     },
     signOut: {

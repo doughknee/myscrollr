@@ -26,13 +26,25 @@ import { queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
 import { useShell } from "../shell-context";
 
-export function useAddWidget(): (item: CatalogItem) => Promise<void> {
+/** Overrides for a one-off add: the catalog's symbol results create Stocks
+ *  with only the symbol asked for, and stay put instead of opening it. */
+export interface AddWidgetOptions {
+  /** Sent instead of the catalog's default config. */
+  config?: Record<string, unknown>;
+  /** Toast text; its presence also keeps the user where they are. */
+  message?: string;
+}
+
+export function useAddWidget(): (
+  item: CatalogItem,
+  opts?: AddWidgetOptions,
+) => Promise<void> {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { prefs, onPrefsChange } = useShell();
 
   return useCallback(
-    async (item: CatalogItem) => {
+    async (item: CatalogItem, opts?: AddWidgetOptions) => {
       // `item.source` rather than isUtilityWidget(item.id): the CatalogItem is
       // already in hand, so this reads the widget the user actually clicked.
       // Looking it up by id again would re-query mutable module state, and a
@@ -40,6 +52,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
       // different catalog than the one that produced this item.
       if (item.source) {
         const widgetType = item.id;
+        const config = opts?.config ?? item.addConfig ?? {};
 
         // Optimistic insert: write a placeholder widget into the
         // dashboard cache immediately so the Sidebar + CatalogCard
@@ -54,7 +67,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
           widget_type: widgetType,
           enabled: true,
           ticker_enabled: true,
-          config: item.addConfig ?? {},
+          config,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -87,11 +100,15 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
 
         // Navigate immediately — the widget page's queries will fire
         // in parallel with the create call below.
-        navigate({
-          to: "/widget/$id",
-          params: { id: item.id },
-        });
-        toast.success(`${item.name} added to the ticker`);
+        if (opts?.message) {
+          toast.success(opts.message);
+        } else {
+          navigate({
+            to: "/widget/$id",
+            params: { id: item.id },
+          });
+          toast.success(`${item.name} added to the ticker`);
+        }
 
         // Fire the network call without blocking the UI. On success
         // we reconcile the optimistic row with the server response.
@@ -99,7 +116,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         dataWidgetsApi
           // Report enabled utility-widget count so the server slot gate counts
           // every widget (utilities live only in local preferences).
-          .create(widgetType, item.addConfig ?? {}, slotWidgetCount(prefs.widgets.enabledWidgets))
+          .create(widgetType, config, slotWidgetCount(prefs.widgets.enabledWidgets))
           .then((created) => {
             queryClient.setQueryData<DashboardResponse>(
               queryKeys.dashboard,

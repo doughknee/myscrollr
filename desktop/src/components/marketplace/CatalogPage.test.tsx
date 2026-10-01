@@ -27,32 +27,50 @@ import type { ShellState } from "../../shell-context";
 import { loadPrefs } from "../../preferences";
 import type { SubscriptionTier } from "../../auth";
 import type { DataWidgetRow } from "../../api/client";
+import { queryKeys } from "../../api/queries";
+import type { TrackedSymbol } from "../../api/queries";
 
 vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn() }));
 vi.mock("@tauri-apps/plugin-http", () => ({
   fetch: vi.fn(() => Promise.reject(new Error("no tauri in tests"))),
+}));
+const api = vi.hoisted(() => ({
+  update: vi.fn(async () => ({})),
+  create: vi.fn(async () => ({})),
 }));
 vi.mock("../../api/client", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../api/client")>();
   return {
     ...mod,
     requestCatalogWidget: vi.fn(async (query: string) => ({ query, count: 3 })),
+    dataWidgetsApi: { ...mod.dataWidgetsApi, update: api.update, create: api.create },
   };
 });
 
-const row = (widget_type: string): DataWidgetRow => ({
+const row = (
+  widget_type: string,
+  config: Record<string, unknown> = {},
+): DataWidgetRow => ({
   id: 1,
   widget_type,
   enabled: true,
   ticker_enabled: true,
-  config: {},
+  config,
   created_at: "2026-09-01T00:00:00Z",
   updated_at: "2026-09-01T00:00:00Z",
 });
 
 function mount(
   path: string,
-  opts: { tier?: SubscriptionTier; widgets?: string[]; authenticated?: boolean } = {},
+  opts: {
+    tier?: SubscriptionTier;
+    widgets?: string[];
+    authenticated?: boolean;
+    /** Watchlists for widgets the user has, by widget id. */
+    watchlists?: Record<string, string[]>;
+    /** The finance symbol catalog (GET /finance/symbols). */
+    symbols?: TrackedSymbol[];
+  } = {},
 ) {
   // Defaults enable a few utilities; the slot maths below wants a clean sheet.
   const base = loadPrefs();
@@ -74,10 +92,13 @@ function mount(
     allDataWidgetManifests: [],
     allWidgets: [],
   };
-  const widgets = (opts.widgets ?? []).map(row);
+  const widgets = (opts.widgets ?? []).map((id) =>
+    row(id, opts.watchlists?.[id] ? { symbols: opts.watchlists[id] } : {}),
+  );
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  if (opts.symbols) queryClient.setQueryData(queryKeys.catalogs.finance, opts.symbols);
 
   // The chassis is active on /catalog in the app, so the directory's bar
   // row goes through the portal here too — that is where REL-218 lived.
@@ -117,6 +138,8 @@ class NoopObserver {
   disconnect() {}
 }
 beforeEach(() => {
+  api.update.mockClear();
+  api.create.mockClear();
   window.localStorage.clear();
   vi.stubGlobal("IntersectionObserver", NoopObserver);
   Element.prototype.scrollTo = () => {};
@@ -132,7 +155,7 @@ describe("hub", () => {
     const sports = screen.getByRole("button", { name: /^Sports, \d+ widgets$/ });
     expect(within(sports).getByText("1 added")).toBeInTheDocument();
     expect(screen.getByText("Something else?")).toBeInTheDocument();
-    expect(screen.getByText("1 of 3 slots used")).toBeInTheDocument();
+    expect(screen.getByText("1 of 3 pages used")).toBeInTheDocument();
     // In your ticker lists the added widget (the Try chip is the other one).
     expect(screen.getAllByRole("button", { name: "NFL" })).toHaveLength(2);
   });
@@ -142,7 +165,7 @@ describe("hub", () => {
       tier: "free",
       widgets: ["sports_nfl", "sports_nba", "finance_stocks"],
     });
-    expect(await screen.findByText("3 of 3 slots used")).toBeInTheDocument();
+    expect(await screen.findByText("3 of 3 pages used")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upgrade for unlimited" })).toBeInTheDocument();
   });
 
@@ -263,9 +286,107 @@ describe("directory", () => {
     });
     const rail = await screen.findByRole("navigation", { name: "Kinds" });
     expect(within(rail).getByText("3/3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /All 3 slots used/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Your bar has room for 3 pages on Free · Uplink fits 6/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove NFL" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add NHL" })).toBeInTheDocument();
+  });
+});
+
+// SCROLLR-285: symbols are findable from the catalog search.
+describe("symbol results", () => {
+  const symbols: TrackedSymbol[] = [
+    { symbol: "AAPL", name: "Apple Inc.", category: "Technology" },
+    { symbol: "MSFT", name: "Microsoft Corp.", category: "Technology" },
+    { symbol: "BTC/USD", name: "Bitcoin", category: "Crypto" },
+  ];
+
+  it("finds a stock by ticker and a coin by name, each under its widget", async () => {
+    mount("/catalog?q=aapl", { symbols });
+    expect(
+      await screen.findByRole("button", { name: "Add AAPL to your Stocks" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Symbols" })).toBeInTheDocument();
+    // Not a widget miss: the symbol answered the query.
+    expect(screen.queryByText(/widget yet/)).not.toBeInTheDocument();
+  });
+
+  it("finds a coin by name and shows the coin, not the pair", async () => {
+    mount("/catalog?q=Bitcoin", { symbols });
+    expect(
+      await screen.findByRole("button", { name: "Add BTC to your Crypto" }),
+    ).toBeInTheDocument();
+  });
+
+  it("adds the symbol to a Stocks widget the user already has", async () => {
+    mount("/catalog?q=aapl", {
+      symbols,
+      widgets: ["finance_stocks"],
+      watchlists: { finance_stocks: ["MSFT"] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Add AAPL to your Stocks" }));
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith("finance_stocks", {
+        config: { symbols: ["MSFT", "AAPL"] },
+      }),
+    );
+    expect(api.create).not.toHaveBeenCalled();
+  });
+
+  it("creates Stocks with only the asked-for symbol when the user has none", async () => {
+    const { router } = mount("/catalog?q=aapl", { symbols });
+    fireEvent.click(await screen.findByRole("button", { name: "Add AAPL to your Stocks" }));
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        "finance_stocks",
+        { asset_class: "stock", symbols: ["AAPL"] }, // not the starter list
+        0,
+      ),
+    );
+    // Stays in the catalog so the next symbol is one more click.
+    expect(router.state.location.pathname).toBe("/catalog");
+  });
+
+  it("reads ✓ for a symbol already on the watchlist", async () => {
+    mount("/catalog?q=aapl", {
+      symbols,
+      widgets: ["finance_stocks"],
+      watchlists: { finance_stocks: ["AAPL"] },
+    });
+    expect(await screen.findByText("On your Stocks")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add AAPL/ })).not.toBeInTheDocument();
+  });
+
+  it("at the cap, creating a widget takes the usual path", async () => {
+    // jsdom has no <dialog>.showModal; the panel is a modal dialog.
+    HTMLDialogElement.prototype.showModal = function () {
+      this.setAttribute("open", "");
+    };
+    const full = ["sports_nfl", "sports_nba", "finance_crypto"];
+    const { router } = mount("/catalog?q=aapl", { tier: "free", symbols, widgets: full });
+    fireEvent.click(await screen.findByRole("button", { name: "Add AAPL to your Stocks" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ widget: "finance_stocks" }),
+    );
+    expect(api.create).not.toHaveBeenCalled();
+    // The panel says the rule in the bar's words.
+    expect(
+      await screen.findByText(/Your bar has room for 3 pages on Free · Uplink fits 6 · remove a page to swap/),
+    ).toBeInTheDocument();
+  });
+
+  it("at the cap, a symbol still goes onto a widget you already have", async () => {
+    mount("/catalog?q=btc", {
+      tier: "free",
+      symbols,
+      widgets: ["sports_nfl", "sports_nba", "finance_crypto"],
+      watchlists: { finance_crypto: ["ETH/USD"] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Add BTC to your Crypto" }));
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith("finance_crypto", {
+        config: { symbols: ["ETH/USD", "BTC/USD"] },
+      }),
+    );
   });
 });
 

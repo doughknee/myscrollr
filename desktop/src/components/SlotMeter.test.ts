@@ -40,13 +40,13 @@ describe("computeSlotUsage", () => {
 describe("slotHeadline", () => {
   it("counts against the cap on finite plans", () => {
     expect(slotHeadline(computeSlotUsage(2, 1, 6))).toBe(
-      "3 of 6 widget slots used",
+      "3 of 6 pages on your bar used",
     );
   });
 
   it("announces a full plan", () => {
     expect(slotHeadline(computeSlotUsage(3, 0, 3))).toBe(
-      "All 3 widget slots in use",
+      "All 3 pages on your bar in use",
     );
   });
 
@@ -67,16 +67,16 @@ describe("slotSubline", () => {
 
   it("counts open slots with singular/plural forms", () => {
     expect(slotSubline(computeSlotUsage(2, 0, 3))).toBe(
-      "1 open slot — room for more.",
+      "1 open page — room for more.",
     );
     expect(slotSubline(computeSlotUsage(2, 0, 6))).toBe(
-      "4 open slots — room for more.",
+      "4 open pages — room for more.",
     );
   });
 
   it("teaches the swap at capacity", () => {
     expect(slotSubline(computeSlotUsage(3, 0, 3))).toMatch(
-      /Remove a widget to free a slot/,
+      /Remove a widget to free a page/,
     );
   });
 

@@ -701,8 +701,8 @@ function SlotChip({
   const label = !finite
     ? "Add a widget"
     : atCap
-      ? `All ${cap} slots used — get more slots`
-      : `${used} of ${cap} slots used — add a widget`;
+      ? `All ${cap} pages on your bar used — get more pages`
+      : `${used} of ${cap} pages on your bar used — add a widget`;
 
   return (
     <Tooltip content={collapsed ? label : undefined} side="right">
@@ -745,7 +745,7 @@ function SlotChip({
         {!collapsed && (
           <>
             <span className="relative z-10 truncate">
-              {atCap ? "Get more slots" : "Add widget"}
+              {atCap ? "Get more pages" : "Add widget"}
             </span>
             {finite && (
               <span className="relative z-10 ml-auto shrink-0 text-ui-meta text-fg-4">
