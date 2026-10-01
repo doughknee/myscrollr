@@ -119,7 +119,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ d3bedf22c4d1c94d -->
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ 00365f6c5036cb4e -->
 56 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
