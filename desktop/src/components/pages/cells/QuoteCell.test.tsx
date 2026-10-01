@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import QuoteCell, { changeText, priceCh, rangeText, CHANGE_CH, PRICE_CH, QUOTE_MIN_COL, QUOTE_MIN_COLS, QUOTE_SPLIT, STOCK_PRICE_CH } from "./QuoteCell";
+import QuoteCell, { changeText, priceCh, rangeText, CHANGE_CH, PRICE_CH, STOCK_PRICE_CH } from "./QuoteCell";
 import type { Trade } from "../../../types";
 
 function trade(over: Partial<Trade> = {}): Trade {
@@ -43,13 +43,13 @@ describe("QuoteCell", () => {
     expect(left.contains(container.querySelector('[data-part="spark"]'))).toBe(false);
     const right = container.querySelector('[data-part="spark"]')!.parentElement!;
     expect(right.contains(container.querySelector('[data-part="range"]'))).toBe(true);
-    expect(container.querySelector("button")!.className).toContain("grid-cols-[minmax(0,1fr)_minmax(0,1fr)]");
   });
 
-  it("the split is the picked one; the other is drawable for comparison", () => {
-    expect(QUOTE_SPLIT).toBe("half");
-    expect(QUOTE_MIN_COL).toBe(QUOTE_MIN_COLS.half);
-    expect(render(<QuoteCell trade={trade()} split="twoFifths" />).container.querySelector("button")!.className).toContain("grid-cols-[minmax(0,2fr)_minmax(0,3fr)]");
+  it("the price zone is only as wide as the price: the day's line starts a 12px gap after it", () => {
+    const button = render(<QuoteCell trade={trade()} />).container.querySelector("button")!;
+    expect(button.className).toContain("grid-cols-[max-content_minmax(0,1fr)]");
+    expect(button.className).toContain("gap-x-3");
+    expect(button.querySelector('[data-part="price"]')!.classList.contains("text-right")).toBe(true);
   });
 
   it("flat is neutral: no arrow, no up colour", () => {
