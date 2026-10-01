@@ -6,6 +6,9 @@ import { plainText } from "../../../utils/rssText";
 /** Narrowest column a headline takes (two lines of a real headline), for pagePlan's `columnsFor`. */
 export const NEWS_MIN_COL = 400;
 
+/** A pinned headline on the edge: one line, so the edge stays narrow (SCROLLR-284). */
+export const NEWS_PIN_W = 260;
+
 /** A column at least this wide sets the headline larger instead of leaving it short. */
 export const BIG_HEADLINE_PX = 560;
 
@@ -22,6 +25,8 @@ interface NewsCellProps {
   width: number;
   /** Clock for the age; tests and the dev gallery pin it. */
   now?: number;
+  /** One line of headline with the feed's name beneath: a pin on the edge. */
+  line?: boolean;
   onClick?: () => void;
 }
 
@@ -32,7 +37,7 @@ interface NewsCellProps {
  * never moves the headline. The headline takes up to two lines, then the
  * summary (or, with none, the feed's name) on one line beneath.
  */
-const NewsCell = memo(function NewsCell({ item, width, now, onClick }: NewsCellProps) {
+const NewsCell = memo(function NewsCell({ item, width, now, line, onClick }: NewsCellProps) {
   const summary = plainText(item.description);
   const big = width >= BIG_HEADLINE_PX;
   return (
@@ -50,14 +55,15 @@ const NewsCell = memo(function NewsCell({ item, width, now, onClick }: NewsCellP
         <span
           data-part="headline"
           className={clsx(
-            "line-clamp-2 text-left font-sans font-semibold text-fg",
+            "text-left font-sans font-semibold text-fg",
+            line ? "truncate" : "line-clamp-2",
             big ? "text-[15px] leading-[18px]" : "text-[13px] leading-[16px]",
           )}
         >
           {plainText(item.title)}
         </span>
         <span data-part="summary" className="truncate text-left font-sans text-[11px] leading-[13px] text-fg-3">
-          {summary || item.source_name}
+          {(!line && summary) || item.source_name}
         </span>
       </span>
     </button>

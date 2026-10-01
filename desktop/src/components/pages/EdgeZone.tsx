@@ -19,7 +19,7 @@
  * clock reads. With no utility and no pin the zone renders nothing and
  * takes no width.
  */
-import { memo, type Ref } from "react";
+import { memo, useLayoutEffect, useRef, type Ref } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
 import type {
@@ -43,7 +43,7 @@ import { formatTemp } from "../../utils/format";
 import { teamShortName } from "../../utils/teamShortName";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
 import GameCell, { gameMinCol } from "./cells/GameCell";
-import NewsCell, { NEWS_MIN_COL } from "./cells/NewsCell";
+import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { Rule, accentFor, accentStyle } from "./cells/parts";
 
@@ -169,7 +169,7 @@ export function buildEdge(
       const at = (r: RssItem) => Date.parse(r.published_at ?? r.created_at);
       const rows = scopedRows<RssItem>(raw, ctx).filter((r) => r.feed_url === p.subject);
       const n = rows.length ? rows.reduce((a, b) => (at(b) > at(a) ? b : a)) : undefined;
-      if (n) out.push({ widget: p.widget, hex, kind: "news", data: n, width: NEWS_MIN_COL, pin: pin(n.source_name) });
+      if (n) out.push({ widget: p.widget, hex, kind: "news", data: n, width: NEWS_PIN_W, pin: pin(n.source_name) });
     }
   }
   return { utilities, pins: out };
@@ -246,11 +246,13 @@ function PinCell({ p, onChipClick }: { p: EdgePin; onChipClick?: (widgetType: st
     return <QuoteCell trade={t} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
   }
   const r = p.data as RssItem;
-  return <NewsCell item={r} width={p.width} onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
+  return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, mode, dark, edgeRef, onChipClick }: {
+export default function EdgeZone({ edge, tick, reduced, mode, dark, edgeRef, onUtilWidth, onChipClick }: {
   edge: Edge;
+  /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
+  onUtilWidth?: (w: number) => void;
   /** The page turn's seq: the slots step on it. */
   tick: number;
   reduced: boolean;
@@ -259,15 +261,31 @@ export default function EdgeZone({ edge, tick, reduced, mode, dark, edgeRef, onC
   edgeRef?: Ref<HTMLDivElement>;
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
 }) {
-  if (edge.utilities.length === 0 && edge.pins.length === 0) return null;
+  const empty = edge.utilities.length === 0 && edge.pins.length === 0;
+  const strip = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = strip.current;
+    if (!el || !onUtilWidth) return;
+    const read = () => onUtilWidth(el.offsetWidth);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      onUtilWidth(0);
+    };
+  }, [onUtilWidth, empty]);
+  if (empty) return null;
   return (
     <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
-      {edge.utilities.map((u, i) => (
-        <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(mode, u.hex, dark))}>
-          {i > 0 && <Rule />}
-          <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
-        </div>
-      ))}
+      <div ref={strip} data-edge-utils="" className="flex h-full">
+        {edge.utilities.map((u, i) => (
+          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(mode, u.hex, dark))}>
+            {i > 0 && <Rule />}
+            <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
+          </div>
+        ))}
+      </div>
       {edge.pins.map((p, i) => (
         <div
           key={p.pin}

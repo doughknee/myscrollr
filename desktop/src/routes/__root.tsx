@@ -83,6 +83,7 @@ import { useAuthState } from "../hooks/useAuthState";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
 import { usePinnedSubjectsSync } from "../hooks/usePinnedSubjectsSync";
+import { useEdgeMeasures } from "../lib/edgeMeasure";
 import { useSharedSSE } from "../hooks/useSharedSSE";
 import { useTauriListener } from "../hooks/useTauriListener";
 import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
@@ -287,6 +288,8 @@ function RootLayout() {
   // Pins are local, but the server needs them to guarantee a row per
   // pinned subject, so they ride along on the dashboard request.
   usePinnedSubjectsSync(prefs.widgets.pins);
+  // The pin rule is width: which ticker bars exist, and how wide (SCROLLR-284).
+  useEdgeMeasures();
 
   const [appVersion, setAppVersion] = useState("");
   useEffect(() => {

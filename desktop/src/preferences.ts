@@ -304,7 +304,12 @@ export interface WidgetPin {
 }
 
 /**
- * How many subjects the fixed zone will hold.
+ * How many subjects the fixed zone will hold when NO ticker reports a width
+ * (the continuous ticker, or none running). The pages bar has no count cap:
+ * its limit is width, 40% of the narrowest bar (SCROLLR-284,
+ * `components/pages/edgeRule.ts`), and `togglePin`'s `canHold` carries it.
+ *
+ * Below is the original derivation of this fallback.
  *
  * MEASURED, not guessed (CHIP_SPEC §10.2). Real chip widths, fonts
  * loaded, from the §10.3 harness:
@@ -340,6 +345,11 @@ export interface WidgetPin {
  * user deliberately parked there.
  */
 export const MAX_PINS = 2;
+
+/** Pins kept when prefs load. Width decides how many show (edgeRule), so this
+ *  is only a sanity bound; a screen that shrank must not lose pins it will
+ *  get back when it widens. */
+const PINS_STORED_MAX = 12;
 
 /** Widgets whose ticker chip is a single chip for the whole widget, so
  *  the widget IS the subject. Everything else pins per item. */
@@ -1347,7 +1357,7 @@ function migratePins(saved: Record<string, unknown>): WidgetPin[] {
         side: (p.side === "left" ? "left" : "right") as PinSide,
         ...(typeof p.row === "number" ? { row: p.row } : {}),
       }))
-      .slice(0, MAX_PINS);
+      .slice(0, PINS_STORED_MAX);
   }
 
   const legacy = saved.pinnedWidgets;
@@ -1361,7 +1371,7 @@ function migratePins(saved: Record<string, unknown>): WidgetPin[] {
       subject: widgetId,
       side: (cfg?.side === "left" ? "left" : "right") as PinSide,
     }))
-    .slice(0, MAX_PINS);
+    .slice(0, PINS_STORED_MAX);
 }
 
 /** Is this subject currently pinned? */
@@ -1399,6 +1409,9 @@ export function pinCount(prefs: AppPreferences): number {
 export function togglePin(
   prefs: AppPreferences,
   pin: WidgetPin,
+  /** The pages bar's width rule (`edgeCanHold`): may these pins all stay?
+   *  Absent, the `MAX_PINS` count stands. */
+  canHold?: (pins: readonly WidgetPin[]) => boolean,
 ): AppPreferences {
   // An empty subject names nothing. Guarded here rather than at each call
   // site because every write routes through this function, and a source
@@ -1416,8 +1429,9 @@ export function togglePin(
       widgets: { ...prefs.widgets, pins: pins.filter((_, i) => i !== at) },
     };
   }
-  if (pinCount(prefs) >= MAX_PINS) return prefs;
-  return { ...prefs, widgets: { ...prefs.widgets, pins: [...pins, pin] } };
+  const next = [...pins, pin];
+  if (canHold ? !canHold(next) : pinCount(prefs) >= MAX_PINS) return prefs;
+  return { ...prefs, widgets: { ...prefs.widgets, pins: next } };
 }
 
 /** Drop every pin belonging to a widget. Used when the widget is removed. */
