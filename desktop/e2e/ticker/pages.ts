@@ -33,6 +33,13 @@ export interface Enter {
   /** 0-based */
   index: number;
   count: number;
+  /** The leader's visit counter (`data-visit`): consecutive pages of one widget's visit share it. */
+  visit: number;
+  /** The label's position counter ("2/8"), or null when the widget has one page. */
+  pos: string | null;
+  /** The label's fact line ("6 LIVE") as drawn, and whether the counter beside it cut it short. */
+  fact: string | null;
+  factCut: boolean;
   items: SeenItem[];
   initial: boolean;
   /** The page's `data-cols` / `data-total` / `data-avail` (PagedBar): a full page's columns, the widget's items over its pages, what it could have shown. */
@@ -77,6 +84,8 @@ export interface PagesTrace {
 declare global {
   interface Window {
     __pg?: PagesTrace & { running: boolean };
+    /** src/dev/liveSim.ts (`?live=1`): write the dashboard cache as a refetch would. */
+    __shimDashboard?: (update: (prev: { data: Record<string, unknown> }) => unknown) => void;
   }
 }
 
@@ -114,7 +123,9 @@ export function installPagesRecorder(opts: { frames: boolean }) {
       rects = new Map();
       const num = (a: string) => Number(el.getAttribute(a));
       r.enters.push({
-        t, page: label, tab, index: i - 1, count: n, initial: installing,
+        t, page: label, tab, index: i - 1, count: n, visit: num("data-visit"), initial: installing,
+        pos: document.querySelector(`[data-label="${tab}"] [data-pos]`)?.textContent ?? null,
+        ...((f) => ({ fact: f?.textContent ?? null, factCut: !!f && f.scrollWidth > f.clientWidth }))(document.querySelector<HTMLElement>(`[data-label="${tab}"] [data-fact]`)),
         cols: num("data-cols"), total: num("data-total"), avail: num("data-avail"),
         items: cells.map((c) => ({ id: c.dataset.item!, live: c.hasAttribute("data-live"), mine: c.hasAttribute("data-mine") })),
       });
@@ -206,17 +217,31 @@ export function dwells(enters: readonly Enter[]): number[] {
 }
 
 /**
- * Lap boundaries: each visit to the first widget seen, at its page 1. A
- * visit always opens on page 1, so these are the beats of one trip round
- * the bar. An initial page may be mid-visit and is skipped.
+ * Lap boundaries: the first page of each visit to the first widget seen.
+ * A visit no longer always opens on page 1 (a widget with nothing live
+ * continues where it left off, SCROLLR-293), so a visit starts where the
+ * leader's visit counter changes. An initial page may be mid-visit and is
+ * skipped.
  */
 export function lapStarts(enters: readonly Enter[]): number[] {
   const w0 = enters[0]?.tab;
   const out: number[] = [];
   enters.forEach((e, i) => {
-    if (!e.initial && e.tab === w0 && e.index === 0) out.push(i);
+    if (!e.initial && e.tab === w0 && (i === 0 || enters[i - 1].visit !== e.visit)) out.push(i);
   });
   return out;
+}
+
+/** Each visit's page indexes (0-based), in order: [[0,1,2],[3,4,5],…]. An initial page's visit is dropped (it may be partial). */
+export function visits(enters: readonly Enter[]): { tab: string; pages: number[] }[] {
+  const out: { tab: string; visit: number; pages: number[] }[] = [];
+  for (const e of enters) {
+    if (e.initial) continue;
+    const last = out.at(-1);
+    if (last?.visit === e.visit) last.pages.push(e.index);
+    else out.push({ tab: e.tab, visit: e.visit, pages: [e.index] });
+  }
+  return out.map(({ tab, pages }) => ({ tab, pages }));
 }
 
 /** Lap lengths in seconds. */

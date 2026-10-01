@@ -97,6 +97,7 @@ interface Props {
 /** The page as it was frozen at swipe-in. */
 interface Shown {
   seq: number;
+  visit: number;
   widget: PageWidget;
   page: FrozenPage<PageItem>;
   index: number;
@@ -376,6 +377,7 @@ export default function PagedBar({
       const short = plan.pages.length === 1 && items.length < plan.cols;
       shown.current = {
         seq: turn.seq,
+        visit: turn.visit,
         widget: w,
         page: freezePage(items, keyOf),
         index,
@@ -439,18 +441,12 @@ export default function PagedBar({
                   {cur.widget.code}
                 </span>
                 {/* fg-2, not fg-3: it sits on the label's tint, which costs contrast (SCROLLR-287). */}
-                <span className="flex items-center justify-between gap-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
-                  <span className="truncate">{fact}</span>
-                  {cur.count > 5 && (
-                    <span className="shrink-0 tabular-nums" style={{ color: "var(--accent-ink)" }}>
+                <span className="flex items-center justify-between gap-[3px] font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
+                  <span data-fact="" className="truncate">{fact}</span>
+                  {/* Where this page sits in the widget, "2/6": there is more, and it comes round (SCROLLR-293). */}
+                  {cur.count > 1 && (
+                    <span data-pos="" className="shrink-0 tabular-nums tracking-normal" style={{ color: "var(--accent-ink)" }} aria-label={`page ${cur.index + 1} of ${cur.count}`}>
                       {cur.index + 1}/{cur.count}
-                    </span>
-                  )}
-                  {cur.count > 1 && cur.count <= 5 && (
-                    <span className="flex shrink-0 gap-[3px]" aria-label={`page ${cur.index + 1} of ${cur.count}`}>
-                      {Array.from({ length: cur.count }, (_, i) => (
-                        <span key={i} className="h-[4px] w-[4px] rounded-full" style={{ background: i === cur.index ? "var(--accent)" : mix(30) }} />
-                      ))}
                     </span>
                   )}
                 </span>
@@ -465,6 +461,7 @@ export default function PagedBar({
               <motion.div
                 key={cur.seq}
                 data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`}
+                data-visit={cur.visit}
                 data-short={cur.short ? "" : undefined}
                 data-cols={cur.cols}
                 data-total={cur.total}

@@ -2,9 +2,9 @@
  * What the pages bar shows, and in what order (SCROLLR-272, design SCROLLR-268).
  * No React here: PagedBar renders what these functions decide.
  *
- *  - `buildPageWidgets` turns the dashboard into one entry per widget, using
- *    the ticker's own selectors (the same horizons, floors and sort the chips
- *    use). Widgets with nothing to show share ONE "Also" page at the end,
+ *  - `buildPageWidgets` turns the dashboard into one entry per widget, from
+ *    the same pool the app's widget page shows (no ticker horizon, SCROLLR-293)
+ *    in the ticker's own order and with no display prefs. Widgets with nothing to show share ONE "Also" page at the end,
  *    each saying why with its status chip's words (CHIP_SPEC §8.7).
  *  - `planAll` splits every widget into pages at a bar width, with the
  *    widget's own cell minimum (the cells' exports are the only source of
@@ -18,8 +18,8 @@ import type { TickerContext } from "../../datawidgets/ticker";
 import { dropPinned, scopedRows } from "../../datawidgets/ticker";
 import type { WidgetPin } from "../../preferences";
 import { TICKER_SOURCES } from "../../datawidgets/tickerRegistry";
-import { getSportsDisplayConfig, selectSportsFill, selectSportsForTicker } from "../../datawidgets/sports/view";
-import { selectRssFill, selectRssForTicker } from "../../datawidgets/rss/view";
+import { TICKER_FINAL_HOURS, selectSportsForPages } from "../../datawidgets/sports/view";
+import { selectRssForPages } from "../../datawidgets/rss/view";
 import { selectFinanceFill, selectFinanceForTicker } from "../../datawidgets/finance/view";
 import { addConfigForWidget, assetClassForWidget, catalogItemById, sourceForWidget } from "../../marketplace";
 import { isLive, isPre, leagueCode } from "../../utils/gameHelpers";
@@ -71,7 +71,7 @@ export interface PageWidget {
   kind: PageWidgetKind;
   /** The label's name: "NFL", "BBC", "STOCKS", "ALSO". */
   code: string;
-  /** The label's one fact: "6 LIVE", "SUN 4 OCT", "▲6 ▼4", "HEADLINES". */
+  /** The label's one fact: "6 LIVE", "SUN 4", "▲6 ▼4", "HEADLINES". */
   sub: string;
   /** Catalog colour; `accentFor` turns it into `--accent`. */
   hex?: string;
@@ -102,7 +102,10 @@ function gameTier(g: Game, mine: boolean, now: number): Tier {
     if (h <= 3) return TIER.fresh;
     return new Date(g.start_time).toDateString() === new Date(now).toDateString() ? TIER.recent : TIER.quiet;
   }
-  return TIER.recent; // a result inside the ticker's 18 h window
+  // A result inside the ticker's 18 h window is recent; an older one (the
+  // widget page still shows yesterday's) trails after every fixture.
+  const ago = (now - Date.parse(g.start_time)) / HOUR;
+  return ago > TICKER_FINAL_HOURS ? TIER.quiet : TIER.recent;
 }
 
 function newsTier(item: RssItem, now: number): Tier {
@@ -110,11 +113,10 @@ function newsTier(item: RssItem, now: number): Tier {
   return h < 2 ? TIER.fresh : h < 6 ? TIER.recent : TIER.quiet;
 }
 
+/** "SUN 4": a game is at most a week away, so the month is noise, and the label's fact line also holds the page counter (SCROLLR-293). */
 function dayLabel(iso: string): string {
   const d = new Date(iso);
-  const wd = d.toLocaleDateString(undefined, { weekday: "short" });
-  const mon = d.toLocaleDateString(undefined, { month: "short" });
-  return `${wd} ${d.getDate()} ${mon}`.toUpperCase();
+  return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${d.getDate()}`.toUpperCase();
 }
 
 /**
@@ -152,7 +154,8 @@ export function buildPageWidgets(
     let widget: PageWidget | null = null;
     if (source === "sports") {
       const rows = scopedRows<Game>(raw, ctx);
-      const pool = selectSportsForTicker(rows, getSportsDisplayConfig(dashboard, tab), now);
+      // Everything the widget page shows by default (§P.4a, SCROLLR-293).
+      const pool = selectSportsForPages(rows, now);
       const eligible = dropPinned(pool, ctx, (g) => [g.home_team_name, g.away_team_name]);
       pinnedAll = pool.length > 0 && eligible.length === 0;
       if (eligible.length) {
@@ -176,38 +179,29 @@ export function buildPageWidgets(
           // As on the chip: the home team is the subject a right-click offers.
           pin: pinOf(tab, g.home_team_name, teamShortName(g.league, g.home_team_name)),
         });
-        const inPool = new Set(pool.map((g) => g.id));
-        // Your team's games lead the fill (the ladder: live, yours, soonest), then kick-off order.
-        const later = selectSportsFill(rows, getSportsDisplayConfig(dashboard, tab), now)
-          .filter((g) => !inPool.has(g.id))
-          .sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
         widget = {
           tab, kind: "sports", hex,
           code: leagueCode(league),
           sub: liveCount ? `${liveCount} LIVE` : dayLabel(ordered[0].start_time),
           minCol: gameMinCol(leagueCode(ordered[0].league)),
           items: ordered.map((g) => item(g, gameTier(g, isMine(g), now))),
-          // Past the horizon, yours then soonest. The same ladder as the pool:
-          // your team's game is on every visit wherever it came from (§P.5).
-          fill: dropPinned(later, ctx, (g) => [g.home_team_name, g.away_team_name]).map((g) => item(g, gameTier(g, isMine(g), now))),
+          fill: [], // the pool is already the whole week
         };
       }
     } else if (source === "rss") {
       const rows = scopedRows<RssItem>(raw, ctx);
-      const pool = selectRssForTicker(rows, now);
+      const pool = selectRssForPages(rows);
       const items = dropPinned(pool, ctx, (r) => r.feed_url);
       pinnedAll = pool.length > 0 && items.length === 0;
       if (items.length) {
         const item = (r: RssItem, tier: Tier): PageItem => ({ key: `n:${r.id}`, tier, data: r, pin: pinOf(tab, r.feed_url, r.source_name) });
-        const inPool = new Set(pool.map((r) => r.id));
-        const older = selectRssFill(rows, now).filter((r) => !inPool.has(r.id));
         widget = {
           tab, kind: "news", hex,
           code: sourceTab(rows[0]?.source_name ?? cat?.name ?? tab).split(" ")[0],
           sub: "HEADLINES",
           minCol: NEWS_MIN_COL,
           items: items.map((r) => item(r, newsTier(r, now))),
-          fill: dropPinned(older, ctx, (r) => r.feed_url).map((r) => item(r, TIER.quiet)),
+          fill: [], // the pool is already every headline the widget holds
         };
       }
     } else if (source === "finance") {
@@ -291,10 +285,14 @@ export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWi
 /**
  * The label's fact for this plan. A watchlist filled with popular symbols
  * says so, in the 11 characters the label has: "+4 POPULAR" (the rest are the
- * user's own), or "10 POPULAR" when none is.
+ * user's own), or "10 POPULAR" when none is (a filled widget is one page, so
+ * there is no counter beside it). A feed on several pages says only where it
+ * is ("NPR / 2/8", SCROLLR-293): "HEADLINES" told nothing and left the
+ * counter no room.
  */
 export function labelFact(widget: PageWidget, plan: WidgetPlan<PageItem> | undefined): string {
   const fills = plan ? plan.pages.reduce((n, p) => n + p.filter((i) => i.fill).length, 0) : 0;
+  if (widget.kind === "news" && plan && plan.pages.length > 1) return "";
   if (!fills) return widget.sub;
   return `${widget.items.length ? "+" : ""}${fills} POPULAR`;
 }
@@ -307,6 +305,8 @@ export function labelFact(widget: PageWidget, plan: WidgetPlan<PageItem> | undef
  */
 export interface Turn {
   seq: number;
+  /** Counts visits (one widget's pages in a row); the page publishes it as `data-visit` for the browser checks. */
+  visit: number;
   tab: string;
   /** Page index in the leader's plan. */
   page: number;
@@ -339,6 +339,7 @@ export function nextTurn(
 ): Turn | null {
   if (widgets.length === 0) return null;
   let tab = prev?.tab ?? "";
+  let visit = prev?.visit ?? 0;
   let plan = plans.get(tab);
   const nextInVisit = nav.visit[nav.k + 1];
   if (prev && plan && nextInVisit !== undefined && nextInVisit < plan.pages.length) {
@@ -354,10 +355,12 @@ export function nextTurn(
     nav.cursors.set(tab, v.next);
     nav.visit = v.pages;
     nav.k = 0;
+    visit += 1;
   }
   const page = nav.visit[nav.k];
   return {
     seq: (prev?.seq ?? 0) + 1,
+    visit,
     tab,
     page,
     pages: plan!.pages.length,

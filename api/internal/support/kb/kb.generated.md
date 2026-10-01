@@ -250,7 +250,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 120849d68bab -->
+<!-- source: docs/CHIP_DESIGN.md @ 41cbf547e7c3 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -297,9 +297,10 @@ once, at the release, with a one-time notice that Continuous is one click away i
 ```
 
 - **The label** on the left is 112 pixels: the widget's name in its own colour (NFL, BBC,
-  Stocks), one fact beneath it (6 LIVE, SUN 4 OCT, how many stocks are up and down), and
-  where you are in the widget (dots, or 2/9 when there are many pages). A line along its
-  bottom edge fills as the page runs out of time.
+  Stocks), one fact beneath it (6 LIVE, SUN 4, how many stocks are up and down), and
+  where you are in the widget when it has more than one page: 2/8 means page 2 of 8, so
+  you can see there's more and that it comes round. A line along its bottom edge fills as
+  the page runs out of time.
 - **The page** is one widget's items in equal columns that fill the bar. How many columns
   is a matter of your screen width and how much room that kind of thing needs: five NFL
   games on a 1280-pixel bar, eight on a 1920 one, but only two headlines, because a
@@ -307,24 +308,31 @@ once, at the release, with a one-time notice that Continuous is one click away i
   with a thin line between them.
 - **The edge** at the right holds the small things that should always be there. See below.
 
+#### Everything the widget page shows
+
+The bar shows everything the widget's own page in the app shows, in the bar's own order.
+There's no time window on pages: if NPR has 30 headlines, all 30 come round on the bar.
+
+- **Sports:** the whole week, as the app shows it: live games, your team, then the soonest
+  kick-off, then yesterday's results. On a Thursday morning the NFL widget is tonight's
+  game, Sunday's slate and Monday night.
+- **News:** every headline the feed has (we keep a week of them), newest first.
+- **Stocks and crypto:** your watchlist, in your order.
+
+A visit to a widget shows three pages (live games and your team always among them), then
+the bar moves on. **The next visit carries on where the last one stopped**, so a feed of 8
+pages shows pages 1 to 3, then 4 to 6 on the next trip round, then 7, 8 and 1. New
+headlines arriving in between don't send it back to the start. The label's 2/8 tells you
+where you are.
+
 #### Every page is full
 
 A page always has an item in every column, unless the widget really has fewer things than
-one page holds. The time windows below were made to keep the scrolling bar short; on a
-page, an empty column is just waste, so the page keeps going down the same order of
-importance until it's full:
-
-- **Sports:** after what's on now and soon, the next games in the coming week, your team
-  first. On a Thursday morning the NFL page is tonight's game plus Sunday's early
-  kick-offs, not one game stretched across the bar.
-- **News:** after the last six hours, older headlines from the last two days, newest first.
-- **Stocks and crypto:** your watchlist first, in your order. If it's shorter than a page,
-  the empty spaces show popular symbols. They are **not** added to your watchlist: the
-  label says so ("+4 POPULAR"), the watchlist screen offers each one as a one-click add,
-  and every symbol you add takes the place of one of them.
-
-Filling only ever uses the empty spaces on the last page, so a widget never gets extra
-pages from it and the bar takes no longer to go round.
+one page holds. If your watchlist is shorter than a page, the empty spaces show popular
+symbols. They are **not** added to your watchlist: the label says so ("+4 POPULAR"), the
+watchlist screen offers each one as a one-click add, and every symbol you add takes the
+place of one of them. Filling only ever uses the empty spaces on the last page, so a widget
+never gets extra pages from it and the bar takes no longer to go round.
 
 If a widget truly has fewer things than a page (one game all week), they keep the width
 they'd have on a full page, starting next to the label, rather than one item stretched
@@ -346,9 +354,10 @@ your place under your cursor.
 - **Hover holds the page.** Put your mouse on the bar and it waits. There is no setting for
   it under Pages.
 - **One visit per widget.** When the bar reaches a widget it shows the pages that have a
-  live game or your team in them, every time, then two more pages of the rest in turn,
-  then moves on. A busy Saturday of 56 college games takes a few laps to see everyone, but
-  whatever is live and whatever is yours is never more than one lap away.
+  live game or your team in them, every time, then two more pages of the rest in turn
+  (three when nothing is live or yours), then moves on. A busy Saturday of 56 college
+  games takes a few laps to see everyone, but whatever is live and whatever is yours is
+  never more than one lap away. One trip round the whole bar takes at most a minute.
 
 #### The edge
 
@@ -498,12 +507,12 @@ The bar isn't the feed. It has one rule per kind of thing, shared by Pages and C
 and there are no settings for it. Nothing on the ticker can be misconfigured because
 nothing on it is configured.
 
-1. **A time window decides what's eligible.** Live games always; games starting within a
-   day; results from the last eighteen hours; headlines from the last six hours; your
-   watchlist. On Pages, a page that isn't full keeps going past the window until it is
-   (see "Every page is full").
-2. **A quiet source still gets something**: its next fixture, its latest headline, as
-   long as that isn't stale. A source with nothing even then says why and, when we know,
+1. **On Pages, everything the widget page shows is eligible** (see "Everything the widget
+   page shows"). **On Continuous, a time window decides**: live games always; games
+   starting within a day; results from the last eighteen hours; headlines from the last
+   six hours; your watchlist.
+2. **A quiet source still gets something**: on Continuous, its next fixture or its latest
+   headline, as long as that isn't stale. A source with nothing at all says why and, when we know,
    when ("NBA · off-season"). That's the Also page under Pages and a grey chip under
    Continuous. Never a made-up date.
 3. **Everything eligible gets its turn.** Nothing is dropped. Pages work through it page by
@@ -582,7 +591,8 @@ say. Dropping items instead of taking turns. Pinning a whole widget. A pin icon 
 chip. Auto-pinning what you just added. Merging pins with stars and favourites. A pinned
 zone that scrolls. Evicting someone's pin to make room for a new one. A hover setting under
 Pages. One item stretched across a page. Centring a short page away from its label. Adding
-popular symbols to your watchlist for you.
+popular symbols to your watchlist for you. A time window on pages that hides part of what
+the widget page shows. Starting a widget from its first page on every visit.
 
 ### Still to do
 

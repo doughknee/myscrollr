@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { DashboardResponse, Game } from "../../types";
+import type { DashboardResponse, Game, RssItem } from "../../types";
 import { isLive } from "../../utils/gameHelpers";
 import fixture from "../../dev/__fixtures__/dashboard.pages.json";
 import busy from "../../dev/__fixtures__/dashboard.busy.json";
+import npr from "../../dev/__fixtures__/dashboard.npr.json";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
@@ -87,7 +88,7 @@ describe("nextTurn", () => {
     for (const v of visits.slice(0, -1)) {
       const plan = plans.get(v.tab)!;
       expect(v.pages.slice(0, plan.sticky)).toEqual([...Array(plan.sticky).keys()]);
-      expect(v.pages.length).toBe(Math.min(plan.pages.length, plan.sticky + MAX_PAGES_PER_VISIT - 1));
+      expect(v.pages.length).toBe(Math.min(plan.pages.length, plan.sticky + MAX_PAGES_PER_VISIT - Math.min(1, plan.sticky)));
     }
   });
 
@@ -106,6 +107,21 @@ describe("nextTurn", () => {
     const t2 = nextTurn(t1, without, planAll(without, 1280), nav)!;
     expect(t2.tab).toBe(without[0].tab);
     expect(t2.seq).toBe(2);
+  });
+
+  it("the cursor survives refreshes and re-plans: rebuilt from fresh data every turn, a feed still continues where it left off (SCROLLR-293)", () => {
+    const nav = newNav();
+    let t: Turn | null = null;
+    const seen: [number, number][] = [];
+    for (let i = 0; i < 9; i++) {
+      const d = structuredClone(npr) as unknown as DashboardResponse;
+      const rss = d.data.rss as RssItem[];
+      if (i >= 4) rss.unshift({ ...rss[0], id: 1, guid: "new" }); // a new headline mid-visit 2
+      const ws = buildPageWidgets(d, ["news_npr"], Date.parse(npr._captured_at));
+      t = nextTurn(t, ws, planAll(ws, 1920), nav);
+      seen.push([t!.visit, t!.page]);
+    }
+    expect(seen).toEqual([[1, 0], [1, 1], [1, 2], [2, 3], [2, 4], [2, 5], [3, 6], [3, 7], [3, 0]]);
   });
 
   it("nothing to show, no turn", () => {

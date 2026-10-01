@@ -3,13 +3,13 @@ import type { DashboardResponse, Game, RssItem, Trade } from "../../types";
 import thursday from "../../dev/__fixtures__/dashboard.nflthursday.json";
 import googl from "../../dev/__fixtures__/dashboard.googl.json";
 import sparse from "../../dev/__fixtures__/dashboard.sparsenews.json";
+import npr from "../../dev/__fixtures__/dashboard.npr.json";
 import market from "../../dev/__fixtures__/market.json";
 import { selectFinanceFill } from "../../datawidgets/finance/view";
-import { selectRssFill } from "../../datawidgets/rss/view";
 import { topUp } from "./pagePlan";
 import { buildPageWidgets, labelFact, planAll } from "./widgetPages";
 
-/** SCROLLR-292: every page is full. */
+/** SCROLLR-292: every page is full. SCROLLR-293: sports and news fill from their whole pool, so only a short watchlist takes a fill. */
 
 const asDash = (f: unknown) => f as DashboardResponse;
 const at = (f: { _captured_at: string }) => Date.parse(f._captured_at);
@@ -30,61 +30,59 @@ describe("topUp", () => {
   });
 });
 
-describe("sports: a Thursday NFL slate", () => {
+describe("sports: the whole week, as the widget page shows it (SCROLLR-293)", () => {
   const now = at(thursday);
   const [nfl] = buildPageWidgets(asDash(thursday), ["sports_nfl"], now);
   const plan = planAll([nfl], 1920).get("sports_nfl")!;
 
-  it("page 1 is tonight's game plus Sunday's, one game per column", () => {
-    expect(nfl.items).toHaveLength(1);
+  it("every game in the week is in the pool: TNF, Sunday and MNF, nothing to fill", () => {
+    expect(nfl.items).toHaveLength(thursday.data.sports.length);
+    expect(nfl.fill).toEqual([]);
     expect(plan.cols).toBe(8);
-    expect(plan.pages).toHaveLength(1);
-    expect(plan.pages[0]).toHaveLength(8);
-    const keys = plan.pages[0].map((i) => i.key);
-    expect(keys).toContain(nfl.items[0].key);
-    const kicks = plan.pages[0].map((i) => Date.parse((i.data as Game).start_time));
-    expect(kicks.every((t) => t > now && t <= now + 7 * 864e5)).toBe(true);
+    expect(plan.pages.map((p) => p.length)).toEqual([8, 8]);
   });
 
-  it("the ladder holds for the fill: your team first (on every visit), then soonest kick-off", () => {
-    const [first, ...rest] = plan.pages[0];
+  it("the ladder: your team first (on every visit), then tonight, then soonest kick-off", () => {
+    const [first, ...rest] = plan.pages.flat();
     expect(first.mine).toBe(true);
     expect(first.tier).toBe(0);
     expect(plan.sticky).toBe(1);
-    // Tonight's game (inside the horizon) leads the rest, then Sunday in kick-off order.
-    expect(rest[0].key).toBe(nfl.items[0].key);
-    const others = rest.map((i) => Date.parse((i.data as Game).start_time));
-    expect(others).toEqual([...others].sort((a, b) => a - b));
-    expect(rest.every((i) => !i.mine)).toBe(true);
+    expect(rest[0].key).toBe("g:10097632"); // TNF tonight
+    const kicks = rest.map((i) => Date.parse((i.data as Game).start_time));
+    expect(kicks).toEqual([...kicks].sort((a, b) => a - b));
   });
 
-  it("a narrower bar needs fewer, and the widest pool is never repeated", () => {
+  it("a narrower bar has more pages of the same pool, none repeated", () => {
     const narrow = planAll([nfl], 1280).get("sports_nfl")!;
-    expect(narrow.pages.flat()).toHaveLength(narrow.cols);
-    const ids = plan.pages.flat().map((i) => i.key);
+    expect(narrow.pages.flat()).toHaveLength(nfl.items.length);
+    const ids = narrow.pages.flat().map((i) => i.key);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("reads no display prefs: a one-day window on the widget page does not shrink the bar", () => {
+    const d = structuredClone(thursday) as unknown as DashboardResponse;
+    (d.widgets![0].config as Record<string, unknown>).display = { daysBack: 0, daysAhead: 0 };
+    expect(buildPageWidgets(d, ["sports_nfl"], now)[0].items).toHaveLength(nfl.items.length);
   });
 });
 
-describe("news: older headlines fill a quiet page", () => {
-  const now = at(sparse);
-  const rows = sparse.data.rss as unknown as RssItem[];
-
-  it("the fill is the 48 h floor, newest first", () => {
-    const ages = selectRssFill(rows, now).map((r) => (now - Date.parse(r.published_at!)) / 36e5);
-    expect(ages.length).toBe(7);
-    expect(Math.max(...ages)).toBeLessThanOrEqual(48);
-    expect(ages).toEqual([...ages].sort((a, b) => a - b));
+describe("news: every headline the widget holds (SCROLLR-293)", () => {
+  it("a quiet feed shows all of it, past the old 6 h window and 48 h floor, newest first", () => {
+    const now = at(sparse);
+    const [bbc] = buildPageWidgets(asDash(sparse), ["news_bbc"], now);
+    expect(bbc.items).toHaveLength(sparse.data.rss.length);
+    expect(bbc.fill).toEqual([]);
+    const shown = planAll([bbc], 1920).get("news_bbc")!.pages.flat().map((i) => Date.parse((i.data as RssItem).published_at!));
+    expect(shown).toHaveLength(sparse.data.rss.length);
+    expect(shown).toEqual([...shown].sort((a, b) => b - a));
+    expect((now - Math.min(...shown)) / 36e5).toBeGreaterThan(48);
   });
 
-  it("two fresh headlines and four columns: the page is four headlines, newest first", () => {
-    const [bbc] = buildPageWidgets(asDash(sparse), ["news_bbc"], now);
-    expect(bbc.items).toHaveLength(2);
-    const plan = planAll([bbc], 1920).get("news_bbc")!;
-    expect(plan.cols).toBe(4);
-    const shown = plan.pages.flat().map((i) => Date.parse((i.data as RssItem).published_at!));
-    expect(shown).toHaveLength(4);
-    expect(shown).toEqual([...shown].sort((a, b) => b - a));
+  it("30 NPR headlines are 8 pages at 1920, nothing sticky, so visits run 1-3, 4-6, 7-8-1", () => {
+    const [w] = buildPageWidgets(asDash(npr), ["news_npr"], at(npr));
+    const plan = planAll([w], 1920).get("news_npr")!;
+    expect(plan.pages.map((p) => p.length)).toEqual([4, 4, 4, 4, 4, 4, 3, 3]);
+    expect(plan.sticky).toBe(0);
   });
 });
 

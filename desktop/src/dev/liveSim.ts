@@ -42,7 +42,15 @@ export function tickDashboard(prev: DashboardResponse, n: number): DashboardResp
   } as DashboardResponse;
 }
 
+declare global {
+  interface Window {
+    /** Dev, `?live=1`: write the dashboard cache as a refetch would (the pages checks inject a mid-lap refresh, SCROLLR-293). */
+    __shimDashboard?: (update: (prev: DashboardResponse) => DashboardResponse) => void;
+  }
+}
+
 export function startLiveSim(qc: QueryClient): void {
+  window.__shimDashboard = (update) => qc.setQueryData<DashboardResponse>(queryKeys.dashboard, (prev) => (prev ? update(prev) : prev));
   let n = 0;
   window.setInterval(() => {
     qc.setQueryData<DashboardResponse>(queryKeys.dashboard, (prev) => (prev?.data ? tickDashboard(prev, n++) : prev));

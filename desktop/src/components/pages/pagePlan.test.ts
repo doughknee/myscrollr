@@ -100,8 +100,9 @@ describe("planWidget", () => {
     expect(plan.sticky).toBe(2);
   });
 
-  it("sticky is at least one page, and zero for no items", () => {
-    expect(planWidget(games([3, 3, 3]), tierOf, 4).sticky).toBe(1);
+  it("nothing live, nothing sticky (SCROLLR-293), and zero for no items", () => {
+    expect(planWidget(games([3, 3, 3]), tierOf, 4).sticky).toBe(0);
+    expect(planWidget(games([3, 0, 3]), tierOf, 4).sticky).toBe(1);
     expect(planWidget([], tierOf, 4)).toEqual({ pages: [], sticky: 0 });
   });
 });
@@ -122,18 +123,31 @@ describe("dwellFor", () => {
 
 describe("visitPages", () => {
   it("shows a small widget whole", () => {
-    expect(visitPages(0, 1)).toEqual({ pages: [], next: 0 });
-    expect(visitPages(1, 1)).toEqual({ pages: [0], next: 1 });
-    expect(visitPages(2, 1)).toEqual({ pages: [0, 1], next: 1 });
-    expect(visitPages(3, 1)).toEqual({ pages: [0, 1, 2], next: 1 });
+    expect(visitPages(0, 1, 1)).toEqual({ pages: [], next: 0 });
+    expect(visitPages(1, 1, 1)).toEqual({ pages: [0], next: 1 });
+    expect(visitPages(2, 1, 1)).toEqual({ pages: [0, 1], next: 1 });
+    expect(visitPages(3, 1, 1)).toEqual({ pages: [0, 1, 2], next: 1 });
+    expect(visitPages(3, 0, 0)).toEqual({ pages: [0, 1, 2], next: 0 });
   });
 
-  it("is page 1 plus the next two, wrapping", () => {
-    expect(visitPages(6, 1)).toEqual({ pages: [0, 1, 2], next: 3 });
-    expect(visitPages(6, 3)).toEqual({ pages: [0, 3, 4], next: 5 });
-    expect(visitPages(6, 5)).toEqual({ pages: [0, 5, 1], next: 2 });
+  it("with a sticky page: page 1 plus the next two, wrapping", () => {
+    expect(visitPages(6, 1, 1)).toEqual({ pages: [0, 1, 2], next: 3 });
+    expect(visitPages(6, 3, 1)).toEqual({ pages: [0, 3, 4], next: 5 });
+    expect(visitPages(6, 5, 1)).toEqual({ pages: [0, 5, 1], next: 2 });
     expect(visitPages(12, 2, 2)).toEqual({ pages: [0, 1, 2, 3], next: 4 });
     expect(visitPages(12, 11, 2)).toEqual({ pages: [0, 1, 11, 2], next: 3 });
+  });
+
+  it("nothing sticky: three pages a visit, continuing where the last stopped (30 headlines on 8 pages)", () => {
+    const shown: number[][] = [];
+    let cursor = 0;
+    for (let i = 0; i < 3; i++) {
+      const v = visitPages(8, cursor, 0);
+      shown.push(v.pages);
+      cursor = v.next;
+    }
+    expect(shown).toEqual([[0, 1, 2], [3, 4, 5], [6, 7, 0]]);
+    expect(new Set(shown.flat()).size).toBe(8);
   });
 
   it("sticky pages show every visit, however many; two more of the rest", () => {
@@ -144,7 +158,7 @@ describe("visitPages", () => {
   });
 
   it("across laps: sticky every lap, every other page comes round fairly, no repeats in a visit", () => {
-    for (const [count, sticky] of [[14, 1], [14, 3], [8, 2], [20, 1]] as const) {
+    for (const [count, sticky] of [[14, 1], [14, 3], [8, 2], [20, 1], [8, 0], [15, 0]] as const) {
       let cursor: number = sticky;
       const seen = new Map<number, number>();
       for (let lap = 0; lap < count * 2; lap++) {
