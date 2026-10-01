@@ -20,13 +20,17 @@
  *    hover back, so every monitor shows the same widget and swipes on the
  *    same beat. A window of a different width maps the leader's page onto
  *    its own pages (`followPage`).
+ *  - The fixed edge zone (EdgeZone, SCROLLR-273) sits on the right: clocks,
+ *    weather and the other utilities, then pins. Its slots step on the
+ *    turn's seq, so they change only while a page swipes. Its measured
+ *    width is frozen into each page with the bar's.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { DashboardResponse, Game, RssItem, Trade } from "../../types";
-import type { ChipColorMode } from "../../preferences";
+import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
+import type { ChipColorMode, WidgetPin } from "../../preferences";
 import { isPrimaryTicker } from "../../lib/windowRole";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
@@ -48,6 +52,7 @@ import NewsCell from "./cells/NewsCell";
 import QuoteCell from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
 import { Rule, accentFor, accentStyle, mix } from "./cells/parts";
+import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
 
 /** The swipe (canvas "Motion"): 0.6 s on a soft ease. */
 export const SWIPE_S = 0.6;
@@ -69,6 +74,10 @@ type TurnMsg = Turn & { held: boolean };
 interface Props {
   dashboard: DashboardResponse | null;
   activeTabs: string[];
+  /** Clock, weather and the other utilities, for the edge zone. */
+  widgetData?: WidgetTickerData;
+  /** Pinned subjects: on the edge, off the pages. */
+  pins?: WidgetPin[];
   chipColorMode?: ChipColorMode;
   /** Hold the page under the mouse (onHover "slow" and "pause" alike). */
   holdOnHover?: boolean;
@@ -88,6 +97,8 @@ interface Shown {
   count: number;
   colW: number;
 }
+
+const NO_PINS: WidgetPin[] = [];
 
 const keyOf = (i: PageItem) => i.key;
 
@@ -162,6 +173,8 @@ function Cell({ widget, item, colW, mode, dark, onChipClick }: {
 export default function PagedBar({
   dashboard,
   activeTabs,
+  widgetData,
+  pins = NO_PINS,
   chipColorMode = "widget",
   holdOnHover = true,
   onChipClick,
@@ -173,7 +186,8 @@ export default function PagedBar({
   const reduced = useOsReducedMotion();
   const dark = typeof document === "undefined" || document.documentElement.getAttribute("data-mode") !== "light";
 
-  const widgets = useMemo(() => buildPageWidgets(dashboard, activeTabs), [dashboard, activeTabs]);
+  const widgets = useMemo(() => buildPageWidgets(dashboard, activeTabs, Date.now(), pins), [dashboard, activeTabs, pins]);
+  const edge = useMemo(() => buildEdge(widgetData, pins, dashboard, activeTabs), [widgetData, pins, dashboard, activeTabs]);
   const widgetsRef = useRef(widgets);
   widgetsRef.current = widgets;
 
@@ -193,9 +207,16 @@ export default function PagedBar({
     return () => ro.disconnect();
   }, [bar]);
 
+  // The edge zone's width, read when a page is planned (not via a
+  // ResizeObserver: that fires after the effect that plans the first page,
+  // which would then be planned against an edge with no pins yet).
+  const edgeEl = useRef<HTMLDivElement>(null);
+  const edgeW = () => edgeEl.current?.offsetWidth ?? 0;
+
   const [turn, setTurn] = useState<Turn | null>(null);
   const turnRef = useRef<Turn | null>(null);
   const [planWidth, setPlanWidth] = useState(0);
+  const [planEdge, setPlanEdge] = useState(0);
   const [held, setHeld] = useState(false);
   const heldRef = useRef(false);
   const nav = useRef(newNav());
@@ -207,6 +228,7 @@ export default function PagedBar({
   const show = useCallback((t: Turn | null) => {
     turnRef.current = t;
     setPlanWidth(widthRef.current);
+    setPlanEdge(edgeW());
     setTurn(t);
   }, []);
 
@@ -218,7 +240,7 @@ export default function PagedBar({
   // ── Leader: the page clock ──────────────────────────────────────
   const advance = useCallback(() => {
     const ws = widgetsRef.current;
-    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current), nav.current));
+    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW()), nav.current));
     broadcast();
   }, [show, broadcast]);
 
@@ -288,13 +310,13 @@ export default function PagedBar({
   };
 
   // ── Presence: widgets that have pages ───────────────────────────
-  const displayedKey = widgets.filter((w) => w.tab !== ALSO_TAB).map((w) => w.tab).sort().join("\0");
+  const displayedKey = [...new Set([...widgets.filter((w) => w.tab !== ALSO_TAB).map((w) => w.tab), ...edgeTabs(edge)])].sort().join("\0");
   useEffect(() => {
     onDisplayedWidgetsChange?.(displayedKey === "" ? [] : displayedKey.split("\0"));
   }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── The frozen page ─────────────────────────────────────────────
-  const plans = useMemo(() => planAll(widgets, planWidth), [widgets, planWidth]);
+  const plans = useMemo(() => planAll(widgets, planWidth, planEdge), [widgets, planWidth, planEdge]);
   const shown = useRef<Shown | null>(null);
   if (turn && shown.current?.seq !== turn.seq) {
     const w = widgets.find((x) => x.tab === turn.tab);
@@ -308,7 +330,7 @@ export default function PagedBar({
         page: freezePage(items, keyOf),
         index,
         count: plan.pages.length,
-        colW: contentWidth(planWidth) / items.length,
+        colW: contentWidth(planWidth, planEdge) / items.length,
       };
     }
   }
@@ -324,7 +346,8 @@ export default function PagedBar({
   const swipe = { initial: { x: "100%" }, animate: { x: "0%" }, exit: { x: "-100%" }, transition: { duration: SWIPE_S, ease: EASE } };
   const wipe = { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: LABEL_S, ease: EASE } };
 
-  if (empty && widgets.length === 0) return <>{empty}</>;
+  // A clock or a pin on the edge is something to show: the bar stays.
+  if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
 
   return (
     <div
@@ -397,10 +420,10 @@ export default function PagedBar({
               </motion.div>
             </AnimatePresence>
           </div>
-          {/* SCROLLR-273: the fixed edge zone (clocks, weather, pins) mounts
-              here, after the page, and its width goes to planAll / contentWidth. */}
         </>
       )}
+      {/* The fixed edge: outside the page block, so it shows with no page at all. */}
+      <EdgeZone edge={edge} tick={turn?.seq ?? 0} reduced={reduced} mode={chipColorMode} dark={dark} edgeRef={edgeEl} onChipClick={onChipClick} />
     </div>
   );
 }

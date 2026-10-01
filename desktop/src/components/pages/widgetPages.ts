@@ -15,7 +15,8 @@
  */
 import type { DashboardResponse, Game, RssItem, Trade } from "../../types";
 import type { TickerContext } from "../../datawidgets/ticker";
-import { scopedRows } from "../../datawidgets/ticker";
+import { dropPinned, scopedRows } from "../../datawidgets/ticker";
+import type { WidgetPin } from "../../preferences";
 import { TICKER_SOURCES } from "../../datawidgets/tickerRegistry";
 import { getSportsDisplayConfig, selectSportsForTicker } from "../../datawidgets/sports/view";
 import { selectRssForTicker } from "../../datawidgets/rss/view";
@@ -110,12 +111,15 @@ function dayLabel(iso: string): string {
 /**
  * Every widget on the ticker as a page widget, in ticker order, then one
  * Also widget for the quiet ones. Utilities (clock, weather, …) are not
- * pages: they belong to the fixed edge zone (SCROLLR-273).
+ * pages: they live on the fixed edge zone (EdgeZone). So do pinned
+ * subjects, which leave the pages (`dropPinned`, CHIP_SPEC §8.5) so each is
+ * on the bar once; a widget whose every item is pinned says nothing.
  */
 export function buildPageWidgets(
   dashboard: DashboardResponse | null,
   activeTabs: readonly string[],
   now: number = Date.now(),
+  pins: readonly WidgetPin[] = [],
 ): PageWidget[] {
   const out: PageWidget[] = [];
   const also: PageItem[] = [];
@@ -127,7 +131,9 @@ export function buildPageWidgets(
     const raw = dashboard?.data?.[source];
     const cat = catalogItemById(tab);
     const hex = cat?.hex;
-    const ctx = { tab, source, dashboard, chipColorMode: "widget" } as TickerContext;
+    const pinnedSubjects = new Set(pins.filter((p) => p.widget === tab).map((p) => p.subject));
+    const ctx = { tab, source, dashboard, chipColorMode: "widget", pinnedSubjects } as TickerContext;
+    let pinnedAll = false;
     const config = dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as
       | { favoriteTeams?: Record<string, { teamName?: string }>; leagues?: string[]; symbols?: string[] }
       | undefined;
@@ -135,7 +141,9 @@ export function buildPageWidgets(
     let widget: PageWidget | null = null;
     if (source === "sports") {
       const rows = scopedRows<Game>(raw, ctx);
-      const eligible = selectSportsForTicker(rows, getSportsDisplayConfig(dashboard, tab), now);
+      const pool = selectSportsForTicker(rows, getSportsDisplayConfig(dashboard, tab), now);
+      const eligible = dropPinned(pool, ctx, (g) => [g.home_team_name, g.away_team_name]);
+      pinnedAll = pool.length > 0 && eligible.length === 0;
       if (eligible.length) {
         const favs = new Set(Object.values(config?.favoriteTeams ?? {}).map((f) => f?.teamName).filter(Boolean));
         const isMine = (g: Game) => favs.has(g.home_team_name) || favs.has(g.away_team_name);
@@ -166,7 +174,9 @@ export function buildPageWidgets(
       }
     } else if (source === "rss") {
       const rows = scopedRows<RssItem>(raw, ctx);
-      const items = selectRssForTicker(rows, now);
+      const pool = selectRssForTicker(rows, now);
+      const items = dropPinned(pool, ctx, (r) => r.feed_url);
+      pinnedAll = pool.length > 0 && items.length === 0;
       if (items.length) {
         widget = {
           tab, kind: "news", hex,
@@ -183,7 +193,9 @@ export function buildPageWidgets(
       }
     } else if (source === "finance") {
       const listed = new Set(config?.symbols ?? []);
-      const items = selectFinanceForTicker(scopedRows<Trade>(raw, ctx), config?.symbols ?? []);
+      const pool = selectFinanceForTicker(scopedRows<Trade>(raw, ctx), config?.symbols ?? []);
+      const items = dropPinned(pool, ctx, (t) => t.symbol);
+      pinnedAll = pool.length > 0 && items.length === 0;
       if (items.length) {
         const up = items.filter((t) => !(Number(t.percentage_change) < 0)).length;
         widget = {
@@ -209,7 +221,7 @@ export function buildPageWidgets(
     }
     // Nothing on: the same words the status chip would say, once the
     // dashboard is in and the source answered (CHIP_SPEC §8.7).
-    if (!dashboard || !Array.isArray(raw)) continue;
+    if (pinnedAll || !dashboard || !Array.isArray(raw)) continue;
     const st = tickerSource.status
       ? tickerSource.status(raw, ctx)
       : { tab: sourceTab(cat?.name ?? tab), text: "nothing to show right now" };
@@ -224,7 +236,7 @@ export function buildPageWidgets(
   return out;
 }
 
-/** Every widget's pages at this bar width. `edgeWidth` is the fixed edge zone (SCROLLR-273; 0 until it ships). */
+/** Every widget's pages at this bar width. `edgeWidth` is the fixed edge zone's measured width (0 when it is empty). */
 export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0): Map<string, WidgetPlan<PageItem>> {
   const content = contentWidth(barWidth, edgeWidth);
   return new Map(widgets.map((w) => [w.tab, planWidget(w.items, (i) => i.tier, columnsFor(content, w.minCol))]));
