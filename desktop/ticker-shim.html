@@ -28,6 +28,8 @@
                       plugin:event emits are relayed between same-origin
                       shim tabs over a BroadcastChannel, as Tauri relays
                       them between windows.
+    ?theme=<f>-<m>    the theme: a family and light|dark, e.g. nord-light,
+                      rose-pine-dark (cells=1 alone takes ?theme=light).
     ?cells=1          SCROLLR-271: the widget-page cells gallery
                       (src/dev/cellsGallery.tsx) instead of the ticker;
                       with ?theme=light and ?colors=widget|theme|subtle.
@@ -114,6 +116,17 @@
           // Defensive default.
         }
 
+        // Dev only: ?theme=<family>-<light|dark> (rose-pine-dark) wins over the
+        // saved mirror. The settings seed below carries the same pair, so
+        // useTheme keeps it instead of resetting to the default.
+        var q = /^([a-z-]+)-(light|dark)$/.exec(
+          new URLSearchParams(location.search).get("theme") || "",
+        );
+        if (q && KNOWN_FAMILIES.indexOf(q[1]) !== -1) {
+          family = q[1];
+          mode = q[2];
+        }
+
         var resolvedMode = resolveMode(mode);
         document.documentElement.setAttribute(
           "data-theme",
@@ -158,6 +171,7 @@
           };
         }
 
+        var themeQ = /^([a-z-]+)-(light|dark)$/.exec(params.get("theme") || "");
         var store = new Map([
           ["scrollr:store-migrated", true],
           ["scrollr:auth", {
@@ -167,6 +181,7 @@
             userSub: "logto|ticker-shim",
           }],
           ["scrollr:settings", {
+            appearance: themeQ ? { themeFamily: themeQ[1], themeMode: themeQ[2] } : undefined,
             ticker: {
               showTicker: true,
               scrollMode: params.get("pages") === "1" ? "pages" : "continuous",
