@@ -250,6 +250,30 @@ export function laps(enters: readonly Enter[]): number[] {
   return s.slice(1).map((e, k) => (enters[e].t - enters[s[k]].t) / 1000);
 }
 
+/**
+ * Seconds from the first lap's start until every page of every widget has
+ * been up and dwelt (SCROLLR-294, the scorecard's "all shown"): the widgets
+ * are the first lap's, each widget's page count its latest, and the time is
+ * when the last page still missing swipes out. Null until then.
+ */
+export function allShown(enters: readonly Enter[]): number | null {
+  const s = lapStarts(enters);
+  if (s.length < 2) return null;
+  const tabs = new Set(enters.slice(s[0], s[1]).map((e) => e.tab));
+  const seen = new Map<string, Set<number>>();
+  const count = new Map<string, number>();
+  for (let i = s[0]; i < enters.length - 1; i++) {
+    const e = enters[i];
+    count.set(e.tab, e.count);
+    seen.set(e.tab, (seen.get(e.tab) ?? new Set()).add(e.index));
+    const whole = (t: string) => Array.from({ length: count.get(t) ?? 1 }, (_, k) => k).every((k) => seen.get(t)?.has(k));
+    if (i >= s[1] - 1 && [...tabs].every(whole)) {
+      return (enters[i + 1].t - enters[s[0]].t) / 1000;
+    }
+  }
+  return null;
+}
+
 /** Ids a lap showed, one set per full lap. */
 export function itemsPerLap(enters: readonly Enter[]): Set<string>[] {
   const s = lapStarts(enters);

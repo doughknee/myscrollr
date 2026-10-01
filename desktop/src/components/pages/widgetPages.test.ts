@@ -8,7 +8,7 @@ import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
-import { MAX_PAGES_PER_VISIT, dwellFor } from "./pagePlan";
+import { REST_PER_VISIT, dwellFor } from "./pagePlan";
 import { ALSO_TAB, buildPageWidgets, followPage, newNav, nextTurn, planAll, type PageWidget, type Turn } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;
@@ -73,7 +73,7 @@ describe("nextTurn", () => {
     return turns;
   }
 
-  it("each widget gets one visit (its sticky pages, then two more), then the next widget, then around again", () => {
+  it("each widget gets one visit (its sticky pages, then one more), then the next widget, then around again", () => {
     const turns = run(60);
     expect(turns.map((t) => t.seq)).toEqual(turns.map((_, i) => i + 1));
     // Group consecutive turns into visits.
@@ -88,7 +88,7 @@ describe("nextTurn", () => {
     for (const v of visits.slice(0, -1)) {
       const plan = plans.get(v.tab)!;
       expect(v.pages.slice(0, plan.sticky)).toEqual([...Array(plan.sticky).keys()]);
-      expect(v.pages.length).toBe(Math.min(plan.pages.length, plan.sticky + MAX_PAGES_PER_VISIT - Math.min(1, plan.sticky)));
+      expect(v.pages.length).toBe(Math.min(plan.pages.length, plan.sticky + REST_PER_VISIT));
     }
   });
 
@@ -116,12 +116,12 @@ describe("nextTurn", () => {
     for (let i = 0; i < 9; i++) {
       const d = structuredClone(npr) as unknown as DashboardResponse;
       const rss = d.data.rss as RssItem[];
-      if (i >= 4) rss.unshift({ ...rss[0], id: 1, guid: "new" }); // a new headline mid-visit 2
+      if (i >= 4) rss.unshift({ ...rss[0], id: 1, guid: "new" }); // a new headline from visit 5 on
       const ws = buildPageWidgets(d, ["news_npr"], Date.parse(npr._captured_at));
       t = nextTurn(t, ws, planAll(ws, 1920), nav);
       seen.push([t!.visit, t!.page]);
     }
-    expect(seen).toEqual([[1, 0], [1, 1], [1, 2], [2, 3], [2, 4], [2, 5], [3, 6], [3, 7], [3, 0]]);
+    expect(seen).toEqual([[1, 0], [2, 1], [3, 2], [4, 3], [5, 4], [6, 5], [7, 6], [8, 7], [9, 0]]);
   });
 
   it("nothing to show, no turn", () => {

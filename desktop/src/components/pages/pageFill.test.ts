@@ -78,7 +78,7 @@ describe("news: every headline the widget holds (SCROLLR-293)", () => {
     expect((now - Math.min(...shown)) / 36e5).toBeGreaterThan(48);
   });
 
-  it("30 NPR headlines are 8 pages at 1920, nothing sticky, so visits run 1-3, 4-6, 7-8-1", () => {
+  it("30 NPR headlines are 8 pages at 1920, nothing sticky, so visits run 1, 2, 3 ... 8, 1", () => {
     const [w] = buildPageWidgets(asDash(npr), ["news_npr"], at(npr));
     const plan = planAll([w], 1920).get("news_npr")!;
     expect(plan.pages.map((p) => p.length)).toEqual([4, 4, 4, 4, 4, 4, 3, 3]);
