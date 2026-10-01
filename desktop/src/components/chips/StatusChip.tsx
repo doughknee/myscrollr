@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { clsx } from "clsx";
-import { getChipColors, chipShellClasses } from "./chipColors";
+import { STATUS_CHIP_COLORS, chipShellClasses } from "./chipColors";
 
 interface StatusChipProps {
   /** League code or feed tab, as the widget's real chips name it. */
@@ -27,7 +27,7 @@ interface StatusChipProps {
  * render whether it says "off-season" or names a date.
  */
 const StatusChip = memo(function StatusChip({ tab, text, reserve, onClick }: StatusChipProps) {
-  const c = getChipColors("subtle", "status");
+  const c = STATUS_CHIP_COLORS;
   return (
     <button
       type="button"

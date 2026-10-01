@@ -525,7 +525,6 @@ function RootLayout() {
     themeFamily: prefs.appearance.themeFamily,
     themeMode: prefs.appearance.themeMode,
     uiScale: prefs.appearance.uiScale,
-    fontWeight: prefs.appearance.fontWeight,
     highContrast: prefs.appearance.highContrast,
   });
 

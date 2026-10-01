@@ -63,8 +63,8 @@ describe("summaries", () => {
 
 describe("changedPaths", () => {
   it("names the leaf that changed", () => {
-    expect(changedPaths({ ticker: { mixMode: "mixed", x: 1 } }, { ticker: { mixMode: "grouped", x: 1 } })).toEqual([
-      'ticker.mixMode: "mixed" -> "grouped"',
+    expect(changedPaths({ ticker: { scrollMode: "pages", x: 1 } }, { ticker: { scrollMode: "continuous", x: 1 } })).toEqual([
+      'ticker.scrollMode: "pages" -> "continuous"',
     ]);
     expect(changedPaths({ a: 1 }, { a: 1 })).toEqual([]);
   });

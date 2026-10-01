@@ -1,7 +1,6 @@
 import { memo, useRef } from "react";
 import { clsx } from "clsx";
 import type { RssItem } from "../../types";
-import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import { timeAgo } from "../../utils/format";
 import { plainText, sourceTab } from "../../utils/rssText";
@@ -10,7 +9,6 @@ import { useFitsOneLine } from "../../hooks/useFitsOneLine";
 
 interface RssChipProps {
   item: RssItem;
-  colorMode?: ChipColorMode;
   /** The news widget's catalog brand colour; widget colour mode only. */
   accent?: string;
   /**
@@ -63,14 +61,13 @@ const GRID_COLS = "grid-cols-[max-content_minmax(0,max-content)_46px]";
 const RssChip = memo(
   function RssChip({
     item,
-    colorMode = "widget",
     accent,
     feedCountToday,
     reserveTitle,
     onClick,
   }: RssChipProps) {
-    const c = getChipColors(colorMode, "rss");
-    const branded = colorMode === "widget" && !!accent;
+    const c = getChipColors("rss");
+    const branded = !!accent;
     const accentStyle = branded ? ({ "--accent": liftForTint(accent) } as React.CSSProperties) : undefined;
     const rule = branded ? "border-[color-mix(in_srgb,var(--accent)_22%,transparent)]" : "border-info/20";
 
@@ -188,7 +185,6 @@ const RssChip = memo(
     );
   },
   (prev, next) =>
-    prev.colorMode === next.colorMode &&
     prev.accent === next.accent &&
     prev.feedCountToday === next.feedCountToday &&
     prev.reserveTitle === next.reserveTitle &&

@@ -124,13 +124,12 @@ describe("GameChip", () => {
     expect(scoreSlots.length).toBe(0);
   });
 
-  it("tints from the league's brand colour in widget mode only", () => {
+  it("tints from the league's brand colour, and only when it has one", () => {
     const { container, rerender } = render(<GameChip game={game()} accent="#e10600" />);
     const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.getPropertyValue("--accent")).toBe("#e10600");
     expect(btn.className).toContain("var(--accent)");
-    // The other two colour modes are shared palettes and ignore the brand.
-    rerender(<GameChip game={game()} accent="#e10600" colorMode="subtle" />);
+    rerender(<GameChip game={game()} />);
     expect((container.querySelector("button") as HTMLButtonElement).style.getPropertyValue("--accent")).toBe("");
   });
 
@@ -142,8 +141,8 @@ describe("GameChip", () => {
     expect(btn.className).toContain("var(--accent)_70%");
     expect(btn.className).not.toContain("border-live/70");
     expect(btn.className).not.toContain("bg-live/[0.13]");
-    // Unbranded modes have no colour of their own, so red still says close.
-    const { container: muted } = render(<GameChip game={tight} colorMode="subtle" />);
+    // An unbranded chip has no colour of its own, so red still says close.
+    const { container: muted } = render(<GameChip game={tight} />);
     expect((muted.querySelector("button") as HTMLButtonElement).className).toContain("border-live/70");
   });
 

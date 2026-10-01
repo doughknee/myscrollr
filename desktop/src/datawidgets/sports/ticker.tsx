@@ -68,7 +68,6 @@ export const sportsTickerSource: TickerSource = {
       node: (
         <GameChip
           game={game}
-          colorMode={ctx.chipColorMode}
           accent={accent}
           reserveNames={reserveNames}
           onClick={() =>
@@ -93,7 +92,6 @@ export const sportsTickerSource: TickerSource = {
       node: (
         <GameChip
           game={game}
-          colorMode={ctx.chipColorMode}
           accent={catalogItemById(ctx.tab)?.hex}
           // The pinned team is fixed; the opponent is not. Reserving the
           // widest opponent across its own fixtures is what keeps the chip

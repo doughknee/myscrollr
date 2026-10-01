@@ -15,7 +15,6 @@ function ctx(over: Partial<TickerContext> = {}): TickerContext {
     tab: "finance_stocks",
     source: "finance",
     dashboard: null,
-    chipColorMode: "theme",
     widgetDisplay: DEFAULT_WIDGET_DISPLAY,
     ...over,
   } as TickerContext;

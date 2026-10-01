@@ -27,7 +27,6 @@
  * CappedChip.
  */
 import { clsx } from "clsx";
-import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import { Sparkline } from "./Sparkline";
 import { recordMetric } from "./metricHistory";
@@ -49,7 +48,6 @@ const CHIP_MAX_PX = 640;
 function UtilityShell({
   type,
   tab,
-  colorMode = "widget",
   onClick,
   cols,
   extra,
@@ -59,7 +57,6 @@ function UtilityShell({
   type: "clock" | "timer" | "weather" | "sysmon";
   /** The word in the tab: CLOCK, TIMER, WEATHER, SYSMON. */
   tab: string;
-  colorMode?: ChipColorMode;
   onClick?: () => void;
   /** Grid template for the item cells, tab column excluded. */
   cols: string;
@@ -67,7 +64,7 @@ function UtilityShell({
   title?: string;
   children: React.ReactNode;
 }) {
-  const c = getChipColors(colorMode, type);
+  const c = getChipColors(type);
   return (
     <button
       onClick={onClick}
@@ -166,7 +163,6 @@ function colsFor(n: number): string {
 
 interface ChipProps<T> {
   items: T[];
-  colorMode?: ChipColorMode;
   onClick?: () => void;
 }
 
@@ -174,10 +170,9 @@ interface ChipProps<T> {
 
 export function ClockChip({
   items,
-  colorMode,
   onClick,
 }: ChipProps<ClockChipData>) {
-  const c = getChipColors(colorMode ?? "widget", "clock");
+  const c = getChipColors("clock");
   if (items.length === 0) return null;
 
   return (
@@ -185,7 +180,6 @@ export function ClockChip({
       type="clock"
       tab="CLOCK"
       cols={colsFor(items.length)}
-      colorMode={colorMode}
       onClick={onClick}
     >
       {items.map((item, i) => (
@@ -226,10 +220,9 @@ function isUrgent(item: ClockChipData): boolean {
 
 export function TimerChip({
   items,
-  colorMode,
   onClick,
 }: ChipProps<ClockChipData>) {
-  const c = getChipColors(colorMode ?? "widget", "timer");
+  const c = getChipColors("timer");
   if (items.length === 0) return null;
 
   const anyUrgent = items.some(isUrgent);
@@ -239,7 +232,6 @@ export function TimerChip({
       type="timer"
       tab="TIMER"
       cols={colsFor(items.length)}
-      colorMode={colorMode}
       onClick={onClick}
       // The last minute borrows the live palette — the same red the rest
       // of the app uses for "happening now".
@@ -300,10 +292,9 @@ function isHot(item: WeatherChipData): boolean {
 
 export function WeatherChip({
   items,
-  colorMode,
   onClick,
 }: ChipProps<WeatherChipData>) {
-  const c = getChipColors(colorMode ?? "widget", "weather");
+  const c = getChipColors("weather");
   if (items.length === 0) return null;
   const anyAlert = items.some((i) => i.alert);
 
@@ -312,7 +303,6 @@ export function WeatherChip({
       type="weather"
       tab="WEATHER"
       cols={colsFor(items.length)}
-      colorMode={colorMode}
       onClick={onClick}
       extra={anyAlert ? "border-warning/45" : undefined}
     >
@@ -387,10 +377,9 @@ function RangeBar({ item }: { item: WeatherChipData }) {
 
 export function SysmonChip({
   items,
-  colorMode,
   onClick,
 }: ChipProps<SysmonChipData>) {
-  const c = getChipColors(colorMode ?? "widget", "sysmon");
+  const c = getChipColors("sysmon");
   const anyHot = items.some((i) => i.hot);
 
   // Recorded on every render so the buffer is always filling and the
@@ -405,7 +394,6 @@ export function SysmonChip({
       type="sysmon"
       tab="SYSMON"
       cols={colsFor(items.length)}
-      colorMode={colorMode}
       onClick={onClick}
       extra={anyHot ? "border-error/30" : undefined}
     >

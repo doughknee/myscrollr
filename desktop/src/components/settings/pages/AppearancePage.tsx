@@ -39,12 +39,6 @@ const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "Auto" },
 ];
 
-const FONT_WEIGHT_OPTIONS: { value: string; label: string }[] = [
-  { value: "normal", label: "Normal" },
-  { value: "medium", label: "Medium" },
-  { value: "bold", label: "Bold" },
-];
-
 const APP_SCALE_OPTIONS = SCALE_PRESETS.map((p) => ({
   value: String(p),
   label: `${p}%`,
@@ -162,17 +156,6 @@ export default function AppearancePage({
 
       <SettingsGroup label="Readability">
         <RowList>
-          <Row id="fontWeight">
-            <SegmentedRow
-              label={R.fontWeight.label}
-              description={R.fontWeight.description}
-              value={appearance.fontWeight}
-              options={FONT_WEIGHT_OPTIONS}
-              onChange={(v) =>
-                set("fontWeight", v as AppearancePrefs["fontWeight"])
-              }
-            />
-          </Row>
           <Row id="highContrast">
             <ToggleRow
               label={R.highContrast.label}

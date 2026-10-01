@@ -1,5 +1,4 @@
 import { clsx } from "clsx";
-import type { ChipColorMode } from "../../preferences";
 
 // ── Color class sets ────────────────────────────────────────────
 // Each set maps to the Tailwind classes a chip uses for bg, border,
@@ -176,11 +175,13 @@ const WIDGET_MAP: Record<string, ChipColors> = {
 
 // ── Resolver ────────────────────────────────────────────────────
 
-export function getChipColors(mode: ChipColorMode, widget: string): ChipColors {
-  if (mode === "theme") return PRIMARY;
-  if (mode === "subtle") return MUTED;
+/** Every widget wears its own colour (SCROLLR-281: no colour modes). */
+export function getChipColors(widget: string): ChipColors {
   return WIDGET_MAP[widget] ?? PURPLE;
 }
+
+/** The status chip's grey: it speaks for the bar, not for a widget. */
+export const STATUS_CHIP_COLORS: ChipColors = MUTED;
 
 // ── Stable numeric width ────────────────────────────────────────
 

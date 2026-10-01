@@ -973,34 +973,6 @@
   --color-warning: #dfa000;
 }
 
-/* ── Font weight boost ────────────────────────────────────────── */
-/* Applied via useTheme hook to the shell element */
-.font-weight-medium {
-  font-weight: 500;
-  & * {
-    font-weight: inherit;
-  }
-  & strong,
-  & b,
-  & [class*="font-bold"],
-  & [class*="font-semibold"] {
-    font-weight: 700;
-  }
-}
-
-.font-weight-bold {
-  font-weight: 600;
-  & * {
-    font-weight: inherit;
-  }
-  & strong,
-  & b,
-  & [class*="font-bold"],
-  & [class*="font-semibold"] {
-    font-weight: 800;
-  }
-}
-
 /* ── High contrast text ──────────────────────────────────────── */
 /* Bumps muted text tiers to be more readable. Matches any theme family
    by suffix: `*-dark` for dark variants, `*-light` for light variants. */

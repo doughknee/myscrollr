@@ -16,7 +16,7 @@
 import type { ReactNode } from "react";
 
 import type { DashboardResponse } from "../types";
-import type { ChipColorMode, WidgetDisplayPrefs } from "../preferences";
+import type { WidgetDisplayPrefs } from "../preferences";
 import { scopeSourceData } from "../utils/widgetScope";
 
 /** One rendered chip plus the stable key the ticker wraps it with. */
@@ -50,7 +50,6 @@ export interface TickerContext {
   /** The resolved data source (sports, rss, …). */
   source: string;
   dashboard: DashboardResponse | null;
-  chipColorMode: ChipColorMode;
   widgetDisplay?: WidgetDisplayPrefs;
   /**
    * How many times each rotating slot has left the viewport, by slot key.

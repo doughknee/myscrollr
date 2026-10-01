@@ -23,6 +23,17 @@ use tauri::Manager;
 /// change; `before_send` drops every event while it is false.
 pub static CRASH_REPORTS: AtomicBool = AtomicBool::new(true);
 
+/// The argument the OS passes when it launches Scrollr at login. It is
+/// registered with the autostart entry (`tauri_plugin_autostart::init`
+/// below), so it is on the command line of a login launch and of nothing
+/// else. A login launch starts quietly (ticker only); anything the user
+/// opens themselves shows the main window (SCROLLR-281).
+const AUTOSTART_ARG: &str = "--autostart";
+
+fn launched_by_autostart(args: impl IntoIterator<Item = String>) -> bool {
+    args.into_iter().any(|a| a == AUTOSTART_ARG)
+}
+
 #[tauri::command]
 fn set_crash_reports(enabled: bool) {
     CRASH_REPORTS.store(enabled, Ordering::Relaxed);
@@ -149,7 +160,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_ARG]),
         ))
         // Use the plugin's default version comparator (`remote.version >
         // current_version`). An earlier build overrode this with `>=` so that
@@ -300,26 +311,31 @@ pub fn run() {
             // ── System tray ──────────────────────────────────────
             tray::setup(app)?;
 
-            // ── Start in the background ──────────────────────────
-            // `startup.startInBackground` (Settings → Startup, saved by
-            // the JS side under `scrollr:settings` in scrollr.json) keeps
-            // the main window hidden at launch: only the ticker comes up.
-            // tauri.conf.json starts `main` with `visible: false` so this
-            // decides before anything paints. The hidden webview still
-            // runs, so it keeps driving the ticker as usual; the tray's
-            // "Open Scrollr", a second launch and the dock show it.
+            // ── Start quietly when the OS launched us ────────────
+            // A login launch (the autostart entry carries `--autostart`)
+            // keeps the main window hidden: only the ticker comes up.
+            // Anything else shows it. tauri.conf.json starts `main` with
+            // `visible: false` so this decides before anything paints. The
+            // hidden webview still runs, so it keeps driving the ticker as
+            // usual; the tray's "Open Scrollr", a second launch and the
+            // dock show it.
+            if launched_by_autostart(std::env::args()) {
+                log::info!("launched at login: keeping the main window hidden");
+            } else if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+            }
+
+            // An autostart entry written by an older build has no
+            // `--autostart`, so it would keep opening the main window at
+            // login. Writing it again (the plugin stamps the current args)
+            // upgrades it; with launch at login off there is nothing to do.
             {
-                use tauri_plugin_store::StoreExt;
-                let in_background = app
-                    .store("scrollr.json")
-                    .ok()
-                    .and_then(|s| s.get("scrollr:settings"))
-                    .and_then(|v| v.pointer("/startup/startInBackground")?.as_bool())
-                    .unwrap_or(false);
-                if in_background {
-                    log::info!("startInBackground: keeping the main window hidden");
-                } else if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
+                use tauri_plugin_autostart::ManagerExt;
+                let launcher = app.autolaunch();
+                if launcher.is_enabled().unwrap_or(false) {
+                    if let Err(err) = launcher.enable() {
+                        log::warn!("could not refresh the autostart entry: {err}");
+                    }
                 }
             }
 
@@ -380,6 +396,22 @@ pub fn run() {
             let _ = &event;
         }
     });
+}
+
+#[cfg(test)]
+mod autostart_launch_tests {
+    use super::*;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn only_a_login_launch_carries_the_flag() {
+        assert!(launched_by_autostart(args(&["scrollr.exe", "--autostart"])));
+        assert!(!launched_by_autostart(args(&["scrollr.exe"])));
+        assert!(!launched_by_autostart(args(&["scrollr.exe", "--autostarted", "autostart"])));
+    }
 }
 
 #[cfg(test)]

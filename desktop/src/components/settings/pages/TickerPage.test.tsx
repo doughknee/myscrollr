@@ -28,23 +28,24 @@ const radios = (group: string) =>
   [...screen.getByRole("radiogroup", { name: group }).querySelectorAll("[role=radio]")].map((r) => r.textContent);
 
 describe("Settings > Ticker rows per scroll mode (SCROLLR-281)", () => {
-  it("Pages hides Speed, On hover and Item order", () => {
+  it("Pages hides Speed and On hover", () => {
     const rows = rowsFor("pages");
-    for (const hidden of ["speed", "onHover", "itemOrder"]) expect(rows).not.toContain(hidden);
+    for (const hidden of ["speed", "onHover"]) expect(rows).not.toContain(hidden);
     expect(rows).toContain("scrollMode");
-    expect(rows).toContain("chipColors");
   });
 
-  it("Continuous shows Speed, On hover (all three options) and Item order", () => {
+  it("Continuous shows Speed and On hover (all three options)", () => {
     const rows = rowsFor("continuous");
-    for (const shown of ["speed", "onHover", "itemOrder"]) expect(rows).toContain(shown);
+    for (const shown of ["speed", "onHover"]) expect(rows).toContain(shown);
     expect(radios("On hover")).toEqual(["Keep moving", "Slow down", "Pause"]);
   });
 
-  it("calls the colors row Colors in both modes", () => {
+  /** SCROLLR-281: no colour or ordering settings in either mode. */
+  it("never shows Colors or Item order", () => {
     for (const mode of ["pages", "continuous"] as const) {
-      rowsFor(mode);
-      expect(radios("Colors")).toEqual(["Widget", "Theme", "Subtle"]);
+      const rows = rowsFor(mode);
+      expect(rows).not.toContain("chipColors");
+      expect(rows).not.toContain("itemOrder");
       cleanup();
     }
   });

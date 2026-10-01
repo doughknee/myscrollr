@@ -82,11 +82,11 @@ describe("RssChip", () => {
     expect((container.querySelector("button") as HTMLButtonElement).className).toContain("_46px]");
   });
 
-  it("tints from the widget's brand in widget mode only", () => {
+  it("tints from the widget's brand, and only when it has one", () => {
     const { container, rerender } = render(<RssChip item={item()} accent="#052962" />);
     const btn = () => container.querySelector("button") as HTMLButtonElement;
     expect(btn().style.getPropertyValue("--accent")).not.toBe("");
-    rerender(<RssChip item={item()} accent="#052962" colorMode="subtle" />);
+    rerender(<RssChip item={item()} />);
     expect(btn().style.getPropertyValue("--accent")).toBe("");
   });
 });

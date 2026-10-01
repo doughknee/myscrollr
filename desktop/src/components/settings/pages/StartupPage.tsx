@@ -8,9 +8,10 @@
  * check always runs, Updates has a manual one for the impatient.
  *
  * "Launch at login" is owned by the Tauri autostart plugin, not prefs;
- * "Reset all settings" turns it off explicitly (SettingsSurface).
+ * "Reset all settings" turns it off explicitly (SettingsSurface). A login
+ * launch always starts quietly (ticker only) and a launch the user makes
+ * shows the window: there is no setting for it (SCROLLR-281, lib.rs).
  */
-import type { StartupPrefs } from "../../../preferences";
 import { RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import { Row } from "./Row";
 import { SETTINGS_ROWS } from "../rows";
@@ -18,15 +19,11 @@ import { SETTINGS_ROWS } from "../rows";
 const R = SETTINGS_ROWS.startup;
 
 interface StartupPageProps {
-  startup: StartupPrefs;
-  onStartupChange: (prefs: StartupPrefs) => void;
   autostartEnabled: boolean;
   onAutostartChange: (enabled: boolean) => void;
 }
 
 export default function StartupPage({
-  startup,
-  onStartupChange,
   autostartEnabled,
   onAutostartChange,
 }: StartupPageProps) {
@@ -39,16 +36,6 @@ export default function StartupPage({
             description={R.autostart.description}
             checked={autostartEnabled}
             onChange={onAutostartChange}
-          />
-        </Row>
-        <Row id="startInBackground">
-          <ToggleRow
-            label={R.startInBackground.label}
-            description={R.startInBackground.description}
-            checked={startup.startInBackground}
-            onChange={(v) =>
-              onStartupChange({ ...startup, startInBackground: v })
-            }
           />
         </Row>
       </RowList>

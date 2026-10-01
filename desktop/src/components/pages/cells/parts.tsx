@@ -4,25 +4,22 @@
  * A page has no chip shells: cells sit straight on the bar in equal
  * columns. The widget's colour reaches a cell through ONE CSS variable,
  * `--accent`, set by whoever lays the page out (the engine, 3/8). Cells
- * only ever read it through `mix()`, so the three chipColors modes are a
+ * only ever read it through `mix()`, so the colour is a
  * single decision made outside them (`accentFor`).
  */
 import type { CSSProperties } from "react";
-import type { ChipColorMode } from "../../../preferences";
 import { liftForTint } from "../../../utils/chipAccent";
 import TeamLogo from "../../TeamLogo";
 
 /**
  * The colour a widget's page is painted in, for the `--accent` variable.
  *
- * widget: the league's or feed's own colour, lifted on dark so a navy brand
- * shows (CHIP_SPEC §7.2), raw on light. theme: the app's green for every
- * widget. subtle: grey. Red, green and amber stay semantic in every mode:
- * they are never the accent.
+ * The league's or feed's own colour, lifted on dark so a navy brand
+ * shows (CHIP_SPEC §7.2), raw on light; grey when there is none. Red,
+ * green and amber stay semantic: they are never the accent.
  */
-export function accentFor(mode: ChipColorMode, hex: string | undefined, dark: boolean): string {
-  if (mode === "theme") return "var(--color-primary)";
-  if (mode === "subtle" || !hex) return "var(--color-fg-3)";
+export function accentFor(hex: string | undefined, dark: boolean): string {
+  if (!hex) return "var(--color-fg-3)";
   return dark ? liftForTint(hex) : hex;
 }
 

@@ -13,7 +13,6 @@
  * point of a cap is that a red block is visible without reading.
  */
 import { clsx } from "clsx";
-import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 import { ChipCap, cappedChipClasses } from "./ChipCap";
 import type { CapTone } from "./ChipCap";
@@ -53,7 +52,6 @@ const GITHUB_CAP: Record<
 interface ShellProps {
   cap: { tone: CapTone; text: string; label: string; pulse?: boolean };
   type: "uptime" | "github";
-  colorMode?: ChipColorMode;
   dim?: boolean;
   alert?: boolean;
   onClick?: () => void;
@@ -65,14 +63,13 @@ interface ShellProps {
 function CapShell({
   cap,
   type,
-  colorMode = "widget",
   dim,
   alert,
   onClick,
   end,
   children,
 }: ShellProps) {
-  const c = getChipColors(colorMode, type);
+  const c = getChipColors(type);
   return (
     <button
       onClick={onClick}
@@ -162,16 +159,14 @@ function HeartbeatBar({
 
 export function UptimeCappedChip({
   item,
-  colorMode,
   onClick,
 }: {
   item: UptimeChipData;
-  colorMode?: ChipColorMode;
   onClick?: () => void;
 }) {
   const cap = UPTIME_CAP[item.status] ?? UPTIME_CAP.pending;
   const down = item.status === "down";
-  const c = getChipColors(colorMode ?? "widget", "uptime");
+  const c = getChipColors("uptime");
 
   // A down monitor's uptime percentage is the least useful number on
   // the chip. Swap in how long it's been down.
@@ -181,7 +176,6 @@ export function UptimeCappedChip({
     <CapShell
       cap={cap}
       type="uptime"
-      colorMode={colorMode}
       alert={down}
       onClick={onClick}
       end={
@@ -216,17 +210,15 @@ export function UptimeCappedChip({
 
 export function GitHubCappedChip({
   item,
-  colorMode,
   onClick,
 }: {
   item: GitHubChipData;
-  colorMode?: ChipColorMode;
   onClick?: () => void;
 }) {
   const cap = GITHUB_CAP[item.status] ?? GITHUB_CAP.unavailable;
   const failed = item.status === "failure";
   const queued = item.status === "unavailable";
-  const c = getChipColors(colorMode ?? "widget", "github");
+  const c = getChipColors("github");
 
   // A failure's most useful value is WHERE it broke — that's the thing
   // you'd otherwise open GitHub to find. Falls back to duration when
@@ -241,7 +233,6 @@ export function GitHubCappedChip({
     <CapShell
       cap={cap}
       type="github"
-      colorMode={colorMode}
       alert={failed}
       dim={queued}
       onClick={onClick}

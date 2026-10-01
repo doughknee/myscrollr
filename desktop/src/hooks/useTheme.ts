@@ -1,5 +1,5 @@
 /**
- * Apply theme family + color mode, UI scale, font weight, and contrast
+ * Apply theme family + color mode, UI scale, and contrast
  * to a shell element.
  *
  * Shared between the app window (#app-shell) and ticker window
@@ -21,14 +21,13 @@
 import { useEffect } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { resolveThemeMode, resolveThemeName } from "../preferences";
-import type { ThemeFamily, ThemeMode, FontWeight } from "../preferences";
+import type { ThemeFamily, ThemeMode } from "../preferences";
 
 interface UseThemeOptions {
   shellId: string;
   themeFamily: ThemeFamily;
   themeMode: ThemeMode;
   uiScale: number;
-  fontWeight: FontWeight;
   highContrast: boolean;
 }
 
@@ -61,7 +60,6 @@ export function useTheme({
   themeFamily,
   themeMode,
   uiScale,
-  fontWeight,
   highContrast,
 }: UseThemeOptions): void {
   // ── Theme application ────────────────────────────────────────
@@ -113,17 +111,6 @@ export function useTheme({
       .setZoom(uiScale / 100)
       .catch(() => {});
   }, [uiScale]);
-
-  // ── Font weight ──────────────────────────────────────────────
-  useEffect(() => {
-    const shell = document.getElementById(shellId);
-    if (!shell) return;
-
-    shell.classList.remove("font-weight-normal", "font-weight-medium", "font-weight-bold");
-    if (fontWeight !== "normal") {
-      shell.classList.add(`font-weight-${fontWeight}`);
-    }
-  }, [shellId, fontWeight]);
 
   // ── High contrast ────────────────────────────────────────────
   useEffect(() => {

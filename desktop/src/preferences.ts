@@ -66,11 +66,6 @@ export function isThemeFamily(value: unknown): value is ThemeFamily {
 export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
-// Stored values match their labels on the Ticker page (REL-207). The
-// old spellings — weave, accent/muted, step/flip — are mapped forward in
-// `migrateTicker`.
-export type MixMode = "grouped" | "mixed";
-export type ChipColorMode = "widget" | "theme" | "subtle";
 /** "pages" is the widget-pages bar and the default (SCROLLR-272/274);
  *  "continuous" is the scrolling chips bar. The old step "page" mode and
  *  "flip" were deleted in SCROLLR-274; `migrateTicker` maps them to pages. */
@@ -79,8 +74,6 @@ export type ScrollMode = "continuous" | "pages";
  *  stop. Pages ignore it and always hold the page (SCROLLR-281). */
 export type HoverBehavior = "keep" | "slow" | "pause";
 export type PinSide = "left" | "right";
-
-export type FontWeight = "normal" | "medium" | "bold";
 
 export interface AppearancePrefs {
   /**
@@ -108,7 +101,6 @@ export interface AppearancePrefs {
    * existing users keep their current scale.
    */
   tickerScale: number;
-  fontWeight: FontWeight;
   highContrast: boolean;
   /** App-wide units — read by the Weather, Sysmon and Clock widgets. */
   units: UnitsPrefs;
@@ -158,8 +150,6 @@ export interface TickerPrefs {
   /** px/s; one of TICKER_SPEEDS (Slow / Normal / Fast on the page). */
   tickerSpeed: number;
   onHover: HoverBehavior;
-  mixMode: MixMode;
-  chipColors: ChipColorMode;
   scrollMode: ScrollMode;
 }
 
@@ -178,23 +168,6 @@ export function snapToPreset(
   return presets.reduce((best, p) =>
     Math.abs(p - value) < Math.abs(best - value) ? p : best,
   );
-}
-
-export interface StartupPrefs {
-  /**
-   * When true, launching Scrollr brings up the ticker only; the main
-   * window stays hidden until the tray's "Open Scrollr", a second
-   * launch, or the dock shows it. Read by the Rust side at setup
-   * (lib.rs) straight from the store file, so the window never flashes.
-   * Defaults to false.
-   *
-   * The only field here. `autoCheckUpdates` (REL-206: the check always
-   * runs now), `defaultView`, `refreshInterval` and `autostart` used to
-   * sit alongside it and are stripped on load. The real launch-at-login
-   * state is owned by the Tauri autostart plugin (see `autostartOn` in
-   * routes/__root.tsx), not by this object.
-   */
-  startInBackground: boolean;
 }
 
 export interface PrivacyPrefs {
@@ -458,7 +431,6 @@ export interface WidgetDisplayPrefs {
 export interface AppPreferences {
   appearance: AppearancePrefs;
   ticker: TickerPrefs;
-  startup: StartupPrefs;
   privacy: PrivacyPrefs;
   window: WindowPrefs;
   widgets: WidgetPrefs;
@@ -485,7 +457,6 @@ const DEFAULT_APPEARANCE: AppearancePrefs = {
   themeMode: "system",
   uiScale: 100,
   tickerScale: 100,
-  fontWeight: "normal",
   highContrast: false,
   units: { temperature: "fahrenheit", timeFormat: "12h" },
 };
@@ -494,13 +465,7 @@ const DEFAULT_TICKER: TickerPrefs = {
   showTicker: true,
   tickerSpeed: TICKER_SPEEDS.normal,
   onHover: "slow",
-  mixMode: "mixed",
-  chipColors: "widget",
   scrollMode: "pages",
-};
-
-const DEFAULT_STARTUP: StartupPrefs = {
-  startInBackground: false,
 };
 
 const DEFAULT_PRIVACY: PrivacyPrefs = {
@@ -572,7 +537,6 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
 const DEFAULT_PREFS: AppPreferences = {
   appearance: DEFAULT_APPEARANCE,
   ticker: DEFAULT_TICKER,
-  startup: DEFAULT_STARTUP,
   privacy: DEFAULT_PRIVACY,
   window: DEFAULT_WINDOW,
   widgets: DEFAULT_WIDGETS,
@@ -590,14 +554,10 @@ const LEGACY_MIRROR_KEYS = ["scrollr:feedPinned", "scrollr:tickerPosition"];
 function migrateV1(saved: Record<string, unknown>): Partial<AppPreferences> {
   const result: Record<string, unknown> = {};
 
-  // Old "general" → split into startup + appearance. Nothing survives
-  // the split: v1's defaultView, refreshInterval and autostart were
-  // migrated forward for years without anything ever reading them, and
-  // autoCheckUpdates went with REL-206 (the check always runs now).
-  // smoothScroll and scrollSmoothness went earlier.
-  if (saved.general) {
-    result.startup = { ...DEFAULT_STARTUP };
-  }
+  // Old "general" is dropped whole: v1's defaultView, refreshInterval and
+  // autostart were migrated forward for years without anything ever reading
+  // them, autoCheckUpdates went with REL-206 and startInBackground with
+  // SCROLLR-281. smoothScroll and scrollSmoothness went earlier.
 
   // v1's "taskbar" block is dropped: nothing ever read it (REL-208).
 
@@ -885,6 +845,7 @@ export function loadPrefs(): AppPreferences {
           tickerRows?: unknown;
           tickerLayout?: unknown;
           theme?: unknown;
+          fontWeight?: unknown;
         })
       | undefined;
     // Strip legacy fields:
@@ -897,6 +858,7 @@ export function loadPrefs(): AppPreferences {
       theme: _legacyTheme,
       themeFamily: _savedFamily,
       themeMode: _savedMode,
+      fontWeight: _legacyFontWeight,
       ...appearanceRest
     } = savedAppearance ?? {};
     void _legacyTickerRows; // intentionally discarded
@@ -904,6 +866,7 @@ export function loadPrefs(): AppPreferences {
     void _legacyTheme; // folded into themeMode below
     void _savedFamily; // re-applied via migrateAppearanceTheme
     void _savedMode; // re-applied via migrateAppearanceTheme
+    void _legacyFontWeight; // Font weight setting removed (SCROLLR-281)
     const { themeFamily, themeMode } = migrateAppearanceTheme(
       savedAppearance as Record<string, unknown> | undefined,
     );
@@ -939,24 +902,13 @@ export function loadPrefs(): AppPreferences {
         clock: legacyClockFormat,
       }),
     };
-    // Strip the retired startup/window fields the same way the legacy
-    // appearance keys above are stripped. Spreading saved-over-defaults
-    // would otherwise carry `autoCheckUpdates`, `defaultView`,
-    // `refreshInterval`, `autostart`, `defaultWidth`, `narrowWidth` and
-    // `skipTaskbar` straight back out to disk on the next save, so
-    // removing them from the types alone would never actually shed them.
-    const {
-      autoCheckUpdates: _autoCheckUpdates,
-      defaultView: _defaultView,
-      refreshInterval: _refreshInterval,
-      autostart: _autostart,
-      ...savedStartup
-    } = (source.startup ?? {}) as Partial<StartupPrefs> & {
-      autoCheckUpdates?: unknown;
-      defaultView?: unknown;
-      refreshInterval?: unknown;
-      autostart?: unknown;
-    };
+    // Strip the retired window fields the same way the legacy appearance
+    // keys above are stripped. Spreading saved-over-defaults would
+    // otherwise carry `defaultWidth`, `narrowWidth` and `skipTaskbar`
+    // straight back out to disk on the next save, so removing them from
+    // the types alone would never actually shed them. The whole `startup`
+    // block is gone (SCROLLR-281): `merged` names its keys, so a saved
+    // one is not carried.
     const {
       defaultWidth: _defaultWidth,
       narrowWidth: _narrowWidth,
@@ -970,7 +922,6 @@ export function loadPrefs(): AppPreferences {
     const merged: AppPreferences = {
       appearance: mergedAppearance,
       ticker: migrateTicker(source.ticker),
-      startup: { ...DEFAULT_STARTUP, ...savedStartup },
       // Absent on every pre-REL-209 install → on. Only a literal
       // `false` turns reporting off; anything else is the default.
       privacy: {
@@ -1083,10 +1034,9 @@ export function loadPrefs(): AppPreferences {
  * SCROLLR-278: the compact/detailed density is gone; the bar has one
  * height. A stored `tickerMode` (any value) is ignored and dropped.
  *
- * REL-207: stored values renamed to match their labels. Anything
- * unrecognised falls back to the default:
- *  - mixMode     weave → mixed
- *  - chipColors  accent → theme, muted → subtle
+ * SCROLLR-281: `mixMode` (Item order) and `chipColors` (Colors) are gone.
+ * The bar always weaves widgets together and every widget wears its own
+ * colour, so a stored value of either is dropped, not carried.
  * SCROLLR-274: the step "page" mode and its `stepPause` are gone. Only an
  * explicit "continuous" stays continuous; "pages", the old step spellings
  * (page, step, flip), a missing value and anything unrecognised are Pages,
@@ -1095,7 +1045,7 @@ export function loadPrefs(): AppPreferences {
 export function migrateTicker(raw: unknown): TickerPrefs {
   const saved = (raw && typeof raw === "object" ? raw : {}) as Omit<
     Partial<TickerPrefs>,
-    "scrollMode" | "mixMode" | "chipColors"
+    "scrollMode"
   > & {
     pauseOnHover?: unknown;
     hoverSpeed?: unknown;
@@ -1115,8 +1065,8 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     scrollMode,
     stepPause: _stepPause,
     tickerMode: _tickerMode,
-    mixMode,
-    chipColors,
+    mixMode: _mixMode,
+    chipColors: _chipColors,
     onHover,
     ...rest
   } = saved;
@@ -1124,6 +1074,8 @@ export function migrateTicker(raw: unknown): TickerPrefs {
   void _direction;
   void _tickerMode;
   void _stepPause;
+  void _mixMode;
+  void _chipColors;
   const isHover = (v: unknown): v is HoverBehavior =>
     v === "keep" || v === "slow" || v === "pause";
   const migratedHover: HoverBehavior = isHover(onHover)
@@ -1137,13 +1089,6 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     ...DEFAULT_TICKER,
     ...rest,
     onHover: migratedHover,
-    mixMode: mixMode === "grouped" ? "grouped" : "mixed",
-    chipColors:
-      chipColors === "theme" || chipColors === "accent"
-        ? "theme"
-        : chipColors === "subtle" || chipColors === "muted"
-          ? "subtle"
-          : "widget",
     scrollMode: scrollMode === "continuous" ? "continuous" : "pages",
     tickerSpeed: snapToPreset(
       rest.tickerSpeed,
@@ -1193,7 +1138,6 @@ export function resetAll(): AppPreferences {
   const defaults: AppPreferences = {
     appearance: { ...DEFAULT_APPEARANCE },
     ticker: { ...DEFAULT_TICKER },
-    startup: { ...DEFAULT_STARTUP },
     privacy: { ...DEFAULT_PRIVACY, postHogAnalyticsDecision, shareProductAnalytics },
     window: { ...DEFAULT_WINDOW },
     widgets: { ...DEFAULT_WIDGETS },
@@ -1244,7 +1188,7 @@ export function resolveThemeName(
  *
  * This function only normalizes the theme fields; the caller is still
  * responsible for merging the rest of AppearancePrefs (uiScale,
- * tickerScale, fontWeight, highContrast) against DEFAULT_APPEARANCE.
+ * tickerScale, highContrast) against DEFAULT_APPEARANCE.
  */
 export function migrateAppearanceTheme(
   saved: Record<string, unknown> | undefined,

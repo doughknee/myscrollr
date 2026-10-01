@@ -118,10 +118,16 @@ describe("searchSettings", () => {
     ]);
   });
 
-  /** "Chip colors" became "Colors" (SCROLLR-281); the old name stays a keyword. */
-  it("finds Colors by its old name", () => {
-    expect(searchSettings("chip colors", true).map((h) => h.rowId)).toContain("chipColors");
-    expect(searchSettings("colors", true).map((h) => h.label)).toContain("Colors");
+  /** SCROLLR-281 removed these rows outright; none may linger in the index. */
+  it("has no entry for the removed rows", () => {
+    for (const gone of ["chipColors", "itemOrder", "fontWeight", "startInBackground"]) {
+      expect(indexedIds().has(gone), gone).toBe(false);
+    }
+  });
+
+  /** "Start in the background" is fixed behaviour now; Launch at login says so and is findable by it. */
+  it("finds Launch at login by the old background wording", () => {
+    expect(searchSettings("hidden", true).map((h) => h.rowId)).toContain("autostart");
   });
 
   it("is case-insensitive", () => {
@@ -146,13 +152,11 @@ describe("searchSettings", () => {
       "tickerMonitors",
       "screenEdge",
       "tickerScale",
-      "chipColors",
       "scrollMode",
       "speed",
       "onHover",
       "alwaysOnTop",
       "hideFullscreen",
-      "itemOrder",
     ]);
   });
 

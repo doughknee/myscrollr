@@ -11,6 +11,8 @@ The lens, in the order Brandon asked for:
 
 Verdicts: **Keep** · **Rework** (same setting, better control or copy) · **Move** · **Fold** (delete the setting, keep the best default) · **Fix** (a bug, not a design choice).
 
+**Update, 1 Oct 2026 (SCROLLR-281): four rows below were removed outright** ("the less settings the better"): Font weight, Chip colors, Item order and Start in the background. Their rows are marked **Removed** in place. Every widget now wears its own colour, the marquee always weaves widgets together, text weight is normal (High contrast stays), and a login launch always starts quietly (ticker only) while a launch the user makes shows the window. Under Pages, Speed and On hover are not shown either (a page always holds under the mouse).
+
 The single biggest finding is structural, so it comes first.
 
 ## 1. The shape is wrong before any row is
@@ -44,7 +46,7 @@ Row count goes from 24 settings to about 20, and three of the removed ones were 
 | **Theme** | Select with 10 palettes; three preview dots | **Rework** | a: fine. d: the dots preview the *active* palette, never the one you are about to pick, so the preview is decorative. Replace select+dots with a grid of 10 swatches (name + three dots each) so all palettes are visible at once and the choice *is* the preview. |
 | **Color mode** | Light / Dark / Auto | **Keep** | a: good. Fix: the Ctrl+Shift+T cycle order (dark→light→system in code) disagrees with the Shortcuts page (light→dark→auto). Pick the page's order. |
 | **Display size** | 85 / 100 / 115 / 130 % presets | **Keep**, rename **App size** | d: presets are right, and the reason the ticker's slider feels wrong is that this one already got it right. Fix: a stored value outside the four presets (old 75/90/150) leaves nothing selected — snap on load. |
-| **Font weight** | Normal / Medium / Bold | **Keep**, group as **Readability** with High contrast | b: rarely changed, but it is accessibility, and accessibility settings stay even when few use them. |
+| **Font weight** | Normal / Medium / Bold | **Removed** (SCROLLR-281; was: Keep, group as **Readability** with High contrast) | b: rarely changed, but it is accessibility, and accessibility settings stay even when few use them. |
 | **High contrast text** | switch | **Keep** under Readability | Fine as is. |
 | **Units & formats** | does not exist; °F/°C lives in the Weather bar *and again* in the Sysmon bar; 12h/24h lives in the Clock bar; each in an ad-hoc storage key outside prefs | **Add** | c: a person's temperature unit is not a per-widget opinion. One row pair here — Temperature (°F / °C), Time (12h / 24h) — read by Weather, Sysmon and Clock. The widget bars lose those controls. The ad-hoc keys move into `preferences.ts` so reset and export see them. |
 
@@ -71,7 +73,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 |---|---|---|---|
 | **Detail level** | Compact / Detailed | **Removed** (SCROLLR-278, 1 Oct 2026) | The bar has one height, today's detailed one; the choice and its `tickerMode` pref no longer exist. |
 | **Scale** | slider 75–150 % | **Rework** → **Size**, presets 85 / 100 / 115 / 130 % | d: the slider Brandon does not like. Same four presets as App size, same control, same word. The 75–150 range was never reachable for the app anyway. |
-| **Chip colors** | Widget / Theme / Subtle | **Keep** | b: real, visible effect. Values `widget/accent/muted`; align in the same migration. |
+| **Chip colors** | Widget / Theme / Subtle | **Removed** (SCROLLR-281; was: Keep) | b: real, visible effect. Values `widget/accent/muted`; align in the same migration. |
 | **Spacing** | Tight / Normal / Wide | **Fold** | b: gap between chips, 8/12/20 px. Nobody opens Settings to change chip gap. Keep one gap (the current default, tight, reads best with the redrawn chips) and delete the row. |
 
 ### Motion
@@ -90,7 +92,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 |---|---|---|---|
 | **Always on top** | Window & startup; also the right-click menu; also the tray | **Move** here as **Stay above other windows**; keep the right-click item; **drop the tray item** | c: one setting, three surfaces, plus a legacy mirror key. Settings + one quick path is enough. The tray is for when the app is hidden; it needs Show/Hide ticker, not this. |
 | **Hide when an app goes fullscreen** | Window & startup, "Windows" badge; shown and writable on macOS and Linux where it does nothing | **Move** here; **hide** it on platforms where it is inert | An inert control with a badge is still an inert control. |
-| **Item order** | By source / Mixed | **Keep** | Fine. Value `weave` → rename to match in the migration. |
+| **Item order** | By source / Mixed | **Removed** (SCROLLR-281; was: Keep) | Fine. Value `weave` → rename to match in the migration. |
 | **Reset ticker settings** (page button) | resets `ticker.*` only, so Screen edge and Size stay; toast says "Reset ticker style" | **Fix** | Reset everything on the page, and one name for the button, the toast and the undo. |
 
 ## 4. Startup (today "Window & startup")
@@ -99,7 +101,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 |---|---|---|---|
 | **Launch on system startup** | switch, owned by the autostart plugin, not in prefs | **Keep** as **Launch at login** | Fix: "Reset all settings" does not turn it off because it is not a pref. Either include it in reset or say so in the reset copy. |
 | **Check for updates on startup** | switch, default on | **Fold** | b: nobody wants to be *not told* about an update; the Updates page has a manual check for the impatient. Default on, row gone, and the Updates page loses its odd sentence pointing here. |
-| **Start in the background** | does not exist | **Add** | For a tray app that launches at login, "open the ticker only, keep the main window closed" is the expected companion switch. Today launch-at-login opens whatever it opens with no say. |
+| **Start in the background** | does not exist | **Added, then removed** (SCROLLR-281: now fixed behaviour; was: Add) | For a tray app that launches at login, "open the ticker only, keep the main window closed" is the expected companion switch. Today launch-at-login opens whatever it opens with no say. |
 
 ## 5. Shortcuts
 

@@ -61,7 +61,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **lap / cycle** | Continuous: one complete trip of a slot off the right edge, across, and off the left. A slot's content advances once per lap. (Pages measure a lap as one pass through every widget's visits.) |
 | **horizon** | The per-source time rule deciding what is eligible. |
 | **floor** | What a quiet source still shows when nothing is inside its horizon: one item for most sources, the whole next matchday for Sports (§8.1). |
-| **palette** | The `ChipColors` object for a chip's colour mode and widget. Page cells take one `--accent` variable instead (§P.13). |
+| **palette** | The `ChipColors` object for a chip's widget. Page cells take one `--accent` variable instead (§P.13). |
 | **status chip** | Continuous: the single grey chip a widget with nothing on the rail shows: why, and when if known (§8.7). Pages say the same words on the Also page. |
 | **source** | A `TickerSource` in `desktop/src/datawidgets/<source>/ticker.tsx`, registered in `tickerRegistry.ts`. Pages read the same sources through the same selectors. |
 
@@ -103,7 +103,7 @@ SCROLLR-274. Existing users keep a stored `continuous` until the release flips t
 | What reaches the next item | The visit rule and the page clock (§P.6, §P.7) | Rotation inside slots, only off screen (§8.2 to §8.4) |
 | Pins live | The edge zone, right (§P.11) | The fixed zone (§8.5) |
 | Utilities (clock, timer, weather, sysmon, uptime, GitHub) | The edge zone, one Cycle slot each (§P.10) | One chip each in the rail, or pinned |
-| Settings that apply | Scroll mode, Size, Colors, Screen edge, Monitors | Those plus Speed, On hover, Item order |
+| Settings that apply | Scroll mode, Size, Screen edge, Monitors | Those plus Speed, On hover |
 | Width stability | Fixed columns; scores and clocks reserve (§P.9) | Reservation per chip (§4) |
 
 Never fork a selector for Pages. A rule about *what is on the bar* (horizon, floor, order,
@@ -212,7 +212,7 @@ first widget. The first page of a visit swipes the label too if the widget chang
 | Label wipe | 0.45 s, same ease, upward, only when the widget changes |
 | Edge slot roll | 0.45 s, same ease, upward |
 | Reduced motion | The **OS** setting, read directly (`prefers-reduced-motion`); every swipe, wipe and roll becomes a 0.4 s linear crossfade, and `data-motion-style="fade"` |
-| Hover | A page under the mouse holds, and so does the dwell line; the clock stands still and resumes when the mouse leaves. Under Pages there is **no hover setting** *(lands with SCROLLR-281; on `main` the page holds unless `onHover` is "keep", a stale value from Continuous)* |
+| Hover | A page under the mouse holds, and so does the dwell line; the clock stands still and resumes when the mouse leaves. Under Pages there is **no hover setting**: the page always holds, whatever `onHover` was left at by Continuous |
 
 The page clock restarts only on a new turn, never on a data update. Dwell is a floor of 6 s
 by design: nothing on the bar turns faster.
@@ -354,13 +354,12 @@ status chip (§8.7); each cell says what the status chip would, in the same word
   amber stay semantic and are never the accent.
 - Every tint is `mix(pct)` = `color-mix(in srgb, var(--accent) pct%, transparent)`: label
   16/12, label border 40, hairline 28, code tag 18, close game 10, `mine` line 100.
-- **Chip colours are being removed** *(lands with SCROLLR-281)*: every widget uses its own
-  colour and the `widget / theme / subtle` choice goes. Until it lands, `accentFor` honours
-  the three modes. **The theme palettes stay**: the 10 theme families and light/dark.
+- **There are no chip colours.** Every widget uses its own colour (`accentFor(hex, dark)`);
+  the `widget / theme / subtle` choice is gone (SCROLLR-281). **The theme palettes stay**: the
+  10 theme families and light/dark.
 - Settings that remain after SCROLLR-281 (Brandon, 1 Oct 2026: "the less settings the
-  better"): item order, font weight and start-in-the-background are gone. Speed is hidden
-  under Pages (SCROLLR-274). On `main` today Item order and On hover are still shown under
-  Pages; they are hidden *(lands with SCROLLR-281)*.
+  better"): item order, font weight and start-in-the-background are gone. Speed and On hover
+  are shown only under Continuous.
 - **Existing users switch to Pages once at the release**, with a one-time notice that
   Continuous is one click away *(lands with SCROLLR-277)*.
 - **A new account's first bar** is NPR + Stocks (`finance_stocks`, default watchlist) on
@@ -420,7 +419,7 @@ only.*
 
 | File | Exports you use | Purpose |
 |---|---|---|
-| `desktop/src/components/chips/chipColors.ts` | `getChipColors(mode, widget): ChipColors`, `chipShellClasses(colors, extra?)`, `chipBaseClasses(...)`, `stableNum(chars)`, `NUM_WIDTH` | Palettes and the shell. |
+| `desktop/src/components/chips/chipColors.ts` | `getChipColors(widget): ChipColors`, `STATUS_CHIP_COLORS`, `chipShellClasses(colors, extra?)`, `chipBaseClasses(...)`, `stableNum(chars)`, `NUM_WIDTH` | Palettes and the shell. |
 | `desktop/src/components/chips/StatusChip.tsx` | `StatusChip({tab, text, reserve, onClick?})` | The one chip an empty widget shows (§8.7). |
 | `desktop/src/components/chips/ChipCap.tsx` | `ChipCap`, `cappedChipClasses`, `CapTone` | Status cap for uptime/GitHub. |
 | `desktop/src/components/chips/Sparkline.tsx` | `Sparkline({points, height?, className?})` | viewBox 100×30, `preserveAspectRatio="none"`, `flex-1`, `stroke="currentColor"`. Draws nothing below 2 points. |
@@ -451,7 +450,6 @@ export interface TickerContext {
   tab: string;            // widget id, e.g. "sports_mlb"
   source: string;         // "sports" | "finance" | "rss" | "predictions" | "fantasy"
   dashboard: DashboardResponse | null;
-  chipColorMode: ChipColorMode;   // "widget" | "accent" | "muted"
   widgetDisplay?: WidgetDisplayPrefs;   // DO NOT read for ticker selection (§1.5)
   predictionsWatchlist: ReadonlySet<string>;
   cycles?: Readonly<Record<string, number>>;   // per-slot lap counts
@@ -486,9 +484,8 @@ export interface ChipColors {
   divider: string;     // "border-<token>/45"   — inner rules, stronger than the outer border
   tabBg: string;       // "bg-<token>/[0.18]"   — the painted tab
 }
-getChipColors("widget", "clock")   // WIDGET_MAP[widget], PURPLE if unknown
-getChipColors("accent", any)       // PRIMARY (emerald)
-getChipColors("muted", any)        // MUTED (grey: divider border-fg-3/35, tabBg bg-fg-3/[0.14])
+getChipColors("clock")             // WIDGET_MAP[widget], PURPLE if unknown
+STATUS_CHIP_COLORS                 // MUTED (grey: divider border-fg-3/35, tabBg bg-fg-3/[0.14]), the status chip only
 ```
 
 Widget → token: `finance→primary #34d399`, `sports→secondary #ff4757` (only when no brand
@@ -746,16 +743,14 @@ to find, and must not restate the top row.
 
 ## 7. Colour
 
-*The modes and classes here are Continuous chips. Page cells take one `--accent` (§P.13);
-§7.2's `liftForTint` is shared. The Widget / Theme / Subtle choice itself is being removed
-(lands with SCROLLR-281): every widget will use its own colour.*
+*The classes here are Continuous chips. Page cells take one `--accent` (§P.13);
+§7.2's `liftForTint` is shared.*
 
-### 7.1 Modes
+### 7.1 One colour per widget
 
-`ctx.chipColorMode`: `"widget"` (brand / widget token), `"accent"` (PRIMARY for all),
-`"muted"` (grey for all). Brand accents (`accent` prop, a `#rrggbb` from
-`catalogItemById(ctx.tab)?.hex`) apply only in `widget` mode: `branded = colorMode ===
-"widget" && !!accent`.
+There are no colour modes (SCROLLR-281 removed the Widget / Theme / Subtle setting): every
+widget wears its own colour. Brand accents (`accent` prop, a `#rrggbb` from
+`catalogItemById(ctx.tab)?.hex`) apply whenever there is one: `branded = !!accent`.
 
 ### 7.2 Brand tint
 
@@ -849,13 +844,13 @@ otherwise have to — "how many?" and "which ones?" — with a rule, not a contr
 | GitHub | `repos`, `excludedRepos` |
 
 **The user controls presentation** (`TickerPrefs`): `showTicker`, `scrollMode` (pages /
-continuous, default pages), `chipColors` (widget / theme / subtle), `tickerPosition`,
-`hideOnFullscreen`, and the Size scale. Continuous adds `tickerSpeed`, `onHover` (keep /
-slow / pause) and `mixMode` (grouped / mixed). Under Pages, Speed and Item order are hidden
-(SCROLLR-274) and the hover setting is hidden *(lands with SCROLLR-281)*: a page under the
-mouse always holds. `chipColors` is being removed *(lands with SCROLLR-281)*; the theme
-palettes (10 families, light/dark) stay. Item order, font weight and start-in-the-background
-are also removed *(lands with SCROLLR-281)*.
+continuous, default pages), `tickerPosition`, `hideOnFullscreen`, and the Size scale.
+Continuous adds `tickerSpeed` and `onHover` (keep / slow / pause). Under Pages, Speed and
+the hover setting are hidden (SCROLLR-274, SCROLLR-281): a page under the mouse always holds.
+There is no colour, item-order or font-weight setting and no start-in-the-background setting
+(SCROLLR-281): every widget wears its own colour, the marquee weaves widgets together, and the
+theme palettes (10 families, light/dark) stay. A login launch starts quietly (the autostart
+entry carries `--autostart`); a launch the user makes shows the window.
 
 Pinning is deliberately NOT in either list above: a pin names a subject, so it is an
 input, but it also decides that the subject leaves the tape, so it touches selection.
@@ -1091,7 +1086,7 @@ fixture says "off-season" or "no … scheduled" and nothing more.
 
 **Chip** (`chips/StatusChip.tsx`): `chipShellClasses` + `grid max-w-[640px]
 grid-cols-[max-content_minmax(0,max-content)]`, rows as §3.3. Tab as §3.5 with the
-`subtle` palette's `divider`/`tabBg`/`text` in every colour mode, so it reads as the bar
+grey `STATUS_CHIP_COLORS` palette's `divider`/`tabBg`/`text`, so it reads as the bar
 speaking, not as the widget's data. Text `font-mono text-[12px] font-medium leading-none`
 + `textDim`, `text-left`, `min-w-0 truncate`. No fixed right cell (nothing on it ticks) and
 no detail row content: the 20px row is there and empty, because anything in it would
@@ -1258,7 +1253,7 @@ needs both until Continuous is retired.
 7. **Wire the source**: `selectXForTicker(rows, …)` with no prefs; `rotateSlots(pool,
    SLOTS_CONST, ctx.cycles ?? {}, \`x-${ctx.tab}\`, id, reserve)`; return `{key, node,
    rotateSlot}`; register in `tickerRegistry.ts` if new.
-8. **Memo compare** must include every prop that changes rendering (`colorMode`, `accent`, `reserve*`, `onClick`, item identity and displayed fields).
+8. **Memo compare** must include every prop that changes rendering (`accent`, `reserve*`, `onClick`, item identity and displayed fields).
 9. **Tests** (vitest, `@testing-library/react`): the detail row
    shows the specified content; reservations present (classList / style); flash keyed;
    selector ignores prefs; rotation arrangement (keys, residue classes, reserve equals
