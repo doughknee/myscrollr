@@ -19,7 +19,7 @@ const clock = (id: string, label: string, value: string): ClockChipData => ({ id
 const data = {
   clock: [clock("clock-local", "Local", "7:21 PM"), clock("clock-ny", "New York", "8:21 PM"), clock("clock-tokyo", "Tokyo", "9:21 AM")],
   timer: [],
-  weather: [{ id: "weather-Chicago", label: "Chicago", temp: "61°F", icon: "⛅", low: 11, high: 19 }],
+  weather: [{ id: "weather-Chicago", label: "Chicago", temp: "61°F", unit: "fahrenheit", icon: "⛅", low: 11, high: 19 }],
   sysmon: [],
   uptime: [],
   github: [],
@@ -49,9 +49,11 @@ describe("buildEdge", () => {
     expect(edgeTabs(edge)).toEqual(["clock", "weather", "sports_nfl", "finance_stocks", "news_bbc"]);
   });
 
-  it("weather range in the user's unit, read off the formatted temperature", () => {
+  it("weather range follows the chip's unit, not the temperature's suffix", () => {
     const edge = buildEdge(data, [], dash, ["weather"]);
     expect(edge.utilities[0].items[0].detail).toBe("52° / 66°");
+    const c = { ...data, weather: [{ ...data.weather[0], temp: "16°C", unit: "celsius" as const }] } as WidgetTickerData;
+    expect(buildEdge(c, [], dash, ["weather"]).utilities[0].items[0].detail).toBe("11° / 19°");
   });
 
   it("skips utilities off the ticker, pins of widgets off the ticker, pinned utilities and subjects with nothing", () => {

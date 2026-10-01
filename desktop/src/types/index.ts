@@ -307,7 +307,11 @@ export interface WeatherChipData {
   temp: string;
   icon: string;
   detail?: string;
-  /** Numeric current/high/low driving the range bar. Degrees, provider units. */
+  /** The user's unit. `temp` is already formatted in it; the numbers below
+   *  stay Celsius (the arithmetic is unit-free) and `formatTempRange` is
+   *  the one place that turns low/high into text in this unit. */
+  unit: "celsius" | "fahrenheit";
+  /** Numeric current/high/low driving the range bar. Degrees Celsius. */
   tempValue?: number;
   high?: number;
   low?: number;

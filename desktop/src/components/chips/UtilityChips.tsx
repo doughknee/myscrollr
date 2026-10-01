@@ -30,6 +30,7 @@ import { clsx } from "clsx";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import { Sparkline } from "./Sparkline";
 import { recordMetric } from "./metricHistory";
+import { formatTempRange } from "../../utils/format";
 import type {
   ClockChipData,
   SysmonChipData,
@@ -283,10 +284,11 @@ export function TimerChip({
 
 // ── Weather — the range moved down ──────────────────────────────
 
-/** Hot enough to tint: an absolute ceiling, or within 2° of today's high. */
+/** Hot enough to tint: 35°C (95°F), or within 2° of today's high. Both
+ *  numbers are Celsius, so the ceiling must be too. */
 function isHot(item: WeatherChipData): boolean {
   if (item.tempValue == null) return false;
-  if (item.tempValue >= 95) return true;
+  if (item.tempValue >= 35) return true;
   return item.high != null && item.tempValue >= item.high - 2;
 }
 
@@ -342,7 +344,8 @@ export function WeatherChip({
  */
 function RangeBar({ item }: { item: WeatherChipData }) {
   const { tempValue, high, low } = item;
-  if (tempValue == null || high == null || low == null || high <= low) {
+  const range = formatTempRange(item);
+  if (tempValue == null || !range || high == null || low == null || high <= low) {
     return <span className="truncate">{item.detail}</span>;
   }
   const pct = Math.min(1, Math.max(0, (tempValue - low) / (high - low)));
@@ -350,7 +353,7 @@ function RangeBar({ item }: { item: WeatherChipData }) {
   return (
     <>
       <span className="shrink-0 tabular-nums text-fg-4">
-        {Math.round(low)}
+        {range.low}
       </span>
       <span
         className="relative h-[3px] min-w-[26px] flex-1 rounded-full"
@@ -367,7 +370,7 @@ function RangeBar({ item }: { item: WeatherChipData }) {
         />
       </span>
       <span className="shrink-0 tabular-nums text-fg-4">
-        {Math.round(high)}
+        {range.high}
       </span>
     </>
   );

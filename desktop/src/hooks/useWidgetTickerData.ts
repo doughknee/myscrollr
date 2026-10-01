@@ -277,13 +277,14 @@ export function useWidgetTickerData(
         id: `weather-${name}`,
         label: truncate(name, 12),
         temp,
+        unit,
         icon,
         detail: condition
           ? `${condition} \u00B7 Feels ${feelsLike}`
           : undefined,
-        // Range bar inputs. Raw provider units, NOT the formatted
-        // string — the bar does arithmetic and formatTemp may already
-        // have converted for display.
+        // Range bar inputs. Celsius as the provider sends it, NOT
+        // the formatted string — the bar does arithmetic. `unit` says how
+        // to print low/high (formatTempRange).
         tempValue: w?.temperature,
         high: w?.tempMax,
         low: w?.tempMin,

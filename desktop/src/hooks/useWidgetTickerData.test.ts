@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { LS_CLOCK_TIMEZONES, LS_TIMER_STATE } from "../constants";
+import { LS_CLOCK_TIMEZONES, LS_TIMER_STATE, LS_WEATHER_CITIES } from "../constants";
+import { formatTempRange } from "../utils/format";
 import { useWidgetTickerData } from "./useWidgetTickerData";
 import type { UnitsPrefs, WidgetPrefs } from "../preferences";
 
@@ -101,6 +102,24 @@ describe("useWidgetTickerData", () => {
         "clock-Europe/London",
       ]);
     });
+  });
+
+  it.each([
+    ["fahrenheit", "61°F", "52°", "66°"],
+    ["celsius", "16°C", "11°", "19°"],
+  ] as const)("weather chip carries the %s unit and Celsius numbers for the range", async (temperature, temp, low, high) => {
+    storeValues.set(LS_WEATHER_CITIES, [
+      { location: { name: "Chicago" }, weather: { temperature: 16, feelsLike: 15, weatherCode: 1, isDay: true, tempMax: 19, tempMin: 11 } },
+    ]);
+    const prefs = makeWidgetPrefs(["weather"]);
+    const { result } = renderHook(() => useWidgetTickerData(prefs, { ...UNITS, temperature }));
+
+    await waitFor(() => expect(result.current.weather).toHaveLength(1));
+    const w = result.current.weather[0];
+    expect(w.temp).toBe(temp);
+    expect(w.unit).toBe(temperature);
+    expect([w.tempValue, w.low, w.high]).toEqual([16, 11, 19]);
+    expect(formatTempRange(w)).toEqual({ low, high });
   });
 
   it("uses configured Pomodoro cadence in timer ticker detail", async () => {
