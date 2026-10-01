@@ -186,7 +186,7 @@ question you'd otherwise open the app for and never repeats the top.
 | Item | The top says | The second line adds |
 |---|---|---|
 | Game | who's playing, the score, the clock | where each team sits in the table (a chip also says where, before kick-off). A narrow page cell has no second line: it spends the room on bigger names and scores, with an @ on the home team |
-| Stock or coin | symbol, price, change | the day's line (a chip also shows the day's range) |
+| Stock or coin | symbol, price, change | the day's line and the day's range |
 | Headline | the headline, how old it is | the summary, or which feed it's from |
 | Clock | the time in each zone | the date: Tokyo may already be tomorrow |
 | Timer | time remaining | a bar draining down |

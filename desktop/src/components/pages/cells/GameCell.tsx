@@ -11,16 +11,18 @@ import { Crest } from "./parts";
 /** A column at least this wide lays the game out as one scoreboard line. */
 export const WIDE_GAME_PX = 430;
 /**
- * The clock box: a FIXED width, 7ch of its 12px face plus 14px of air in
- * front, where the live dot sits (SCROLLR-296 round 2, Brandon: "the
- * quarter and the time need more space to breathe"). Its widest lines are
+ * The clock box: a FIXED width, 7ch of its 12px face plus 22px of air in
+ * front, where the live dot sits: with the 6px gap, 28px from the score's
+ * last digit to the clock (SCROLLR-296 rounds 2 and 3, Brandon: "the
+ * quarter / game start time needs more padding next to the scores"; 14px
+ * read as touching). Its widest lines are
  * "12:00P" and a same-day countdown "in 9h59" (ten hours or more out says
  * "TODAY"). Never a min-width that includes padding: that grew with
  * "12:00P" and moved every name left of it (e2e/ticker/cells.spec.ts).
  */
-export const STATUS_WIDTH = "calc(7ch + 14px)";
-/** The same box between the scores of a wide cell: 14px each side, so the text centres. */
-export const STATUS_WIDE = "calc(7ch + 28px)";
+export const STATUS_WIDTH = "calc(7ch + 22px)";
+/** The same box between the scores of a wide cell: 22px each side, so the text centres. */
+export const STATUS_WIDE = "calc(7ch + 44px)";
 
 /**
  * The cell's three type sizes (SCROLLR-296: at most three, none under 12px):
@@ -35,12 +37,12 @@ const US_PRO = new Set(["NFL", "MLB", "NBA", "NHL", "MLS", "WNBA"]);
 /**
  * Narrowest column a game cell takes, for pagePlan's `columnsFor(…, minCol)`.
  * SCROLLR-296 round 2 (Brandon: "we don't need that many per page. I'd
- * rather fit more of the names"): everything but the name costs 158px
+ * rather fit more of the names"): everything but the name costs 166px
  * (16px gutters with the "@" hung in the left one, the crest, an 18px
- * score, the clock with 14px of air), so 264 leaves a 14.5px name 106px:
- * every US-pro nickname whole ("Commanders", "Timberwolves",
- * "Diamondbacks"; "Golden Knights" loses its last letter), the full short
- * name from ~340px. 264 still gives four games at 1280 with the Clock on the
+ * score, the clock with 28px of air before it), so 264 leaves a 14.5px name
+ * 98px: "Commanders", "Timberwolves", "Buccaneers" whole; "Diamondbacks"
+ * and "Golden Knights" lose a letter or two at the narrowest bars; the full
+ * short name from ~350px. 264 still gives four games at 1280 with the Clock on the
  * edge. Leagues that show a city or college name get 276.
  */
 export function gameMinCol(league: string): number {
@@ -70,11 +72,11 @@ export function cellName(league: string, name: string, roomy: boolean): string {
  */
 export function nameRoom(width: number, scoreCh: number): number {
   if (width >= WIDE_GAME_PX) {
-    // gutters 32, four 12px gaps, the 78px clock, two 22px scores; then per
+    // gutters 32, four 12px gaps, the 94px clock, two 22px scores; then per
     // side the crest and its gap (and, at home, the "@").
-    return (width - 32 - 48 - 78.4 - 2 * scoreCh * 13.2) / 2 - 45;
+    return (width - 32 - 48 - 94.4 - 2 * scoreCh * 13.2) / 2 - 45;
   }
-  return width - 32 - 22 - 6 - 6 - scoreCh * 10.8 - 6 - 64.4;
+  return width - 32 - 22 - 6 - 6 - scoreCh * 10.8 - 6 - 72.4;
 }
 
 let ctx: CanvasRenderingContext2D | null | undefined;
@@ -213,8 +215,8 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
     <span
       data-part="status"
       className={clsx(
-        "relative flex shrink-0 flex-col justify-center gap-[6px] whitespace-nowrap pl-[14px] font-mono text-[12px] leading-none",
-        wide ? "items-center pr-[14px]" : "items-start",
+        "relative flex shrink-0 flex-col justify-center gap-[6px] whitespace-nowrap pl-[22px] font-mono text-[12px] leading-none",
+        wide ? "items-center pr-[22px]" : "items-start",
       )}
       style={{ width: wide ? STATUS_WIDE : STATUS_WIDTH }}
     >
@@ -222,7 +224,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
         {/* Always mounted, in the box's own air so it takes no room from the text. */}
         <span
           data-part="live-dot"
-          className={clsx("absolute right-full top-1/2 mr-[5px] h-[5px] w-[5px] -translate-y-1/2 rounded-full bg-live", !live && "invisible")}
+          className={clsx("absolute right-full top-1/2 mr-[7px] h-[5px] w-[5px] -translate-y-1/2 rounded-full bg-live", !live && "invisible")}
         />
         {top}
       </span>

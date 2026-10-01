@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import QuoteCell, { changeText, priceCh, CHANGE_CH, PRICE_CH, STOCK_PRICE_CH } from "./QuoteCell";
+import QuoteCell, { changeText, priceCh, rangeText, CHANGE_CH, PRICE_CH, QUOTE_MIN_COL, QUOTE_MIN_COLS, QUOTE_SPLIT, STOCK_PRICE_CH } from "./QuoteCell";
 import type { Trade } from "../../../types";
 
 function trade(over: Partial<Trade> = {}): Trade {
@@ -34,17 +34,22 @@ describe("QuoteCell", () => {
     expect(container.querySelector('[data-part="change"]')!.classList.contains("text-down")).toBe(true);
   });
 
-  it("the price is the largest thing in the cell; no range row unless asked", () => {
+  it("price first: symbol over the price (the largest type) over the change, on the left; the day on the right", () => {
     const { container } = render(<QuoteCell trade={trade()} />);
-    expect(container.querySelector('[data-part="price"]')!.classList.contains("text-[20px]")).toBe(true);
-    expect(container.querySelector('[data-part="range"]')).toBeNull();
+    const price = container.querySelector('[data-part="price"]')!;
+    expect(price.classList.contains("text-[20px]")).toBe(true);
+    const left = price.parentElement!;
+    expect(left.contains(container.querySelector('[data-part="change"]'))).toBe(true);
+    expect(left.contains(container.querySelector('[data-part="spark"]'))).toBe(false);
+    const right = container.querySelector('[data-part="spark"]')!.parentElement!;
+    expect(right.contains(container.querySelector('[data-part="range"]'))).toBe(true);
+    expect(container.querySelector("button")!.className).toContain("grid-cols-[minmax(0,1fr)_minmax(0,1fr)]");
   });
 
-  it("the day's line spans the cell, in its own row under symbol, price and change", () => {
-    const { container } = render(<QuoteCell trade={trade()} />);
-    const spark = container.querySelector('[data-part="spark"]')!;
-    expect(spark.querySelector("svg")).toBeTruthy();
-    expect(spark.parentElement).toBe(container.querySelector("button"));
+  it("the split is the picked one; the other is drawable for comparison", () => {
+    expect(QUOTE_SPLIT).toBe("half");
+    expect(QUOTE_MIN_COL).toBe(QUOTE_MIN_COLS.half);
+    expect(render(<QuoteCell trade={trade()} split="twoFifths" />).container.querySelector("button")!.className).toContain("grid-cols-[minmax(0,2fr)_minmax(0,3fr)]");
   });
 
   it("flat is neutral: no arrow, no up colour", () => {
@@ -59,24 +64,25 @@ describe("QuoteCell", () => {
     expect(render(<QuoteCell trade={trade()} />).container.querySelector('[aria-label="popular"]')).toBeNull();
   });
 
-  it("the day's range: low and high, and where the price sits", () => {
-    const { getByText } = render(<QuoteCell trade={trade()} range />);
+  it("the day's range: low and high, whole units from 1,000 so an end stays within seven characters", () => {
+    const { getByText } = render(<QuoteCell trade={trade()} />);
     expect(getByText("253.39")).toBeTruthy();
     expect(getByText("257.63")).toBeTruthy();
+    expect(rangeText(79002.24)).toBe("79,002");
+    expect(rangeText(0.0904)).toBe("0.0904");
   });
 
   it("no range: the track stays, the labels and marker do not guess", () => {
-    const { container } = render(<QuoteCell trade={trade({ day_low: 0, day_high: 0 })} range />);
-    const range = container.querySelector('[data-part="range"]')!;
-    expect(range.textContent).toBe("");
-    expect(range.querySelector(".invisible")).toBeTruthy();
+    const { container } = render(<QuoteCell trade={trade({ day_low: 0, day_high: 0 })} />);
+    expect(container.querySelector('[data-part="range"]')!.textContent).toBe("");
+    expect(container.querySelector('[data-part="range-rail"]')!.querySelector(".invisible")).toBeTruthy();
   });
 
   it("width-stable: a one-digit and a two-digit move, a small and a large price, reserve the same", () => {
     const parts = (t: Trade) => {
-      const { container } = render(<QuoteCell trade={t} range />);
+      const { container } = render(<QuoteCell trade={t} />);
       const el = (p: string) => (container.querySelector(`[data-part="${p}"]`) as HTMLElement).style.minWidth;
-      return [el("change"), el("price"), el("range-low"), el("range-high")];
+      return [el("change"), el("price")];
     };
     const small = parts(trade({ price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }));
     const large = parts(trade({ price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 9260.55 }));
@@ -84,7 +90,7 @@ describe("QuoteCell", () => {
     expect(large).toEqual(small);
     expect(none).toEqual(small);
     // A stock holds eight characters ("9,999.99"), a coin nine ("79,850.21").
-    expect(small).toEqual([`${CHANGE_CH}ch`, `${STOCK_PRICE_CH}ch`, `${STOCK_PRICE_CH}ch`, `${STOCK_PRICE_CH}ch`]);
+    expect(small).toEqual([`${CHANGE_CH}ch`, `${STOCK_PRICE_CH}ch`]);
     expect(parts(trade({ symbol: "BTC/USD", price: 79850.21, day_low: 79002.24, day_high: 81263.52 }))[1]).toBe(`${PRICE_CH}ch`);
     expect(priceCh("BTC/USD")).toBe(9);
     // The widest change fits its reservation.

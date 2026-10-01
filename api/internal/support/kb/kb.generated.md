@@ -250,7 +250,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ a8a2deb5739f -->
+<!-- source: docs/CHIP_DESIGN.md @ 350045d697c0 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -437,7 +437,7 @@ question you'd otherwise open the app for and never repeats the top.
 | Item | The top says | The second line adds |
 |---|---|---|
 | Game | who's playing, the score, the clock | where each team sits in the table (a chip also says where, before kick-off). A narrow page cell has no second line: it spends the room on bigger names and scores, with an @ on the home team |
-| Stock or coin | symbol, price, change | the day's line (a chip also shows the day's range) |
+| Stock or coin | symbol, price, change | the day's line and the day's range |
 | Headline | the headline, how old it is | the summary, or which feed it's from |
 | Clock | the time in each zone | the date: Tokyo may already be tomorrow |
 | Timer | time remaining | a bar draining down |
