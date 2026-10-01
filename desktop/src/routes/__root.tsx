@@ -71,6 +71,7 @@ import {
 import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
 import { applyAutostartDefault } from "../lib/autostartDefault";
+import { applyPagesIntro } from "../lib/pagesIntro";
 import { hydrateProductAnalyticsConsent } from "../lib/productAnalyticsConsent";
 
 // Types
@@ -584,6 +585,16 @@ function RootLayout() {
       .catch((err) => console.error("[Scrollr] Autostart default failed:", err))
       .then(() => isAutostartEnabled().then(setAutostartOn))
       .catch(() => {});
+    // Mount only: the marker is consumed once and the prefs are the loaded ones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Existing users move from Continuous to Pages once, with a notice
+  // (SCROLLR-288). Main window only, once per process.
+  useEffect(() => {
+    applyPagesIntro(prefs, persistPrefs, () =>
+      navigate({ to: "/customize", search: { page: "ticker" } }),
+    ).catch((err) => console.error("[Scrollr] Pages intro failed:", err));
     // Mount only: the marker is consumed once and the prefs are the loaded ones.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
