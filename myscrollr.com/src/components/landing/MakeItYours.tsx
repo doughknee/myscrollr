@@ -79,7 +79,7 @@ export function MakeItYours() {
               <span className="text-primary">Dress it, park it.</span>
             </h2>
             <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
-              Twenty palettes, light or dark. Top or bottom of any monitor.
+              Ten themes, each light or dark. Top or bottom of any monitor.
               Pages, or a continuous scroll if you prefer. Try it right here.
               The bar takes orders.
             </p>

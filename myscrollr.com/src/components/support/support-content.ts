@@ -41,7 +41,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Can I customize the bar?',
     answer:
-      'Twenty palettes in light or dark, top or bottom of any monitor, one monitor or all of them, pages or a continuous scroll, and per-widget settings.',
+      'Ten themes, each light or dark; top or bottom of any monitor, one monitor or all of them, pages or a continuous scroll, and per-widget settings.',
   },
   {
     question: 'How do I update the app?',
