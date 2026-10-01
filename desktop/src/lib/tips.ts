@@ -46,6 +46,8 @@ export const TIP_IDS = {
   TRAY_STILL_RUNNING: "tray-still-running",
   /** New install: Scrollr was set to start with the computer (SCROLLR-263). */
   AUTOSTART_DEFAULT: "autostart-default",
+  /** Existing user moved from Continuous to Pages once (SCROLLR-288). */
+  PAGES_INTRO: "pages-intro",
 } as const;
 
 export type TipId = (typeof TIP_IDS)[keyof typeof TIP_IDS];
