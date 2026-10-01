@@ -850,8 +850,8 @@ export default function App() {
               installedWidgetsMeta.length > 0 &&
               !hasAnyPinnedWidget;
             // Widget pages (SCROLLR-272), the default. They get the same two
-            // empty states as the chips bar (SCROLLR-274); the fixed edge
-            // zone arrives with SCROLLR-273.
+            // empty states as the chips bar (SCROLLR-274); utilities and
+            // pins sit on the fixed edge zone (SCROLLR-273).
             if (prefs.ticker.scrollMode === "pages") {
               const emptyKind = showSourcelessCTA
                 ? "sourceless"
@@ -873,6 +873,8 @@ export default function App() {
                   }
                   dashboard={dashboard ?? null}
                   activeTabs={activeTabs}
+                  widgetData={widgetData}
+                  pins={prefs.widgets.pins}
                   chipColorMode={prefs.ticker.chipColors}
                   holdOnHover={prefs.ticker.onHover !== "keep"}
                   onChipClick={handleChipClick}
