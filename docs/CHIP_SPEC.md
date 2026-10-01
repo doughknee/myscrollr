@@ -792,7 +792,7 @@ else HSL lightness `max(l, 0.6)`, saturation `max(s, 0.55)`. Applied once, as th
 | Final | `opacity-[0.82]` |
 | Score flash | `bg-live/20` |
 | Timer urgent (≤60s, not paused) | value `text-live`, chip `border-live/40`, bar `bg-live` |
-| Weather alert | chip `border-warning/45`, text `text-warning`; hot temp (≥95 or within 2° of high) `text-warning` |
+| Weather alert | chip `border-warning/45`, text `text-warning`; hot temp (≥35°C (95°F) or within 2° of high) `text-warning` |
 | Sysmon hot | chip `border-error/30`, value `text-error`, gauge/line `bg-error`/`text-error` |
 | Uptime down | chip `border-down/30`, value `text-down`, cap `down` pulses |
 | Stale news (>2h) | `border-edge/55`, title `text-fg/55`, tab `opacity-55` |

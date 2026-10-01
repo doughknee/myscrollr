@@ -197,6 +197,16 @@ export function formatTemp(celsius: number, unit: "celsius" | "fahrenheit", show
   return `${Math.round(val)}\u00B0${suffix}`;
 }
 
+/** A weather chip's low/high as text in the user's unit, or null without both. */
+export function formatTempRange(w: {
+  low?: number;
+  high?: number;
+  unit: "celsius" | "fahrenheit";
+}): { low: string; high: string } | null {
+  if (w.low == null || w.high == null) return null;
+  return { low: formatTemp(w.low, w.unit), high: formatTemp(w.high, w.unit) };
+}
+
 /**
  * Format a byte count as a human-readable string.
  * Handles B, KB, MB, GB, and TB.

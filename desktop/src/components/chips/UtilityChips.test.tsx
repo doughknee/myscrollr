@@ -57,17 +57,27 @@ describe("TimerChip", () => {
 
 describe("WeatherChip", () => {
   const places: WeatherChipData[] = [
-    { id: "w1", label: "Austin", temp: "97°", icon: "☀", tempValue: 97, high: 99, low: 78 },
-    { id: "w2", label: "Denver", temp: "61°", icon: "⛈", alert: "Storm watch" },
+    { id: "w1", label: "Austin", temp: "36°C", unit: "celsius", icon: "☀", tempValue: 36, high: 37, low: 25 },
+    { id: "w2", label: "Denver", temp: "16°C", unit: "celsius", icon: "⛈", alert: "Storm watch" },
   ];
 
   it("top row is label, icon and temperature; the range sits beneath, and an alert takes its own cell", () => {
     render(<WeatherChip items={places} />);
-    expect(screen.getByText("78")).toBeTruthy();
-    expect(screen.getByText("99")).toBeTruthy();
+    expect(screen.getByText("25°")).toBeTruthy();
+    expect(screen.getByText("37°")).toBeTruthy();
     // Under Denver, where Denver's range bar would be — not across the chip.
     const alert = screen.getByText("Storm watch");
     expect(alert.closest(".row-start-2")).toBeTruthy();
+  });
+
+  it("prints the range in fahrenheit when the chip is fahrenheit, and the dot stays put", () => {
+    const f: WeatherChipData = { id: "w3", label: "Chicago", temp: "61°F", unit: "fahrenheit", icon: "⛅", tempValue: 16, high: 19, low: 11 };
+    const { container } = render(<WeatherChip items={[f]} />);
+    // 11°C and 19°C, shown in the unit the temperature is in.
+    expect(screen.getByText("52°")).toBeTruthy();
+    expect(screen.getByText("66°")).toBeTruthy();
+    // (16 - 11) / (19 - 11) = 62.5%: positioned in Celsius, unit-free.
+    expect(container.querySelector('[style*="left: 62.5%"]')).toBeTruthy();
   });
 
   it("tints a temperature at the day's high", () => {

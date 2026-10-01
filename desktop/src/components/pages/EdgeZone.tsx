@@ -39,7 +39,7 @@ import { scopedRows, type TickerContext } from "../../datawidgets/ticker";
 import { gamesForTeam } from "../../datawidgets/sports/view";
 import { catalogItemById, sourceForWidget } from "../../marketplace";
 import { leagueCode } from "../../utils/gameHelpers";
-import { formatTemp } from "../../utils/format";
+import { formatTempRange } from "../../utils/format";
 import { teamShortName } from "../../utils/teamShortName";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
 import GameCell, { gameMinCol } from "./cells/GameCell";
@@ -111,10 +111,8 @@ function slotOf(tab: Utility, raw: unknown): SlotItem {
     }
     case "weather": {
       const w = raw as WeatherChipData;
-      // low/high arrive in the provider's Celsius; `temp` is already in the
-      // user's unit, and its suffix says which.
-      const unit = w.temp.endsWith("F") ? "fahrenheit" : "celsius";
-      const range = w.low != null && w.high != null ? `${formatTemp(w.low, unit)} / ${formatTemp(w.high, unit)}` : w.detail;
+      const r = formatTempRange(w);
+      const range = r ? `${r.low} / ${r.high}` : w.detail;
       return { id: w.id, label: w.label, icon: w.icon, value: w.temp, reserve: reserveOf(w.temp, 3), detail: w.alert ?? range, dim: w.night, tone: w.alert ? "warning" : undefined };
     }
     case "sysmon": {
