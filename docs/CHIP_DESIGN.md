@@ -97,8 +97,7 @@ own empty page. All of them share one page at the very end: "EPL · next match S
 ### Colour and a new account
 
 Each page is painted in its widget's own colour. A new account starts with NPR, Stocks and
-a clock on the edge, so the bar shows news, markets and the time with no setup *(lands with
-SCROLLR-283)*.
+a clock on the edge, so the bar shows news, markets and the time with no setup.
 
 ---
 

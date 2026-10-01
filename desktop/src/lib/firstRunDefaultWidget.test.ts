@@ -1,35 +1,36 @@
 /**
- * firstRunDefaultWidget tests — the once-only rule and the
- * untouched-account rule from SCROLLR-246:
+ * firstRunDefaultWidget tests — the once-only rule, the untouched-account rule
+ * (SCROLLR-246) and the starter sequence (SCROLLR-283):
  *
- *   - A fresh, zero-widget, flag-false account is offered the default.
+ *   - A fresh, zero-widget, flag-false account is offered the starter.
  *   - An account with any existing widget is left alone, regardless of
  *     the flag (the "untouched account" rule).
  *   - An account whose flag is already true is left alone even at zero
- *     widgets — this is what makes removing the default stick: it never
+ *     widgets — this is what makes removing the starter stick: it never
  *     comes back just because the widget count dropped to zero again.
- *   - `applyDefaultWidget` sets the flag before creating the widget, and
- *     never calls create if the flag write fails.
+ *   - The starter is ONE server call (`applyStarter`); the Clock is turned on
+ *     by the caller only after it succeeds, and never when the server had
+ *     nothing to do. A failure brings the CTA back with exactly one retry.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import {
   shouldOfferDefaultWidget,
-  applyDefaultWidget,
+  applyStarterWidgets,
+  withStarterClock,
   useFirstRunDefaultWidget,
   DEFAULT_WIDGET_RETRY_MS,
-  FIRST_RUN_DEFAULT_WIDGET,
 } from "./firstRunDefaultWidget";
+import { loadPrefs } from "../preferences";
 import type { DashboardResponse } from "../types";
 
 vi.mock("../api/client", () => ({
-  dataWidgetsApi: { create: vi.fn() },
-  updatePreferences: vi.fn(),
+  dataWidgetsApi: { applyStarter: vi.fn() },
 }));
 vi.mock("./windowRole", () => ({ ownsSharedConnection: vi.fn(async () => true) }));
 vi.mock("@sentry/react", () => ({ captureException: vi.fn() }));
 
-import { dataWidgetsApi, updatePreferences } from "../api/client";
+import { dataWidgetsApi } from "../api/client";
 import { ownsSharedConnection } from "./windowRole";
 
 function dashboardWith(
@@ -85,40 +86,45 @@ describe("shouldOfferDefaultWidget", () => {
   });
 });
 
-describe("applyDefaultWidget", () => {
+describe("applyStarterWidgets", () => {
+  // Braces: a beforeEach that returns the mock makes vitest call it as teardown.
   beforeEach(() => {
-    vi.mocked(updatePreferences).mockReset();
-    vi.mocked(dataWidgetsApi.create).mockReset();
+    vi.mocked(dataWidgetsApi.applyStarter).mockReset();
   });
 
-  it("sets the once-flag before creating the widget", async () => {
-    const order: string[] = [];
-    vi.mocked(updatePreferences).mockImplementation(async () => {
-      order.push("flag");
-      return {} as never;
-    });
-    vi.mocked(dataWidgetsApi.create).mockImplementation(async () => {
-      order.push("create");
-      return {} as never;
-    });
-
-    await applyDefaultWidget();
-
-    expect(order).toEqual(["flag", "create"]);
-    expect(updatePreferences).toHaveBeenCalledWith({
-      default_widgets_applied: true,
-    });
-    expect(dataWidgetsApi.create).toHaveBeenCalledWith(
-      FIRST_RUN_DEFAULT_WIDGET,
-      {},
-    );
+  it("is one server call and reports whether the server applied the set", async () => {
+    vi.mocked(dataWidgetsApi.applyStarter).mockResolvedValue({ applied: true, widgets: [] });
+    expect(await applyStarterWidgets()).toBe(true);
+    vi.mocked(dataWidgetsApi.applyStarter).mockResolvedValue({ applied: false, widgets: [] });
+    expect(await applyStarterWidgets()).toBe(false);
+    expect(dataWidgetsApi.applyStarter).toHaveBeenCalledTimes(2);
   });
 
-  it("never creates the widget when the flag write fails", async () => {
-    vi.mocked(updatePreferences).mockRejectedValue(new Error("network"));
+  it("rejects when the server call fails (nothing else was attempted)", async () => {
+    vi.mocked(dataWidgetsApi.applyStarter).mockRejectedValue(new Error("network"));
+    await expect(applyStarterWidgets()).rejects.toThrow("network");
+  });
+});
 
-    await expect(applyDefaultWidget()).rejects.toThrow("network");
-    expect(dataWidgetsApi.create).not.toHaveBeenCalled();
+describe("withStarterClock", () => {
+  it("turns the clock on and onto the ticker when it is off", () => {
+    const base = loadPrefs();
+    const off = {
+      ...base,
+      widgets: { ...base.widgets, enabledWidgets: ["timer"], widgetsOnTicker: ["timer"] },
+    };
+    const next = withStarterClock(off);
+    expect(next.widgets.enabledWidgets).toEqual(["timer", "clock"]);
+    expect(next.widgets.widgetsOnTicker).toEqual(["timer", "clock"]);
+  });
+
+  it("returns the same object when the clock is already on (no write)", () => {
+    const base = loadPrefs();
+    const on = {
+      ...base,
+      widgets: { ...base.widgets, enabledWidgets: ["clock"], widgetsOnTicker: ["clock"] },
+    };
+    expect(withStarterClock(on)).toBe(on);
   });
 });
 
@@ -127,8 +133,7 @@ describe("useFirstRunDefaultWidget", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.mocked(updatePreferences).mockReset();
-    vi.mocked(dataWidgetsApi.create).mockReset();
+    vi.mocked(dataWidgetsApi.applyStarter).mockReset();
     vi.mocked(ownsSharedConnection).mockResolvedValue(true);
   });
   afterEach(() => vi.useRealTimers());
@@ -136,53 +141,63 @@ describe("useFirstRunDefaultWidget", () => {
   const mount = (onApplied = vi.fn()) =>
     renderHook(() => useFirstRunDefaultWidget(true, fresh, onApplied));
 
-  it("suppresses the CTA while applying, then calls onApplied once on success", async () => {
-    vi.mocked(updatePreferences).mockResolvedValue({} as never);
-    vi.mocked(dataWidgetsApi.create).mockResolvedValue({} as never);
+  it("suppresses the CTA while applying, then calls onApplied(true) once on success", async () => {
+    vi.mocked(dataWidgetsApi.applyStarter).mockResolvedValue({ applied: true, widgets: [] });
     const onApplied = vi.fn();
     const { result } = mount(onApplied);
     expect(result.current).toBe(true);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(dataWidgetsApi.create).toHaveBeenCalledTimes(1);
+    expect(dataWidgetsApi.applyStarter).toHaveBeenCalledTimes(1);
     expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(onApplied).toHaveBeenCalledWith(true);
   });
 
-  it("stops suppressing the CTA when the flag write rejects, retries once after 30 s, never loops", async () => {
-    vi.mocked(updatePreferences).mockRejectedValue(new Error("network"));
+  it("passes applied=false through so the caller never enables the clock for a no-op", async () => {
+    vi.mocked(dataWidgetsApi.applyStarter).mockResolvedValue({ applied: false, widgets: [] });
+    const onApplied = vi.fn();
+    mount(onApplied);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(onApplied).toHaveBeenCalledWith(false);
+  });
+
+  it("on failure: CTA is back, onApplied never runs (no clock), one retry after 30 s, never loops", async () => {
+    vi.mocked(dataWidgetsApi.applyStarter).mockRejectedValue(new Error("network"));
     const onApplied = vi.fn();
     const { result } = mount(onApplied);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(result.current).toBe(false); // CTA is back
-    expect(updatePreferences).toHaveBeenCalledTimes(1);
+    expect(dataWidgetsApi.applyStarter).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DEFAULT_WIDGET_RETRY_MS);
     });
-    expect(updatePreferences).toHaveBeenCalledTimes(2); // the one retry
+    expect(dataWidgetsApi.applyStarter).toHaveBeenCalledTimes(2); // the one retry
     expect(result.current).toBe(false);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10 * DEFAULT_WIDGET_RETRY_MS);
     });
-    expect(updatePreferences).toHaveBeenCalledTimes(2); // no loop
+    expect(dataWidgetsApi.applyStarter).toHaveBeenCalledTimes(2); // no loop
     expect(onApplied).not.toHaveBeenCalled();
   });
 
-  it("a retry that succeeds calls onApplied", async () => {
-    vi.mocked(updatePreferences)
+  it("a retry that succeeds calls onApplied(true)", async () => {
+    vi.mocked(dataWidgetsApi.applyStarter)
       .mockRejectedValueOnce(new Error("network"))
-      .mockResolvedValue({} as never);
-    vi.mocked(dataWidgetsApi.create).mockResolvedValue({} as never);
+      .mockResolvedValue({ applied: true, widgets: [] });
     const onApplied = vi.fn();
     mount(onApplied);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DEFAULT_WIDGET_RETRY_MS);
     });
     expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(onApplied).toHaveBeenCalledWith(true);
   });
 
   it("does nothing in a window that does not own the shared connection", async () => {
@@ -191,7 +206,7 @@ describe("useFirstRunDefaultWidget", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DEFAULT_WIDGET_RETRY_MS);
     });
-    expect(updatePreferences).not.toHaveBeenCalled();
+    expect(dataWidgetsApi.applyStarter).not.toHaveBeenCalled();
     expect(result.current).toBe(true); // still awaiting the owner's result
   });
 });

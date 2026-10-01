@@ -233,25 +233,47 @@
         // window.fetch is still the browser's here; src/api/fetchOverride
         // replaces it only once the bundle loads.
         var nativeFetch = window.fetch.bind(window);
-        var fixture = nativeFetch(fixturePath)
-          .then(function (r) {
-            if (!r.ok) throw new Error(r.status + " " + fixturePath);
-            return r.json();
-          })
-          .then(function (j) {
-            var captured = Date.parse(j._captured_at);
-            var body = isNaN(captured) ? j : rebase(j, Date.now() - captured);
-            return [200, JSON.stringify(body)];
-          })
-          .catch(function (e) {
-            console.error("[ticker-shim] fixture failed: " + e.message);
-            return [500, JSON.stringify({ error: "fixture not found: " + fixturePath })];
-          });
+        function loadFixture(path) {
+          return nativeFetch(path)
+            .then(function (r) {
+              if (!r.ok) throw new Error(r.status + " " + path);
+              return r.json();
+            })
+            .then(function (j) {
+              var captured = Date.parse(j._captured_at);
+              var body = isNaN(captured) ? j : rebase(j, Date.now() - captured);
+              return [200, JSON.stringify(body)];
+            })
+            .catch(function (e) {
+              console.error("[ticker-shim] fixture failed: " + e.message);
+              return [500, JSON.stringify({ error: "fixture not found: " + path })];
+            });
+        }
+        // What /dashboard answers. POST /users/me/widgets/starter (SCROLLR-283)
+        // swaps it for dashboard.starter.json when the account is fresh, as the
+        // server would: NPR + Stocks created, flag flipped.
+        var fixture = loadFixture(fixturePath);
+        var starterFixture = loadFixture("/src/dev/__fixtures__/dashboard.starter.json");
+        // The writes the page made, "METHOD url" — specs read it to prove
+        // exactly one starter call happened.
+        window.__shimRequests = [];
 
         var bodies = new Map();
+        var methods = new Map();
         var nextRid = 1;
 
-        function reply(url) {
+        function reply(url, method) {
+          if (method && method !== "GET") window.__shimRequests.push(method + " " + url);
+          if (method === "POST" && /\/users\/me\/widgets\/starter/.test(url)) {
+            return fixture.then(function (cur) {
+              var applied = JSON.parse(cur[1]).preferences.default_widgets_applied === false;
+              if (!applied) return [200, '{"applied":false,"widgets":[]}'];
+              fixture = starterFixture;
+              return starterFixture.then(function (s) {
+                return [200, JSON.stringify({ applied: true, widgets: JSON.parse(s[1]).widgets })];
+              });
+            });
+          }
           if (/\/dashboard/.test(url) || /\/public\/feed/.test(url)) return fixture;
           if (/\/catalog/.test(url)) return Promise.resolve([200, '{"widgets":[]}']);
           if (/\/health/.test(url)) return Promise.resolve([200, '{"status":"healthy","database":"healthy","redis":"healthy","services":{}}']);
@@ -319,11 +341,12 @@
           if (cmd === "plugin:http|fetch") {
             var rid = nextRid++;
             bodies.set(rid, args.clientConfig.url);
+            methods.set(rid, args.clientConfig.method);
             return Promise.resolve(rid);
           }
           if (cmd === "plugin:http|fetch_send") {
             var url = bodies.get(args.rid);
-            return reply(url).then(function (r) {
+            return reply(url, methods.get(args.rid)).then(function (r) {
               bodies.set(args.rid, r[1]);
               return {
                 status: r[0], statusText: "", url: url,

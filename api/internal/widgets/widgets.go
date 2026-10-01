@@ -232,9 +232,18 @@ func CreateWidget(c *fiber.Ctx) error {
 		ch.Config = map[string]interface{}{}
 	}
 
+	afterWidgetCreated(context.Background(), userID, ch)
+
+	return c.Status(fiber.StatusCreated).JSON(ch)
+}
+
+// afterWidgetCreated is everything that follows a committed user_widgets
+// insert: SSE resubscribe, the lifecycle hook, analytics, cache drops. Shared
+// by CreateWidget and the starter set (SCROLLR-283) so a widget made either
+// way is indistinguishable.
+func afterWidgetCreated(ctx context.Context, userID string, ch platform.Widget) {
 	// Rebuild SSE topic subscriptions on every replica holding a
 	// connection for this user (Redis control message, ADR-0001)
-	ctx := context.Background()
 	if ch.Enabled {
 		events.NotifyTopicSubscriptionChange(userID)
 	}
@@ -248,8 +257,6 @@ func CreateWidget(c *fiber.Ctx) error {
 	// Widget summary in the overview response changed — drop the
 	// per-user overview cache so the next /users/me/overview rebuilds.
 	platform.InvalidateOverviewCache(ctx, userID)
-
-	return c.Status(fiber.StatusCreated).JSON(ch)
 }
 
 // recordWidgetChange writes one add/remove fact for the admin widget

@@ -11,7 +11,7 @@ import { useSharedSSE } from "./hooks/useSharedSSE";
 import { useProductActivity } from "./hooks/useProductActivity";
 import { usePostHogActivity } from "./hooks/usePostHogActivity";
 import { isPrimaryTicker } from "./lib/windowRole";
-import { useFirstRunDefaultWidget } from "./lib/firstRunDefaultWidget";
+import { useFirstRunDefaultWidget, withStarterClock } from "./lib/firstRunDefaultWidget";
 import { emit } from "@tauri-apps/api/event";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
@@ -117,20 +117,28 @@ export default function App() {
 
   // ── First-run default widget (SCROLLR-246) ──────────────────────────
   //
-  // A fresh account's first signed-in ticker should scroll NPR headlines
-  // instead of the "no sources yet" CTA below. `awaitingDefaultWidget` is
-  // computed the same way in every window from the same broadcast
-  // dashboard, so the CTA stays suppressed everywhere while the add is
-  // decided/in flight; the hook (lib/firstRunDefaultWidget.ts) only runs the
-  // network call in the owning window, and stops suppressing on failure.
+  // A fresh account's first signed-in bar shows NPR + Stocks pages with the
+  // Clock on the edge instead of the "no sources yet" CTA below (SCROLLR-283).
+  // `awaitingDefaultWidget` is computed the same way in every window from the
+  // same broadcast dashboard, so the CTA stays suppressed everywhere while the
+  // add is decided/in flight; the hook (lib/firstRunDefaultWidget.ts) only runs
+  // the network call in the owning window, and stops suppressing on failure.
   // On success, refetch here and tell the main window to do the same: its
-  // next CDC merge would otherwise re-broadcast a copy without the widget.
+  // next CDC merge would otherwise re-broadcast a copy without the widgets.
+  // The Clock (a local utility) is enabled here, only after the server's NPR +
+  // Stocks landed, so a failed start never leaves a lone clock.
   const awaitingDefaultWidget = useFirstRunDefaultWidget(
     authenticated,
     dashboard,
-    () => {
+    (applied) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
       void emit("dashboard-invalidate").catch(() => {});
+      if (!applied) return;
+      const next = withStarterClock(prefsRef.current);
+      if (next !== prefsRef.current) {
+        setPrefs(next);
+        savePrefs(next);
+      }
     },
   );
 
