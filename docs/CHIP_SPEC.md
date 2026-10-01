@@ -1014,9 +1014,20 @@ exactly as it did before the model changed.
    The rotation memo (§8.2, REL-234) freezes a slot's item until it has gone fully off
    screen, and that rule outranks this one — a chip must not vanish from under the
    reader's eyes, not even to enforce de-duplication. It clears itself on the next lap.
-6. **The cap refuses, it never evicts.** `MAX_PINS = 2`, measured (§10.2) against the
-   narrowest bar; the derivation and the chip widths are in `preferences.ts`. `togglePin`
-   returns the same `prefs` reference when full, and every surface says so.
+6. **The limit refuses, it never evicts.** On the pages bar the limit is WIDTH, not a
+   count (SCROLLR-284, `components/pages/edgeRule.ts`): the edge (utilities + pins +
+   its border) never takes more than **40% of the bar**, measured on the narrowest ticker
+   window (every pages bar publishes `{bar, util}` through `lib/edgeMeasure.ts`, so the
+   main window and every ticker agree). A pin's width is its family's edge column: a game
+   `gameMinCol`, a quote 172, a headline the narrow one-line **260** (`NEWS_PIN_W`, ellipsis,
+   the feed's name beneath). A pin that would pass the budget is refused with one line
+   naming what fills the edge ("No room on the edge at this screen size — unpin Chicago
+   Bears first"); `togglePin` returns the same `prefs` reference and every pin entry point
+   (the ticker's right-click item, a widget page's pin button, the sidebar row) says so.
+   When a window shrinks past what is pinned, the **newest** pins step back onto their
+   normal pages (`stepBack`); they stay in prefs and return when there is room. With no
+   ticker reporting a width (the continuous ticker, none running) the old
+   `MAX_PINS = 2` count stands (derivation in `preferences.ts`).
 
 **The control is not on the chip.** The hover pin icon is gone. Pins are set from:
 

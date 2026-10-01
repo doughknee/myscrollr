@@ -32,6 +32,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { ChipColorMode, WidgetPin } from "../../preferences";
 import { isPrimaryTicker } from "../../lib/windowRole";
+import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
 import { LABEL_W, contentWidth, freezePage, pageItems, refreshPage, type FrozenPage } from "./pagePlan";
@@ -53,6 +54,7 @@ import QuoteCell from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
 import { Rule, accentFor, accentStyle, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
+import { stepBack } from "./edgeRule";
 
 /** The swipe (canvas "Motion"): 0.6 s on a soft ease. */
 export const SWIPE_S = 0.6;
@@ -186,8 +188,16 @@ export default function PagedBar({
   const reduced = useOsReducedMotion();
   const dark = typeof document === "undefined" || document.documentElement.getAttribute("data-mode") !== "light";
 
-  const widgets = useMemo(() => buildPageWidgets(dashboard, activeTabs, Date.now(), pins), [dashboard, activeTabs, pins]);
-  const edge = useMemo(() => buildEdge(widgetData, pins, dashboard, activeTabs), [widgetData, pins, dashboard, activeTabs]);
+  // The edge takes at most 40% of the narrowest ticker's bar (SCROLLR-284):
+  // every window publishes its bar and utilities strip, and the newest pins
+  // that no longer fit step back onto their pages (they stay in prefs).
+  const [utilW, setUtilW] = useState(0);
+  useEdgeMeasures();
+  const room = useEdgeRoom();
+  const onEdge = useMemo(() => (room ? stepBack(pins, room) : pins), [pins, room]);
+
+  const widgets = useMemo(() => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge), [dashboard, activeTabs, onEdge]);
+  const edge = useMemo(() => buildEdge(widgetData, onEdge, dashboard, activeTabs), [widgetData, onEdge, dashboard, activeTabs]);
   const widgetsRef = useRef(widgets);
   widgetsRef.current = widgets;
 
@@ -195,6 +205,7 @@ export default function PagedBar({
   const widthRef = useRef(0);
   const [width, setWidth] = useState(0);
   const [bar, setBar] = useState<HTMLDivElement | null>(null);
+  usePublishEdge(label, width, utilW);
   useEffect(() => {
     if (!bar) return;
     const read = () => {
@@ -423,7 +434,7 @@ export default function PagedBar({
         </>
       )}
       {/* The fixed edge: outside the page block, so it shows with no page at all. */}
-      <EdgeZone edge={edge} tick={turn?.seq ?? 0} reduced={reduced} mode={chipColorMode} dark={dark} edgeRef={edgeEl} onChipClick={onChipClick} />
+      <EdgeZone edge={edge} tick={turn?.seq ?? 0} reduced={reduced} mode={chipColorMode} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} onChipClick={onChipClick} />
     </div>
   );
 }

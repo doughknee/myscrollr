@@ -13,14 +13,12 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { useShell } from "../shell-context";
-import {
-  MAX_PINS,
-  isPinned as isPinnedIn,
-  pinCount,
-  togglePin,
-} from "../preferences";
+import { isPinned as isPinnedIn, togglePin } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import { nothingToShow } from "../lib/pinMessages";
+import { currentEdgeRoom, useEdgeRoom } from "../lib/edgeMeasure";
+import { edgeCanHold, pinRefusal } from "../components/pages/edgeRule";
+import type { EdgeRoom } from "../components/pages/edgeRule";
 
 /**
  * Pin or unpin one subject, and say what happened.
@@ -41,11 +39,13 @@ export function applyPinToggle(
   empty = false,
 ): void {
   const wasPinned = isPinnedIn(prefs, widget, subject);
-  const next = togglePin(prefs, { widget, subject, side: "right" });
+  const room = currentEdgeRoom();
+  const next = togglePin(prefs, { widget, subject, side: "right" }, edgeCanHold(room));
   if (next === prefs) {
     // Refused, not evicted: the zone holds what the user put there.
     toast.error(
-      `The ticker already holds ${MAX_PINS} pins — unpin one to pin ${label}`,
+      pinRefusal(prefs.widgets.pins, { widget, subject, label }, room) ??
+        `Can't pin ${label}`,
     );
     return;
   }
@@ -64,8 +64,8 @@ export function applyPinToggle(
 export interface PinSubjectApi {
   /** Is this subject in the fixed zone? */
   isPinned: (widget: string, subject: string) => boolean;
-  /** Is there room for another pin? */
-  hasRoom: boolean;
+  /** Why this subject cannot be pinned now (one line), or null when it can. */
+  refusal: (widget: string, subject: string, label: string) => string | null;
   /** Pin or unpin. `label` names the subject in the toast; `empty` says
    *  the subject has nothing to show right now. */
   toggle: (widget: string, subject: string, label: string, empty?: boolean) => void;
@@ -85,9 +85,12 @@ export function usePinSubject(): PinSubjectApi {
     [prefs, onPrefsChange],
   );
 
-  return {
-    isPinned,
-    hasRoom: pinCount(prefs) < MAX_PINS,
-    toggle,
-  };
+  const room: EdgeRoom | null = useEdgeRoom();
+  const refusal = useCallback(
+    (widget: string, subject: string, label: string) =>
+      pinRefusal(prefs.widgets.pins, { widget, subject, label }, room),
+    [prefs, room],
+  );
+
+  return { isPinned, refusal, toggle };
 }

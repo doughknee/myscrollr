@@ -30,7 +30,7 @@ export default function PinSubjectButton({
   label: string;
   className?: string;
 }) {
-  const { isPinned, hasRoom, toggle } = usePinSubject();
+  const { isPinned, refusal, toggle } = usePinSubject();
   const pinned = isPinned(widget, subject);
   // The server guarantees a row for every pinned subject, so still
   // nothing means the subject itself is empty. §8.5 keeps the zone blank
@@ -39,14 +39,15 @@ export default function PinSubjectButton({
   // A row whose subject is missing (a standings row with no team name)
   // gets no control rather than a dead one.
   if (!subject) return null;
-  const full = !pinned && !hasRoom;
+  // Not disabled: a click on a full edge says why, in a toast (SCROLLR-284).
+  const refused = pinned ? null : refusal(widget, subject, label);
   const Icon = pinned ? PinOff : Pin;
   const title = pinned
     ? empty
       ? `${nothingToShow(label)} — unpin from the ticker`
       : `Unpin ${label} from the ticker`
-    : full
-      ? "The ticker's pinned zone is full"
+    : refused
+      ? refused
       : `Pin ${label} to the ticker`;
 
   return (
@@ -55,7 +56,7 @@ export default function PinSubjectButton({
       aria-label={title}
       aria-pressed={pinned}
       title={title}
-      disabled={full}
+      aria-disabled={refused ? true : undefined}
       onClick={(e) => {
         e.stopPropagation();
         toggle(widget, subject, label, empty);
@@ -68,8 +69,8 @@ export default function PinSubjectButton({
             empty
             ? "text-primary/50 hover:text-primary/70"
             : "text-primary hover:text-primary/80"
-          : "text-fg-4 hover:text-fg-2 disabled:hover:text-fg-4",
-        "disabled:opacity-40 disabled:cursor-not-allowed",
+          : "text-fg-4 hover:text-fg-2",
+        refused && "opacity-40 cursor-not-allowed hover:text-fg-4",
         className,
       )}
     >

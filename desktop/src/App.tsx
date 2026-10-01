@@ -41,9 +41,9 @@ import {
   TICKER_HEIGHT,
   togglePin,
   isPinned,
-  pinCount,
-  MAX_PINS,
   } from "./preferences";
+import { currentEdgeRoom } from "./lib/edgeMeasure";
+import { edgeCanHold, pinRefusal } from "./components/pages/edgeRule";
 import type { SubscriptionTier } from "./auth";
 import type { AppPreferences, TickerPosition } from "./preferences";
 import { catalogItemById, getCatalogItems, sourceForWidget } from "./marketplace";
@@ -548,7 +548,7 @@ export default function App() {
    */
   const handleTogglePin = useCallback((pin: PinTarget) => {
     setPrefs((prev) => {
-      const updated = togglePin(prev, { ...pin, side: "right" });
+      const updated = togglePin(prev, { ...pin, side: "right" }, edgeCanHold(currentEdgeRoom()));
       if (updated === prev) return prev;
       savePrefs(updated);
       return updated;
@@ -634,18 +634,19 @@ export default function App() {
       const target = pinTargetAt(e.target);
       if (target) {
         const pinned = isPinned(prefsRef.current, target.widget, target.subject);
-        const full =
-          !pinned && pinCount(prefsRef.current) >= MAX_PINS;
+        // The refusal is one line and names what fills the edge
+        // (SCROLLR-284); a native menu has no toast, so the item says it.
+        const refusal = pinned
+          ? null
+          : pinRefusal(prefsRef.current.widgets.pins, target, currentEdgeRoom());
         items.push(
           await MenuItem.new({
             // Refuse, never evict: a full zone says so instead of
             // silently dropping something the user parked there.
             text: pinned
               ? `Unpin ${target.label}`
-              : full
-                ? `Pin ${target.label} — bar is full`
-                : `Pin ${target.label}`,
-            enabled: !full,
+              : (refusal ?? `Pin ${target.label}`),
+            enabled: !refusal,
             action: () => handleTogglePin(target),
           }),
         );

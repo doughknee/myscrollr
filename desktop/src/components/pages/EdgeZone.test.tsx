@@ -4,7 +4,7 @@ import type { ClockChipData, DashboardResponse, Game, WidgetTickerData } from ".
 import type { WidgetPin } from "../../preferences";
 import fixture from "../../dev/__fixtures__/dashboard.pages.json";
 import { gameMinCol } from "./cells/GameCell";
-import { NEWS_MIN_COL } from "./cells/NewsCell";
+import { NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import EdgeZone, { buildEdge, edgeTabs, reserveOf, type Edge } from "./EdgeZone";
 import { ALSO_TAB, buildPageWidgets } from "./widgetPages";
@@ -43,7 +43,7 @@ describe("buildEdge", () => {
     expect(edge.pins.map((p) => [p.kind, p.width])).toEqual([
       ["sports", gameMinCol("NFL")],
       ["finance", QUOTE_MIN_COL],
-      ["news", NEWS_MIN_COL],
+      ["news", NEWS_PIN_W],
     ]);
     expect(JSON.parse(edge.pins[0].pin)).toMatchObject({ widget: "sports_nfl", subject: BEARS });
     expect(edgeTabs(edge)).toEqual(["clock", "weather", "sports_nfl", "finance_stocks", "news_bbc"]);
