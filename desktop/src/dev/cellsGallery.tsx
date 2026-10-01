@@ -25,7 +25,7 @@ import GameCell, { gameMinCol } from "../components/pages/cells/GameCell";
 import NewsCell, { NEWS_MIN_COL } from "../components/pages/cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "../components/pages/cells/QuoteCell";
 import AlsoCell, { ALSO_MIN_COL } from "../components/pages/cells/AlsoCell";
-import { Rule, accentFor, accentStyle, mix } from "../components/pages/cells/parts";
+import { Rule, accentFor, accentStyle, inkFor, mix } from "../components/pages/cells/parts";
 import fixture from "./__fixtures__/dashboard.pages.json";
 
 const params = new URLSearchParams(location.search);
@@ -44,17 +44,17 @@ function firstPage<T>(items: T[], minCol: number, page = 0): T[] {
 }
 
 function Bar({ tab, code, sub, children, caption }: { tab: string; code: string; sub: string; children: ReactNode[]; caption: string }) {
-  const accent = accentFor(catalogItemById(tab)?.hex, dark);
+  const hex = catalogItemById(tab)?.hex;
   return (
     <figure className="m-0 flex shrink-0 flex-col gap-1">
       <figcaption className="px-1 font-mono text-[10px] tracking-[0.06em] text-fg-4">{caption}</figcaption>
-      <div className="flex h-16 w-full items-stretch overflow-hidden border-b border-edge/50 bg-base-150" style={accentStyle(accent)} data-bar={tab}>
+      <div className="flex h-16 w-full items-stretch overflow-hidden border-b border-edge/50 bg-base-150" style={accentStyle(accentFor(hex, dark), inkFor(hex, dark))} data-bar={tab}>
         <div
           className="flex shrink-0 flex-col justify-center gap-[3px] pl-3.5 pr-2"
           style={{ width: LABEL_W, background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
         >
-          <span className="truncate font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]" style={{ color: "var(--accent)" }}>{code}</span>
-          <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-3">{sub}</span>
+          <span className="truncate font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]" style={{ color: "var(--accent-ink)" }}>{code}</span>
+          <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">{sub}</span>
         </div>
         <Columns>{children}</Columns>
       </div>
@@ -132,7 +132,7 @@ const NEWS_STATES: [string, RssItem][] = [
 
 function Strip({ name, width, children }: { name: string; width: number; children: [string, ReactNode][] }) {
   return (
-    <div className="flex h-16 shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={accentStyle(accentFor("#0b2265", dark))}>
+    <div className="flex h-16 shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={accentStyle(accentFor("#0b2265", dark), inkFor("#0b2265", dark))}>
       <Columns width={width}>
         {children.map(([state, node]) => (
           <div key={state} className="h-full" data-state={state}>{node}</div>
@@ -167,7 +167,7 @@ function Gallery() {
       </Bar>
       <Bar tab="quiet" code="ALSO" sub="NOTHING ON" caption="ALSO · WIDGETS WITH NOTHING ON">
         {firstPage(also, ALSO_MIN_COL).map((q) => (
-          <AlsoCell key={q.tab} code={q.code} text={q.text} accent={accentFor(catalogItemById(q.tab)?.hex, dark)} />
+          <AlsoCell key={q.tab} code={q.code} text={q.text} hex={catalogItemById(q.tab)?.hex} dark={dark} />
         ))}
       </Bar>
 

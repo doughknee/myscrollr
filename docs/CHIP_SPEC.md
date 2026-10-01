@@ -121,9 +121,9 @@ pin handling, status words) lives once, in `datawidgets/`, and both presentation
 ### P.2 The label
 
 - 112px (`LABEL_W`), widget colour mixed at 16% (dark) or 12% (light) over the bar, right border at 40%, vertically centred, `pl-3.5 pr-2`.
-- **Name:** the widget code in the accent, `font-sans font-extrabold`, `text-[19px]`; `text-[15px]` when the code is longer than six characters; truncates. Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance: the catalog name in capitals. Also: `ALSO`.
-- **One fact** beneath, `font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-3`: sports `n LIVE`, else the first game's day (`SUN 4 OCT`); news `HEADLINES`; finance `▲up ▼down`; Also `NOTHING ON`. It is read live, so it updates in place while a page is up (a fact, not a layout).
-- **Position** at the right of that line: 2 to 5 pages: one 4px dot per page, the current one in the accent; more than 5: `n/m` in the accent, tabular. One page: nothing.
+- **Name:** the widget code in the ink (`--accent-ink`, §P.13), `font-sans font-extrabold`, `text-[19px]`; `text-[15px]` when the code is longer than six characters; truncates. Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance: the catalog name in capitals. Also: `ALSO`.
+- **One fact** beneath, `font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2` (fg-2, not fg-3: it sits on the label's tint): sports `n LIVE`, else the first game's day (`SUN 4 OCT`); news `HEADLINES`; finance `▲up ▼down`; Also `NOTHING ON`. It is read live, so it updates in place while a page is up (a fact, not a layout).
+- **Position** at the right of that line: 2 to 5 pages: one 4px dot per page, the current one in the accent; more than 5: `n/m` in the ink, tabular. One page: nothing.
 - **Dwell line:** a 2px line along the bottom of the label that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held.
 - **Wipe:** the label rolls upward (`y` 100% to 0 in, 0 to -100% out, 0.45s, §P.7) only when the widget changes. Pages of the same widget keep it still.
 
@@ -137,7 +137,7 @@ pin handling, status words) lives once, in `datawidgets/`, and both presentation
 - **Content width** = `bar width - LABEL_W - edge width` (`contentWidth`). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
 - The page block is a grid, `repeat(n, minmax(0, 1fr))` where `n` is the number of items **on that page**. A page of three items on a bar that fits five is three wider columns, not three columns and a gap.
 - `colW = content width / n`, frozen with the page (§P.8) and passed to the cell, which picks its own layout from it.
-- A hairline `Rule` (`parts.tsx`) sits between columns: 1px, inset 9px top and bottom, accent at 28%. Cells have no border, no background card, no rounded shell.
+- A hairline `Rule` (`parts.tsx`) sits between columns: 1px, inset 9px top and bottom, the ink at 40% (clears 1.5:1 on every palette). Cells have no border, no background card, no rounded shell.
 - Height is not an input to any of this.
 
 ### P.4 Columns and pages
@@ -255,8 +255,13 @@ Reservations (the Pages form of §4, enforced by `cells.spec.ts`):
 
 Tints: your team's game carries a 2px accent line at the top (`data-part="mine"`, always
 mounted and transparent when not yours); a close live game tints 10% in the accent; a final
-is `opacity-80`; a score change flashes `--color-live` at 18%, keyed on the game id
+draws its leader in `text-fg-2` instead of `text-fg` (never an opacity: it cost every text
+contrast, SCROLLR-287); a score change flashes `--color-live` at 18%, keyed on the game id
 (`useScoreFlash`). Red is the live dot and the live clock only (invariant 6).
+
+Greys on a cell: `fg` for what leads, `fg-2` for a quieter lead, `fg-3` for everything
+secondary (the trailing team, records, venue, `FINAL`, range ends, ages, summaries).
+**`fg-4` never carries text on the bar**: it is under 4.5:1 in every palette (§P.13).
 
 Reused helpers, unchanged from the chips: `teamShortName` (§5.4), `plainText` and
 `sourceTab` (§5.5), `reservationFor` (§4.3), `liftForTint` (§7.2), `recordText`, `ordinal`,
@@ -288,7 +293,8 @@ slots, not five.
 - A slot is at most `max-w-[180px]`; the label is 9.5px caps, the value 16px bold
   `tabular-nums`, the detail 9.5px; tones: timer urgent `text-live`, weather alert
   `text-warning` bold caps, sysmon hot `text-error`, uptime or GitHub down `text-down`; a
-  night zone or paused timer is `opacity-70`, a night clock carries `☾`.
+  night zone or paused timer draws its value in `text-fg-2` (no opacity, SCROLLR-287), a
+  night clock carries `☾`. Label and detail are `text-fg-3`.
 - Clicking a slot opens that widget (`onChipClick(tab, id)`).
 
 Clock and Weather are free of widget slots, so they cost the user none of their plan's
@@ -339,8 +345,8 @@ status chip (§8.7); each cell says what the status chip would, in the same word
   (so "loading" is never mistaken for "empty"), and only if its items were not all pinned.
 - Text comes from `TickerSource.status(raw, ctx)` (§8.7 table), else `nothing to show right
   now`. Never a made-up date (invariant 7).
-- Tier 4, minimum column 300px, one cell per widget: code tag (the widget's own tab text),
-  then the text on a truncating line. The tag is fixed for the widget's life.
+- Tier 4, minimum column 300px, one cell per widget: code tag (the widget's own tab text, in
+  its ink on the label's tint, 16/12), then the text on a truncating line. The tag is fixed for the widget's life.
 - The Also page is not counted as "data shown" for the presence check-in
   (`onDisplayedWidgetsChange` excludes it; the edge's tabs are included).
 - This is the Pages half of "no silent empty widgets": a widget you added never just goes
@@ -348,12 +354,25 @@ status chip (§8.7); each cell says what the status chip would, in the same word
 
 ### P.13 Colour and the settings that touch the bar
 
-- A page is painted in **one accent**: `accentFor(mode, hex, dark)`. `widget`: the catalog
-  colour (`catalogItemById(tab).hex`), lifted for the dark bar by `liftForTint` (§7.2), raw
-  on light. `theme`: the app's `--color-primary`. `subtle`: `--color-fg-3`. Green, red and
-  amber stay semantic and are never the accent.
+- A page is painted in **one accent**: `accentFor(hex, dark)`, the catalog colour
+  (`catalogItemById(tab).hex`), lifted for the dark bar by `liftForTint` (§7.2), raw on
+  light; `--color-fg-3` when there is none. Green, red and amber stay semantic and are never
+  the accent.
 - Every tint is `mix(pct)` = `color-mix(in srgb, var(--accent) pct%, transparent)`: label
-  16/12, label border 40, hairline 28, code tag 18, close game 10, `mine` line 100.
+  16/12, label border 40, Also code tag 16/12, close game 10, `mine` line 100.
+- **Anything that must be read in the widget's colour uses the ink**, `--accent-ink` =
+  `inkFor(hex, dark)` (`readableInk` in `utils/chipAccent.ts`), set beside `--accent` by
+  `accentStyle(accent, ink)`: the same hue and saturation, HSL lightness moved only until
+  relative luminance is at most 0.07 (light) or at least 0.45 (dark), which reads at 4.5:1
+  on every palette's bar, bare and under the label's tint (`chipAccent.ink.test.ts` checks
+  every catalog colour against every palette). The label's name, `n/m`, the Also code and
+  the hairline (ink at 40%, 1.5:1) use it; tints never do. No colour: the ink is `fg`.
+- **Contrast floors, every palette** (SCROLLR-287; `pages-themes.spec.ts` asserts every
+  reading): text 4.5:1 against what is really behind it (the bar, the label's tint, a close
+  game's tint); large text (24px, or 18.66px bold) 3:1; hairlines 1.5:1. So: no opacity on
+  text, `fg-4` never carries text, and the semantic `up`, `down`, `live` tokens are defined
+  per palette to clear 4.5 on the bar. A palette change that drops a token under its floor
+  fails that spec, naming the token and the text.
 - **There are no chip colours.** Every widget uses its own colour (`accentFor(hex, dark)`);
   the `widget / theme / subtle` choice is gone (SCROLLR-281). **The theme palettes stay**: the
   10 theme families and light/dark.
@@ -398,9 +417,9 @@ state and one window owns it.
   scorecard gets a `pages` mode: lap, widget share, Also share, cells moved or cut, dwell,
   dropped swipe frames.
 - `e2e/ticker/pages-themes.spec.ts`: one static frame per theme family x light/dark
-  (`?theme=<family>-<mode>`), text measured against what is behind it: fg and fg-2 at 4.5:1 and
-  the label name at 3:1 are asserted (the palettes that miss are listed in the spec's `LOW`);
-  fg-3, fg-4, dimmed finals, accent text and the hairline are reported, not asserted.
+  (`?theme=<family>-<mode>`), text measured against what is behind it: every reading is
+  asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
+  text in the widget's colour at 4.5:1, the label name at 3:1, every hairline at 1.5:1.
 - vitest: `pagePlan.test.ts`, `widgetPages.test.ts`, `EdgeZone.test.tsx`, one test per cell.
 
 ---
@@ -1282,7 +1301,8 @@ needs both until Continuous is retired.
 - [ ] A widget with nothing on reaches the Also page with its status words; nothing fabricated.
 - [ ] Edge: one Cycle slot per utility stepping on the turn `seq`; a sizer for every item so the width is constant; edge width read when the page is planned.
 - [ ] Hover holds the page and the dwell line; reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
-- [ ] Colour only through `--accent` and `mix()`; red only live or urgent.
+- [ ] Colour only through `--accent` and `mix()`, text in the widget's colour only through `--accent-ink`; red only live or urgent.
+- [ ] Contrast (§P.13): no opacity on text, no `fg-4` text, `pages-themes.spec.ts` green in all 20 palettes.
 - [ ] Process-wide work (page clock, hover) runs in the primary window only; followers follow.
 - [ ] No template-literal classes; served CSS checked.
 - [ ] Verified in the shim at 1280 and 1920 with `?pages=1&live=1`; `npm run test:browser` green.

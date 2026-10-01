@@ -5,14 +5,14 @@ import { accentFor } from "./parts";
 
 describe("AlsoCell", () => {
   it("names the widget and says why it has nothing on, in that widget's colour", () => {
-    const { getByText, container } = render(<AlsoCell code="EPL" text="next match Sat, Oct 17, 6:30 AM" accent="#37003c" />);
+    const { getByText, container } = render(<AlsoCell code="EPL" text="next match Sat, Oct 17, 6:30 AM" hex="#37003c" dark={false} />);
     expect(getByText("EPL")).toBeTruthy();
     expect(getByText("next match Sat, Oct 17, 6:30 AM")).toBeTruthy();
     expect((container.querySelector("button") as HTMLElement).style.getPropertyValue("--accent")).toBe("#37003c");
   });
 
   it("width-stable: the tag is first and fixed, the message truncates after it", () => {
-    const { container } = render(<AlsoCell code="NBA" text="off-season" accent="#c9082a" />);
+    const { container } = render(<AlsoCell code="NBA" text="off-season" hex="#c9082a" dark={false} />);
     expect(container.querySelector('[data-part="code"]')!.classList.contains("shrink-0")).toBe(true);
     const text = container.querySelector('[data-part="text"]')!;
     expect(text.classList.contains("min-w-0")).toBe(true);
@@ -21,7 +21,7 @@ describe("AlsoCell", () => {
 
   it("clicks through", () => {
     const onClick = vi.fn();
-    const { container } = render(<AlsoCell code="PBS" text="no headlines yet" accent="#2638c4" onClick={onClick} />);
+    const { container } = render(<AlsoCell code="PBS" text="no headlines yet" hex="#2638c4" dark={false} onClick={onClick} />);
     fireEvent.click(container.querySelector("button")!);
     expect(onClick).toHaveBeenCalledOnce();
   });

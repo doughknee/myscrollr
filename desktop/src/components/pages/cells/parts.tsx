@@ -8,7 +8,7 @@
  * single decision made outside them (`accentFor`).
  */
 import type { CSSProperties } from "react";
-import { liftForTint } from "../../../utils/chipAccent";
+import { liftForTint, readableInk } from "../../../utils/chipAccent";
 import TeamLogo from "../../TeamLogo";
 
 /**
@@ -23,23 +23,36 @@ export function accentFor(hex: string | undefined, dark: boolean): string {
   return dark ? liftForTint(hex) : hex;
 }
 
+/**
+ * The widget's colour as TEXT (the label's name) and hairlines, for the
+ * `--accent-ink` variable (SCROLLR-287): the accent, darkened on light or
+ * lightened on dark only as far as it takes to read at 4.5:1 on every
+ * palette's bar. Tints keep `--accent`; anything that must be read uses this.
+ */
+export function inkFor(hex: string | undefined, dark: boolean): string {
+  // No colour (the Also page): fg, because fg-3 sits at 4.5:1 and its 40% rule would not reach 1.5.
+  if (!hex) return "var(--color-fg)";
+  return readableInk(accentFor(hex, dark), dark);
+}
+
 /** `--accent` at `pct`% over whatever is behind it. Inline style, not a class. */
 export function mix(pct: number): string {
   return `color-mix(in srgb, var(--accent) ${pct}%, transparent)`;
 }
 
-/** Sets `--accent` on an element; spread into its `style`. */
-export function accentStyle(accent: string): CSSProperties {
-  return { "--accent": accent } as CSSProperties;
+/** Sets `--accent` (and `--accent-ink`, for text and rules) on an element; spread into its `style`. */
+export function accentStyle(accent: string, ink?: string): CSSProperties {
+  return { "--accent": accent, "--accent-ink": ink } as CSSProperties;
 }
 
 /**
  * The hairline between columns, and between a game and its clock. Inset
  * 9px top and bottom so it reads as a divider, not a cage. Its parent must
- * be `relative`.
+ * be `relative`. Drawn in the ink at 40%, which clears 1.5:1 on every
+ * palette's bar (the accent at 28% did not, on any: SCROLLR-287).
  */
 export function Rule() {
-  return <span aria-hidden className="absolute bottom-[9px] left-0 top-[9px] w-px" style={{ background: mix(28) }} />;
+  return <span aria-hidden className="absolute bottom-[9px] left-0 top-[9px] w-px" style={{ background: "color-mix(in srgb, var(--accent-ink) 40%, transparent)" }} />;
 }
 
 /**

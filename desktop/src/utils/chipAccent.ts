@@ -37,6 +37,42 @@ export function liftForTint(hex: string): string {
   return toHex(hslToRgb(h, s, l));
 }
 
+/**
+ * A brand colour made readable as TEXT on the bar (SCROLLR-287): same hue
+ * and saturation, HSL lightness moved only as far as it takes to reach a
+ * relative luminance that clears 4.5:1 on every palette's bar of that
+ * polarity, including under the label's own tint of the colour (16% dark,
+ * 12% light). The bounds come from the palettes, not from the colour: the
+ * darkest light bar is Tokyo Night Day's (luminance 0.674) and the lightest
+ * dark bar Gruvbox's (0.030); chipAccent.test.ts checks every catalog
+ * colour against every palette. A colour that already clears them is
+ * returned unchanged.
+ */
+const INK_LIGHT_MAX = 0.07;
+const INK_DARK_MIN = 0.45;
+
+export function readableInk(hex: string, dark: boolean): string {
+  const rgb = parse(hex);
+  if (!rgb) return hex;
+  const ok = (c: [number, number, number]) => (dark ? luminance(c) >= INK_DARK_MIN : luminance(c) <= INK_LIGHT_MAX);
+  if (ok(rgb)) return hex;
+  const [h, s, l0] = rgbToHsl(rgb);
+  // Binary search on lightness between where it is and white or black.
+  let [lo, hi] = dark ? [l0, 1] : [0, l0];
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (ok(hslToRgb(h, s, mid)) === dark) hi = mid;
+    else lo = mid;
+  }
+  return toHex(hslToRgb(h, s, dark ? hi : lo));
+}
+
+/** WCAG relative luminance of an sRGB colour, 0-255 channels. */
+export function luminance([r, g, b]: [number, number, number]): number {
+  const f = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
 function parse(hex: string): [number, number, number] | null {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return null;

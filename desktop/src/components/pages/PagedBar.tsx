@@ -52,7 +52,7 @@ import GameCell from "./cells/GameCell";
 import NewsCell from "./cells/NewsCell";
 import QuoteCell from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
-import { Rule, accentFor, accentStyle, mix } from "./cells/parts";
+import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
 import { stepBack } from "./edgeRule";
 
@@ -175,7 +175,7 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
     }
     case "also": {
       const a = item.data as AlsoItem;
-      return <AlsoCell code={a.code} text={a.text} accent={accentFor(a.hex, dark)} onClick={() => onChipClick?.(a.tab, a.tab)} />;
+      return <AlsoCell code={a.code} text={a.text} hex={a.hex} dark={dark} onClick={() => onChipClick?.(a.tab, a.tab)} />;
     }
   }
 }
@@ -356,6 +356,7 @@ export default function PagedBar({
   if (cur && live) cur.page = refreshPage(cur.page, live.items, keyOf);
 
   const accent = accentFor(cur?.widget.hex, dark);
+  const ink = inkFor(cur?.widget.hex, dark);
   const items = cur ? pageItems(cur.page) : [];
   const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: FADE_S, ease: "linear" as const } };
   const swipe = { initial: { x: "100%" }, animate: { x: "0%" }, exit: { x: "-100%" }, transition: { duration: SWIPE_S, ease: EASE } };
@@ -383,7 +384,7 @@ export default function PagedBar({
                 key={cur.widget.tab}
                 data-label={cur.widget.tab}
                 className="absolute inset-0 flex flex-col justify-center gap-[3px] pl-3.5 pr-2"
-                style={{ ...accentStyle(accent), background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
+                style={{ ...accentStyle(accent, ink), background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
                 {...(reduced ? fade : wipe)}
               >
                 <span
@@ -392,14 +393,15 @@ export default function PagedBar({
                       ? "truncate font-sans text-[15px] font-extrabold leading-none tracking-[0.04em]"
                       : "truncate font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]"
                   }
-                  style={{ color: "var(--accent)" }}
+                  style={{ color: "var(--accent-ink)" }}
                 >
                   {cur.widget.code}
                 </span>
-                <span className="flex items-center justify-between gap-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-3">
+                {/* fg-2, not fg-3: it sits on the label's tint, which costs contrast (SCROLLR-287). */}
+                <span className="flex items-center justify-between gap-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
                   <span className="truncate">{(live ?? cur.widget).sub}</span>
                   {cur.count > 5 && (
-                    <span className="shrink-0 tabular-nums" style={{ color: "var(--accent)" }}>
+                    <span className="shrink-0 tabular-nums" style={{ color: "var(--accent-ink)" }}>
                       {cur.index + 1}/{cur.count}
                     </span>
                   )}
@@ -423,7 +425,7 @@ export default function PagedBar({
                 key={cur.seq}
                 data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`}
                 className="absolute inset-0 grid"
-                style={{ ...accentStyle(accent), gridTemplateColumns: `repeat(${Math.max(1, items.length)}, minmax(0, 1fr))` }}
+                style={{ ...accentStyle(accent, ink), gridTemplateColumns: `repeat(${Math.max(1, items.length)}, minmax(0, 1fr))` }}
                 {...(reduced ? fade : swipe)}
               >
                 {items.map((item, i) => (
