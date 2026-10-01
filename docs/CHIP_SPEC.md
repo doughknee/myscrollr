@@ -124,7 +124,7 @@ pin handling, status words) lives once, in `datawidgets/`, and both presentation
 - **Name:** the widget code in the ink (`--accent-ink`, §P.13), `font-sans font-extrabold`, `text-[19px]`; `text-[15px]` when the code is longer than six characters; truncates. Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance: the catalog name in capitals. Also: `ALSO`.
 - **One fact** beneath, `font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2` (fg-2, not fg-3: it sits on the label's tint): sports `n LIVE`, else the first game's day (`SUN 4 OCT`); news `HEADLINES`; finance `▲up ▼down`; Also `NOTHING ON`. It is read live, so it updates in place while a page is up (a fact, not a layout).
 - **Position** at the right of that line: 2 to 5 pages: one 4px dot per page, the current one in the accent; more than 5: `n/m` in the ink, tabular. One page: nothing.
-- **Dwell line:** a 2px line along the bottom of the label that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held.
+- **Dwell line:** a 2px line along the bottom of the label that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held (an active pointer, §P.7), and runs on when the pointer rests.
 - **Wipe:** the label rolls upward (`y` 100% to 0 in, 0 to -100% out, 0.45s, §P.7) only when the widget changes. Pages of the same widget keep it still.
 
 ### P.3 Geometry of a page
@@ -212,7 +212,7 @@ first widget. The first page of a visit swipes the label too if the widget chang
 | Label wipe | 0.45 s, same ease, upward, only when the widget changes |
 | Edge slot roll | 0.45 s, same ease, upward |
 | Reduced motion | The **OS** setting, read directly (`prefers-reduced-motion`); every swipe, wipe and roll becomes a 0.4 s linear crossfade, and `data-motion-style="fade"` |
-| Hover | A page under the mouse holds, and so does the dwell line; the clock stands still and resumes when the mouse leaves. Under Pages there is **no hover setting**: the page always holds, whatever `onHover` was left at by Continuous |
+| Hover | A page held by an **active** pointer holds, and so does the dwell line; the clock stands still and resumes when the hold ends. Active = over the bar and entering or moving within the last **5 s** (`HOVER_IDLE_MS`, `activeHover.ts`). A pointer that rests 5 s releases the hold and the bar turns again (worst case a further dwell of up to 12 s); moving it grabs the page back; leaving the bar releases at once. Under Pages there is **no hover setting**, whatever `onHover` was left at by Continuous |
 
 The page clock restarts only on a new turn, never on a data update. Dwell is a floor of 6 s
 by design: nothing on the bar turns faster.
@@ -394,8 +394,9 @@ state and one window owns it.
 
 - The **primary** ticker (`isPrimaryTicker`, label `ticker`) runs the page clock and
   broadcasts each turn as the Tauri event `pages:turn` (`{seq, tab, page, pages, dwell,
-  held}`). Followers show it. A follower reports its hover as `pages:hover`; the leader holds
-  while any window is hovered. A starting follower asks `pages:hello` and the leader
+  held}`). Followers show it. Each window times its own pointer (§P.7) and reports only the
+  transitions, as `pages:hover` (`{label, on}`); the leader holds while any window's pointer is
+  active, so a hold ends when the last active window's pointer has rested 5 s or left. A starting follower asks `pages:hello` and the leader
   rebroadcasts.
 - Each window plans at **its own** width and edge. A window whose width gives the widget a
   different page count maps the leader's page onto its own: same index when the counts
@@ -420,7 +421,8 @@ state and one window owns it.
   (`?theme=<family>-<mode>`), text measured against what is behind it: every reading is
   asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
   text in the widget's colour at 4.5:1, the label name at 3:1, every hairline at 1.5:1.
-- vitest: `pagePlan.test.ts`, `widgetPages.test.ts`, `EdgeZone.test.tsx`, one test per cell.
+- `e2e/ticker/hover.spec.ts`: under the fake clock, a still pointer holds 5 s and then the bar turns, a moving pointer holds the page and the dwell line for 40 s, and moving again after a release grabs the page back.
+- vitest: `activeHover.test.ts`, `pagePlan.test.ts`, `widgetPages.test.ts`, `EdgeZone.test.tsx`, one test per cell.
 
 ---
 
@@ -865,7 +867,7 @@ otherwise have to — "how many?" and "which ones?" — with a rule, not a contr
 **The user controls presentation** (`TickerPrefs`): `showTicker`, `scrollMode` (pages /
 continuous, default pages), `tickerPosition`, `hideOnFullscreen`, and the Size scale.
 Continuous adds `tickerSpeed` and `onHover` (keep / slow / pause). Under Pages, Speed and
-the hover setting are hidden (SCROLLR-274, SCROLLR-281): a page under the mouse always holds.
+the hover setting are hidden (SCROLLR-274, SCROLLR-281): a page under an active pointer holds (§P.7, SCROLLR-291).
 There is no colour, item-order or font-weight setting and no start-in-the-background setting
 (SCROLLR-281): every widget wears its own colour, the marquee weaves widgets together, and the
 theme palettes (10 families, light/dark) stay. A login launch starts quietly (the autostart
@@ -1300,7 +1302,7 @@ needs both until Continuous is retired.
 - [ ] The ticker selector reads no feed prefs; pinned subjects dropped from the pages with `dropPinned`; the pin is on the bar once.
 - [ ] A widget with nothing on reaches the Also page with its status words; nothing fabricated.
 - [ ] Edge: one Cycle slot per utility stepping on the turn `seq`; a sizer for every item so the width is constant; edge width read when the page is planned.
-- [ ] Hover holds the page and the dwell line; reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
+- [ ] An active pointer (moved within 5 s) holds the page and the dwell line, a resting one does not (`hover.spec.ts`); reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
 - [ ] Colour only through `--accent` and `mix()`, text in the widget's colour only through `--accent-ink`; red only live or urgent.
 - [ ] Contrast (§P.13): no opacity on text, no `fg-4` text, `pages-themes.spec.ts` green in all 20 palettes.
 - [ ] Process-wide work (page clock, hover) runs in the primary window only; followers follow.
