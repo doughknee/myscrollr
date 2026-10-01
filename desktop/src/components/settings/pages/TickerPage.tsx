@@ -4,10 +4,11 @@
  * (docs/SETTINGS_AUDIT.md §1, §3; REL-204).
  *
  * Every number on this page is a preset, never a slider. The prefs stay
- * numbers (`tickerSpeed`, `stepPause`, `tickerScale`) so the bar reads
+ * numbers (`tickerSpeed`, `tickerScale`) so the bar reads
  * them unchanged; `loadPrefs` snaps anything off the list.
  *
- * Time per page only exists in Page mode, so it only renders there.
+ * Speed only moves the Continuous marquee (a page's dwell and swipe are
+ * fixed by the pages bar, SCROLLR-272), so it only renders there.
  * Hide-when-fullscreen only does anything on Windows, so it only
  * renders there.
  *
@@ -18,7 +19,6 @@ import { useCallback } from "react";
 import {
   resetTickerPage,
   SCALE_PRESETS,
-  STEP_PAUSES,
   TICKER_SPEEDS,
 } from "../../../preferences";
 import type {
@@ -62,8 +62,8 @@ const CHIP_COLOR_OPTIONS: { value: ChipColorMode; label: string }[] = [
 ];
 
 const SCROLL_MODE_OPTIONS: { value: ScrollMode; label: string }[] = [
+  { value: "pages", label: "Pages" },
   { value: "continuous", label: "Continuous" },
-  { value: "page", label: "Page" },
 ];
 
 const SPEED_OPTIONS = [
@@ -78,11 +78,6 @@ const HOVER_OPTIONS: { value: HoverBehavior; label: string }[] = [
   { value: "pause", label: "Pause" },
 ];
 
-const STEP_PAUSE_OPTIONS = STEP_PAUSES.map((v) => ({
-  value: String(v),
-  label: `${v} s`,
-}));
-
 const MIX_OPTIONS: { value: MixMode; label: string }[] = [
   { value: "grouped", label: "By source" },
   { value: "mixed", label: "Mixed" },
@@ -95,7 +90,7 @@ interface TickerPageProps {
 
 export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
   const { ticker, window: window_ } = prefs;
-  const paged = ticker.scrollMode === "page";
+  const paged = ticker.scrollMode === "pages";
 
   const setTicker = useCallback(
     <K extends keyof TickerPrefs>(key: K, value: TickerPrefs[K]) =>
@@ -180,17 +175,17 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               onChange={(v) => setTicker("scrollMode", v)}
             />
           </Row>
-          <Row id="speed">
-            <SegmentedRow
-              label={R.speed.label}
-              description={
-                paged ? "How quickly each page slides in." : R.speed.description
-              }
-              value={String(ticker.tickerSpeed)}
-              options={SPEED_OPTIONS}
-              onChange={(v) => setTicker("tickerSpeed", Number(v))}
-            />
-          </Row>
+          {!paged && (
+            <Row id="speed">
+              <SegmentedRow
+                label={R.speed.label}
+                description={R.speed.description}
+                value={String(ticker.tickerSpeed)}
+                options={SPEED_OPTIONS}
+                onChange={(v) => setTicker("tickerSpeed", Number(v))}
+              />
+            </Row>
+          )}
           <Row id="onHover">
             <SegmentedRow
               label={R.onHover.label}
@@ -204,17 +199,6 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               onChange={(v) => setTicker("onHover", v)}
             />
           </Row>
-          {paged && (
-            <Row id="stepPause">
-              <SegmentedRow
-                label={R.stepPause.label}
-                description={R.stepPause.description}
-                value={String(ticker.stepPause)}
-                options={STEP_PAUSE_OPTIONS}
-                onChange={(v) => setTicker("stepPause", Number(v))}
-              />
-            </Row>
-          )}
         </RowList>
       </SettingsGroup>
 

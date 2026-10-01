@@ -14,7 +14,7 @@ import { openShim } from "./shim";
  *
  *   SCORECARD=1 SCORECARD_OUT=out SHIM_PORT=5185 npx playwright test scorecard --headed
  *
- * SCORECARD_FIXTURES / SCORECARD_MODES (continuous,page,shots) /
+ * SCORECARD_FIXTURES / SCORECARD_MODES (continuous,shots) /
  * SCORECARD_MS narrow a run. Each fixture x mode takes RUN_MS + ~40 s.
  */
 const ON = !!process.env.SCORECARD;
@@ -22,7 +22,7 @@ const OUT = process.env.SCORECARD_OUT || ".";
 const RUN_MS = Number(process.env.SCORECARD_MS) || 150_000;
 const CPU_MS = 20_000;
 const FIXTURES = (process.env.SCORECARD_FIXTURES || "default,busy,quiet,longnames").split(",");
-const MODES = (process.env.SCORECARD_MODES || "continuous,page").split(",");
+const MODES = (process.env.SCORECARD_MODES || "continuous").split(",");
 
 test.use({ viewport: { width: 1920, height: 120 } });
 test.describe.configure({ retries: 0 });
@@ -200,12 +200,12 @@ async function clicks(page: Page) {
 }
 
 for (const fixture of FIXTURES) {
-  for (const mode of MODES.filter((m) => m === "continuous" || m === "page")) {
+  for (const mode of MODES.filter((m) => m === "continuous")) {
     test(`scorecard ${fixture} ${mode}`, async ({ page }) => {
       test.skip(!ON, "opt-in: SCORECARD=1, headed");
       test.setTimeout(RUN_MS + CPU_MS + 120_000);
       await page.addInitScript(installTickerAudit);
-      await openShim(page, `?fixture=${fixture}${mode === "page" ? "&mode=page" : ""}`);
+      await openShim(page, `?fixture=${fixture}`);
       await page.waitForTimeout(2000);
       const snap = await snapshot(page);
       const load = await cpu(page, CPU_MS);

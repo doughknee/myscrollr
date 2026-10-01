@@ -1,7 +1,7 @@
 /**
  * The pages bar (SCROLLR-272, design SCROLLR-268): one widget at a time,
  * laid straight onto the bar in equal columns, then a swipe to the next.
- * Behind `scrollMode: "pages"` (not in Settings until SCROLLR-274; the
+ * The default `scrollMode: "pages"` (Settings › Ticker, SCROLLR-274; the
  * ticker shim's `?pages=1` sets it).
  *
  * The rules this file keeps:
@@ -21,7 +21,7 @@
  *    same beat. A window of a different width maps the leader's page onto
  *    its own pages (`followPage`).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -75,6 +75,8 @@ interface Props {
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
   /** Widgets with a page up this lap, for the presence check-in (the Also page does not count). */
   onDisplayedWidgetsChange?: (widgetIds: string[]) => void;
+  /** Drawn instead of the bar when no widget has a page (the empty-state CTAs). */
+  empty?: ReactNode;
 }
 
 /** The page as it was frozen at swipe-in. */
@@ -164,6 +166,7 @@ export default function PagedBar({
   holdOnHover = true,
   onChipClick,
   onDisplayedWidgetsChange,
+  empty,
 }: Props) {
   const leader = useMemo(() => isPrimaryTicker(), []);
   const label = useMemo(() => getCurrentWindow().label, []);
@@ -320,6 +323,8 @@ export default function PagedBar({
   const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: FADE_S, ease: "linear" as const } };
   const swipe = { initial: { x: "100%" }, animate: { x: "0%" }, exit: { x: "-100%" }, transition: { duration: SWIPE_S, ease: EASE } };
   const wipe = { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: LABEL_S, ease: EASE } };
+
+  if (empty && widgets.length === 0) return <>{empty}</>;
 
   return (
     <div

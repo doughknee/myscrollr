@@ -688,11 +688,32 @@ describe("migrateTicker (REL-204: presets + one hover row)", () => {
     expect(migrateTicker({ onHover: "pause", pauseOnHover: false }).onHover).toBe("pause");
   });
 
-  it("folds Rotate into Page and keeps the other modes", () => {
-    expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("page");
-    expect(migrateTicker({ scrollMode: "step" }).scrollMode).toBe("page");
-    expect(migrateTicker({ scrollMode: "continuous" }).scrollMode).toBe("continuous");
-    expect(migrateTicker({ scrollMode: "sideways" }).scrollMode).toBe("continuous");
+  /** SCROLLR-274: Pages is the default; only an explicit Continuous stays. */
+  describe("scrollMode (SCROLLR-274)", () => {
+    it("fresh install, or a mode never chosen, is Pages", () => {
+      storeValues.clear();
+      expect(loadPrefs().ticker.scrollMode).toBe("pages");
+      expect(migrateTicker(undefined).scrollMode).toBe("pages");
+      expect(migrateTicker({}).scrollMode).toBe("pages");
+      expect(migrateTicker({ tickerSpeed: 40 }).scrollMode).toBe("pages");
+    });
+
+    it("an explicit Continuous stays Continuous", () => {
+      expect(migrateTicker({ scrollMode: "continuous" }).scrollMode).toBe("continuous");
+    });
+
+    it("the old step Page (and Rotate) moves to Pages", () => {
+      expect(migrateTicker({ scrollMode: "page" }).scrollMode).toBe("pages");
+      expect(migrateTicker({ scrollMode: "step" }).scrollMode).toBe("pages");
+      expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("pages");
+      expect(migrateTicker({ scrollMode: "pages" }).scrollMode).toBe("pages");
+    });
+
+    it("anything unrecognised is the default, and stepPause is dropped", () => {
+      expect(migrateTicker({ scrollMode: "sideways" }).scrollMode).toBe("pages");
+      expect(migrateTicker({ scrollMode: 3 }).scrollMode).toBe("pages");
+      expect(migrateTicker({ scrollMode: "page", stepPause: 8 })).not.toHaveProperty("stepPause");
+    });
   });
 
   it("snaps old slider values to the nearest preset", () => {
@@ -700,9 +721,6 @@ describe("migrateTicker (REL-204: presets + one hover row)", () => {
     expect(migrateTicker({ tickerSpeed: 55 }).tickerSpeed).toBe(TICKER_SPEEDS.normal);
     expect(migrateTicker({ tickerSpeed: 150 }).tickerSpeed).toBe(TICKER_SPEEDS.fast);
     expect(migrateTicker({ tickerSpeed: "fast" }).tickerSpeed).toBe(TICKER_SPEEDS.normal);
-    expect(migrateTicker({ stepPause: 1 }).stepPause).toBe(3);
-    expect(migrateTicker({ stepPause: 10 }).stepPause).toBe(8);
-    expect(migrateTicker({ stepPause: 6 }).stepPause).toBe(5);
   });
 
   it("drops Spacing, Direction and the legacy hover pair from the saved shape", () => {
@@ -724,7 +742,7 @@ describe("migrateTicker (REL-204: presets + one hover row)", () => {
       ticker: { scrollMode: "flip", pauseOnHover: true, hoverSpeed: 0, tickerSpeed: 5 },
     });
     const p = loadPrefs();
-    expect(p.ticker).toMatchObject({ scrollMode: "page", onHover: "pause", tickerSpeed: 20 });
+    expect(p.ticker).toMatchObject({ scrollMode: "pages", onHover: "pause", tickerSpeed: 20 });
     expect(p.appearance.tickerScale).toBe(130);
   });
 });
@@ -734,7 +752,7 @@ describe("resetTickerPage (REL-204)", () => {
     const before = loadPrefs();
     const changed: AppPreferences = {
       ...before,
-      ticker: { ...before.ticker, scrollMode: "page", onHover: "pause", tickerSpeed: 80 },
+      ticker: { ...before.ticker, scrollMode: "continuous", onHover: "pause", tickerSpeed: 80 },
       window: { ...before.window, pinned: false, tickerPosition: "bottom", tickerMonitors: ["X"] },
       appearance: { ...before.appearance, tickerScale: 130, uiScale: 115, themeFamily: "nord" },
     };
@@ -830,22 +848,21 @@ describe("ticker values renamed to match their labels (REL-207)", () => {
     expect(out).toMatchObject({
       mixMode: "mixed",
       chipColors: "theme",
-      scrollMode: "page",
+      scrollMode: "pages",
     });
     expect(migrateTicker({ chipColors: "muted" }).chipColors).toBe("subtle");
-    expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("page");
   });
 
   it("keeps the new spellings and defaults anything unknown", () => {
     const out = migrateTicker({
       mixMode: "grouped",
       chipColors: "subtle",
-      scrollMode: "page",
+      scrollMode: "continuous",
     });
     expect(out).toMatchObject({
       mixMode: "grouped",
       chipColors: "subtle",
-      scrollMode: "page",
+      scrollMode: "continuous",
     });
     expect(migrateTicker({ chipColors: 3 })).toMatchObject({ chipColors: "widget" });
   });

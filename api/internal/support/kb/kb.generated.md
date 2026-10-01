@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ dcde0ac7408f -->
+<!-- source: desktop/src/components/settings/rows.ts @ 09211c4f02c5 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -222,10 +222,9 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Ticker › Screen edge: Which edge of the screen the ticker sits on.
 - Settings › Ticker › Size: Resize the bar. The app window has its own size.
 - Settings › Ticker › Chip colors: Each widget's own color, the theme accent, or subtle grays.
-- Settings › Ticker › Scroll mode: Scroll without stopping, or show a page at a time.
+- Settings › Ticker › Scroll mode: One whole widget per page, or chips that scroll without stopping.
 - Settings › Ticker › Speed: How fast the chips travel.
 - Settings › Ticker › On hover: What the bar does while your mouse is over it.
-- Settings › Ticker › Time per page: How long each page stays before the next one.
 - Settings › Ticker › Stay above other windows: Keep the ticker visible over whatever else is open.
 - Settings › Ticker › Hide when an app goes fullscreen: Get out of the way of games, videos and presentations.
 - Settings › Ticker › Item order: Keep each widget's items together, or mix them.

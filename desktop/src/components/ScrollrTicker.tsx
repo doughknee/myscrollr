@@ -3,12 +3,10 @@ import {
   useEffect,
   useRef,
   useState,
-  useCallback,
 } from "react";
 import clsx from "clsx";
-import { ChevronDown, Plus, Settings2 } from "lucide-react";
+import { ChevronDown, Settings2 } from "lucide-react";
 import { Ticker } from "motion-plus/react";
-import { useMotionValue, animate } from "motion/react";
 import type {
   DashboardResponse,
   Trade,
@@ -25,7 +23,6 @@ import type {
   HoverBehavior,
   MixMode,
   ChipColorMode,
-  ScrollMode,
   WidgetPin,
   WidgetDisplayPrefs,
 } from "../preferences";
@@ -42,7 +39,7 @@ import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
 import StatusChip from "./chips/StatusChip";
 import { rotateSlots, type RotationMemo, type TickerContext, type TickerStatus } from "../datawidgets/ticker";
 import { sourceTab } from "../utils/rssText";
-import { stepItemIndex } from "./tickerStep";
+import EmptyBar from "./EmptyBar";
 import { advanceCycles, visibleSlots } from "./tickerRotation";
 import { WIDGET_ORDER } from "../widgets/registry";
 
@@ -78,10 +75,6 @@ interface ScrollrTickerProps {
   chipColorMode?: ChipColorMode;
   /** Per-widget display preferences (controls what data chips show) */
   widgetDisplay?: WidgetDisplayPrefs;
-  /** Scroll mode: continuous or step (Page) */
-  scrollMode?: ScrollMode;
-  /** Seconds each page stays put in step mode (default 5) */
-  stepPause?: number;
   /**
    * When true, this row should render the "no sources installed yet"
    * empty-shell CTA instead of returning null. Only the parent
@@ -124,35 +117,6 @@ interface ScrollrTickerProps {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
-
-/** Empty-ticker shell: accent hairline + centered stack, with an
- *  optional teaching tip beneath the primary row. */
-function EmptyTickerRow({
-  containerClass,
-  tip,
-  children,
-}: {
-  containerClass: string;
-  tip?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={containerClass}>
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
-      <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full px-4 min-w-0">
-        <div className="flex items-center justify-center gap-2 min-w-0">
-          {children}
-        </div>
-        {tip && (
-          <p className="text-[10px] text-fg-4/80 shrink-0 leading-tight hidden md:inline-flex items-center gap-1">
-            <span className="text-fg-4">Tip:</span>
-            {tip}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /**
  * Capped widgets (uptime, GitHub) render one chip per item instead of
@@ -315,8 +279,6 @@ export default function ScrollrTicker({
   mixMode = "grouped",
   chipColorMode = "widget",
   widgetDisplay,
-  scrollMode = "continuous",
-  stepPause = 5,
   showSourcelessCTA = false,
   onAddSources,
   showInstalledOffCTA = false,
@@ -324,10 +286,8 @@ export default function ScrollrTicker({
   onOpenWidget,
   onDisplayedWidgetsChange,
 }: ScrollrTickerProps) {
-  const effectiveScrollMode: ScrollMode = scrollMode;
   // Direction left the settings 2026-09-06 (REL-204): tickers go left.
   const effectiveDirection = "left" as const;
-  const holdOnHover = onHover !== "keep";
   const effectiveSpeed: number = speed;
   const effectiveMixMode: MixMode = mixMode;
 
@@ -506,7 +466,6 @@ export default function ScrollrTicker({
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
-  const isHoveredRef = useRef(false);
 
   // ── Slot rotation: advance a slot once it has fully left the viewport ──
   //
@@ -528,99 +487,7 @@ export default function ScrollrTicker({
       wasVisibleRef.current = now;
     }, 250);
     return () => window.clearInterval(id);
-  }, [hasRotatingSlots, effectiveScrollMode]);
-
-  // ── Step mode: external offset driven by async animate loop ──
-  const offset = useMotionValue(0);
-  const stepLoopRef = useRef(false);
-
-  const transitionDuration = speedToTransitionDuration(effectiveSpeed);
-
-  // Measure the ticker item the next step will travel across, plus gap.
-  // Queries .ticker-item inside containerRef — works because <Ticker> renders
-  // its items as descendants of our wrapper div. Only called once per step
-  // cycle (~5s apart), not in a tight loop, so the layout read is safe.
-  //
-  // WHICH item matters now that chips are content-sized. This used to
-  // measure the first item every time, which stepped correctly only while
-  // every chip was 264px; with a short Cubs-Tigers chip next to a long
-  // Revolution-Minnesota one the rail drifted, pausing mid-chip after a
-  // few steps. stepItemIndex names the item at the leading edge for this
-  // step and direction (originals come first in the DOM, in order).
-  const stepCountRef = useRef(0);
-  const measureStepSize = useCallback((): number => {
-    const container = containerRef.current;
-    if (!container) return 200; // fallback
-    const items = container.querySelectorAll<HTMLElement>(".ticker-item");
-    if (!items.length) return 200;
-    const count = Math.min(items.length, chips.length || items.length);
-    const item = items[stepItemIndex(stepCountRef.current, count, effectiveDirection)];
-    return (item ?? items[0]).offsetWidth + gap;
-  }, [gap, chips.length, effectiveDirection]);
-
-  // Reset step offset when entering step mode or when direction changes,
-  // so the ticker doesn't start from a stale accumulated position.
-  useEffect(() => {
-    if (effectiveScrollMode === "page") {
-      offset.set(0);
-      stepCountRef.current = 0;
-    }
-  }, [effectiveScrollMode, effectiveDirection, offset]);
-
-  // Step loop: animate offset by one item width, pause, repeat
-  useEffect(() => {
-    if (effectiveScrollMode !== "page" || chips.length === 0) return;
-
-    stepLoopRef.current = true;
-    let cancelled = false;
-
-    async function stepLoop() {
-      // Small delay to let DOM render and measure
-      await sleep(500);
-
-      while (!cancelled && stepLoopRef.current) {
-        // Hold the page while hovered unless the user chose Keep moving
-        if (holdOnHover && isHoveredRef.current) {
-          await sleep(100);
-          continue;
-        }
-
-        const stepSize = measureStepSize();
-        const sign = effectiveDirection === "left" ? 1 : -1;
-        const current = offset.get();
-        const target = current + sign * stepSize;
-
-        // Animate one step — duration derived from unified speed slider
-        await animate(offset, target, {
-          duration: transitionDuration,
-          ease: [0.25, 0.1, 0.25, 1],
-        });
-
-        if (cancelled) break;
-        stepCountRef.current += 1;
-
-        // Pause between steps
-        await sleep(stepPause * 1000);
-      }
-    }
-
-    stepLoop();
-
-    return () => {
-      cancelled = true;
-      stepLoopRef.current = false;
-    };
-  }, [
-    effectiveScrollMode,
-    effectiveDirection,
-    stepPause,
-    holdOnHover,
-    effectiveSpeed,
-    chips.length,
-    measureStepSize,
-    offset,
-    transitionDuration,
-  ]);
+  }, [hasRotatingSlots]);
 
   // ── Build the fixed zone ────────────────────────────────────────
   //
@@ -733,99 +600,9 @@ export default function ScrollrTicker({
 
   const containerClass = `ticker-container h-16 flex items-center bg-base-150 border-b border-edge/50 flex-shrink-0 relative w-full overflow-hidden`;
 
-  if (isSourceless) {
-    return (
-      <EmptyTickerRow
-        containerClass={containerClass}
-        tip={
-          <>
-            <span>use</span>
-            <span
-              className={clsx(
-                "inline-flex items-center gap-0.5 align-baseline",
-                "px-1 py-px rounded",
-                "bg-fg-4/10 text-fg-2 font-semibold",
-              )}
-            >
-              + Add source
-            </span>
-            <span>in the sidebar to do this yourself next time.</span>
-          </>
-        }
-      >
-        <span className="text-ui-meta font-medium text-fg-2 shrink-0">
-          You haven&rsquo;t added any sources yet.
-        </span>
-        <span className="text-ui-meta text-fg-4 shrink-0 hidden sm:inline">
-          Browse the catalog to add one:
-        </span>
-        <button
-          type="button"
-          onClick={onAddSources}
-          disabled={!onAddSources}
-          className={clsx(
-            "inline-flex items-center gap-1.5 rounded-md shrink-0",
-            "px-2.5 py-1 text-ui-meta font-semibold",
-            "text-accent bg-accent/10 hover:bg-accent/15",
-            "border border-accent/25 hover:border-accent/40",
-            "transition-colors active:scale-[0.97]",
-            "disabled:opacity-50 disabled:pointer-events-none",
-          )}
-        >
-          <Plus size={11} strokeWidth={2.5} aria-hidden="true" />
-          Browse the catalog
-        </button>
-      </EmptyTickerRow>
-    );
-  }
-
+  if (isSourceless) return <EmptyBar kind="sourceless" onAddSources={onAddSources} />;
   if (isInstalledButTickerOff) {
-    return (
-      <EmptyTickerRow
-        containerClass={containerClass}
-        tip={
-          <span>
-            every widget&rsquo;s settings live in the bar at the top of its
-            page.
-          </span>
-        }
-      >
-        <span className="text-ui-meta font-medium text-fg-2 shrink-0">
-          Your ticker is empty right now.
-        </span>
-        <span className="text-ui-meta text-fg-4 shrink-0 hidden sm:inline">
-          Open a source to pick what shows up here:
-        </span>
-        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
-          {installedWidgets.map((ch) => {
-            const WidgetGlyphIcon = ch.icon;
-            return (
-              <button
-                key={ch.id}
-                type="button"
-                onClick={() => onOpenWidget?.(ch.id)}
-                disabled={!onOpenWidget}
-                className={clsx(
-                  "inline-flex items-center gap-1.5 shrink-0 rounded-md",
-                  "px-2 py-1 text-ui-meta font-semibold",
-                  "border transition-colors active:scale-[0.97]",
-                  "disabled:opacity-50 disabled:pointer-events-none",
-                )}
-                style={{
-                  color: ch.hex,
-                  backgroundColor: `${ch.hex}14`, // ~8% alpha
-                  borderColor: `${ch.hex}3D`, // ~24% alpha
-                }}
-                title={`Open ${ch.name}`}
-              >
-                <WidgetGlyphIcon size={12} className="shrink-0" />
-                <span className="truncate">{ch.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      </EmptyTickerRow>
-    );
+    return <EmptyBar kind="installedOff" installedWidgets={installedWidgets} onOpenWidget={onOpenWidget} />;
   }
 
   // Nothing to show at all
@@ -848,30 +625,22 @@ export default function ScrollrTicker({
       </div>
     ) : null;
 
-  // ── Continuous / Step mode: motion-plus Ticker ────────────────
+  // ── Continuous mode: motion-plus Ticker ───────────────────────
   const velocity =
     effectiveDirection === "left" ? effectiveSpeed : -effectiveSpeed;
-  const isStepMode = effectiveScrollMode === "page";
 
   return (
     <div
       ref={containerRef}
       className={containerClass}
-      onMouseEnter={() => {
-        isHoveredRef.current = true;
-      }}
-      onMouseLeave={() => {
-        isHoveredRef.current = false;
-      }}
     >
       {accentLine}
       {pinnedZone("left", pinnedLeft)}
       <div className="ticker-scroll-wrapper">
         <Ticker
           items={chips}
-          velocity={isStepMode ? 0 : velocity}
-          offset={isStepMode ? offset : undefined}
-          hoverFactor={isStepMode ? 1 : HOVER_FACTOR[onHover]}
+          velocity={velocity}
+          hoverFactor={HOVER_FACTOR[onHover]}
           gap={gap}
           fade={hasPinnedLeft || hasPinnedRight ? 20 : 40}
         />
@@ -885,14 +654,3 @@ export default function ScrollrTicker({
 
 /** Continuous-mode speed multiplier under the mouse; 0 stops the marquee. */
 const HOVER_FACTOR: Record<HoverBehavior, number> = { keep: 1, slow: 0.3, pause: 0 };
-
-/** Promise-based sleep helper. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Map speed (px/s) to the step transition duration in Page mode.
- *  Slow 20 → ~1.1s, Normal 40 → ~0.95s, Fast 80 → ~0.66s. */
-function speedToTransitionDuration(speed: number): number {
-  return Math.max(0.15, 1.2 - (speed - 5) * 0.0072);
-}

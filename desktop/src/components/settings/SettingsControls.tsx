@@ -516,7 +516,7 @@ export function ResetButton({
 //
 // Wraps each child after the first in a hairline divider, so callers can
 // list rows without threading separator props through every one. Rows
-// that conditionally render (Time per page, Hide when fullscreen) drop
+// that conditionally render (Speed, Hide when fullscreen) drop
 // out cleanly because `false`/`null` children are filtered first.
 
 export function RowList({ children }: { children: React.ReactNode }) {
@@ -526,7 +526,7 @@ export function RowList({ children }: { children: React.ReactNode }) {
     <>
       {visible.map((row, i) => (
         // Keyed by the row's own id where it has one, not by position.
-        // Conditional rows (Time per page, Hide when fullscreen) shift
+        // Conditional rows (Speed, Hide when fullscreen) shift
         // every index below them as they appear and disappear, so an
         // index key hands one setting's mounted instance to a different
         // setting — the sliding pill and any transient state ride along
