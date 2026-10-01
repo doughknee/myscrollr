@@ -250,7 +250,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 528e422b1a0a -->
+<!-- source: docs/CHIP_DESIGN.md @ 120849d68bab -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -306,6 +306,29 @@ once, at the release, with a one-time notice that Continuous is one click away i
   headline needs 400 pixels to be readable. There are no cards or boxes, just the items,
   with a thin line between them.
 - **The edge** at the right holds the small things that should always be there. See below.
+
+#### Every page is full
+
+A page always has an item in every column, unless the widget really has fewer things than
+one page holds. The time windows below were made to keep the scrolling bar short; on a
+page, an empty column is just waste, so the page keeps going down the same order of
+importance until it's full:
+
+- **Sports:** after what's on now and soon, the next games in the coming week, your team
+  first. On a Thursday morning the NFL page is tonight's game plus Sunday's early
+  kick-offs, not one game stretched across the bar.
+- **News:** after the last six hours, older headlines from the last two days, newest first.
+- **Stocks and crypto:** your watchlist first, in your order. If it's shorter than a page,
+  the empty spaces show popular symbols. They are **not** added to your watchlist: the
+  label says so ("+4 POPULAR"), the watchlist screen offers each one as a one-click add,
+  and every symbol you add takes the place of one of them.
+
+Filling only ever uses the empty spaces on the last page, so a widget never gets extra
+pages from it and the bar takes no longer to go round.
+
+If a widget truly has fewer things than a page (one game all week), they keep the width
+they'd have on a full page, starting next to the label, rather than one item stretched
+across the whole bar.
 
 #### Pages stay still
 
@@ -477,7 +500,8 @@ nothing on it is configured.
 
 1. **A time window decides what's eligible.** Live games always; games starting within a
    day; results from the last eighteen hours; headlines from the last six hours; your
-   watchlist.
+   watchlist. On Pages, a page that isn't full keeps going past the window until it is
+   (see "Every page is full").
 2. **A quiet source still gets something**: its next fixture, its latest headline, as
    long as that isn't stale. A source with nothing even then says why and, when we know,
    when ("NBA · off-season"). That's the Also page under Pages and a grey chip under
@@ -557,7 +581,8 @@ you read them. Ranking a page by how close a game is. A page for a widget with n
 say. Dropping items instead of taking turns. Pinning a whole widget. A pin icon on the
 chip. Auto-pinning what you just added. Merging pins with stars and favourites. A pinned
 zone that scrolls. Evicting someone's pin to make room for a new one. A hover setting under
-Pages.
+Pages. One item stretched across a page. Centring a short page away from its label. Adding
+popular symbols to your watchlist for you.
 
 ### Still to do
 
