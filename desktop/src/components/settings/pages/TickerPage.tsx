@@ -10,10 +10,9 @@
  * Speed only moves the Continuous marquee (a page's dwell and swipe are
  * fixed by the pages bar, SCROLLR-272), so it only renders there.
  * Hide-when-fullscreen only does anything on Windows, so it only
- * renders there. Item order weaves chips of different widgets and a page
- * is always one widget, so it only renders in Continuous too. On hover
- * has two answers under Pages (hold the page / keep going) and three
- * under Continuous (SCROLLR-281).
+ * renders there. So do On hover (a page always holds under the mouse; the
+ * pref only drives the marquee) and Item order (a page is one widget, so
+ * there is nothing to weave) (SCROLLR-281).
  *
  * Screen edge writes `window.tickerPosition`; App.tsx's pref subscriber
  * owns the reposition side effect, so this only has to set the pref.
@@ -79,13 +78,6 @@ const HOVER_OPTIONS: { value: HoverBehavior; label: string }[] = [
   { value: "keep", label: "Keep moving" },
   { value: "slow", label: "Slow down" },
   { value: "pause", label: "Pause" },
-];
-
-/** A page cannot slow down: it holds still or it does not (SCROLLR-281). */
-type PageHover = "hold" | "keep";
-const PAGE_HOVER_OPTIONS: { value: PageHover; label: string }[] = [
-  { value: "hold", label: "Hold page" },
-  { value: "keep", label: "Keep going" },
 ];
 
 const MIX_OPTIONS: { value: MixMode; label: string }[] = [
@@ -196,24 +188,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               />
             </Row>
           )}
-          <Row id="onHover">
-            {paged ? (
-              // The pref keeps its three values; the engine holds on
-              // "slow" and "pause" alike. Choosing Hold keeps a stored
-              // "pause", so the choice survives a trip through Continuous.
-              <SegmentedRow
-                label={R.onHover.label}
-                description="Whether the page holds still while your mouse is over it."
-                value={ticker.onHover === "keep" ? "keep" : "hold"}
-                options={PAGE_HOVER_OPTIONS}
-                onChange={(v) =>
-                  setTicker(
-                    "onHover",
-                    v === "keep" ? "keep" : ticker.onHover === "keep" ? "slow" : ticker.onHover,
-                  )
-                }
-              />
-            ) : (
+          {!paged && (
+            <Row id="onHover">
               <SegmentedRow
                 label={R.onHover.label}
                 description={R.onHover.description}
@@ -221,8 +197,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
                 options={HOVER_OPTIONS}
                 onChange={(v) => setTicker("onHover", v)}
               />
-            )}
-          </Row>
+            </Row>
+          )}
         </RowList>
       </SettingsGroup>
 

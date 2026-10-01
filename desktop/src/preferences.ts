@@ -75,8 +75,8 @@ export type ChipColorMode = "widget" | "theme" | "subtle";
  *  "continuous" is the scrolling chips bar. The old step "page" mode and
  *  "flip" were deleted in SCROLLR-274; `migrateTicker` maps them to pages. */
 export type ScrollMode = "continuous" | "pages";
-/** What the bar does under the mouse. Continuous: keep / slow to 30 % /
- *  stop. Page: keep advancing / hold the page (slow and pause alike). */
+/** What the continuous bar does under the mouse: keep / slow to 30 % /
+ *  stop. Pages ignore it and always hold the page (SCROLLR-281). */
 export type HoverBehavior = "keep" | "slow" | "pause";
 export type PinSide = "left" | "right";
 

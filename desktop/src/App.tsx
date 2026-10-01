@@ -885,7 +885,6 @@ export default function App() {
                   widgetData={widgetData}
                   pins={prefs.widgets.pins}
                   chipColorMode={prefs.ticker.chipColors}
-                  holdOnHover={prefs.ticker.onHover !== "keep"}
                   onChipClick={handleChipClick}
                   onDisplayedWidgetsChange={reportDisplayedWidgets}
                 />

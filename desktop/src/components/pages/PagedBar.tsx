@@ -81,8 +81,6 @@ interface Props {
   /** Pinned subjects: on the edge, off the pages. */
   pins?: WidgetPin[];
   chipColorMode?: ChipColorMode;
-  /** Hold the page under the mouse (onHover "slow" and "pause" alike). */
-  holdOnHover?: boolean;
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
   /** Widgets with a page up this lap, for the presence check-in (the Also page does not count). */
   onDisplayedWidgetsChange?: (widgetIds: string[]) => void;
@@ -190,7 +188,6 @@ export default function PagedBar({
   widgetData,
   pins = NO_PINS,
   chipColorMode = "widget",
-  holdOnHover = true,
   onChipClick,
   onDisplayedWidgetsChange,
   empty,
@@ -245,8 +242,6 @@ export default function PagedBar({
   const nav = useRef(newNav());
   const localHover = useRef(false);
   const remoteHover = useRef(new Set<string>());
-  const holdRef = useRef(holdOnHover);
-  holdRef.current = holdOnHover;
 
   const show = useCallback((t: Turn | null) => {
     turnRef.current = t;
@@ -291,15 +286,12 @@ export default function PagedBar({
   }, [leader, turn, advance]);
 
   const updateHold = useCallback(() => {
-    const h = holdRef.current && (localHover.current || remoteHover.current.size > 0);
+    const h = localHover.current || remoteHover.current.size > 0;
     if (h === heldRef.current) return;
     heldRef.current = h;
     setHeld(h);
     broadcast();
   }, [broadcast]);
-
-  // Switching to Keep going while the mouse is over the bar lets go at once.
-  useEffect(updateHold, [holdOnHover, updateHold]);
 
   useTauriListener<{ label: string; on: boolean }>(HOVER_EVENT, (e) => {
     if (!leader || e.payload.label === label) return;
