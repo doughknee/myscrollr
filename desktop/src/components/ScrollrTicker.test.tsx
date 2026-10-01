@@ -228,7 +228,7 @@ describe("ScrollrTicker status chip", () => {
       <ScrollrTicker dashboard={dash([item(1, old), item(2, fresh)])} activeTabs={["news_pbs"]} widgetData={widgetData} />,
     );
     expect(screen.queryByTestId("status-chip")).toBeNull();
-    expect(screen.getByText("Headline 2")).toBeInTheDocument();
+    expect(screen.getAllByText("Headline 2").length).toBeGreaterThan(0); // visible + sizer
   });
 
   it("says nothing before the dashboard is in", () => {
@@ -246,6 +246,6 @@ describe("ScrollrTicker status chip", () => {
       />,
     );
     expect(screen.queryByTestId("status-chip")).toBeNull();
-    expect(screen.getByText("Headline 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Headline 1").length).toBeGreaterThan(0); // visible + sizer
   });
 });

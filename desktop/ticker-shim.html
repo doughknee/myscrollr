@@ -15,8 +15,8 @@
                       /dashboard answer 500 and logs the failed path —
                       loud on purpose.
     ?mode=page        scrollMode "page" (steps) instead of "continuous".
-    ?comfort=1        tickerMode "detailed" (one extra row per chip)
-                      instead of "compact".
+    ?comfort=1        accepted and ignored: the bar has one height since
+                      SCROLLR-278, so old links still open.
     ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
     ?cells=1          SCROLLR-271: the widget-page cells gallery
                       (src/dev/cellsGallery.tsx) instead of the ticker;
@@ -25,8 +25,7 @@
                       (e.g. ?pin=sports_mlb:Milwaukee Brewers). Only
                       the first ':' splits, so a feed url works.
 
-  What the seed does: scrollr:settings puts the bar on, continuous and
-  compact, with the local clock on the ticker; the fixture's `widgets`
+  What the seed does: scrollr:settings puts the bar on, continuous, with the local clock on the ticker; the fixture's `widgets`
   rows (enabled + ticker_enabled) supply the data widgets, so whatever a
   fixture lists is on the bar. scrollr:auth looks valid for a day so the
   authenticated /dashboard path is taken. Every ISO timestamp in the
@@ -144,7 +143,6 @@
             ticker: {
               showTicker: true,
               scrollMode: params.get("mode") === "page" ? "page" : "continuous",
-              tickerMode: params.get("comfort") === "1" ? "detailed" : "compact",
               // Snaps to the nearest preset (20/40/80 px/s) on load.
               tickerSpeed: Number(params.get("speed")) || 40,
             },

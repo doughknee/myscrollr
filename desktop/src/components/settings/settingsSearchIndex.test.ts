@@ -139,7 +139,6 @@ describe("searchSettings", () => {
       "showTicker",
       "tickerMonitors",
       "screenEdge",
-      "detailLevel",
       "tickerScale",
       "chipColors",
       "scrollMode",

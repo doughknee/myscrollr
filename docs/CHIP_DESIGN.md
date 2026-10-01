@@ -7,12 +7,10 @@ number, class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spe
 
 ## One rule above all
 
-**Compact is the chip. Detailed is the same chip with one extra row underneath. Nothing
-on the top row moves.**
+**The bar has one height. Every chip is a top row plus one row of detail underneath.**
 
-That's it. If you remember one thing, remember this. A user should be able to switch
-density and recognise every chip instantly, because the only difference is a row of
-extra detail appearing beneath what was already there.
+That's it. If you remember one thing, remember this. There is no density setting and no
+compact version: every widget gets one polished layout instead of two.
 
 ## What a chip looks like
 
@@ -107,7 +105,7 @@ starred markets, your favourite team, your feeds, your time zones, your cities, 
 system metrics matter to you, which monitors and repos to watch. These are *what you
 care about*, and they're yours everywhere.
 
-**You control how the bar looks and moves.** Compact or detailed. Speed, direction, gap,
+**You control how the bar looks and moves.** Speed, direction, gap,
 whether it pauses on hover. Continuous, step or flip. Grouped or woven. Colour mode.
 Where the bar sits.
 
@@ -200,16 +198,16 @@ widget just tells you it was added.
 
 ## How we work
 
-1. Draw it first, on the canvas, with lots of real examples, compact before detailed.
+1. Draw it first, on the canvas, with lots of real examples.
 2. Pick a direction, then build exactly that.
 3. Look at it on the running bar. If something can't be seen, measure it instead.
 4. Ship a whole family at once, so the bar never speaks two languages.
 
 ## Things we've already decided against
 
-Two different layouts for the two densities. Every chip the same width. Dots and spines as
-decoration. A dash where a score should be blank. A shared red for close games. The
-weather range squeezed into the compact row. Monitors packed into one chip as cells. A
+Two different layouts for two densities (the compact one is deleted, SCROLLR-278). Every
+chip the same width. Dots and spines as decoration. A dash where a score should be blank.
+A shared red for close games. The weather range squeezed into the top row. Monitors packed into one chip as cells. A
 per-widget "how many on the bar" control. Naming a time zone twice. Dropping items instead
 of rotating them. Pinning a whole widget. A pin icon on the chip. Auto-pinning what you
 just added. Merging pins with stars and favourites. A pinned zone that rotates. Evicting

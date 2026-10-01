@@ -51,7 +51,6 @@ interface ChipCapProps {
   children: React.ReactNode;
   /** Pulse the cap. Reserve for states that want attention now. */
   pulse?: boolean;
-  comfort?: boolean;
   /** Screen-reader text, since a glyph or an abbreviation isn't one. */
   label: string;
 }
@@ -60,18 +59,17 @@ export function ChipCap({
   tone,
   children,
   pulse,
-  comfort,
   label,
 }: ChipCapProps) {
   const t = CAP_TONES[tone];
   return (
     <span
-      // Self-stretch so the cap is full chip height in both densities
-      // rather than a floating badge — it reads as a bound edge.
+      // Self-stretch so the cap is full chip height rather than a
+      // floating badge — it reads as a bound edge.
       className={clsx(
         "flex shrink-0 select-none items-center justify-center self-stretch border-r",
         "font-mono font-bold uppercase tracking-wider",
-        comfort ? "px-2 text-[11px]" : "px-1.5 text-[10px]",
+        "px-2 text-[11px]",
         t.bg,
         t.border,
         t.text,

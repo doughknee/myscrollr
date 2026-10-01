@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ e27e1b89fa5f -->
+<!-- source: desktop/src/components/settings/rows.ts @ dcde0ac7408f -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -220,7 +220,6 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Ticker › Show the ticker: The bar on your screen. Ctrl+T, the tray and the ticker's right-click menu do the same.
 - Settings › Ticker › Monitors: Which screens show the ticker
 - Settings › Ticker › Screen edge: Which edge of the screen the ticker sits on.
-- Settings › Ticker › Detail level: One line per chip, or a detail row under each.
 - Settings › Ticker › Size: Resize the bar. The app window has its own size.
 - Settings › Ticker › Chip colors: Each widget's own color, the theme accent, or subtle grays.
 - Settings › Ticker › Scroll mode: Scroll without stopping, or show a page at a time.
@@ -256,7 +255,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 1b44d8acd195 -->
+<!-- source: docs/CHIP_DESIGN.md @ b63a66bd16e0 -->
 *The short version of the ticker chip rules. Read this first; the exact spec with every
 number, class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -264,12 +263,10 @@ number, class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spe
 
 ### One rule above all
 
-**Compact is the chip. Detailed is the same chip with one extra row underneath. Nothing
-on the top row moves.**
+**The bar has one height. Every chip is a top row plus one row of detail underneath.**
 
-That's it. If you remember one thing, remember this. A user should be able to switch
-density and recognise every chip instantly, because the only difference is a row of
-extra detail appearing beneath what was already there.
+That's it. If you remember one thing, remember this. There is no density setting and no
+compact version: every widget gets one polished layout instead of two.
 
 ### What a chip looks like
 
@@ -364,7 +361,7 @@ starred markets, your favourite team, your feeds, your time zones, your cities, 
 system metrics matter to you, which monitors and repos to watch. These are *what you
 care about*, and they're yours everywhere.
 
-**You control how the bar looks and moves.** Compact or detailed. Speed, direction, gap,
+**You control how the bar looks and moves.** Speed, direction, gap,
 whether it pauses on hover. Continuous, step or flip. Grouped or woven. Colour mode.
 Where the bar sits.
 
@@ -457,16 +454,16 @@ widget just tells you it was added.
 
 ### How we work
 
-1. Draw it first, on the canvas, with lots of real examples, compact before detailed.
+1. Draw it first, on the canvas, with lots of real examples.
 2. Pick a direction, then build exactly that.
 3. Look at it on the running bar. If something can't be seen, measure it instead.
 4. Ship a whole family at once, so the bar never speaks two languages.
 
 ### Things we've already decided against
 
-Two different layouts for the two densities. Every chip the same width. Dots and spines as
-decoration. A dash where a score should be blank. A shared red for close games. The
-weather range squeezed into the compact row. Monitors packed into one chip as cells. A
+Two different layouts for two densities (the compact one is deleted, SCROLLR-278). Every
+chip the same width. Dots and spines as decoration. A dash where a score should be blank.
+A shared red for close games. The weather range squeezed into the top row. Monitors packed into one chip as cells. A
 per-widget "how many on the bar" control. Naming a time zone twice. Dropping items instead
 of rotating them. Pinning a whole widget. A pin icon on the chip. Auto-pinning what you
 just added. Merging pins with stars and favourites. A pinned zone that rotates. Evicting
@@ -478,7 +475,7 @@ GitHub chips haven't been rebuilt on these rules yet (REL-184).
 
 ## The settings model
 
-<!-- source: docs/SETTINGS_AUDIT.md @ be6a898d8318 -->
+<!-- source: docs/SETTINGS_AUDIT.md @ ef57081ad887 -->
 Excerpt (sections 1–3) of the settings audit that shaped the 1.6.0 Settings rebuild. Its "Today" columns describe the app *before* that rebuild; the Settings section above is what the app shows now.
 
 ### 1. The shape is wrong before any row is
@@ -496,7 +493,7 @@ Proposed page map (7 pages → 7 pages, but each with one job):
 | Page | Contents |
 |---|---|
 | **Appearance** | Theme · Color mode · App size · Readability (font weight, high contrast) · **Units & formats** (new) |
-| **Ticker** | **Show the ticker** (new row) · Where: Monitors, Screen edge · Look: Detail level, Size, Chip colors · Motion: Scroll mode, Speed, On hover, Time per page · Behaviour: Stay above other windows, Hide when an app goes fullscreen, Item order |
+| **Ticker** | **Show the ticker** (new row) · Where: Monitors, Screen edge · Look: Size, Chip colors · Motion: Scroll mode, Speed, On hover, Time per page · Behaviour: Stay above other windows, Hide when an app goes fullscreen, Item order |
 | **Startup** | Launch at login · **Start in the background** (new) |
 | **Shortcuts** | unchanged, copy fixed |
 | **Profile & plan** | unchanged, copy fixed |
@@ -537,7 +534,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 | Setting | Today | Verdict | Notes |
 |---|---|---|---|
-| **Detail level** | Compact / Detailed | **Keep**, first in Look | This is *the* choice on the bar. Values are `compact` / `comfort` internally; rename the value to match the label in a migration so the prefs file reads like the UI. |
+| **Detail level** | Compact / Detailed | **Removed** (SCROLLR-278, 1 Oct 2026) | The bar has one height, today's detailed one; the choice and its `tickerMode` pref no longer exist. |
 | **Scale** | slider 75–150 % | **Rework** → **Size**, presets 85 / 100 / 115 / 130 % | d: the slider Brandon does not like. Same four presets as App size, same control, same word. The 75–150 range was never reachable for the app anyway. |
 | **Chip colors** | Widget / Theme / Subtle | **Keep** | b: real, visible effect. Values `widget/accent/muted`; align in the same migration. |
 | **Spacing** | Tight / Normal / Wide | **Fold** | b: gap between chips, 8/12/20 px. Nobody opens Settings to change chip gap. Keep one gap (the current default, tight, reads best with the redrawn chips) and delete the row. |

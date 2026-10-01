@@ -288,7 +288,7 @@ export interface ClockChipData {
   detail?: string;
   /** Zone is in its night hours — the cell dims and shows a moon. */
   night?: boolean;
-  /** Short UTC offset for the comfort cell, e.g. "UTC-4". */
+  /** Short UTC offset for the detail row, e.g. "UTC-4". */
   offset?: string;
 
   // ── Timer only ──
@@ -297,7 +297,7 @@ export interface ClockChipData {
   /** Total duration the spine measures against. */
   totalSec?: number;
   paused?: boolean;
-  /** Wall-clock time the timer ends, for the comfort row. */
+  /** Wall-clock time the timer ends, for the detail row. */
   endsAt?: string;
 }
 
@@ -314,7 +314,7 @@ export interface WeatherChipData {
   /** Local night — dims the chip the same way a clock's night zone does. */
   night?: boolean;
   /** Active weather alert headline, e.g. "Storm watch". Replaces the
-   *  range bar in compact: a warning outranks a temperature. */
+   *  range bar in the detail row: a warning outranks a temperature. */
   alert?: string;
 }
 

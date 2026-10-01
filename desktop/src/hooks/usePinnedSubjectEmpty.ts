@@ -39,7 +39,6 @@ export function usePinnedSubjectEmpty(widget: string, subject: string): boolean 
       tab: widget,
       source,
       dashboard,
-      comfort: false,
       chipColorMode: "theme",
       pinnedSubject: subject,
     }) === null

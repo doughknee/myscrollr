@@ -43,7 +43,6 @@ export const rssTickerSource: TickerSource = {
       node: (
         <RssChip
           item={item}
-          comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
           accent={accent}
           reserveTitle={reserveTitle}
@@ -73,7 +72,6 @@ export const rssTickerSource: TickerSource = {
       node: (
         <RssChip
           item={newest}
-          comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
           accent={catalogItemById(ctx.tab)?.hex}
           feedCountToday={today}

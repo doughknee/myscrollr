@@ -116,7 +116,7 @@ export const GETTING_STARTED_STEPS: Array<GettingStartedStep> = [
   {
     title: 'Customize the Ticker',
     description:
-      'The ticker bar runs across your screen showing live data. Open Settings > Ticker to change the detail level (Compact / Detailed), add ticker rows, and adjust speed. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.',
+      'The ticker bar runs across your screen showing live data. Open Settings > Ticker to change its size, chip colors and speed. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.',
   },
 ]
 

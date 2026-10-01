@@ -9,7 +9,6 @@ interface StatusChipProps {
   text: string;
   /** The widest text this widget's status can show; sets the width. */
   reserve: string;
-  comfort?: boolean;
   onClick?: () => void;
 }
 
@@ -20,14 +19,14 @@ interface StatusChipProps {
  * Two cells: the tab and one line of status. Always the subtle palette,
  * whatever the colour mode, so it reads as the bar talking about a widget
  * rather than as that widget's data. It has no changing value and no
- * detail: detailed mode adds the empty 20px row and nothing in it, because
+ * detail: the second 20px row stays empty, because
  * nothing in it would not restate the top row (§6).
  *
  * The width is set by a hidden sizer holding `reserve`, the widest message
  * this widget's status can ever show, so the chip is one width from first
  * render whether it says "off-season" or names a date.
  */
-const StatusChip = memo(function StatusChip({ tab, text, reserve, comfort, onClick }: StatusChipProps) {
+const StatusChip = memo(function StatusChip({ tab, text, reserve, onClick }: StatusChipProps) {
   const c = getChipColors("subtle", "status");
   return (
     <button
@@ -37,8 +36,7 @@ const StatusChip = memo(function StatusChip({ tab, text, reserve, comfort, onCli
       data-testid="status-chip"
       className={clsx(
         chipShellClasses(c, "whitespace-nowrap"),
-        "grid max-w-[640px] grid-cols-[max-content_minmax(0,max-content)]",
-        comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
+        "grid max-w-[640px] grid-cols-[max-content_minmax(0,max-content)] grid-rows-[30px_20px]",
       )}
     >
       <span

@@ -1,5 +1,5 @@
 /**
- * The headline chip's contract: compact is the first line of the title;
+ * The headline chip's contract:
  * detailed adds whatever the title still needs -- the summary on line two
  * if the title fit, inline after it if it wrapped -- without ever widening
  * the chip. jsdom has no layout, so fit is driven by stubbing the widths
@@ -37,17 +37,17 @@ afterEach(() => {
 });
 
 describe("RssChip", () => {
-  it("compact is the headline alone, entities decoded, source as a tab", () => {
+  it("shows the headline, entities decoded, source as a tab", () => {
     render(<RssChip item={item()} />);
-    expect(screen.getByText("What Is The Best Waterproof Rating For Bluetooth Speakers?")).toBeTruthy();
+    // Twice: the visible headline and the hidden sizer that sets the column.
+    expect(screen.getAllByText("What Is The Best Waterproof Rating For Bluetooth Speakers?").length).toBe(2);
     expect(screen.getByText("ENGADGET")).toBeTruthy();
-    expect(screen.queryByText(/lounging/)).toBeNull();
     expect(screen.getByTestId("age-cell").textContent).toBe("12m");
   });
 
   it("puts the summary on line two when the title fit on one", () => {
     stubWidths(400, 520);
-    render(<RssChip item={item()} comfort />);
+    render(<RssChip item={item()} />);
     expect(screen.getByTestId("summary-break")).toBeTruthy();
     // decoded: &#39; became an apostrophe
     expect(screen.getByText(/There's nothing like lounging/)).toBeTruthy();
@@ -55,20 +55,20 @@ describe("RssChip", () => {
 
   it("runs the summary on after a title that wrapped", () => {
     stubWidths(900, 520);
-    render(<RssChip item={item()} comfort />);
+    render(<RssChip item={item()} />);
     expect(screen.queryByTestId("summary-break")).toBeNull();
     expect(screen.getByText(/There's nothing like lounging/)).toBeTruthy();
   });
 
   it("shows the feed's volume when there is no summary and the title fit", () => {
     stubWidths(300, 520);
-    render(<RssChip item={item({ description: "", source_name: "Dev.to" })} comfort feedCountToday={34} />);
+    render(<RssChip item={item({ description: "", source_name: "Dev.to" })} feedCountToday={34} />);
     expect(screen.getByText("Dev.to · 34 today")).toBeTruthy();
   });
 
   it("says nothing on line two when there is no summary and the title wrapped", () => {
     stubWidths(900, 520);
-    const { container } = render(<RssChip item={item({ description: "" })} comfort feedCountToday={34} />);
+    const { container } = render(<RssChip item={item({ description: "" })} feedCountToday={34} />);
     expect(container.textContent).not.toContain("today");
   });
 
@@ -77,12 +77,9 @@ describe("RssChip", () => {
     expect(screen.getByText("HOLLYWOOD")).toBeTruthy();
   });
 
-  it("fixes the age column at the same width in both modes", () => {
-    const { container, rerender } = render(<RssChip item={item()} />);
-    const cls = () => (container.querySelector("button") as HTMLButtonElement).className;
-    expect(cls()).toContain("_46px]");
-    rerender(<RssChip item={item()} comfort />);
-    expect(cls()).toContain("_46px]");
+  it("fixes the age column at 46px", () => {
+    const { container } = render(<RssChip item={item()} />);
+    expect((container.querySelector("button") as HTMLButtonElement).className).toContain("_46px]");
   });
 
   it("tints from the widget's brand in widget mode only", () => {

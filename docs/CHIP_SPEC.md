@@ -18,8 +18,7 @@ checklist) literally.
 |---|---|
 | **chip** | One `<button>` on the ticker rail representing one item (game, symbol, headline, …) or one widget (clock, weather, …). |
 | **rail** | The scrolling marquee. `desktop/src/components/ScrollrTicker.tsx`, rendered by motion-plus `<Ticker>`. |
-| **compact** | The single-row density. `comfort === false`. Row height 28px. |
-| **detailed** | The two-row density. `comfort === true`. Rows 30px + 20px. Also called "comfort" in code. |
+| **one height** | The bar has one height (SCROLLR-278, 1 Oct 2026): every chip is two rows, 30px + 20px, in a 64px bar. The compact single-row density and the `tickerMode` setting are deleted. |
 | **tab** | The left cell naming the source: league code, feed name, widget name, or status cap. Spans both rows. |
 | **fixed right cell** | The rightmost cell holding the one value that changes on screen. Bordered on its left. |
 | **reservation** | Width held from first render for a value that will change, so the chip never resizes. |
@@ -37,7 +36,7 @@ checklist) literally.
 
 ## 1. The invariants (never violate)
 
-1. **Compact is the chip. Detailed is compact plus exactly one 20px row underneath. Every element of the top row keeps its position, size and content across both densities.** Verify: render the same item with `comfort={false}` and `comfort={true}`; the top row must be pixel-identical.
+1. **One height.** Every chip is a 30px top row plus one 20px detail row; there is no other density and no setting for it.
 2. **A chip never changes width while on screen.** Every value that can change reserves its widest plausible width from first render (§4). Verify: render the same fixture in every state it can pass through (pre / live / final; no-score / one-digit / two-digit; short / long swap) side by side; widths must be identical.
 3. **The detailed row is never derivable from the top row.** It is what the user would otherwise open the app to find (§6).
 4. **Nothing on the ticker is user-configurable.** No per-widget or global setting decides what is on the rail or how many. Horizons, floors and slot counts are constants (§8).
@@ -55,7 +54,7 @@ checklist) literally.
 | File | Exports you use | Purpose |
 |---|---|---|
 | `desktop/src/components/chips/chipColors.ts` | `getChipColors(mode, widget): ChipColors`, `chipShellClasses(colors, extra?)`, `chipBaseClasses(...)`, `stableNum(chars)`, `NUM_WIDTH` | Palettes and the shell. |
-| `desktop/src/components/chips/StatusChip.tsx` | `StatusChip({tab, text, reserve, comfort?, onClick?})` | The one chip an empty widget shows (§8.7). |
+| `desktop/src/components/chips/StatusChip.tsx` | `StatusChip({tab, text, reserve, onClick?})` | The one chip an empty widget shows (§8.7). |
 | `desktop/src/components/chips/ChipCap.tsx` | `ChipCap`, `cappedChipClasses`, `CapTone` | Status cap for uptime/GitHub. |
 | `desktop/src/components/chips/Sparkline.tsx` | `Sparkline({points, height?, className?})` | viewBox 100×30, `preserveAspectRatio="none"`, `flex-1`, `stroke="currentColor"`. Draws nothing below 2 points. |
 | `desktop/src/components/chips/metricHistory.ts` | `recordMetric(id, value, now?)`, `__resetMetricHistory()` | Ring buffer for sysmon, 32 points, 500ms tick guard. |
@@ -86,7 +85,6 @@ export interface TickerContext {
   tab: string;            // widget id, e.g. "sports_mlb"
   source: string;         // "sports" | "finance" | "rss" | "predictions" | "fantasy"
   dashboard: DashboardResponse | null;
-  comfort: boolean;
   chipColorMode: ChipColorMode;   // "widget" | "accent" | "muted"
   widgetDisplay?: WidgetDisplayPrefs;   // DO NOT read for ticker selection (§1.5)
   predictionsWatchlist: ReadonlySet<string>;
@@ -150,12 +148,11 @@ chip adds:
 ```
 grid max-w-[640px]
 grid-cols-[<tab> <cells…> <end>]        // literal string, see §3.2
-comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]"
+grid-rows-[30px_20px]
 ```
 
 Fixed-width chips (finance, predictions, fantasy, uptime, GitHub) still use
-`chipBaseClasses(comfort, colors, extra)` = the 264px flex box (`w-[264px]`, comfort
-`h-[52px]`). They need no reservations and rotate without a reserve. Rebuilding them onto
+`chipBaseClasses(colors, extra)` = the 264px flex box (`w-[264px]`, `h-[52px]`). They need no reservations and rotate without a reserve. Rebuilding them onto
 the grid is the open work (REL-184); when doing so, follow this spec.
 
 ### 3.2 Column templates (literal)
@@ -176,7 +173,7 @@ Rules:
 
 ### 3.3 Rows
 
-- Compact: `grid-rows-[28px]`. Detailed: `grid-rows-[30px_20px]`.
+- Always `grid-rows-[30px_20px]`.
 - Tab and fixed right cell: `row-span-full`.
 - Top-row cells: `row-start-1`. Detail-row cells: `row-start-2`.
 - Exception: a chip whose detail is a single two-line block (news) uses one
@@ -369,8 +366,7 @@ to find, and must not restate the top row.
 - The news fit decision is **measured** (`useFitsOneLine`) never counted.
 - When there is no summary and the title fit, show `${source_name} · ${feedCountToday}
   today` (feed volume over the last 24h from all rows the widget holds).
-- Sysmon must call `recordMetric` on every render including compact, so the buffer fills
-  before the user switches density.
+- Sysmon must call `recordMetric` on every render, so the buffer is always filling.
 
 ---
 
@@ -463,7 +459,7 @@ shrinks or jumps as a slate fills.
 | GitHub | `repos`, `excludedRepos` |
 
 **The user controls presentation** (`TickerPrefs`): `showTicker`, `tickerSpeed`,
-`onHover` (keep / slow / pause), `tickerMode` (compact / detailed),
+`onHover` (keep / slow / pause),
 `mixMode` (grouped / mixed), `chipColors` (widget / theme / subtle),
 `scrollMode` (continuous / page), `stepPause`, `tickerPosition`,
 `hideOnFullscreen`.
@@ -668,7 +664,7 @@ grid-cols-[max-content_minmax(0,max-content)]`, rows as §3.3. Tab as §3.5 with
 `subtle` palette's `divider`/`tabBg`/`text` in every colour mode, so it reads as the bar
 speaking, not as the widget's data. Text `font-mono text-[12px] font-medium leading-none`
 + `textDim`, `text-left`, `min-w-0 truncate`. No fixed right cell (nothing on it ticks) and
-no detail row content: detailed mode adds the empty 20px row, because anything there would
+no detail row content: the 20px row is there and empty, because anything in it would
 restate the top row (§1.3).
 
 **Reservation**: `reserve` is the widest text that widget's status can show (every template,
@@ -753,7 +749,7 @@ harness.
    (`docker exec scrollr-postgres psql … -c "SELECT max(length(col)) …"`). Record them.
 3. **Decide the grammar cells**: what is the tab, what are the content cells, what is the
    one changing value for the fixed right cell, what is the detail row (must satisfy §6).
-4. **Draw it on the canvas first** (Claude Design), compact first, with ≥ 4 real fixtures
+4. **Draw it on the canvas first** (Claude Design), with ≥ 4 real fixtures
    across every state, plus the worst cases from step 2, and ≥ 3 directions if the design
    is not already settled. Get a pick before writing code.
 5. **Write the reservation plan**: for each changing value, `ch` or sizer, sized from
@@ -764,9 +760,8 @@ harness.
 7. **Wire the source**: `selectXForTicker(rows, …)` with no prefs; `rotateSlots(pool,
    SLOTS_CONST, ctx.cycles ?? {}, \`x-${ctx.tab}\`, id, reserve)`; return `{key, node,
    rotateSlot}`; register in `tickerRegistry.ts` if new.
-8. **Memo compare** must include every prop that changes rendering (`comfort`,
-   `colorMode`, `accent`, `reserve*`, `onClick`, item identity and displayed fields).
-9. **Tests** (vitest, `@testing-library/react`): compact hides the detail row; detailed
+8. **Memo compare** must include every prop that changes rendering (`colorMode`, `accent`, `reserve*`, `onClick`, item identity and displayed fields).
+9. **Tests** (vitest, `@testing-library/react`): the detail row
    shows the specified content; reservations present (classList / style); flash keyed;
    selector ignores prefs; rotation arrangement (keys, residue classes, reserve equals
    what is rendered); horizon boundaries (`NOW` fixed, `ago(h)` helper).
@@ -780,7 +775,7 @@ harness.
 
 ## 13. Review checklist (answer every line before approving)
 
-- [ ] Top row identical in compact and detailed (position, size, content).
+- [ ] Two rows, 30px + 20px; no density branch anywhere in the chip.
 - [ ] Detail row is not derivable from the top row; matches §6 for its family.
 - [ ] Every changing value has a reservation; sizes cite real data.
 - [ ] Sometimes-empty elements are always mounted (`invisible`), never conditional.

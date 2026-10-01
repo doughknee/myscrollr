@@ -711,13 +711,11 @@ describe("migrateTicker (REL-204: presets + one hover row)", () => {
       tickerDirection: "right",
       pauseOnHover: true,
       hoverSpeed: 0.5,
-      tickerMode: "compact",
     });
     expect(out).not.toHaveProperty("tickerGap");
     expect(out).not.toHaveProperty("tickerDirection");
     expect(out).not.toHaveProperty("pauseOnHover");
     expect(out).not.toHaveProperty("hoverSpeed");
-    expect(out.tickerMode).toBe("compact");
   });
 
   it("runs on load, and Size snaps to the App-size presets too", () => {
@@ -825,13 +823,11 @@ describe("appearance.units migration (REL-205)", () => {
 describe("ticker values renamed to match their labels (REL-207)", () => {
   it("maps every old spelling forward", () => {
     const out = migrateTicker({
-      tickerMode: "comfort",
       mixMode: "weave",
       chipColors: "accent",
       scrollMode: "step",
     });
     expect(out).toMatchObject({
-      tickerMode: "detailed",
       mixMode: "mixed",
       chipColors: "theme",
       scrollMode: "page",
@@ -842,21 +838,30 @@ describe("ticker values renamed to match their labels (REL-207)", () => {
 
   it("keeps the new spellings and defaults anything unknown", () => {
     const out = migrateTicker({
-      tickerMode: "compact",
       mixMode: "grouped",
       chipColors: "subtle",
       scrollMode: "page",
     });
     expect(out).toMatchObject({
-      tickerMode: "compact",
       mixMode: "grouped",
       chipColors: "subtle",
       scrollMode: "page",
     });
-    expect(migrateTicker({ tickerMode: "huge", chipColors: 3 })).toMatchObject({
-      tickerMode: "detailed",
-      chipColors: "widget",
-    });
+    expect(migrateTicker({ chipColors: 3 })).toMatchObject({ chipColors: "widget" });
+  });
+
+  /**
+   * SCROLLR-278: the density choice is gone and the bar has one height
+   * (detailed). A stored value, whatever it was, is dropped on load, so
+   * a user who had picked Compact gets the detailed bar.
+   */
+  it("drops a stored tickerMode: compact, comfort, detailed or junk", () => {
+    for (const tickerMode of ["compact", "comfort", "detailed", "huge", 3]) {
+      expect(migrateTicker({ tickerMode, mixMode: "grouped" })).not.toHaveProperty("tickerMode");
+    }
+    expect(migrateTicker({ tickerMode: "compact", mixMode: "grouped" }).mixMode).toBe("grouped");
+    storeValues.set("scrollr:settings", { ticker: { tickerMode: "compact" } });
+    expect(loadPrefs().ticker).not.toHaveProperty("tickerMode");
   });
 
   it("sheds the ticker window's mirror keys on load", () => {

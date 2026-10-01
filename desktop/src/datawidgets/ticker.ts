@@ -50,7 +50,6 @@ export interface TickerContext {
   /** The resolved data source (sports, rss, …). */
   source: string;
   dashboard: DashboardResponse | null;
-  comfort: boolean;
   chipColorMode: ChipColorMode;
   widgetDisplay?: WidgetDisplayPrefs;
   /**

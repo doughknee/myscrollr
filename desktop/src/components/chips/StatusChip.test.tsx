@@ -16,14 +16,10 @@ describe("StatusChip", () => {
     expect(screen.getByText("off-season").closest("span.col-start-2")).not.toBeNull();
   });
 
-  it("is one row compact, and detailed only adds the empty 20px row", () => {
-    const { rerender } = render(<StatusChip {...props} />);
+  it("has the bar's two rows, the second empty", () => {
+    render(<StatusChip {...props} />);
     const chip = screen.getByTestId("status-chip");
-    expect(chip.classList.contains("grid-rows-[28px]")).toBe(true);
-    const compactCells = chip.children.length;
-    rerender(<StatusChip {...props} comfort />);
     expect(chip.classList.contains("grid-rows-[30px_20px]")).toBe(true);
-    expect(chip.children.length).toBe(compactCells);
     expect(chip.querySelector(".row-start-2")).toBeNull();
   });
 

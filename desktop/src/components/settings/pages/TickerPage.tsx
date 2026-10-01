@@ -27,7 +27,6 @@ import type {
   HoverBehavior,
   MixMode,
   ScrollMode,
-  TickerMode,
   TickerPosition,
   TickerPrefs,
   WindowPrefs,
@@ -49,11 +48,6 @@ const R = SETTINGS_ROWS.ticker;
 const POSITION_OPTIONS: { value: TickerPosition; label: string }[] = [
   { value: "top", label: "Top" },
   { value: "bottom", label: "Bottom" },
-];
-
-const DETAIL_LEVEL_OPTIONS: { value: TickerMode; label: string }[] = [
-  { value: "compact", label: "Compact" },
-  { value: "detailed", label: "Detailed" },
 ];
 
 const SIZE_OPTIONS = SCALE_PRESETS.map((v) => ({
@@ -149,15 +143,6 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
 
       <SettingsGroup label="Look">
         <RowList>
-          <Row id="detailLevel">
-            <SegmentedRow
-              label={R.detailLevel.label}
-              description={R.detailLevel.description}
-              value={ticker.tickerMode}
-              options={DETAIL_LEVEL_OPTIONS}
-              onChange={(v) => setTicker("tickerMode", v)}
-            />
-          </Row>
           <Row id="tickerScale">
             <SegmentedRow
               label={R.tickerScale.label}

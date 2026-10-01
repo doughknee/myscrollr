@@ -53,7 +53,6 @@ const GITHUB_CAP: Record<
 interface ShellProps {
   cap: { tone: CapTone; text: string; label: string; pulse?: boolean };
   type: "uptime" | "github";
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   dim?: boolean;
   alert?: boolean;
@@ -66,7 +65,6 @@ interface ShellProps {
 function CapShell({
   cap,
   type,
-  comfort,
   colorMode = "widget",
   dim,
   alert,
@@ -79,7 +77,7 @@ function CapShell({
     <button
       onClick={onClick}
       className={clsx(
-        chipBaseClasses(comfort, c, "font-mono whitespace-nowrap"),
+        chipBaseClasses(c, "font-mono whitespace-nowrap"),
         cappedChipClasses("relative"),
         // Alert borders are semantic, never the widget accent — a red
         // edge has to mean the same thing on every chip on the rail.
@@ -90,17 +88,11 @@ function CapShell({
       <ChipCap
         tone={cap.tone}
         pulse={cap.pulse}
-        comfort={comfort}
         label={cap.label}
       >
         {cap.text}
       </ChipCap>
-      <span
-        className={clsx(
-          "flex min-w-0 flex-1 flex-col justify-center px-3",
-          comfort ? "gap-0.5 py-1.5" : "py-1",
-        )}
-      >
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-1.5">
         {children}
       </span>
       {/* The one number that changes, in its own bound cell on the right
@@ -112,8 +104,7 @@ function CapShell({
           className={clsx(
             "flex shrink-0 select-none items-center justify-center self-stretch border-l px-2",
             c.divider,
-            "font-semibold tabular-nums",
-            comfort ? "text-[13px]" : "text-ui-chip",
+            "text-[13px] font-semibold tabular-nums",
           )}
         >
           {end}
@@ -171,12 +162,10 @@ function HeartbeatBar({
 
 export function UptimeCappedChip({
   item,
-  comfort,
   colorMode,
   onClick,
 }: {
   item: UptimeChipData;
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
 }) {
@@ -192,7 +181,6 @@ export function UptimeCappedChip({
     <CapShell
       cap={cap}
       type="uptime"
-      comfort={comfort}
       colorMode={colorMode}
       alert={down}
       onClick={onClick}
@@ -202,26 +190,24 @@ export function UptimeCappedChip({
     >
       {/* The monitor's name owns the flexible middle; the number sits in
           its own cell on the right, the way every other chip's clock
-          does. Compact is cap, name, number and nothing else. */}
+          does. */}
       <span className="flex min-w-0 items-center">
         <span className={clsx("min-w-0 truncate font-semibold", c.text)}>
           {item.label}
         </span>
       </span>
-      {comfort && (
-        // The whole detail row is the history, edge to edge. Uptime is
-        // the one widget whose past matters more than its present, and
-        // a percentage already sits on the row above.
-        <span className="flex items-center pt-1">
-          {item.heartbeats?.length ? (
-            <HeartbeatBar heartbeats={item.heartbeats} bleed />
-          ) : (
-            <span className={clsx("truncate text-ui-chip", c.textFaint)}>
-              {down ? item.detail : (item.responseAvg ?? item.detail)}
-            </span>
-          )}
-        </span>
-      )}
+      {/* The whole detail row is the history, edge to edge. Uptime is
+          the one widget whose past matters more than its present, and
+          a percentage already sits on the row above. */}
+      <span className="flex items-center pt-1">
+        {item.heartbeats?.length ? (
+          <HeartbeatBar heartbeats={item.heartbeats} bleed />
+        ) : (
+          <span className={clsx("truncate text-ui-chip", c.textFaint)}>
+            {down ? item.detail : (item.responseAvg ?? item.detail)}
+          </span>
+        )}
+      </span>
     </CapShell>
   );
 }
@@ -230,12 +216,10 @@ export function UptimeCappedChip({
 
 export function GitHubCappedChip({
   item,
-  comfort,
   colorMode,
   onClick,
 }: {
   item: GitHubChipData;
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
 }) {
@@ -257,7 +241,6 @@ export function GitHubCappedChip({
     <CapShell
       cap={cap}
       type="github"
-      comfort={comfort}
       colorMode={colorMode}
       alert={failed}
       dim={queued}
@@ -281,7 +264,7 @@ export function GitHubCappedChip({
           </span>
         )}
       </span>
-      {comfort && item.detail && (
+      {item.detail && (
         <span className={clsx("truncate text-ui-chip", c.textFaint)}>
           {item.detail}
         </span>

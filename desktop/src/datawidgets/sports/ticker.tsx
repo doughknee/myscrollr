@@ -68,7 +68,6 @@ export const sportsTickerSource: TickerSource = {
       node: (
         <GameChip
           game={game}
-          comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
           accent={accent}
           reserveNames={reserveNames}
@@ -94,7 +93,6 @@ export const sportsTickerSource: TickerSource = {
       node: (
         <GameChip
           game={game}
-          comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
           accent={catalogItemById(ctx.tab)?.hex}
           // The pinned team is fixed; the opponent is not. Reserving the
