@@ -58,6 +58,7 @@ import { isSingleChipWidget } from "../preferences";
 import type { SubscriptionTier } from "../auth";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 import { getMaxWidgets } from "../tierLimits";
+import { slotWidgetCount } from "../marketplace";
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -324,7 +325,7 @@ export default function Sidebar({
             adding is something you DO, not something you follow. */}
         <SlotChip
           collapsed={collapsed}
-          used={sources.length}
+          used={slotWidgetCount(sources.map((s) => s.id))}
           cap={slotCap}
           active={isMarketplace}
           onClick={onNavigateToMarketplace}

@@ -119,7 +119,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ 894098f984fb1be8 -->
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ d3bedf22c4d1c94d -->
 56 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
@@ -254,7 +254,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 5cac32ff6df1 -->
+<!-- source: docs/CHIP_DESIGN.md @ 6a1735fb8ad9 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -340,7 +340,7 @@ A fixed block at the right end of the bar that doesn't swipe away.
   two spots, not five. The spot is as wide as its widest item from the start, so the
   clock reading 12:00 and then 9:07 never shifts anything.
 - **Pins** sit after them (see "Pinning").
-- Clock and Weather don't use up one of your widget slots *(lands with SCROLLR-282)*.
+- Clock and Weather don't use up one of your widget slots.
 - The edge never takes more than 40% of the bar, so the pages always have room *(lands
   with SCROLLR-284)*.
 

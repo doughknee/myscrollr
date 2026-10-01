@@ -1,5 +1,5 @@
 {
-    "version": "894098f984fb1be8",
+    "version": "d3bedf22c4d1c94d",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -1431,6 +1431,7 @@
             "color": "#6366f1",
             "required_tier": "free",
             "order": 50,
+            "free_slot": true,
             "group": "Desk",
             "keywords": [
                 "time",
@@ -1463,6 +1464,7 @@
             "color": "#0ea5e9",
             "required_tier": "free",
             "order": 52,
+            "free_slot": true,
             "group": "Desk",
             "keywords": [
                 "forecast",

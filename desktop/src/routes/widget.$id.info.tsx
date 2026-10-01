@@ -28,6 +28,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import {
   catalogItemById,
   getCatalogItems,
+  slotWidgetCount,
   readableTextOn,
   CATEGORY_LABELS,
 } from "../marketplace";
@@ -119,17 +120,22 @@ function WidgetInfoPage() {
     !tierMeets(tier, item.requiredTier);
 
   // Enabled rows only — matches the server gate (WHERE enabled = true).
+  // Free-slot widgets (Clock, Weather) are not counted.
   const used =
     widgets.filter((ch) => ch.enabled).length +
-    prefs.widgets.enabledWidgets.length;
+    slotWidgetCount(prefs.widgets.enabledWidgets);
   const maxSlots = getMaxWidgets(tier);
-  const slotLocked = used >= maxSlots && !enabled && !tierLocked;
+  const free = item.freeSlot === true;
+  const slotLocked = !free && used >= maxSlots && !enabled && !tierLocked;
 
   const slotCounter = Number.isFinite(maxSlots)
     ? used === 0 && !enabled
       ? `0 of ${maxSlots} slots used — room for this one!`
       : `${used} of ${maxSlots} widget slots used`
     : `${used} widgets added · unlimited slots`;
+  const slotNote = free
+    ? `Free — ${item.name} never uses a slot. ${slotCounter}`
+    : slotCounter;
 
   // Shared flow (useRemoveWidget) — same behavior as the sidebar menu.
   const removeWidget = async () => {
@@ -282,7 +288,7 @@ function WidgetInfoPage() {
                 className="text-ui-meta font-medium opacity-75"
                 style={{ color: textOn }}
               >
-                {slotCounter}
+                {slotNote}
               </span>
             </div>
           </div>
@@ -331,7 +337,7 @@ function WidgetInfoPage() {
             {
               icon: Layers,
               label: "Slot cost",
-              value: "1 slot · unlimited items",
+              value: free ? "Free · no slot" : "1 slot · unlimited items",
             },
             {
               icon: Sparkles,
@@ -397,7 +403,7 @@ function WidgetInfoPage() {
           className="flex flex-col gap-3 rounded-xl border border-edge/35 bg-base-150/25 p-4"
         >
           <div className="flex items-center justify-between gap-3">
-            <p className="text-ui-meta text-fg-3">{slotCounter}</p>
+            <p className="text-ui-meta text-fg-3">{slotNote}</p>
             {enabled && (
               <button
                 onClick={() => void removeWidget()}
@@ -424,7 +430,7 @@ function WidgetInfoPage() {
           )}
           {enabled && (
             <p className="text-ui-meta leading-relaxed text-fg-4">
-              Removing frees the slot instantly — you can swap widgets any time.
+              {free ? "Remove it any time." : "Removing frees the slot instantly — you can swap widgets any time."}
             </p>
           )}
         </div>

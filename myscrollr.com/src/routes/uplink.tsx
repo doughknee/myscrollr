@@ -133,7 +133,7 @@ function UplinkPrerender() {
         eyebrowRight="LIVE UPDATES INCLUDED ON EVERY PLAN"
         line1="Plans for more"
         line2="widgets at once"
-        sub="Plans for more widgets at once, plus priority support and early access. The free app keeps three widgets running; paid plans raise that limit without changing update speed."
+        sub="Plans for more widgets at once, plus priority support and early access. The free app keeps three widgets running, and Clock and Weather are free on every plan; paid plans raise that limit without changing update speed."
         actions={
           <Link
             to="/download"

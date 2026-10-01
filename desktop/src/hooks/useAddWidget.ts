@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import type { CatalogItem } from "../marketplace";
+import { slotWidgetCount } from "../marketplace";
 import { dataWidgetsApi } from "../api/client";
 import type { DataWidgetRow, WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
@@ -98,7 +99,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         dataWidgetsApi
           // Report enabled utility-widget count so the server slot gate counts
           // every widget (utilities live only in local preferences).
-          .create(widgetType, item.addConfig ?? {}, prefs.widgets.enabledWidgets.length)
+          .create(widgetType, item.addConfig ?? {}, slotWidgetCount(prefs.widgets.enabledWidgets))
           .then((created) => {
             queryClient.setQueryData<DashboardResponse>(
               queryKeys.dashboard,

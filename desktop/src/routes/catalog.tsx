@@ -212,7 +212,8 @@ function CatalogPage() {
       return {
         added,
         tierLocked,
-        slotLocked: capped && !added && !tierLocked,
+        // Free-slot widgets (Clock, Weather) never hit the cap.
+        slotLocked: capped && !added && !tierLocked && !item.freeSlot,
       };
     },
     [addedIds, authenticated, tier, capped],

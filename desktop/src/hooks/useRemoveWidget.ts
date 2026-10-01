@@ -18,6 +18,7 @@ import { dataWidgetsApi } from "../api/client";
 import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { CatalogItem } from "../marketplace";
+import { slotWidgetCount } from "../marketplace";
 import { disableWidget } from "../preferences";
 import { ShellContext } from "../shell-context";
 import type { DashboardResponse } from "../types";
@@ -61,7 +62,7 @@ export function useRemoveWidget(
                   .create(
                     item.id,
                     row?.config ?? item.addConfig ?? {},
-                    prefs?.widgets.enabledWidgets.length,
+                    slotWidgetCount(prefs?.widgets.enabledWidgets ?? []),
                   )
                   .then(() => {
                     queryClient.invalidateQueries({
@@ -82,7 +83,9 @@ export function useRemoveWidget(
         undoable(
           {
             label: `Removed ${item.name}`,
-            description: "Its slot is free for another widget.",
+            description: item.freeSlot
+              ? undefined
+              : "Its slot is free for another widget.",
           },
           (current) => disableWidget(current, item.id),
         );

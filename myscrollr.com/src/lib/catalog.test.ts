@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { CATALOG_SNAPSHOT } from './catalog'
 
 describe('catalog snapshot', () => {
   it('contains every server catalog widget in server order', () => {
@@ -24,5 +25,19 @@ describe('catalog snapshot', () => {
       ([, id]) => id,
     )
     expect(marketingIds).toEqual(serverIds)
+  })
+
+  it('flags exactly the widgets the server marks FreeSlot', () => {
+    const server = readFileSync(
+      new URL('../../../api/internal/platform/widgets.go', import.meta.url),
+      'utf8',
+    )
+    const serverFree = [
+      ...server.matchAll(/\bID:\s*"([^"]+)"[^\n]*\n[^\n]*FreeSlot:\s*true/g),
+    ].map(([, id]) => id)
+    expect(serverFree).toEqual(['clock', 'weather'])
+    expect(
+      CATALOG_SNAPSHOT.filter((w) => w.free_slot).map((w) => w.id),
+    ).toEqual(serverFree)
   })
 })

@@ -188,6 +188,7 @@ export interface WidgetDef {
   usage?: string[];
   order: number;
   hidden?: boolean;
+  free_slot?: boolean;
   group?: string;
   keywords?: string[];
   added_at?: string;
