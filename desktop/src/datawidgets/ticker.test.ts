@@ -3,7 +3,20 @@
  * their own reservations; this covers the arithmetic with none.
  */
 import { describe, it, expect } from "vitest";
-import { rotateSlots, dropPinned, type RotationMemo, type TickerContext } from "./ticker";
+import { rotateSlots, dropPinned, barTime, statusDate, type RotationMemo, type TickerContext } from "./ticker";
+
+describe("the bar's one date and time format (SCROLLR-296)", () => {
+  const at = new Date(2026, 9, 17, 18, 30).getTime();
+
+  it("a time is compact: 6:30P, never 6:30 PM (a 24-hour locale keeps 18:30)", () => {
+    expect(barTime(at)).toMatch(/^(6:30P|18:30)$/);
+  });
+
+  it("a date is the weekday, month and day in capitals, then the time", () => {
+    expect(statusDate(at, false)).toMatch(/^[A-Z]{2,} [A-Z]{3,} 17$/);
+    expect(statusDate(at, true)).toBe(`${statusDate(at, false)} ${barTime(at)}`);
+  });
+});
 
 const ids = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i + 1}` }));
 const run = (n: number, slots: number, cycles: Record<string, number> = {}) =>

@@ -185,7 +185,7 @@ question you'd otherwise open the app for and never repeats the top.
 
 | Item | The top says | The second line adds |
 |---|---|---|
-| Game | who's playing, the score, the clock | before kick-off, where; after it, where each team sits in the table |
+| Game | who's playing, the score, the clock | where each team sits in the table (a chip also says where, before kick-off). A narrow page cell has no second line: it spends the room on bigger names and scores, with an @ on the home team |
 | Stock or coin | symbol, price, change | the day's range and a line |
 | Headline | the headline, how old it is | the summary, or which feed it's from |
 | Clock | the time in each zone | the date: Tokyo may already be tomorrow |
@@ -201,8 +201,9 @@ saying, the line stays empty rather than getting filler.
 
 - Everything wears its own colour: the league's, the feed's, the widget's. Dark brand
   colours are lightened a little so they show on the dark bar.
-- **Red means "live" or "something's wrong", and nothing else.** A close game gets a
-  brighter tint in its own colour; it doesn't turn red. A red monitor is down. A red timer
+- **Red means "live" or "something's wrong", and nothing else.** A close game is marked in
+  its own colour (a brighter tint on a chip, a line along its foot on a page); it doesn't
+  turn red. A red monitor is down. A red timer
   is in its last minute.
 - Dividers, tabs and text come from one shared palette. A cell never picks its own hue.
 - You pick a theme (ten palettes, light or dark). There is no separate

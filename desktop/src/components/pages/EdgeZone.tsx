@@ -292,8 +292,14 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
           <PinCell p={p} onChipClick={onChipClick} />
-          {/* The line on top marks it as yours (canvas "Pins"). */}
-          <span aria-hidden data-part="pinned" className="pointer-events-none absolute left-0 right-0 top-0 h-[2px]" style={{ background: "var(--accent)" }} />
+          {/* The dashed line on top marks it as pinned (canvas "Pins"); dashed, so it is not
+              read as the solid line a page draws over your team's game (SCROLLR-296). */}
+          <span
+            aria-hidden
+            data-part="pinned"
+            className="pointer-events-none absolute left-0 right-0 top-0 h-[2px]"
+            style={{ backgroundImage: "repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 10px)" }}
+          />
         </div>
       ))}
     </div>

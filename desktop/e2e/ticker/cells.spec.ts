@@ -15,10 +15,10 @@ import { test, expect, type Page } from "@playwright/test";
 
 /** [part, which edges must hold]. Names may change weight, so only their anchored edge counts. */
 const PARTS: Record<string, [string, "box" | "left" | "right"][]> = {
-  "game-stacked": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["mine", "box"], ["away-name", "left"], ["home-name", "left"]],
+  "game-stacked": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["mine", "box"], ["close", "box"], ["away-name", "left"], ["home-name", "left"]],
   "game-wide": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "right"], ["home-name", "left"]],
-  quote: [["change", "box"], ["price", "box"], ["range", "box"], ["range-low", "box"], ["range-rail", "box"], ["range-high", "box"]],
-  news: [["age", "box"], ["headline", "box"]],
+  quote: [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-low", "box"], ["range-rail", "box"], ["range-high", "box"]],
+  news: [["age", "box"], ["headline", "box"], ["summary", "left"]],
 };
 
 async function edges(page: Page, strip: string) {

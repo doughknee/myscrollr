@@ -123,7 +123,7 @@ describe("finance: popular symbols fill a short watchlist", () => {
   it("a watchlist as long as a page takes no fill, and neither does one longer than it", () => {
     const syms = ["GOOGL", "AAPL", "MSFT", "NVDA", "AMZN", "TSLA", "META", "SPY", "QQQ", "AVGO", "NFLX", "AMD"];
     const plan = planAll(buildPageWidgets(asDash(withWatchlist(syms)), ["finance_stocks"], now, [], quotes), 1920).get("finance_stocks")!;
-    expect(plan.cols).toBe(10);
+    expect(plan.cols).toBe(8);
     expect(plan.pages.flat().every((i) => !i.fill)).toBe(true);
     expect(plan.pages.map((p) => p.length)).toEqual([6, 6]);
   });

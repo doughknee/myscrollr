@@ -185,7 +185,7 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
     }
     case "finance": {
       const t = item.data as Trade;
-      return <QuoteCell trade={t} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
+      return <QuoteCell trade={t} fill={item.fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
     }
     case "also": {
       const a = item.data as AlsoItem;

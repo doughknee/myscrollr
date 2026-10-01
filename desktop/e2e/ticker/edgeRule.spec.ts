@@ -43,7 +43,7 @@ test("1280: a game pin beside clocks and weather leaves every family its columns
   await expect.poll(async () => (await measure(page)).pins).toBe(1);
   const m = await measure(page);
   expect(m.edge).toBeLessThanOrEqual(Math.floor(m.bar * 0.4));
-  // Pro games (212) and quotes (172) keep 2 or more columns.
+  // Pro games and quotes (212 each) keep 2 or more columns.
   expect(Math.floor((m.bar - 112 - m.edge) / 212)).toBeGreaterThanOrEqual(2);
 });
 

@@ -127,7 +127,7 @@ const GAME_STATES: [string, Game][] = [
 const aapl = stocks[0];
 const QUOTE_STATES: [string, Trade][] = [
   ["small", { ...aapl, price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }],
-  ["large", { ...aapl, price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 61260.55 }],
+  ["large", { ...aapl, price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 9260.55 }],
   ["no-range", { ...aapl, price: 253.69, percentage_change: 0, day_low: 0, day_high: 0 }],
 ];
 const NEWS_STATES: [string, RssItem][] = [
@@ -161,7 +161,7 @@ const GAME_BOARD: [string, Game, boolean][] = [
   ["pre · today", byName("Minnesota Vikings"), false],
   ["pre · later day", byName("New Orleans Saints"), false],
   ["live", notClose!, false],
-  ["live · close (tint)", close!, false],
+  ["live · close (marked)", close!, false],
   ["live · yours", data.sports.find(isMine)!, true],
   ["final · longest nickname", byName("Washington Commanders"), false],
   ["postponed", { ...byName("Las Vegas Raiders"), state: "postponed", status_short: "PST" }, false],
@@ -215,7 +215,10 @@ const col = (viewport: number, minCol: number) => contentWidth(viewport) / colum
 function States() {
   const games = (w: number): [string, ReactNode][] => GAME_BOARD.map(([s, g, m]) => [s, <GameCell key={s} game={g} width={w} mine={m} now={NOW} />]);
   const news = (w: number, line?: boolean): [string, ReactNode][] => NEWS_BOARD.map(([s, r]) => [s, <NewsCell key={s} item={r} width={w} line={line} now={NOW} />]);
-  const quotes = QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} />]);
+  const quotes = [
+    ...QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} />]),
+    ["popular fill", <QuoteCell key="fill" trade={fin("NVDA")} fill />] as [string, ReactNode],
+  ];
   return (
     <>
       <div className="px-4 pt-6 font-mono text-[10px] tracking-[0.06em] text-fg-4">EVERY STATE AT THE BAR&apos;S REAL COLUMN WIDTHS (SCROLLR-295)</div>
@@ -262,9 +265,9 @@ function Gallery() {
       </Bar>
 
       <div className="px-1 pt-3 font-mono text-[10px] tracking-[0.06em] text-fg-4">ONE ITEM IN EVERY STATE · SAME COLUMN WIDTH · NOTHING MAY MOVE</div>
-      <Strip name="game-stacked" width={240}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={240} mine now={NOW} />])}</Strip>
+      <Strip name="game-stacked" width={gameMinCol("NFL")}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
-      <Strip name="quote" width={200}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
       <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}

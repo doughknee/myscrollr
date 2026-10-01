@@ -1,12 +1,12 @@
 /**
- * The game cell: nickname when narrow, records beneath, clock on the right,
- * and every part that holds a changing value reserves its width in every
+ * The game cell: nickname when narrow, the "@" on the home team, no stadium,
+ * the clock tied to its own scores, and every part that holds a changing value reserves its width in every
  * state (pre / live one-digit / live two-digit / final). Real layout is
  * measured by e2e/ticker/cells.spec.ts; here the reservations themselves.
  */
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import GameCell, { cellName, gameMinCol, statusLines, STATUS_WIDTH } from "./GameCell";
+import GameCell, { cellName, gameMinCol, nameFits, nameRoom, statusLines, STATUS_WIDE, STATUS_WIDTH } from "./GameCell";
 import type { Game, TeamStanding } from "../../../types";
 
 const NOW = Date.parse("2026-10-04T18:40:00Z");
@@ -76,27 +76,70 @@ describe("statusLines", () => {
     const [day] = statusLines(game({ state: "pre", start_time: new Date(NOW + 3 * 86_400_000).toISOString() }), NOW);
     expect(day).toMatch(/^[A-Z]{2,}/);
   });
+
+  it("ten hours or more out says TODAY, so the box holds seven characters", () => {
+    const at = (h: number) => statusLines(game({ state: "pre", start_time: new Date(NOW + h * 3_600_000).toISOString() }), NOW);
+    const sameDay = (h: number) => new Date(NOW + h * 3_600_000).toDateString() === new Date(NOW).toDateString();
+    for (const h of [0.5, 3, 9.9]) if (sameDay(h)) expect(at(h)[1].length).toBeLessThanOrEqual(7);
+    if (sameDay(10.5)) expect(at(10.5)[1]).toBe("TODAY");
+  });
 });
 
 describe("GameCell", () => {
-  it("narrow: nicknames, both scores, the table line beneath", () => {
-    const { getByText } = render(<GameCell game={game()} width={240} now={NOW} />);
-    expect(getByText("Jets")).toBeTruthy();
-    expect(getByText("Bears")).toBeTruthy();
+  it("narrow: nicknames and both scores; the home team carries the @; no stadium, no table line", () => {
+    const { getAllByText, getByText, getByLabelText, container } = render(<GameCell game={game()} width={240} now={NOW} />);
+    expect(getAllByText("Jets")[0]).toBeTruthy();
+    expect(getAllByText("Bears")[0]).toBeTruthy();
     expect(getByText("24")).toBeTruthy();
-    expect(getByText(/1-2\s+·\s+2-1/)).toBeTruthy();
+    expect(getByLabelText("at").textContent).toBe("@");
+    expect(container.textContent).not.toMatch(/1-2/);
+    expect(container.textContent).not.toMatch(/Soldier Field/);
   });
 
-  it("before kick-off: no score digits, the venue beneath", () => {
-    const { container, getByText } = render(<GameCell game={STATES[0][1]} width={240} now={NOW} />);
+  it("before kick-off: no score digits and no venue", () => {
+    const { container } = render(<GameCell game={STATES[0][1]} width={240} now={NOW} />);
     expect(container.querySelector('[data-part="away-score"]')!.textContent).toBe("");
-    expect(getByText("Soldier Field")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Soldier Field/);
   });
 
-  it("wide: one scoreboard line with full short names", () => {
-    const { getByText } = render(<GameCell game={game()} width={460} now={NOW} />);
-    expect(getByText("New York Jets")).toBeTruthy();
-    expect(getByText("Chicago Bears")).toBeTruthy();
+  it("wide: one scoreboard line, records under the names, the clock between the scores", () => {
+    const { getAllByText, getByText, container } = render(<GameCell game={game()} width={460} now={NOW} />);
+    expect(getAllByText("Jets")[0]).toBeTruthy();
+    expect(getByText("1-2")).toBeTruthy();
+    const order = [...container.querySelectorAll("[data-part]")].map((el) => el.getAttribute("data-part")).filter((p) => /score|status/.test(p!));
+    expect(order).toEqual(["away-score", "status", "home-score"]);
+  });
+
+  it("a result reads as clearly as a fixture: the winner in fg, only the loser steps down", () => {
+    const { container } = render(<GameCell game={STATES[3][1]} width={240} now={NOW} />);
+    const cls = (p: string) => container.querySelector(`[data-part="${p}"]`)!.firstElementChild!.className;
+    expect(cls("away-name")).toMatch(/text-fg(\s|$)/);
+    expect(container.querySelector(`[data-part="away-score"]`)!.className).toMatch(/text-fg(\s|$)/);
+    expect(cls("home-name")).toContain("text-fg-3");
+  });
+
+  it("a close game is marked on itself (a line at its foot), never by tinting the cell", () => {
+    const g = game({ status_short: "Q4", timer: "1:10", away_team_score: 24, home_team_score: 21 });
+    const { container } = render(<GameCell game={g} width={240} now={NOW} />);
+    const button = container.querySelector("button")!;
+    expect(button.hasAttribute("data-close")).toBe(true);
+    expect(button.style.background).toBe("");
+    expect((container.querySelector('[data-part="close"]') as HTMLElement).style.background).toBe("var(--accent)");
+    const quiet = render(<GameCell game={STATES[3][1]} width={240} now={NOW} />).container;
+    expect((quiet.querySelector('[data-part="close"]') as HTMLElement).style.background).toBe("transparent");
+  });
+
+  it("a full short name only where it sets whole, else the nickname", () => {
+    expect(nameFits("New York Jets", nameRoom(212, 2), 14.5)).toBe(false);
+    expect(nameFits("New York Jets", nameRoom(340, 2), 14.5)).toBe(true);
+    expect(nameFits("New York Jets", nameRoom(460, 2), 15)).toBe(false);
+    expect(nameFits("New York Jets", nameRoom(560, 2), 15)).toBe(true);
+  });
+
+  it("wide and roomy: full short names", () => {
+    const { getAllByText } = render(<GameCell game={game()} width={560} now={NOW} />);
+    expect(getAllByText("New York Jets")[0]).toBeTruthy();
+    expect(getAllByText("Chicago Bears")[0]).toBeTruthy();
   });
 
   it("the live dot is always mounted, invisible unless live", () => {
@@ -118,7 +161,7 @@ describe("GameCell", () => {
     const byPart = Object.fromEntries(skeletons[0].map((p) => [p.part, p]));
     expect(byPart["away-score"].minWidth).toBe("2ch");
     expect(byPart["home-score"].minWidth).toBe("2ch");
-    expect(byPart.status.width).toBe(STATUS_WIDTH);
+    expect(byPart.status.width).toBe(width >= 430 ? STATUS_WIDE : STATUS_WIDTH);
   });
 
   it("a league that reaches 100 reserves three characters", () => {

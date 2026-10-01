@@ -155,12 +155,18 @@ cell family's own export**, never a default in `pagePlan.ts`:
 |---|---|---|
 | Game, US pro (NFL MLB NBA NHL MLS WNBA) | 212px | `gameMinCol(league)` |
 | Game, every other league | 244px | `gameMinCol(league)` |
-| Quote (stock, coin) | 172px | `QUOTE_MIN_COL` |
+| Quote (stock, coin) | 212px | `QUOTE_MIN_COL` |
 | Headline | 400px | `NEWS_MIN_COL` |
 | Also entry | 300px | `ALSO_MIN_COL` |
 
-Worked columns, no edge: at 1280 the content is 1168px: 5 NFL, 4 college, 6 quotes, 2
-headlines. At 1920 it is 1808px: 8, 7, 10, 4. An edge of 400px takes 400px off the content.
+Worked columns, no edge: at 1280 the content is 1168px: 5 NFL, 4 college, 5 quotes, 2
+headlines. At 1920 it is 1808px: 8, 7, 8, 4. With the Clock on the edge (102px): 5, 4, 5, 2
+and 8, 6, 8, 4. An edge of 400px takes 400px off the content. SCROLLR-296 took the quote
+column from 172 to 212 for the continuous chip's one-line top row (it was 6 and 10 quotes
+without an edge, 6 and 9 with the Clock); the game columns kept their width and paid for
+bigger type with tighter gutters, because a column fewer at 1920 split TNF + Sunday's 16
+games into uneven pages (6/5/5, not full) and, before SCROLLR-294's shorter visits, put the
+busiest lap (`pages` fixture) at 64.6 s, over the 60 s rule (§P.15).
 
 `paginate(items, cols)` makes the **fewest pages of at most `cols`**, evenly: sizes differ by
 at most one, larger pages first, so there is never a lonely last page (14 at 12 columns is
@@ -234,7 +240,7 @@ a short watchlist still needs topping up:
 - Sports order within a widget: **your games first, then every other live game, each in
   kick-off order**, then the rest in the ticker's own order (`sortForDisplay`). There is no
   per-score ranking on purpose: closeness changes with every score and would reshuffle a
-  page. A close game is shown as a tint instead (§P.9).
+  page. A close game is marked on its cell instead (§P.9).
 - Finance: the watchlist, in the user's order, is tier 1, not tier 0 on purpose: a long
   watchlist takes turns like any other widget instead of putting all its pages on every
   visit.
@@ -315,27 +321,41 @@ data-chip data-item>`, `text-left`. The widget's colour reaches a cell only thro
 
 | Cell | Grammar | Layout choice |
 |---|---|---|
-| **GameCell** | Stacked: two rows of crest, name and score, then a detail line (venue before kick-off; both records after). Wide: one scoreboard line, names and records either side of the scores. Clock box on the right behind a hairline: live `Q4` over `2:14` (baseball `7th` over `INN`), `FINAL`, `PPD`, today's kick-off over `in 3h05`, a later day's weekday over its time | Wide from a column of 430px (`WIDE_GAME_PX`); a name is the full short name from 340px (`ROOMY_GAME_PX`), else the nickname in US pro leagues (`cellName`) |
-| **NewsCell** | A 26px age column (`9m`, `4h`, `3d`), then the headline (2 lines, `font-sans font-semibold`) and one line beneath: the summary, or the feed's name when there is none | Headline 15px from 560px (`BIG_HEADLINE_PX`), else 13px |
-| **QuoteCell** | Symbol over price on the left; change over a sparkline on the right; the day's range along the bottom (low, rail with a dot, high) | One layout |
-| **AlsoCell** | A code tag in the widget's colour, then the status text on one truncating line | One layout (§P.12) |
+| **GameCell** | Stacked: away over home, each row crest, name (14.5px) and score (18px); the home row carries an `@`, hung in the gutter before its crest (away at home). No stadium and no third line (SCROLLR-296: "it adds nothing"; the type is bigger instead). The clock box sits **left-aligned right after the scores, with no rule**, and its gutters (16px left, holding the `@`; 12px right) put the page's column rule between one game and the next, so a clock is never read as the next game's. Wide: one scoreboard line centred on its content, names (15px) and records either side, the scores (22px) with the clock box **between them** (centred), the `@` before the home crest. The clock: live `Q4` over `2:14` (baseball `7th` over `INN`), `FINAL`, `PPD`, today's kick-off over `in 3h05` (ten hours or more out: `TODAY`), a later day's weekday over its time | Wide from a column of 430px (`WIDE_GAME_PX`). A name is the full short name when it sets whole in the room the layout leaves it (`nameRoom`, `nameFits`: measured off-screen on a canvas at the bold weight before paint, never after), else the nickname in US pro leagues (`cellName`) |
+| **NewsCell** | A fixed grid, top-anchored: the headline (15px at every width, up to 2 lines, `font-sans font-semibold`) always starts on the first line, and the meta line (12px) sits at the same y under a one-line and a two-line headline: the age (`9m`, `4h`, `3d`, mono in a 3ch box, `AGE_CH`) then the summary, or the feed's name when there is none. The headline has the column's whole width (the old 26px age column and its gap cost 36px). Real news columns are 426 to 584px, so the old 560px switch to 15px almost never fired | One layout |
+| **QuoteCell** | To the standard of the continuous `TradeChip` (SCROLLR-296). Top row: the symbol (13px, `fg-2`; a popular fill prefixes it with a `fg-3` `+`, as the label says `+4 POPULAR`), then the price (15px bold) and the change (12px) at the right: `up`/`down` with its arrow, flat `0.00%` in `fg-3` with none. Under it the day's line across the whole cell (`data-part="spark"`), so it grows with the column, and the day's range (12px) tight under that: low, a 3px track filled up to the price in the direction's colour with a 2px marker, high, the ends at the cell's edges | One layout |
+| **AlsoCell** | A code tag (12px) in the widget's colour, then the status text (13px) on one truncating line | One layout (§P.12) |
+
+**Type on a cell** (SCROLLR-296): nothing under 12px, and at most three sizes per cell
+(game: names, scores, everything else at 12px; news: headline 15, meta 12; quote: price 15,
+symbol 13, the rest 12).
+
+**Times and dates** are the bar's one format family (`barTime`, `statusDate` in
+`datawidgets/ticker.ts`): a time is `6:30P` (a 24-hour locale keeps `18:30`); a day is the
+weekday in capitals (`FRI`), a date adds the month and day (`SAT OCT 17`). Game cells, the
+Also page and the Continuous status chip all print through them.
 
 Reservations (the Pages form of §4, enforced by `cells.spec.ts`):
 
-- Game scores hold `max(2, reservationFor(league).score)` `ch`, even before kick-off, in `font-mono tabular-nums`. The clock box is a **fixed** `STATUS_WIDTH = calc(8ch + 16px)`: a `min-width` that included its padding grew for "12:00P" and moved every name left of it. The live dot is always mounted and `invisible` when not live. Names sit in `minmax(0,1fr)` tracks and truncate rather than push.
-- Quotes: the price holds `PRICE_CH = 9` and the change `CHANGE_CH = 8`, and **both ends of the range** hold `PRICE_CH`; the sparkline is the chips' own `pushPrice` history, which needs two points and draws nothing below that. A missing range or change renders empty, never a dash (invariant 7).
-- News: the age is a fixed column so `9m` turning `1h` never moves the headline.
+- Game scores hold `max(2, reservationFor(league).score)` `ch`, even before kick-off, in `font-mono tabular-nums`. The clock box is a **fixed** `STATUS_WIDTH = calc(7ch + 9px)` at 12px (the 9px holds the live dot; `STATUS_WIDE = calc(7ch + 18px)` between the scores of a wide cell): a `min-width` that included its padding grew for "12:00P" and moved every name left of it. The live dot and both marks (`mine`, `close`) are always mounted and invisible or transparent when off. Names sit in `minmax(0,1fr)` (stacked) or `minmax(0,max-content)` (wide) tracks and truncate rather than push.
+- Quotes: the price holds `priceCh(symbol)`, 8 for a stock (`STOCK_PRICE_CH`, "9,999.99") and 9 for a coin (`PRICE_CH`, "79,850.21"), the change `CHANGE_CH = 8`, and **both ends of the range** hold the price's reservation; the sparkline is the chips' own `pushPrice` history, which needs two points and draws nothing below that. A missing range or change renders empty, never a dash (invariant 7).
+- News: the age is a fixed `AGE_CH = 3` box at the head of the meta line, so `9m` turning `1h` never moves the summary; the rows are fixed (`38px` for the headline, `15px` for the meta), so a one-line headline never drops lower.
 - A `Crest` always holds its box (16px, 22px at `lg`), so a missing logo does not pull the name sideways.
 
-Tints: your team's game carries a 2px accent line at the top (`data-part="mine"`, always
-mounted and transparent when not yours); a close live game tints 10% in the accent; a final
-draws its leader in `text-fg-2` instead of `text-fg` (never an opacity: it cost every text
-contrast, SCROLLR-287); a score change flashes `--color-live` at 18%, keyed on the game id
+Marks: your team's game carries a solid 2px accent line at the top (`data-part="mine"`); a
+close live game is marked **on itself** by a 2px accent line along its foot
+(`data-part="close"`, `data-close` on the cell), never by tinting the cell (SCROLLR-296: with
+four of five games close, a 10% tint made the fifth look highlighted on light themes and
+striped the bar on dark); a pin on the edge carries a **dashed** top line, so it is not read
+as your team. A result reads as clearly as a fixture: the winner in `text-fg` bold, only the
+loser steps down to `text-fg-3` (never an opacity: it cost every text contrast,
+SCROLLR-287). A score change flashes `--color-live` at 18%, keyed on the game id
 (`useScoreFlash`). Red is the live dot and the live clock only (invariant 6).
 
-Greys on a cell: `fg` for what leads, `fg-2` for a quieter lead, `fg-3` for everything
-secondary (the trailing team, records, venue, `FINAL`, range ends, ages, summaries).
-**`fg-4` never carries text on the bar**: it is under 4.5:1 in every palette (§P.13).
+Greys on a cell: `fg` for what leads, `fg-2` for a quieter lead (a symbol, a pre-game
+clock), `fg-3` for everything secondary (the trailing team, records, the `@`, `FINAL`, range
+ends, ages, summaries, a flat change). **`fg-4` never carries text on the bar**: it is under
+4.5:1 in every palette (§P.13).
 
 Reused helpers, unchanged from the chips: `teamShortName` (§5.4), `plainText` and
 `sourceTab` (§5.5), `reservationFor` (§4.3), `liftForTint` (§7.2), `recordText`, `ordinal`,
@@ -378,7 +398,8 @@ widget count.
 
 A pin is a **subject** (§8.5), not a widget. Under Pages it lives on the edge, after the
 utilities, as one **cell at its family's minimum column** (`gameMinCol`, `QUOTE_MIN_COL`,
-`NEWS_MIN_COL`), marked by a 2px accent line on top.
+`NEWS_MIN_COL`), marked by a dashed 2px accent line on top (dashed so it is not your team's
+solid line, SCROLLR-296).
 
 1. **Resolved with no horizon.** The pin is the selection (§8.5 rule 2): a team shows its
    live game, else its next fixture, else its last result (`gamesForTeam`); a symbol its
@@ -394,7 +415,7 @@ utilities, as one **cell at its family's minimum column** (`gameMinCol`, `QUOTE_
    takes more than 40% of the bar width** (utilities + pins + its 1px border), measured on
    the narrowest ticker window. Every pages bar publishes `{bar, util}` (`lib/edgeMeasure.ts`)
    so the main window and every ticker agree. A pin's width is its family's edge column
-   (`pinWidth`): a game `gameMinCol`, a quote 172, a headline 260. A pin that would pass 40%
+   (`pinWidth`): a game `gameMinCol`, a quote `QUOTE_MIN_COL` (212), a headline 260. A pin that would pass 40%
    is refused with a one-line message naming what fills the edge ("No room on the edge at
    this screen size — unpin Chicago Bears first"), from every entry point: the ticker's
    right-click item, a widget page's pin button, the sidebar row. When a screen shrinks and
@@ -433,7 +454,7 @@ status chip (§8.7); each cell says what the status chip would, in the same word
   light; `--color-fg-3` when there is none. Green, red and amber stay semantic and are never
   the accent.
 - Every tint is `mix(pct)` = `color-mix(in srgb, var(--accent) pct%, transparent)`: label
-  16/12, label border 40, Also code tag 16/12, close game 10, `mine` line 100.
+  16/12, label border 40, Also code tag 16/12, `mine` and `close` lines 100 (the close-game tint is gone, SCROLLR-296).
 - **Anything that must be read in the widget's colour uses the ink**, `--accent-ink` =
   `inkFor(hex, dark)` (`readableInk` in `utils/chipAccent.ts`), set beside `--accent` by
   `accentStyle(accent, ink)`: the same hue and saturation, HSL lightness moved only until
@@ -1157,7 +1178,7 @@ exactly as it did before the model changed.
    its border) never takes more than **40% of the bar**, measured on the narrowest ticker
    window (every pages bar publishes `{bar, util}` through `lib/edgeMeasure.ts`, so the
    main window and every ticker agree). A pin's width is its family's edge column: a game
-   `gameMinCol`, a quote 172, a headline the narrow one-line **260** (`NEWS_PIN_W`, ellipsis,
+   `gameMinCol`, a quote `QUOTE_MIN_COL` (212), a headline the narrow one-line **260** (`NEWS_PIN_W`, ellipsis,
    the feed's name beneath). A pin that would pass the budget is refused with one line
    naming what fills the edge ("No room on the edge at this screen size — unpin Chicago
    Bears first"); `togglePin` returns the same `prefs` reference and every pin entry point

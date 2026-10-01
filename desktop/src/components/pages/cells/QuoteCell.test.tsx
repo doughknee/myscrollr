@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import QuoteCell, { changeText, CHANGE_CH, PRICE_CH } from "./QuoteCell";
+import QuoteCell, { changeText, priceCh, CHANGE_CH, PRICE_CH, STOCK_PRICE_CH } from "./QuoteCell";
 import type { Trade } from "../../../types";
 
 function trade(over: Partial<Trade> = {}): Trade {
@@ -15,7 +15,8 @@ describe("changeText", () => {
   it("arrow, absolute value, two decimals", () => {
     expect(changeText(-0.8869)).toBe("▼ 0.89%");
     expect(changeText("12.4")).toBe("▲ 12.40%");
-    expect(changeText(0)).toBe("▲ 0.00%");
+    expect(changeText(0)).toBe("0.00%");
+    expect(changeText(-0.001)).toBe("0.00%");
   });
 
   it("an unknown change is blank, never invented", () => {
@@ -31,6 +32,25 @@ describe("QuoteCell", () => {
     expect(getByText("BTC")).toBeTruthy();
     expect(getByText("79,850.21")).toBeTruthy();
     expect(container.querySelector('[data-part="change"]')!.classList.contains("text-down")).toBe(true);
+  });
+
+  it("the day's line spans the cell, in its own row under symbol, price and change", () => {
+    const { container } = render(<QuoteCell trade={trade()} />);
+    const spark = container.querySelector('[data-part="spark"]')!;
+    expect(spark.querySelector("svg")).toBeTruthy();
+    expect(spark.parentElement).toBe(container.querySelector("button"));
+  });
+
+  it("flat is neutral: no arrow, no up colour", () => {
+    const { container } = render(<QuoteCell trade={trade({ percentage_change: 0 })} />);
+    const c = container.querySelector('[data-part="change"]')!;
+    expect(c.textContent).toBe("0.00%");
+    expect(c.classList.contains("text-fg-3")).toBe(true);
+  });
+
+  it("a popular fill carries a + before its symbol; the user's own does not", () => {
+    expect(render(<QuoteCell trade={trade()} fill />).container.querySelector('[aria-label="popular"]')!.textContent).toBe("+");
+    expect(render(<QuoteCell trade={trade()} />).container.querySelector('[aria-label="popular"]')).toBeNull();
   });
 
   it("the day's range: low and high, and where the price sits", () => {
@@ -53,11 +73,14 @@ describe("QuoteCell", () => {
       return [el("change"), el("price"), el("range-low"), el("range-high")];
     };
     const small = parts(trade({ price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }));
-    const large = parts(trade({ price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 61260.55 }));
+    const large = parts(trade({ price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 9260.55 }));
     const none = parts(trade({ day_low: 0, day_high: 0 }));
     expect(large).toEqual(small);
     expect(none).toEqual(small);
-    expect(small).toEqual([`${CHANGE_CH}ch`, `${PRICE_CH}ch`, `${PRICE_CH}ch`, `${PRICE_CH}ch`]);
+    // A stock holds eight characters ("9,999.99"), a coin nine ("79,850.21").
+    expect(small).toEqual([`${CHANGE_CH}ch`, `${STOCK_PRICE_CH}ch`, `${STOCK_PRICE_CH}ch`, `${STOCK_PRICE_CH}ch`]);
+    expect(parts(trade({ symbol: "BTC/USD", price: 79850.21, day_low: 79002.24, day_high: 81263.52 }))[1]).toBe(`${PRICE_CH}ch`);
+    expect(priceCh("BTC/USD")).toBe(9);
     // The widest change fits its reservation.
     expect(changeText(-12.4).length).toBeLessThanOrEqual(CHANGE_CH);
   });
