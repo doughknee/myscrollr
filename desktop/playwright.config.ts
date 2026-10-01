@@ -13,8 +13,20 @@ const ci = !!process.env.CI;
 // reused (`reuseExistingServer`) and serve ITS fixtures, not this checkout's.
 const port = Number(process.env.SHIM_PORT) || 5180;
 
+/**
+ * CI runs the suite as three parallel jobs (SCROLLR-289): the real-time
+ * continuous-bar laps (coverage; width + rule6) are the long poles, so each
+ * gets a job and `rest` is everything else BY COMPLEMENT, so a new spec file
+ * can never fall between the slices. Unset runs it all (the local default).
+ */
+const SLICES: Record<string, RegExp> = { coverage: /coverage\.spec/, rail: /(width|rule6)\.spec/ };
+const slice = process.env.SPEC_SLICE;
+if (slice && slice !== "rest" && !SLICES[slice]) throw new Error(`SPEC_SLICE=${slice}: expected ${Object.keys(SLICES).join(", ")} or rest`);
+
 export default defineConfig({
   testDir: "e2e",
+  testMatch: slice && slice !== "rest" ? SLICES[slice] : undefined,
+  testIgnore: slice === "rest" ? Object.values(SLICES) : undefined,
   fullyParallel: false,
   workers: 1,
   reporter: ci ? [["list"], ["html", { open: "never" }]] : "list",
