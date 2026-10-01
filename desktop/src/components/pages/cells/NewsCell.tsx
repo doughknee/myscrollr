@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import type { RssItem } from "../../../types";
 import { plainText } from "../../../utils/rssText";
 
-/** Narrowest column a headline takes (pagePlan's default; two lines of a real headline). */
+/** Narrowest column a headline takes (two lines of a real headline), for pagePlan's `columnsFor`. */
 export const NEWS_MIN_COL = 400;
 
 /** A column at least this wide sets the headline larger instead of leaving it short. */

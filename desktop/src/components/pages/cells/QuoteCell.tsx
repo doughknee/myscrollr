@@ -14,8 +14,8 @@ export const CHANGE_CH = 8;
 /**
  * Narrowest column a quote cell takes, for pagePlan's `columnsFor`. Padding
  * 28 + a 9ch price at 15px (81) + gap 8 + an 8ch change at 11.5px (55) =
- * 172, so "79,850.21" fits whole. pagePlan's default of 158 cuts a
- * five-digit price.
+ * 172, so "79,850.21" fits whole. The page engine passes it to every
+ * finance page; nothing else holds a quote width.
  */
 export const QUOTE_MIN_COL = 172;
 
@@ -36,8 +36,8 @@ interface QuoteCellProps {
  * stocks and crypto).
  *
  * Symbol over price on the left; the change over the day's line on the
- * right; the day's range along the bottom. The change keeps CHANGE_CH and
- * the price PRICE_CH, so a live tick never moves the column. The line is
+ * right; the day's range along the bottom. The change keeps CHANGE_CH, and
+ * the price and both range ends PRICE_CH, so a live tick never moves anything. The line is
  * the chips' own price history (`pushPrice`, seeded from the server's
  * intraday series), so pages and chips draw the same thing.
  */
@@ -74,16 +74,22 @@ const QuoteCell = memo(function QuoteCell({ trade: t, onClick }: QuoteCellProps)
         <Sparkline points={series} height={16} className={up ? "text-up" : "text-down"} />
       </span>
       {/* The day's range: low, where the price sits, high. The track is
-          always there; with no range it stays empty rather than guess. */}
+          always there; with no range it stays empty rather than guess. Both
+          ends hold PRICE_CH from first render, so a new low or high changes
+          the number, never where the rail starts or stops. */}
       <span data-part="range" className="col-span-2 flex items-center gap-1.5 text-[9.5px] leading-none text-fg-4 tabular-nums">
-        <span>{pos !== null ? formatPriceBare(t.day_low!) : ""}</span>
-        <span className="relative h-px flex-1 bg-fg-4/40">
+        <span data-part="range-low" className="shrink-0 text-right" style={{ minWidth: `${PRICE_CH}ch` }}>
+          {pos !== null ? formatPriceBare(t.day_low!) : ""}
+        </span>
+        <span data-part="range-rail" className="relative h-px flex-1 bg-fg-4/40">
           <span
             className={clsx("absolute -top-[2px] h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-fg-2", pos === null && "invisible")}
             style={{ left: `${pos ?? 0}%` }}
           />
         </span>
-        <span>{pos !== null ? formatPriceBare(t.day_high!) : ""}</span>
+        <span data-part="range-high" className="shrink-0 text-left" style={{ minWidth: `${PRICE_CH}ch` }}>
+          {pos !== null ? formatPriceBare(t.day_high!) : ""}
+        </span>
       </span>
     </button>
   );

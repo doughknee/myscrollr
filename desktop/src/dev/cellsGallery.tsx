@@ -21,7 +21,7 @@ import type { LeagueMeta } from "../api/queries";
 import { catalogItemById } from "../marketplace";
 import { isLive } from "../utils/gameHelpers";
 import { sportsTickerStatus } from "../datawidgets/sports/view";
-import { LABEL_W, columnsFor, contentWidth, paginate, type PageKind } from "../components/pages/pagePlan";
+import { LABEL_W, columnsFor, contentWidth, paginate } from "../components/pages/pagePlan";
 import GameCell, { gameMinCol } from "../components/pages/cells/GameCell";
 import NewsCell, { NEWS_MIN_COL } from "../components/pages/cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "../components/pages/cells/QuoteCell";
@@ -38,8 +38,8 @@ for (const el of [document.documentElement, document.body]) Object.assign(el.sty
 const data = fixture.data as unknown as { sports: Game[]; finance: Trade[]; rss: RssItem[]; sports_meta: { leagues: LeagueMeta[] } };
 
 /** Page `page` of `items` at this window's width, by pagePlan's arithmetic and the cell's own minimum column. */
-function firstPage<T>(items: T[], kind: PageKind, minCol: number, page = 0): T[] {
-  return paginate(items, columnsFor(kind, contentWidth(window.innerWidth), minCol))[page] ?? [];
+function firstPage<T>(items: T[], minCol: number, page = 0): T[] {
+  return paginate(items, columnsFor(contentWidth(window.innerWidth), minCol))[page] ?? [];
 }
 
 function Bar({ tab, code, sub, children, caption }: { tab: string; code: string; sub: string; children: ReactNode[]; caption: string }) {
@@ -105,7 +105,7 @@ const also = [
 ];
 
 function games(page: number) {
-  const items = firstPage(nfl, "sports", gameMinCol("NFL"), page);
+  const items = firstPage(nfl, gameMinCol("NFL"), page);
   return items.map((g) => <GameCell key={g.id} game={g} width={colWidth(items.length)} mine={isMine(g)} now={NOW} />);
 }
 
@@ -120,8 +120,9 @@ const GAME_STATES: [string, Game][] = [
 ];
 const aapl = stocks[0];
 const QUOTE_STATES: [string, Trade][] = [
-  ["small", { ...aapl, price: 9.99, percentage_change: 0.89 }],
-  ["large", { ...aapl, price: 1253.69, percentage_change: -12.4 }],
+  ["small", { ...aapl, price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }],
+  ["large", { ...aapl, price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 61260.55 }],
+  ["no-range", { ...aapl, price: 253.69, percentage_change: 0, day_low: 0, day_high: 0 }],
 ];
 const NEWS_STATES: [string, RssItem][] = [
   ["fresh", { ...bbc[0], published_at: new Date(NOW - 9 * 60_000).toISOString() }],
@@ -152,19 +153,19 @@ function Gallery() {
       <Bar tab="sports_nfl" code="NFL" sub={`${live} LIVE`} caption="NFL · PAGE 1 · YOURS (BEARS) AND LIVE">{games(0)}</Bar>
       <Bar tab="sports_nfl" code="NFL" sub={`${live} LIVE`} caption="NFL · PAGE 2 · THE REST: LIVE, LATE KICK-OFFS, FINALS">{games(1)}</Bar>
       <Bar tab="finance_stocks" code="STOCKS" sub={`▲${stocks.filter((t) => Number(t.percentage_change) >= 0).length}  ▼${stocks.filter((t) => Number(t.percentage_change) < 0).length}`} caption="STOCKS">
-        {firstPage(stocks, "finance", QUOTE_MIN_COL).map((t) => <QuoteCell key={t.symbol} trade={t} />)}
+        {firstPage(stocks, QUOTE_MIN_COL).map((t) => <QuoteCell key={t.symbol} trade={t} />)}
       </Bar>
       <Bar tab="finance_crypto" code="CRYPTO" sub="COINS" caption="CRYPTO">
-        {firstPage(crypto, "finance", QUOTE_MIN_COL).map((t) => <QuoteCell key={t.symbol} trade={t} />)}
+        {firstPage(crypto, QUOTE_MIN_COL).map((t) => <QuoteCell key={t.symbol} trade={t} />)}
       </Bar>
       <Bar tab="news_bbc" code="BBC" sub="HEADLINES" caption="BBC">
-        {firstPage(bbc, "news", NEWS_MIN_COL).map((r, _i, a) => <NewsCell key={r.id} item={r} width={colWidth(a.length)} now={NOW} />)}
+        {firstPage(bbc, NEWS_MIN_COL).map((r, _i, a) => <NewsCell key={r.id} item={r} width={colWidth(a.length)} now={NOW} />)}
       </Bar>
       <Bar tab="news_npr" code="NPR" sub="HEADLINES" caption="NPR">
-        {firstPage(npr, "news", NEWS_MIN_COL).map((r, _i, a) => <NewsCell key={r.id} item={r} width={colWidth(a.length)} now={NOW} />)}
+        {firstPage(npr, NEWS_MIN_COL).map((r, _i, a) => <NewsCell key={r.id} item={r} width={colWidth(a.length)} now={NOW} />)}
       </Bar>
       <Bar tab="quiet" code="ALSO" sub="NOTHING ON" caption="ALSO · WIDGETS WITH NOTHING ON">
-        {firstPage(also, "quiet", ALSO_MIN_COL).map((q) => (
+        {firstPage(also, ALSO_MIN_COL).map((q) => (
           <AlsoCell key={q.tab} code={q.code} text={q.text} accent={accentFor(mode, catalogItemById(q.tab)?.hex, dark)} />
         ))}
       </Bar>

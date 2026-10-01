@@ -45,6 +45,10 @@ initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).t
   // SCROLLR-255: dev-only ticker jump detector. Dynamic import behind DEV so
   // a release bundle contains none of it.
   if (import.meta.env.DEV) void import("./dev/jumpDetector").then((m) => m.startJumpDetector(getCurrentWindow().label));
+  // SCROLLR-272: ?live=1 in the ticker shim moves the data every 4 s.
+  if (import.meta.env.DEV && new URLSearchParams(location.search).get("live") === "1") {
+    void import("./dev/liveSim").then((m) => m.startLiveSim(queryClient));
+  }
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <Sentry.ErrorBoundary fallback={SentryFallback}>
