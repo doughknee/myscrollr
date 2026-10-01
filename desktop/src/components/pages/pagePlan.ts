@@ -1,0 +1,199 @@
+/**
+ * Widget pages arithmetic (SCROLLR-270, ported from the SCROLLR-268 prototype).
+ * Pure functions and types only: no React, no DOM, no clock. The page engine
+ * (SCROLLR-272), the cells (SCROLLR-271) and the browser checks (SCROLLR-276)
+ * all share this file, so every number the bar uses lives here.
+ *
+ * A page is ONE widget laid across the bar in EQUAL columns that fill the
+ * width. The column count comes from the width and the kind, never from the
+ * content, so a score change cannot move a cell.
+ *
+ * Interfaces defined here (the contract for the other pieces):
+ *
+ *  - WIDTHS. Every width in this file is in CSS pixels. `barWidth` is the full
+ *    width of the ticker window. `contentWidth(barWidth, edgeWidth)` is what is
+ *    left for columns after the label block (LABEL_W) and the fixed edge zone
+ *    (`edgeWidth`, 0 until the edge zone ships). `columnsFor` takes the CONTENT
+ *    width. Height does not enter: comfort mode changes the row height, not how
+ *    many columns fit.
+ *  - COLUMN OVERRIDE. A cell family whose content is wider than its kind's
+ *    default (college team names) passes `minCol` to `columnsFor`. It replaces
+ *    MIN_COL[kind] for that widget only.
+ *  - ITEMS. A page holds opaque items `T`. The caller supplies `tierOf(item)`
+ *    (the SCROLLR-267 importance ladder below) and `keyOf(item)` (a stable id:
+ *    game id, symbol, article url) for freezing.
+ *  - ORDER. `planWidget` sorts by tier, STABLY: inside a tier the caller's own
+ *    order is kept (soonest kick-off, newest headline), so give it the source
+ *    order. The ladder has no per-score ranking on purpose: closeness changes
+ *    with every score and would reshuffle a page (it is shown as a tint).
+ *  - STICKY. `WidgetPlan.sticky` is how many leading pages hold tier-0 items
+ *    (live or yours). They show on EVERY visit; `visitPages` takes it.
+ *  - FREEZE. A page on screen is a `FrozenPage`: its keys and their order are
+ *    fixed at swipe-in; later data only updates values in place.
+ */
+
+export type PageKind = "sports" | "news" | "finance" | "clock" | "weather" | "quiet";
+
+// ── Importance ladder (SCROLLR-267) ────────────────────────────────
+
+/**
+ * One ladder for the whole bar, lowest number first:
+ *  0 live:   live games, alerts, favourite teams, watchlist symbols
+ *  1 fresh:  headlines < 2 h old, games starting within 3 h
+ *  2 recent: games later today, results < 18 h, headlines 2-6 h old
+ *  3 quiet:  fixtures > 1 day out, headlines 6-48 h old
+ *  4 status: "NBA - off-season" (one chip, only when nothing else)
+ */
+export const TIER = { live: 0, fresh: 1, recent: 2, quiet: 3, status: 4 } as const;
+export type Tier = (typeof TIER)[keyof typeof TIER];
+
+// ── Columns ────────────────────────────────────────────────────────
+
+/** Narrowest a column may get before the page takes one column fewer. */
+export const MIN_COL: Readonly<Record<PageKind, number>> = {
+  sports: 212,
+  news: 400,
+  finance: 158,
+  clock: 176,
+  weather: 196,
+  quiet: 300,
+};
+
+/** Width of the label block on the left of every page. */
+export const LABEL_W = 112;
+
+/** Pages shown per visit: the sticky ones, then two more of the rest. */
+export const MAX_PAGES_PER_VISIT = 3;
+
+/** Width left for columns once the label and the edge zone are taken. */
+export function contentWidth(barWidth: number, edgeWidth = 0): number {
+  return Math.max(0, barWidth - LABEL_W - edgeWidth);
+}
+
+/** Columns that fit `contentW` (never fewer than one). */
+export function columnsFor(kind: PageKind, contentW: number, minCol?: number): number {
+  return Math.max(1, Math.floor(contentW / (minCol ?? MIN_COL[kind])));
+}
+
+// ── Pages ──────────────────────────────────────────────────────────
+
+/**
+ * Split an ordered list into the fewest pages of at most `cols`, evenly: page
+ * sizes differ by at most one, larger pages first, so there is never a lonely
+ * one-item last page (14 at 12 columns is 7 + 7; 56 at 5 is 8x5 + 4x4).
+ * Order is kept, so what the caller ranked first is page 1.
+ */
+export function paginate<T>(items: readonly T[], cols: number): T[][] {
+  if (items.length === 0) return [];
+  const pages = Math.ceil(items.length / Math.max(1, Math.floor(cols)));
+  const base = Math.floor(items.length / pages);
+  const extra = items.length % pages;
+  const out: T[][] = [];
+  let at = 0;
+  for (let p = 0; p < pages; p++) {
+    const size = base + (p < extra ? 1 : 0);
+    out.push(items.slice(at, at + size));
+    at += size;
+  }
+  return out;
+}
+
+export interface WidgetPlan<T> {
+  /** Items split into pages, tier order kept. */
+  pages: T[][];
+  /** Leading pages that hold live items (at least 1 when there is any page). */
+  sticky: number;
+}
+
+/** Rank by tier (stable), split at `cols`, and count the sticky pages. */
+export function planWidget<T>(
+  items: readonly T[],
+  tierOf: (item: T) => Tier,
+  cols: number,
+): WidgetPlan<T> {
+  const ranked = items
+    .map((item, i) => ({ item, i, t: tierOf(item) }))
+    .sort((a, b) => a.t - b.t || a.i - b.i);
+  const pages = paginate(ranked.map((r) => r.item), cols);
+  const top = ranked.filter((r) => r.t === TIER.live).length;
+  let sticky = 0;
+  for (let covered = 0; covered < top; sticky++) covered += pages[sticky].length;
+  return { pages, sticky: pages.length ? Math.max(1, sticky) : 0 };
+}
+
+/** Seconds a page holds: longer for a fuller page, within 6..12 s. */
+export function dwellFor(itemsOnPage: number): number {
+  return Math.min(12, Math.max(6, 3 + itemsOnPage * 0.75));
+}
+
+// ── Visits ─────────────────────────────────────────────────────────
+
+export interface Visit {
+  /** Page indexes to show this visit, in order. */
+  pages: number[];
+  /** Cursor to pass to the next visit of the same widget. */
+  next: number;
+}
+
+/**
+ * Which pages one visit to a widget shows. The `sticky` leading pages (live
+ * and yours, however many) show every visit; then MAX_PAGES_PER_VISIT - 1 more
+ * of the rest, continuing from `cursor` and wrapping, so every page comes
+ * round over a few laps; then the caller moves to the next widget. Start a
+ * widget's cursor at `sticky`. A widget small enough to show whole does.
+ */
+export function visitPages(pageCount: number, cursor: number, sticky = 1): Visit {
+  if (pageCount <= 0) return { pages: [], next: 0 };
+  const s = Math.max(1, Math.min(sticky, pageCount));
+  if (pageCount <= s + MAX_PAGES_PER_VISIT - 1) {
+    return { pages: Array.from({ length: pageCount }, (_, i) => i), next: s };
+  }
+  const rest = pageCount - s;
+  const pages = Array.from({ length: s }, (_, i) => i);
+  let c = (((cursor - s) % rest) + rest) % rest;
+  for (let k = 0; k < MAX_PAGES_PER_VISIT - 1; k++) {
+    pages.push(s + c);
+    c = (c + 1) % rest;
+  }
+  return { pages, next: s + c };
+}
+
+// ── Freeze ─────────────────────────────────────────────────────────
+
+/**
+ * A page on screen. `keys` (which items, in what order) is fixed when the page
+ * swipes in; `latest` holds the newest value seen for each key. Data updates go
+ * through `refreshPage` and change values only, so a game turning close or a
+ * new headline never re-sorts or re-columns a page being read. An item that
+ * drops out of the pool keeps its last value until the page leaves.
+ */
+export interface FrozenPage<T> {
+  readonly keys: readonly string[];
+  readonly latest: ReadonlyMap<string, T>;
+}
+
+export function freezePage<T>(page: readonly T[], keyOf: (item: T) => string): FrozenPage<T> {
+  return {
+    keys: page.map(keyOf),
+    latest: new Map(page.map((item) => [keyOf(item), item])),
+  };
+}
+
+/** Fold in fresh data: values update in place, keys and order never change. */
+export function refreshPage<T>(
+  frozen: FrozenPage<T>,
+  pool: readonly T[],
+  keyOf: (item: T) => string,
+): FrozenPage<T> {
+  const latest = new Map(frozen.latest);
+  for (const item of pool) {
+    const k = keyOf(item);
+    if (latest.has(k)) latest.set(k, item);
+  }
+  return { keys: frozen.keys, latest };
+}
+
+/** The items to draw, in frozen order. */
+export function pageItems<T>(frozen: FrozenPage<T>): T[] {
+  return frozen.keys.map((k) => frozen.latest.get(k) as T);
+}
