@@ -72,8 +72,6 @@ interface ScrollrTickerProps {
   /** Continuous: keep / slow to 30 % / stop under the mouse.
    *  Page: keep advancing, or hold the page (slow and pause alike). */
   onHover?: HoverBehavior;
-  /** Show 2-row comfort chips with extra detail */
-  comfort?: boolean;
   /** How items from different widgets are ordered */
   mixMode?: MixMode;
   /** Chip color scheme */
@@ -128,7 +126,7 @@ interface ScrollrTickerProps {
 // ── Helpers ──────────────────────────────────────────────────────
 
 /** Empty-ticker shell: accent hairline + centered stack, with an
- *  optional comfort-only teaching tip beneath the primary row. */
+ *  optional teaching tip beneath the primary row. */
 function EmptyTickerRow({
   containerClass,
   tip,
@@ -180,7 +178,6 @@ function widgetChipsFor(
   wt: keyof WidgetTickerData,
   items: WidgetTickerData[keyof WidgetTickerData],
   opts: {
-    comfort?: boolean;
     chipColorMode?: ChipColorMode;
     onChipClick?: (type: string, id: string, url?: string) => void;
     /** Subjects of this widget that live in the fixed zone. */
@@ -191,7 +188,7 @@ function widgetChipsFor(
     rotationMemo?: RotationMemo;
   },
 ): WidgetChip[] {
-  const { comfort, chipColorMode, onChipClick, pinnedSubjects, pinnedSubject, cycles, rotationMemo } = opts;
+  const { chipColorMode, onChipClick, pinnedSubjects, pinnedSubject, cycles, rotationMemo } = opts;
   const widgetLabel = catalogItemById(wt)?.name ?? wt;
 
   // The four cell/gauge/spine utilities each render as ONE chip holding
@@ -205,7 +202,6 @@ function widgetChipsFor(
     if (pinnedSubject !== undefined && pinnedSubject !== wt) return [];
     if (pinnedSubject === undefined && pinnedSubjects?.has(wt)) return [];
     const shared = {
-      comfort,
       colorMode: chipColorMode,
       onClick: () => onChipClick?.(wt, wt),
     };
@@ -220,7 +216,6 @@ function widgetChipsFor(
   const capped = items as Array<UptimeChipData | GitHubChipData>;
   const render = (item: UptimeChipData | GitHubChipData) => {
     const shared = {
-      comfort,
       colorMode: chipColorMode,
       onClick: () => onChipClick?.(wt, item.id),
     };
@@ -320,7 +315,6 @@ export default function ScrollrTicker({
   mixMode = "grouped",
   chipColorMode = "widget",
   widgetDisplay,
-  comfort = false,
   scrollMode = "continuous",
   stepPause = 5,
   showSourcelessCTA = false,
@@ -415,7 +409,6 @@ export default function ScrollrTicker({
           // failure impossible to pick out of the row, which is the
           // whole point of a status cap.
           const chipsForWidget = widgetChipsFor(wt, items, {
-            comfort,
             chipColorMode,
             onChipClick,
             pinnedSubjects,
@@ -447,7 +440,6 @@ export default function ScrollrTicker({
         tab,
         source: effectiveSource,
         dashboard,
-        comfort,
         chipColorMode,
         widgetDisplay,
         cycles,
@@ -481,7 +473,6 @@ export default function ScrollrTicker({
                 tab={status.tab}
                 text={status.text}
                 reserve={status.reserve}
-                comfort={comfort}
                 onClick={() => onChipClick?.(tab, tab)}
               />
             </div>,
@@ -506,7 +497,6 @@ export default function ScrollrTicker({
     widgetData,
     onChipClick,
     pinnedByWidget,
-    comfort,
     effectiveMixMode,
     chipColorMode,
     widgetDisplay,
@@ -677,7 +667,6 @@ export default function ScrollrTicker({
       const items = widgetData?.[wt];
       if (!items?.length) continue;
       for (const { node, pinLabel } of widgetChipsFor(wt, items, {
-        comfort,
         chipColorMode,
         onChipClick,
         pinnedSubject: pin.subject,
@@ -693,7 +682,6 @@ export default function ScrollrTicker({
       tab: pin.widget,
       source,
       dashboard,
-      comfort,
       chipColorMode,
       widgetDisplay,
       pinnedSubject: pin.subject,
@@ -743,28 +731,26 @@ export default function ScrollrTicker({
     showInstalledOffCTA &&
     installedWidgets.length > 0;
 
-  const containerClass = `ticker-container ${comfort ? "h-16" : "h-11"} flex items-center bg-base-150 border-b border-edge/50 flex-shrink-0 relative w-full overflow-hidden`;
+  const containerClass = `ticker-container h-16 flex items-center bg-base-150 border-b border-edge/50 flex-shrink-0 relative w-full overflow-hidden`;
 
   if (isSourceless) {
     return (
       <EmptyTickerRow
         containerClass={containerClass}
         tip={
-          comfort && (
-            <>
-              <span>use</span>
-              <span
-                className={clsx(
-                  "inline-flex items-center gap-0.5 align-baseline",
-                  "px-1 py-px rounded",
-                  "bg-fg-4/10 text-fg-2 font-semibold",
-                )}
-              >
-                + Add source
-              </span>
-              <span>in the sidebar to do this yourself next time.</span>
-            </>
-          )
+          <>
+            <span>use</span>
+            <span
+              className={clsx(
+                "inline-flex items-center gap-0.5 align-baseline",
+                "px-1 py-px rounded",
+                "bg-fg-4/10 text-fg-2 font-semibold",
+              )}
+            >
+              + Add source
+            </span>
+            <span>in the sidebar to do this yourself next time.</span>
+          </>
         }
       >
         <span className="text-ui-meta font-medium text-fg-2 shrink-0">
@@ -798,12 +784,10 @@ export default function ScrollrTicker({
       <EmptyTickerRow
         containerClass={containerClass}
         tip={
-          comfort && (
-            <span>
-              every widget&rsquo;s settings live in the bar at the top of its
-              page.
-            </span>
-          )
+          <span>
+            every widget&rsquo;s settings live in the bar at the top of its
+            page.
+          </span>
         }
       >
         <span className="text-ui-meta font-medium text-fg-2 shrink-0">

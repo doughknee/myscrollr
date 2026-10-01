@@ -10,7 +10,6 @@ import { DayRangeRail } from "./DayRangeRail";
 
 interface TradeChipProps {
   trade: Trade;
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
 }
@@ -18,7 +17,6 @@ interface TradeChipProps {
 const TradeChip = memo(
   function TradeChip({
     trade,
-    comfort,
     colorMode = "widget",
     onClick,
   }: TradeChipProps) {
@@ -44,22 +42,17 @@ const TradeChip = memo(
     return (
       <button
         onClick={onClick}
-        className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
+        className={chipBaseClasses(c, "font-mono whitespace-nowrap")}
       >
         {/* Row 1: symbol, price, change */}
-        <div
-          className={clsx(
-            "flex w-full items-center gap-2",
-            comfort && "text-ui-body",
-          )}
-        >
+        <div className="flex w-full items-center gap-2 text-ui-body">
           {/* Symbol is never coloured. Colour carries exactly one meaning
               on this chip — direction — and a green symbol makes every chip
               read as "up" in peripheral vision. */}
           <span className={clsx("font-semibold", c.text)}>{trade.symbol}</span>
           <Sparkline
             points={series}
-            height={comfort ? 16 : 14}
+            height={16}
             className={isUp ? "text-up" : "text-down"}
           />
           {/* No currency glyph: every number on the row is a price, and at
@@ -77,22 +70,19 @@ const TradeChip = memo(
             </span>
           )}
         </div>
-        {/* Row 2: day-range rail (comfort only). Replaces the previous-close
+        {/* Row 2: day-range rail. Replaces the previous-close
             fragment, which stopped halfway across the chip and left the
             lower-right quadrant empty. */}
-        {comfort && (
-          <DayRangeRail
-            price={Number(trade.price) || 0}
-            low={trade.day_low}
-            high={trade.day_high}
-            isUp={isUp}
-          />
-        )}
+        <DayRangeRail
+          price={Number(trade.price) || 0}
+          low={trade.day_low}
+          high={trade.day_high}
+          isUp={isUp}
+        />
       </button>
     );
   },
   (prev, next) =>
-    prev.comfort === next.comfort &&
     prev.colorMode === next.colorMode &&
     prev.onClick === next.onClick &&
     prev.trade.symbol === next.trade.symbol &&

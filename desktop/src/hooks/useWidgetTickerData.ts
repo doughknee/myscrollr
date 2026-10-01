@@ -76,7 +76,7 @@ function formatDetail(date: Date, tz: string | undefined): string {
 
 function tzShortLabel(tz: string): string {
   const city = tzLabel(tz);
-  // Abbreviate long city names for compact ticker chips
+  // Abbreviate long city names for ticker chips
   if (city.length > 10) {
     const words = city.split(" ");
     return words
@@ -172,7 +172,7 @@ function isNightIn(now: Date, tz: string | undefined): boolean {
   }
 }
 
-/** "UTC-4" for the comfort cell. Empty when the zone can't be resolved. */
+/** "UTC-4" for the detail row. Empty when the zone can't be resolved. */
 function utcOffsetLabel(now: Date, tz: string | undefined): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
@@ -443,7 +443,7 @@ export function useWidgetTickerData(
       const repoLabel = truncate(repo.repo, 20);
       const workflow = repo.workflowName ?? "CI";
 
-      // Comfort detail: first line of commit message + time ago
+      // Detail row: first line of commit message + time ago
       const firstLine = repo.commitMessage?.split("\n")[0] ?? "";
       const commit = truncate(firstLine, 30);
       const checked = timeAgo(repo.updatedAt, { suffix: true });

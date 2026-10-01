@@ -1,7 +1,7 @@
 /**
- * The sports chip's contract: compact is the scoreboard row, detailed is
- * the same row plus a table line per team, and every slot that can change
- * holds its width whatever state the game is in.
+ * The sports chip's contract: a scoreboard row plus a table line per team,
+ * and every slot that can change holds its width whatever state the game
+ * is in.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -43,30 +43,26 @@ function game(over: Partial<Game> = {}): Game {
 
 describe("GameChip", () => {
   it("names teams by short name, never the three-letter slice", () => {
-    render(<GameChip game={game()} comfort />);
+    render(<GameChip game={game()} />);
     expect(screen.getByText("Phillies")).toBeTruthy();
     expect(screen.getByText("Detroit Tigers")).toBeTruthy(); // 14 chars: untouched
     expect(screen.queryByText("PHI")).toBeNull();
   });
 
-  it("detailed adds each team's table line under that team; compact does not", () => {
-    const { unmount } = render(<GameChip game={game()} comfort />);
+  it("puts each team's table line under that team", () => {
+    render(<GameChip game={game()} />);
     expect(screen.getByText("2nd")).toBeTruthy();
     expect(screen.getByText("78-61")).toBeTruthy();
     expect(screen.getByText(/\+136/)).toBeTruthy(); // 746 − 610, run differential
     expect(screen.getByText("4th")).toBeTruthy();
     expect(screen.getByText("63-75")).toBeTruthy();
-    unmount();
-
-    render(<GameChip game={game()} />);
-    expect(screen.queryByText("78-61")).toBeNull();
-    expect(screen.getByText("Phillies")).toBeTruthy();
   });
 
   it("leaves a pre-game score blank rather than drawing a dash", () => {
     const { container } = render(
       <GameChip
-        game={game({ state: "pre", status_short: "NS", start_time: new Date(Date.now() + 3 * 3_600_000).toISOString() })}
+        // No standings: a record like "78-61" would carry its own hyphen.
+        game={game({ state: "pre", status_short: "NS", away_standing: undefined, home_standing: undefined, start_time: new Date(Date.now() + 3 * 3_600_000).toISOString() })}
       />,
     );
     expect(container.textContent).not.toContain("–");
@@ -97,7 +93,7 @@ describe("GameChip", () => {
 
   it("holds the table line's height with a dash when a league has no table", () => {
     const { container } = render(
-      <GameChip game={game({ league: "UFC", away_standing: undefined, home_standing: undefined })} comfort />,
+      <GameChip game={game({ league: "UFC", away_standing: undefined, home_standing: undefined })} />,
     );
     expect(container.textContent?.match(/—/g)?.length).toBe(2);
   });
@@ -116,7 +112,6 @@ describe("GameChip", () => {
           away_standing: undefined,
           home_standing: undefined,
         })}
-        comfort
       />,
     );
     expect(screen.getByText("Italy Grand Prix")).toBeTruthy();
@@ -240,7 +235,6 @@ describe("GameChip", () => {
           away_standing: { rank: 2, wins: 27, draws: 5, losses: 6, points: 86, goal_diff: 42, points_for: 0, points_against: 0, otl: 0 },
           home_standing: { rank: 9, wins: 13, draws: 10, losses: 15, points: 49, goal_diff: -9, points_for: 0, points_against: 0, otl: 0 },
         })}
-        comfort
       />,
     );
     expect(screen.getByText("27-5-6")).toBeTruthy();

@@ -3,22 +3,21 @@
  *
  * Rebuilt on the chip language the data families took in v1.5.0 — a
  * content-sized grid with a named tab where the league tab goes, item
- * cells divided by hairlines, and detailed adding exactly one row
- * without moving anything above it. A clock chip and a game chip are
- * now the same shape.
+ * cells divided by hairlines, and one detail row beneath. A clock chip
+ * and a game chip are now the same shape.
  *
  * What each widget puts in that second row is NOT the same, and that is
  * the design rather than an inconsistency: it is whatever you would
  * otherwise open the app to find.
  *
  *   clock    the date and offset  — a zone can be on a different DAY,
- *                                   which compact cannot say at all
+ *                                   which the time alone cannot say
  *   timer    a draining bar       — the shape of the remaining time
  *   weather  today's range        — is 61° warm for here, or not
  *   sysmon   a real trend         — 82°C climbing reads differently
  *                                   from 82°C steady
  *
- * Weather is the one that also changed above the fold: its compact row
+ * Weather is the one that also changed above the fold: its top row
  * is label, icon and temperature only. The range bar used to sit beside
  * the temperature and made the widest cell on the rail out of the chip
  * with the least to say.
@@ -40,12 +39,6 @@ import type {
 
 // ── Shared shell ────────────────────────────────────────────────
 
-/** Rows, matching every other chip on the rail. */
-const ROWS = {
-  comfort: "grid-rows-[30px_20px]",
-  compact: "grid-rows-[28px]",
-} as const;
-
 /**
  * The cap, in px. Utilities are the one family that can genuinely run
  * long — six timezones, four metrics — and past this the rail stops
@@ -56,7 +49,6 @@ const CHIP_MAX_PX = 640;
 function UtilityShell({
   type,
   tab,
-  comfort,
   colorMode = "widget",
   onClick,
   cols,
@@ -67,7 +59,6 @@ function UtilityShell({
   type: "clock" | "timer" | "weather" | "sysmon";
   /** The word in the tab: CLOCK, TIMER, WEATHER, SYSMON. */
   tab: string;
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
   /** Grid template for the item cells, tab column excluded. */
@@ -85,7 +76,7 @@ function UtilityShell({
       className={clsx(
         chipShellClasses(c, "font-mono whitespace-nowrap"),
         "grid max-w-[640px]",
-        comfort ? ROWS.comfort : ROWS.compact,
+        "grid-rows-[30px_20px]",
         extra,
       )}
     >
@@ -175,7 +166,6 @@ function colsFor(n: number): string {
 
 interface ChipProps<T> {
   items: T[];
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
 }
@@ -184,7 +174,6 @@ interface ChipProps<T> {
 
 export function ClockChip({
   items,
-  comfort,
   colorMode,
   onClick,
 }: ChipProps<ClockChipData>) {
@@ -196,7 +185,6 @@ export function ClockChip({
       type="clock"
       tab="CLOCK"
       cols={colsFor(items.length)}
-      comfort={comfort}
       colorMode={colorMode}
       onClick={onClick}
     >
@@ -212,14 +200,13 @@ export function ClockChip({
           )}
         </Cell>
       ))}
-      {comfort &&
-        items.map((item, i) => (
-          <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
-            <span className="truncate">
-              {[item.detail, item.offset].filter(Boolean).join(" · ")}
-            </span>
-          </Meta>
-        ))}
+      {items.map((item, i) => (
+        <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
+          <span className="truncate">
+            {[item.detail, item.offset].filter(Boolean).join(" · ")}
+          </span>
+        </Meta>
+      ))}
     </UtilityShell>
   );
 }
@@ -239,7 +226,6 @@ function isUrgent(item: ClockChipData): boolean {
 
 export function TimerChip({
   items,
-  comfort,
   colorMode,
   onClick,
 }: ChipProps<ClockChipData>) {
@@ -253,7 +239,6 @@ export function TimerChip({
       type="timer"
       tab="TIMER"
       cols={colsFor(items.length)}
-      comfort={comfort}
       colorMode={colorMode}
       onClick={onClick}
       // The last minute borrows the live palette — the same red the rest
@@ -276,31 +261,30 @@ export function TimerChip({
           )}
         </Cell>
       ))}
-      {comfort &&
-        items.map((item, i) => {
-          const { remainingSec: rem, totalSec: total } = item;
-          const drawable = rem != null && total != null && total > 0;
-          return (
-            <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider} bleed={drawable}>
-              {drawable ? (
-                <span className="h-[3px] w-full bg-fg-3/15">
-                  <span
-                    className={clsx(
-                      "block h-full",
-                      isUrgent(item) ? "bg-live" : "bg-widget-timer",
-                    )}
-                    style={{ width: `${Math.min(1, rem / total) * 100}%` }}
-                  />
-                </span>
-              ) : (
-                // A stopwatch counts UP with no target, so it has no
-                // fraction to draw. Say what it is instead of inventing
-                // a finish line.
-                <span className="truncate px-2.5">{item.detail}</span>
-              )}
-            </Meta>
-          );
-        })}
+      {items.map((item, i) => {
+        const { remainingSec: rem, totalSec: total } = item;
+        const drawable = rem != null && total != null && total > 0;
+        return (
+          <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider} bleed={drawable}>
+            {drawable ? (
+              <span className="h-[3px] w-full bg-fg-3/15">
+                <span
+                  className={clsx(
+                    "block h-full",
+                    isUrgent(item) ? "bg-live" : "bg-widget-timer",
+                  )}
+                  style={{ width: `${Math.min(1, rem / total) * 100}%` }}
+                />
+              </span>
+            ) : (
+              // A stopwatch counts UP with no target, so it has no
+              // fraction to draw. Say what it is instead of inventing
+              // a finish line.
+              <span className="truncate px-2.5">{item.detail}</span>
+            )}
+          </Meta>
+        );
+      })}
     </UtilityShell>
   );
 }
@@ -316,7 +300,6 @@ function isHot(item: WeatherChipData): boolean {
 
 export function WeatherChip({
   items,
-  comfort,
   colorMode,
   onClick,
 }: ChipProps<WeatherChipData>) {
@@ -329,7 +312,6 @@ export function WeatherChip({
       type="weather"
       tab="WEATHER"
       cols={colsFor(items.length)}
-      comfort={comfort}
       colorMode={colorMode}
       onClick={onClick}
       extra={anyAlert ? "border-warning/45" : undefined}
@@ -345,21 +327,20 @@ export function WeatherChip({
           </span>
         </Cell>
       ))}
-      {comfort &&
-        items.map((item, i) => (
-          <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
-            {/* An alert outranks a range: it takes the cell rather than
-                sitting beside it, and stays under ITS city so you can
-                see which one it belongs to. */}
-            {item.alert ? (
-              <span className="truncate font-bold uppercase tracking-wider text-warning">
-                {item.alert}
-              </span>
-            ) : (
-              <RangeBar item={item} />
-            )}
-          </Meta>
-        ))}
+      {items.map((item, i) => (
+        <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
+          {/* An alert outranks a range: it takes the cell rather than
+              sitting beside it, and stays under ITS city so you can
+              see which one it belongs to. */}
+          {item.alert ? (
+            <span className="truncate font-bold uppercase tracking-wider text-warning">
+              {item.alert}
+            </span>
+          ) : (
+            <RangeBar item={item} />
+          )}
+        </Meta>
+      ))}
     </UtilityShell>
   );
 }
@@ -406,16 +387,14 @@ function RangeBar({ item }: { item: WeatherChipData }) {
 
 export function SysmonChip({
   items,
-  comfort,
   colorMode,
   onClick,
 }: ChipProps<SysmonChipData>) {
   const c = getChipColors(colorMode ?? "widget", "sysmon");
   const anyHot = items.some((i) => i.hot);
 
-  // Recorded on every render, comfort or not: the buffer has to be
-  // filling while the user is in compact, or switching density would
-  // show an empty graph. Hooks run before the early return below.
+  // Recorded on every render so the buffer is always filling and the
+  // graph is never empty. Hooks run before the early return below.
   const series = items.map((item) =>
     item.percent != null ? recordMetric(item.id, item.percent) : [],
   );
@@ -426,7 +405,6 @@ export function SysmonChip({
       type="sysmon"
       tab="SYSMON"
       cols={colsFor(items.length)}
-      comfort={comfort}
       colorMode={colorMode}
       onClick={onClick}
       extra={anyHot ? "border-error/30" : undefined}
@@ -448,27 +426,26 @@ export function SysmonChip({
           </span>
         </Cell>
       ))}
-      {comfort &&
-        items.map((item, i) => {
-          const points = series[i];
-          const drawable = points.length >= 2;
-          return (
-            <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider} bleed={drawable}>
-              {drawable ? (
-                <Sparkline
-                  points={points}
-                  height={18}
-                  className={item.hot ? "text-error" : "text-widget-sysmon"}
-                />
-              ) : (
-                // Under two readings there is no line to draw. Say what
-                // the number is instead — a single dot would imply a
-                // trend that does not exist.
-                <span className="truncate px-2.5">{item.detail}</span>
-              )}
-            </Meta>
-          );
-        })}
+      {items.map((item, i) => {
+        const points = series[i];
+        const drawable = points.length >= 2;
+        return (
+          <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider} bleed={drawable}>
+            {drawable ? (
+              <Sparkline
+                points={points}
+                height={18}
+                className={item.hot ? "text-error" : "text-widget-sysmon"}
+              />
+            ) : (
+              // Under two readings there is no line to draw. Say what
+              // the number is instead — a single dot would imply a
+              // trend that does not exist.
+              <span className="truncate px-2.5">{item.detail}</span>
+            )}
+          </Meta>
+        );
+      })}
     </UtilityShell>
   );
 }

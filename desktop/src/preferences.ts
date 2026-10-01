@@ -67,9 +67,8 @@ export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
 // Stored values match their labels on the Ticker page (REL-207). The
-// old spellings — comfort, weave, accent/muted, step/flip — are mapped
-// forward in `migrateTicker`.
-export type TickerMode = "compact" | "detailed";
+// old spellings — weave, accent/muted, step/flip — are mapped forward in
+// `migrateTicker`.
 export type MixMode = "grouped" | "mixed";
 export type ChipColorMode = "widget" | "theme" | "subtle";
 /** Rotate ("flip") folded into Page 2026-09-06 (REL-204). */
@@ -157,7 +156,6 @@ export interface TickerPrefs {
   /** px/s; one of TICKER_SPEEDS (Slow / Normal / Fast on the page). */
   tickerSpeed: number;
   onHover: HoverBehavior;
-  tickerMode: TickerMode;
   mixMode: MixMode;
   chipColors: ChipColorMode;
   scrollMode: ScrollMode;
@@ -487,7 +485,6 @@ const DEFAULT_TICKER: TickerPrefs = {
   showTicker: true,
   tickerSpeed: TICKER_SPEEDS.normal,
   onHover: "slow",
-  tickerMode: "detailed",
   mixMode: "mixed",
   chipColors: "widget",
   scrollMode: "continuous",
@@ -1075,9 +1072,11 @@ export function loadPrefs(): AppPreferences {
  *  - `tickerGap` (Spacing) and `tickerDirection` (Direction) → gone
  *  - `tickerSpeed` / `stepPause` snap to the nearest preset
  *
+ * SCROLLR-278: the compact/detailed density is gone; the bar has one
+ * height. A stored `tickerMode` (any value) is ignored and dropped.
+ *
  * REL-207: stored values renamed to match their labels. Anything
  * unrecognised falls back to the default:
- *  - tickerMode  comfort → detailed
  *  - mixMode     weave → mixed
  *  - chipColors  accent → theme, muted → subtle
  *  - scrollMode  step → page, and flip (Rotate, REL-204) → page
@@ -1085,7 +1084,7 @@ export function loadPrefs(): AppPreferences {
 export function migrateTicker(raw: unknown): TickerPrefs {
   const saved = (raw && typeof raw === "object" ? raw : {}) as Omit<
     Partial<TickerPrefs>,
-    "scrollMode" | "tickerMode" | "mixMode" | "chipColors"
+    "scrollMode" | "mixMode" | "chipColors"
   > & {
     pauseOnHover?: unknown;
     hoverSpeed?: unknown;
@@ -1102,7 +1101,7 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     tickerGap: _gap,
     tickerDirection: _direction,
     scrollMode,
-    tickerMode,
+    tickerMode: _tickerMode,
     mixMode,
     chipColors,
     onHover,
@@ -1110,6 +1109,7 @@ export function migrateTicker(raw: unknown): TickerPrefs {
   } = saved;
   void _gap;
   void _direction;
+  void _tickerMode;
   const isHover = (v: unknown): v is HoverBehavior =>
     v === "keep" || v === "slow" || v === "pause";
   const migratedHover: HoverBehavior = isHover(onHover)
@@ -1123,7 +1123,6 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     ...DEFAULT_TICKER,
     ...rest,
     onHover: migratedHover,
-    tickerMode: tickerMode === "compact" ? "compact" : "detailed",
     mixMode: mixMode === "grouped" ? "grouped" : "mixed",
     chipColors:
       chipColors === "theme" || chipColors === "accent"
@@ -1258,10 +1257,8 @@ export function migrateAppearanceTheme(
 
 // ── Derived values ──────────────────────────────────────────────
 
-export const TICKER_HEIGHTS: Record<TickerMode, number> = {
-  compact: 44,
-  detailed: 64,
-};
+/** The bar's one height at 100 % scale (SCROLLR-278; `h-16` in ScrollrTicker). */
+export const TICKER_HEIGHT = 64;
 
 // ── Ticker layout helpers ───────────────────────────────────────
 

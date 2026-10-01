@@ -111,11 +111,6 @@ export const SETTINGS_ROWS = {
       description: "Which edge of the screen the ticker sits on.",
       keywords: "top bottom position",
     },
-    detailLevel: {
-      label: "Detail level",
-      description: "One line per chip, or a detail row under each.",
-      keywords: "compact detailed density rows height",
-    },
     tickerScale: {
       label: "Size",
       description: "Resize the bar. The app window has its own size.",

@@ -28,7 +28,7 @@ Proposed page map (7 pages → 7 pages, but each with one job):
 | Page | Contents |
 |---|---|
 | **Appearance** | Theme · Color mode · App size · Readability (font weight, high contrast) · **Units & formats** (new) |
-| **Ticker** | **Show the ticker** (new row) · Where: Monitors, Screen edge · Look: Detail level, Size, Chip colors · Motion: Scroll mode, Speed, On hover, Time per page · Behaviour: Stay above other windows, Hide when an app goes fullscreen, Item order |
+| **Ticker** | **Show the ticker** (new row) · Where: Monitors, Screen edge · Look: Size, Chip colors · Motion: Scroll mode, Speed, On hover, Time per page · Behaviour: Stay above other windows, Hide when an app goes fullscreen, Item order |
 | **Startup** | Launch at login · **Start in the background** (new) |
 | **Shortcuts** | unchanged, copy fixed |
 | **Profile & plan** | unchanged, copy fixed |
@@ -69,7 +69,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 | Setting | Today | Verdict | Notes |
 |---|---|---|---|
-| **Detail level** | Compact / Detailed | **Keep**, first in Look | This is *the* choice on the bar. Values are `compact` / `comfort` internally; rename the value to match the label in a migration so the prefs file reads like the UI. |
+| **Detail level** | Compact / Detailed | **Removed** (SCROLLR-278, 1 Oct 2026) | The bar has one height, today's detailed one; the choice and its `tickerMode` pref no longer exist. |
 | **Scale** | slider 75–150 % | **Rework** → **Size**, presets 85 / 100 / 115 / 130 % | d: the slider Brandon does not like. Same four presets as App size, same control, same word. The 75–150 range was never reachable for the app anyway. |
 | **Chip colors** | Widget / Theme / Subtle | **Keep** | b: real, visible effect. Values `widget/accent/muted`; align in the same migration. |
 | **Spacing** | Tight / Normal / Wide | **Fold** | b: gap between chips, 8/12/20 px. Nobody opens Settings to change chip gap. Keep one gap (the current default, tight, reads best with the redrawn chips) and delete the row. |

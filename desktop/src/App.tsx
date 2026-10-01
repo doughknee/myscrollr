@@ -36,7 +36,7 @@ import {
   savePref,
   loadPrefs,
   savePrefs,
-  TICKER_HEIGHTS,
+  TICKER_HEIGHT,
   togglePin,
   isPinned,
   pinCount,
@@ -51,11 +51,9 @@ import { useTheme } from "./hooks/useTheme";
 import { useCatalog } from "./hooks/useCatalog";
 
 
-/** Ticker window height in px: per-mode row height × scale. */
+/** Ticker window height in px: the one bar height × scale. */
 function tickerHeight(p: AppPreferences): number {
-  return Math.round(
-    TICKER_HEIGHTS[p.ticker.tickerMode] * (p.appearance.tickerScale / 100),
-  );
+  return Math.round(TICKER_HEIGHT * (p.appearance.tickerScale / 100));
 }
 
 // ── App (Ticker Window) ─────────────────────────────────────────
@@ -404,7 +402,6 @@ export default function App() {
       }).catch(() => {});
     }
   }, [
-    prefs.ticker.tickerMode,
     prefs.appearance.tickerScale,
     prefs.ticker.showTicker,
     prefs.window.tickerPosition,
@@ -862,7 +859,6 @@ export default function App() {
                 mixMode={prefs.ticker.mixMode}
                 chipColorMode={prefs.ticker.chipColors}
                 widgetDisplay={prefs.widgetDisplay}
-                comfort={prefs.ticker.tickerMode === "detailed"}
                 scrollMode={prefs.ticker.scrollMode}
                 stepPause={prefs.ticker.stepPause}
                 showSourcelessCTA={showSourcelessCTA}

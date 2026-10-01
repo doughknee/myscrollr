@@ -10,7 +10,6 @@ import { useFitsOneLine } from "../../hooks/useFitsOneLine";
 
 interface RssChipProps {
   item: RssItem;
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   /** The news widget's catalog brand colour; widget colour mode only. */
   accent?: string;
@@ -50,10 +49,10 @@ const GRID_COLS = "grid-cols-[max-content_minmax(0,max-content)_46px]";
  * chip's league / teams / clock, one for one. Content-sized under the same
  * cap, with the headline as the cell that gives way.
  *
- * Compact is the first line of the headline. Detailed is one centred
- * two-line block: line one the headline; line two whatever the headline
- * still needs -- the rest of itself if it wrapped, and then the summary
- * in whatever room is left, or the summary alone if it fit. The summary
+ * The headline cell is one centred two-line block: line one the headline;
+ * line two whatever the headline still needs -- the rest of itself if it
+ * wrapped, and then the summary in whatever room is left, or the summary
+ * alone if it fit. The summary
  * never widens the chip: the block has zero intrinsic width and fills the
  * track a hidden single-line copy of the title sets. Whether the title
  * fit is measured, not counted (useFitsOneLine).
@@ -64,7 +63,6 @@ const GRID_COLS = "grid-cols-[max-content_minmax(0,max-content)_46px]";
 const RssChip = memo(
   function RssChip({
     item,
-    comfort,
     colorMode = "widget",
     accent,
     feedCountToday,
@@ -114,7 +112,7 @@ const RssChip = memo(
           ),
           "grid max-w-[640px]",
           GRID_COLS,
-          comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
+          "grid-rows-[30px_20px]",
           stale && "border-edge/55",
         )}
       >
@@ -137,64 +135,44 @@ const RssChip = memo(
           </span>
         </span>
 
-        {comfort ? (
-          <>
-            {/* Sets the column: the title's own single-line width, invisible. */}
-            <span
-              ref={sizerRef}
-              aria-hidden
-              className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
-            >
-              {title}
-            </span>
-            {/* A rotating slot also sizes to the longest headline it will
-                ever hold, so a swap cannot widen or narrow the chip. */}
-            {reserveTitle && reserveTitle !== title && (
-              <span
-                aria-hidden
-                className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
-              >
-                {reserveTitle}
-              </span>
-            )}
-            <span ref={cellRef} className="col-start-2 row-span-full flex min-w-0 items-center px-2.5">
-              <span
-                data-testid="headline-block"
-                // text-left is load-bearing: a <button> centres its text by
-                // UA default. A single truncated line fills the width and
-                // hides it, but a wrapped block centres whichever of its two
-                // lines is shorter, which reads as a random indent.
-                className="w-0 min-w-full overflow-hidden whitespace-normal text-left font-sans leading-[17px] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
-              >
-                <span className={clsx("text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>{title}</span>
-                {second && (
-                  <>
-                    {/* Fit on one line: the summary takes line two. Wrapped:
-                        it continues in whatever room line two has left. */}
-                    {fits ? <br data-testid="summary-break" /> : " "}
-                    <span className="text-[11px] font-medium text-fg-3">{second}</span>
-                  </>
-                )}
-              </span>
-            </span>
-          </>
-        ) : (
-          <>
-            {reserveTitle && reserveTitle !== title && (
-              <span
-                aria-hidden
-                className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
-              >
-                {reserveTitle}
-              </span>
-            )}
-            <span className="col-start-2 row-start-1 flex min-w-0 items-center px-2.5">
-              <span className={clsx("min-w-0 truncate text-left font-sans text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>
-                {title}
-              </span>
-            </span>
-          </>
+        {/* Sets the column: the title's own single-line width, invisible. */}
+        <span
+          ref={sizerRef}
+          aria-hidden
+          className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
+        >
+          {title}
+        </span>
+        {/* A rotating slot also sizes to the longest headline it will
+            ever hold, so a swap cannot widen or narrow the chip. */}
+        {reserveTitle && reserveTitle !== title && (
+          <span
+            aria-hidden
+            className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
+          >
+            {reserveTitle}
+          </span>
         )}
+        <span ref={cellRef} className="col-start-2 row-span-full flex min-w-0 items-center px-2.5">
+          <span
+            data-testid="headline-block"
+            // text-left is load-bearing: a <button> centres its text by
+            // UA default. A single truncated line fills the width and
+            // hides it, but a wrapped block centres whichever of its two
+            // lines is shorter, which reads as a random indent.
+            className="w-0 min-w-full overflow-hidden whitespace-normal text-left font-sans leading-[17px] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+          >
+            <span className={clsx("text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>{title}</span>
+            {second && (
+              <>
+                {/* Fit on one line: the summary takes line two. Wrapped:
+                    it continues in whatever room line two has left. */}
+                {fits ? <br data-testid="summary-break" /> : " "}
+                <span className="text-[11px] font-medium text-fg-3">{second}</span>
+              </>
+            )}
+          </span>
+        </span>
 
         <span
           data-testid="age-cell"
@@ -210,7 +188,6 @@ const RssChip = memo(
     );
   },
   (prev, next) =>
-    prev.comfort === next.comfort &&
     prev.colorMode === next.colorMode &&
     prev.accent === next.accent &&
     prev.feedCountToday === next.feedCountToday &&

@@ -28,7 +28,6 @@ import type { ChipColorMode } from "../../preferences";
 
 interface GameChipProps {
   game: Game;
-  comfort?: boolean;
   colorMode?: ChipColorMode;
   /**
    * The league widget's catalog brand colour (#rrggbb). Used only in the
@@ -53,9 +52,8 @@ const CHIP_MAX_PX = 640;
 
 /**
  * The sports chip: four boxed cells -- league, away, home, status -- with
- * one rule running the full height between the two teams. Compact is the
- * scoreboard row; detailed is the same row plus each team's table line
- * beneath it. Nothing in the top row moves when the second appears.
+ * one rule running the full height between the two teams. The top row is
+ * the scoreboard; the second row is each team's table line beneath it.
  *
  * Content-sized, not 264px. Each team column is as wide as its own
  * content, so a Cubs-Tigers chip is short and a Revolution-Minnesota chip
@@ -75,7 +73,6 @@ const CHIP_MAX_PX = 640;
 const GameChip = memo(
   function GameChip({
     game,
-    comfort,
     colorMode = "widget",
     accent,
     reserveNames,
@@ -292,7 +289,7 @@ const GameChip = memo(
           capped
             ? "grid-cols-[max-content_minmax(0,1fr)_minmax(0,1fr)_max-content]"
             : "grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
-          comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
+          "grid-rows-[30px_20px]",
           // Closeness is the whole weighting; the rules brighten with it.
           //
           // In the league's OWN colour, not a shared red. A red chip on a
@@ -339,18 +336,16 @@ const GameChip = memo(
                 {teamShortName(game.league, game.home_team_name)}
               </span>
             </span>
-            {comfort && (
-              <span className="col-start-2 col-span-2 row-start-2 flex items-center px-2.5 text-[10px] leading-none text-fg-3">
-                {teamShortName(game.league, game.away_team_name)}
-              </span>
-            )}
+            <span className="col-start-2 col-span-2 row-start-2 flex items-center px-2.5 text-[10px] leading-none text-fg-3">
+              {teamShortName(game.league, game.away_team_name)}
+            </span>
           </>
         ) : (
           <>
             {top("away", game.away_team_logo, game.away_team_name, game.away_team_score, awayLeads)}
             {top("home", game.home_team_logo, game.home_team_name, game.home_team_score, homeLeads)}
-            {comfort && bottom("away", game.away_standing)}
-            {comfort && bottom("home", game.home_standing)}
+            {bottom("away", game.away_standing)}
+            {bottom("home", game.home_standing)}
           </>
         )}
 
@@ -380,7 +375,6 @@ const GameChip = memo(
     );
   },
   (prev, next) =>
-    prev.comfort === next.comfort &&
     prev.colorMode === next.colorMode &&
     prev.onClick === next.onClick &&
     prev.reserveNames?.away === next.reserveNames?.away &&
