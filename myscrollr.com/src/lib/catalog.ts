@@ -70,14 +70,16 @@ export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
     ['news_thehill', 'The Hill', 'news', '#16447e', 'Congress, campaigns and Washington policy.'],
     ['news_reason', 'Reason', 'news', '#d13b1f', 'Libertarian reporting and commentary on politics and policy.'],
     ['rss_custom', 'Custom RSS', 'news', '#ee802f', 'Follow any RSS or Atom feed by pasting its URL.'],
-    ['clock', 'Clock', 'utility', '#6366f1', 'Local time and world clocks'],
+    ['clock', 'Clock', 'utility', '#6366f1', 'Local time and world clocks', true],
     ['timer', 'Timer', 'utility', '#f59e0b', 'Pomodoro, countdown, and stopwatch tools'],
-    ['weather', 'Weather', 'utility', '#0ea5e9', 'Current conditions for your locations'],
+    ['weather', 'Weather', 'utility', '#0ea5e9', 'Current conditions for your locations', true],
     ['sysmon', 'System Monitor', 'utility', '#06b6d4', 'Live CPU, memory, and GPU stats'],
     ['uptime', 'Uptime', 'utility', '#10b981', 'Monitor status from Uptime Kuma'],
     ['github', 'GitHub', 'utility', '#f97316', 'CI/Actions status for your repos'],
-  ] as Array<[string, string, string, string, string]>).map(
-    ([id, name, category, color, description], order) => ({
+    // A trailing `true` is the catalog's FreeSlot flag (free_slot): the widget
+    // never uses a plan slot. Mirrors api/internal/platform/widgets.go.
+  ] as Array<[string, string, string, string, string, boolean?]>).map(
+    ([id, name, category, color, description, freeSlot], order) => ({
       id,
       name,
       category,
@@ -85,6 +87,7 @@ export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
       description,
       required_tier: 'free',
       order,
+      ...(freeSlot ? { free_slot: true } : {}),
     }),
   ),
 ]

@@ -33,7 +33,9 @@ func configOrDefault(widgetType string, cfg map[string]interface{}) map[string]i
 // A row whose widget_type is no longer in the catalog (a retired widget,
 // e.g. fantasy_yahoo/predictions after SCROLLR-239) never counts: it is
 // unusable and unremovable by the user, so letting it hold a slot forever
-// locks them out of adding anything new (SCROLLR-245).
+// locks them out of adding anything new (SCROLLR-245). Free-slot widgets
+// (clock, weather — the catalog's FreeSlot flag) never count either
+// (SCROLLR-282).
 func CountEnabledWidgets(ctx context.Context, logtoSub string) (int, error) {
 	rows, err := platform.DBPool.Query(ctx,
 		`SELECT widget_type FROM user_widgets WHERE logto_sub = $1 AND enabled = true`,
@@ -49,7 +51,7 @@ func CountEnabledWidgets(ctx context.Context, logtoSub string) (int, error) {
 		if err := rows.Scan(&widgetType); err != nil {
 			return 0, err
 		}
-		if platform.IsKnownWidgetType(widgetType) {
+		if platform.IsKnownWidgetType(widgetType) && !platform.IsFreeSlotWidgetType(widgetType) {
 			n++
 		}
 	}
@@ -107,10 +109,13 @@ func CreateWidget(c *fiber.Ctx) error {
 		WidgetType string                 `json:"widget_type"`
 		Config     map[string]interface{} `json:"config"`
 		// LocalWidgets is the client's count of enabled utility widgets
-		// (clock/weather/…). They live in preferences, not user_widgets, but
-		// every widget counts toward the slot cap — so the client reports them
-		// and the slot gate adds them to the DB widget count. Absent (older
-		// client) = 0, degrading to a data-widget-only gate.
+		// that use a slot (timer/sysmon/…, NOT the FreeSlot ones — clock and
+		// weather). They live in preferences, not user_widgets, but they count
+		// toward the slot cap — so the client reports them and the slot gate
+		// adds them to the DB widget count. Absent (older client) = 0,
+		// degrading to a data-widget-only gate; clients before the
+		// widget-pages release still include clock/weather in it, which only
+		// ever errs toward counting more.
 		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -184,7 +189,7 @@ func CreateWidget(c *fiber.Ctx) error {
 		if count, err := CountEnabledWidgets(context.Background(), userID); err != nil {
 			log.Printf("[Widgets] slot count failed for %s: %v", userID, err)
 		} else {
-			// Every widget counts toward the slot cap. Utility widgets live
+			// Every widget except the FreeSlot ones counts. Utility widgets live
 			// client-side (preferences), so add the client-reported count to
 			// the DB widget count.
 			used := count + req.LocalWidgets

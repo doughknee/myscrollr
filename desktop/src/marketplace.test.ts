@@ -12,6 +12,8 @@ import {
   subscribeCatalog,
   canonicalOrder,
   isUtilityWidget,
+  isFreeSlotWidget,
+  slotWidgetCount,
 } from "./marketplace";
 import type { CatalogPayload } from "./types";
 
@@ -40,6 +42,21 @@ describe("bundled snapshot", () => {
     expect(assetClassForWidget("finance_stocks")).toBe("stock");
     expect(assetClassForWidget("finance_crypto")).toBe("crypto");
     expect(assetClassForWidget("sports_nfl")).toBeUndefined();
+  });
+
+  it("reads the free-slot flag from the catalog, never from a list of names", () => {
+    expect(catalogItemById("clock")!.freeSlot).toBe(true);
+    expect(catalogItemById("weather")!.freeSlot).toBe(true);
+    expect(catalogItemById("timer")!.freeSlot).toBe(false);
+    expect(catalogItemById("sports_nfl")!.freeSlot).toBe(false);
+    expect(isFreeSlotWidget("clock")).toBe(true);
+    expect(isFreeSlotWidget("nope_not_real")).toBe(false);
+  });
+
+  it("counts only widgets that use a slot", () => {
+    expect(slotWidgetCount(["clock", "weather"])).toBe(0);
+    expect(slotWidgetCount(["clock", "timer", "weather", "sysmon"])).toBe(2);
+    expect(slotWidgetCount([])).toBe(0);
   });
 
   it("builds catalog items with server identity and a client renderer", () => {

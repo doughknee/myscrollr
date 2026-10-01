@@ -106,6 +106,8 @@ export interface CatalogWidget {
   logo_light?: boolean
   required_tier: string
   order?: number
+  /** Never uses a plan slot (Clock, Weather). */
+  free_slot?: boolean
 }
 
 export interface CatalogResponse {

@@ -286,7 +286,10 @@ export default function WidgetPanel({
 
               {/* ── Facts ─────────────────────────────────────── */}
               <div className="grid grid-cols-2 gap-2 px-5 pt-3.5">
-                <Fact label="Slot cost" value="1 slot · unlimited items" />
+                <Fact
+                  label="Slot cost"
+                  value={item.freeSlot ? "Free · no slot" : "1 slot · unlimited items"}
+                />
                 <Fact
                   label="Plan"
                   value={
@@ -339,7 +342,7 @@ export default function WidgetPanel({
               {added && (
                 <div className="mx-5 mt-4 flex items-center justify-between gap-2.5 rounded-[10px] border border-edge/50 bg-surface-raised px-3 py-2.5">
                   <span className="text-ui-meta text-fg-4">
-                    Removing frees the slot instantly.
+                    {item.freeSlot ? "Remove it any time." : "Removing frees the slot instantly."}
                   </span>
                   <button
                     type="button"

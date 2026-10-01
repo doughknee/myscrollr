@@ -47,7 +47,9 @@ export function CatalogPicker() {
   const [expanded, setExpanded] = useState(false)
 
   const counts = categoryCounts(widgets)
-  const used = active.length
+  // Free-slot widgets (Clock, Weather) never use a slot.
+  const freeIds = new Set(widgets.filter((w) => w.free_slot).map((w) => w.id))
+  const used = active.filter((id) => !freeIds.has(id)).length
   const featured = FEATURED_IDS.map((id) =>
     widgets.find((w) => w.id === id),
   ).filter((w): w is CatalogWidget => w != null)

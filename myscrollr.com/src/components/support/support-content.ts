@@ -16,7 +16,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes. The free tier lets three widgets run at once. No account is required to download or look around; sign in to add live data widgets and sync settings. Uplink plans add more concurrent widgets from $6.67/mo.',
+      'Yes. The free tier lets three widgets run at once, and Clock and Weather are free on top of that. No account is required to download or look around; sign in to add live data widgets and sync settings. Uplink plans add more concurrent widgets from $6.67/mo.',
   },
   {
     question: "Does it affect my computer's performance?",

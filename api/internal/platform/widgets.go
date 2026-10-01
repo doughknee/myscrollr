@@ -72,6 +72,13 @@ type WidgetDef struct {
 	// the people who already have it.
 	Hidden bool `json:"hidden,omitempty"`
 
+	// FreeSlot marks a widget that never uses a plan slot (SCROLLR-282):
+	// Clock and Weather live on the bar's fixed edge, cost nothing to run,
+	// and are on every plan. This is the ONE place that says so — the slot
+	// gate (CountEnabledWidgets), the desktop slot meter and the website
+	// copy all read this flag, so do not name widgets anywhere else.
+	FreeSlot bool `json:"free_slot,omitempty"`
+
 	// Group is the sub-shelf inside a category the directory files this
 	// under ("Football", "Soccer", "Business", "Dev"). Optional: a widget
 	// without one lists ungrouped. Categories past ~8 entries should carry
@@ -670,10 +677,11 @@ var catalog = []WidgetDef{
 		},
 	},
 
-	// ── Utilities — local-only, no data source, but still cost a slot ───
+	// ── Utilities — local-only, no data source. Most cost a slot; the ones
+	// flagged FreeSlot (clock, weather) do not (SCROLLR-282). ──────────────
 	{
 		ID: "clock", Name: "Clock", Category: "utility", Color: "#6366f1",
-		Group: "Desk", AddedAt: addedV110,
+		Group: "Desk", AddedAt: addedV110, FreeSlot: true,
 		Keywords:    []string{"time", "timezone", "world clock"},
 		Description: "Local time and world clocks",
 	},
@@ -685,7 +693,7 @@ var catalog = []WidgetDef{
 	},
 	{
 		ID: "weather", Name: "Weather", Category: "utility", Color: "#0ea5e9",
-		Group: "Desk", AddedAt: addedV110,
+		Group: "Desk", AddedAt: addedV110, FreeSlot: true,
 		Keywords:    []string{"forecast", "temperature", "rain"},
 		Description: "Current conditions for your locations",
 	},
@@ -773,6 +781,12 @@ func IsKnownWidgetType(widgetType string) bool {
 		return true
 	}
 	return DataSourceForWidget(widgetType) != ""
+}
+
+// IsFreeSlotWidgetType reports whether a widget id never uses a plan slot
+// (the catalog's FreeSlot flag).
+func IsFreeSlotWidgetType(widgetType string) bool {
+	return widgetByID[widgetType].FreeSlot
 }
 
 // IsUtilityWidgetType reports whether a widget id is a local-only utility.

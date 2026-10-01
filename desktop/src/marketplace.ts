@@ -150,6 +150,20 @@ export interface CatalogItem {
   keywords?: string[];
   /** ISO date the widget joined the catalog; drives "new". */
   addedAt?: string;
+  /** Never uses a plan slot (Clock, Weather): the server's FreeSlot flag. */
+  freeSlot?: boolean;
+}
+
+/** Whether a widget id never uses a plan slot. The catalog's `free_slot`
+ *  flag is the only authority — never name widgets here. */
+export function isFreeSlotWidget(id: string): boolean {
+  return byId(id)?.free_slot === true;
+}
+
+/** How many of these widget ids use a plan slot — the count the slot meter,
+ *  the cap checks and the server's `local_widgets` all want. */
+export function slotWidgetCount(ids: readonly string[]): number {
+  return ids.filter((id) => !isFreeSlotWidget(id)).length;
 }
 
 /** The source widget id for a data-widget id, or undefined for a utility /
@@ -286,6 +300,7 @@ function buildItem(w: CatalogWidget): CatalogItem | null {
     group: w.group,
     keywords: w.keywords,
     addedAt: w.added_at,
+    freeSlot: w.free_slot === true,
   };
 }
 

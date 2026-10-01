@@ -5,12 +5,14 @@
  * Slots in use = ENABLED widgets + enabled local widgets — the server
  * gate counts `WHERE enabled = true`, and the downgrade prune disables
  * (never deletes) over-cap rows, so counting disabled rows here would
- * claim slots the server would happily accept.
+ * claim slots the server would happily accept. Free-slot widgets (Clock,
+ * Weather — the catalog's `free_slot` flag) are not counted.
  */
 import { useMemo } from "react";
 import clsx from "clsx";
 import { useShell, useShellData } from "../shell-context";
 import { getMaxWidgets } from "../tierLimits";
+import { slotWidgetCount } from "../marketplace";
 
 export interface SlotUsage {
   used: number;
@@ -41,10 +43,10 @@ export function useSlotUsage(): SlotUsage {
     () =>
       computeSlotUsage(
         widgets.filter((ch) => ch.enabled).length,
-        prefs.widgets.enabledWidgets.length,
+        slotWidgetCount(prefs.widgets.enabledWidgets),
         getMaxWidgets(tier),
       ),
-    [widgets, prefs.widgets.enabledWidgets.length, tier],
+    [widgets, prefs.widgets.enabledWidgets, tier],
   );
 }
 

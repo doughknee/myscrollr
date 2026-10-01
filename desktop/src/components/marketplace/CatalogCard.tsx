@@ -89,6 +89,18 @@ export function LogoTile({
   );
 }
 
+/** "Free" — the widget never uses a plan slot (Clock, Weather). */
+function FreeTag() {
+  return (
+    <span
+      title="Free: doesn't use a widget slot"
+      className="ml-1.5 rounded bg-accent/14 px-1 py-px align-middle text-ui-chip font-semibold normal-case tracking-normal text-accent"
+    >
+      Free
+    </span>
+  );
+}
+
 // ── Add / added control ─────────────────────────────────────────
 
 function AddControl({
@@ -180,6 +192,7 @@ export default function CatalogCard({
         <span className="flex min-w-0 flex-1 flex-col leading-4">
           <span className="truncate text-[12.5px] font-semibold text-fg">
             {item.name}
+            {item.freeSlot && <FreeTag />}
           </span>
           <span className="truncate text-ui-chip text-fg-4">
             {item.description}
@@ -244,6 +257,7 @@ export default function CatalogCard({
             </div>
             <div className="text-ui-chip font-semibold tracking-wide text-fg-4 uppercase">
               {CATEGORY_LABELS[item.category]}
+              {item.freeSlot && <FreeTag />}
             </div>
           </div>
           <AddControl item={item} added={added} onAdd={onAdd} />
