@@ -27,8 +27,8 @@ import { THEME_FAMILIES } from "../../src/preferences";
  * known misses): fg, fg-2 and fg-3 text, finals, the up/down change and the
  * live clock at 4.5; the label's name at 3; small text in the widget's
  * colour at 4.5; every hairline at 1.5. SCROLLR-290 adds the weather alert
- * (the amber `warning` text on the edge, 4.5; the shim's demo city carries
- * one) and the empty bar's EMPTY label (3, it is large). A theme that misses fails and names
+ * (the amber `warning` text on the edge, 4.5; the shim's `weather=alert` is
+ * one alerted city, alone so the slot never rotates away) and the empty bar's EMPTY label (3, it is large). A theme that misses fails and names
  * the group, the ratio and the text, so the fix lands in the palette token
  * or the cell rule that painted it.
  */
@@ -139,10 +139,9 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
   };
 }
 
-async function readings(page: Page, url: string, root: string, ready: string, also?: string): Promise<Reading[]> {
+async function readings(page: Page, url: string, root: string, ready: string): Promise<Reading[]> {
   await page.goto(url);
   await page.locator(ready).first().waitFor();
-  if (also) await page.locator(also).first().waitFor();
   await page.evaluate(() => document.fonts.ready);
   // Colours are measured at rest: a theme applied after first paint transitions, and a mid-fade reading is not the palette's.
   await page.waitForTimeout(100);
@@ -157,8 +156,13 @@ for (const family of THEME_FAMILIES) {
   for (const mode of ["dark", "light"] as const) {
     const theme = `${family}-${mode}`;
     test(`${theme}: label, cell text and rules clear their contrast floor`, async ({ page }) => {
-      // The edge zone carries a weather alert (the shim's demo city), in the warning colour.
-      const bar = await readings(page, `/ticker-shim.html?pages=1&fixture=pages&utils=clock,weather&weather=demo&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]", "text=Storm watch");
+      // The edge zone carries a weather alert (the shim's `weather=alert` city, alone so the slot holds still), in the warning colour.
+      let bar = await readings(page, `/ticker-shim.html?pages=1&fixture=pages&utils=clock,weather&weather=alert&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]");
+      // The edge slot can be a beat behind the page's cells (slower on CI): read again until the alert is in.
+      for (let i = 0; i < 20 && !bar.some((r) => r.group === "warning"); i++) {
+        await page.waitForTimeout(250);
+        bar = await page.evaluate((root) => window.__contrast(root), ".ticker-container");
+      }
       // SCROLLR-290: the empty bar's label (nothing installed, and everything off).
       const empty = [
         ...(await readings(page, `/ticker-shim.html?pages=1&fixture=empty&utils=&theme=${theme}`, "[data-label=empty]", "[data-label=empty]")),
