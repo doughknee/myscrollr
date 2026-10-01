@@ -54,7 +54,7 @@ export function useRemoveWidget(
           await dataWidgetsApi.delete(item.id);
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
           toast.success(`${item.name} removed`, {
-            description: "Its slot is free for another widget.",
+            description: "Its page is free for another widget.",
             action: {
               label: "Undo",
               onClick: () => {
@@ -85,7 +85,7 @@ export function useRemoveWidget(
             label: `Removed ${item.name}`,
             description: item.freeSlot
               ? undefined
-              : "Its slot is free for another widget.",
+              : "Its page is free for another widget.",
           },
           (current) => disableWidget(current, item.id),
         );

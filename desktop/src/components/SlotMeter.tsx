@@ -52,19 +52,21 @@ export function useSlotUsage(): SlotUsage {
 
 /** Human one-liner under the headline. Same voice on every surface. */
 export function slotSubline(usage: SlotUsage): string {
-  if (!usage.finite) return "Unlimited slots on your plan — add away.";
+  if (!usage.finite) return "Unlimited pages on your plan — add away.";
   if (usage.atCapacity)
-    return "Remove a widget to free a slot, or upgrade for more.";
+    return "Remove a widget to free a page, or upgrade for more.";
   if (usage.used === 0) return "Fresh start — pick your first widget.";
   const open = usage.max - usage.used;
-  return `${open} open slot${open === 1 ? "" : "s"} — room for more.`;
+  return `${open} open page${open === 1 ? "" : "s"} — room for more.`;
 }
 
+/** A slot is a page on your bar: a news source is a page, a watchlist is
+ *  one page, and Clock and Weather ride the edge for free. */
 export function slotHeadline(usage: SlotUsage): string {
   if (!usage.finite)
     return `${usage.used} widget${usage.used === 1 ? "" : "s"} added`;
-  if (usage.atCapacity) return `All ${usage.max} widget slots in use`;
-  return `${usage.used} of ${usage.max} widget slots used`;
+  if (usage.atCapacity) return `All ${usage.max} pages on your bar in use`;
+  return `${usage.used} of ${usage.max} pages on your bar used`;
 }
 
 /** One pill per slot, filled as used. Renders nothing on unlimited plans. */

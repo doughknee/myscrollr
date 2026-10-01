@@ -130,11 +130,11 @@ function WidgetInfoPage() {
 
   const slotCounter = Number.isFinite(maxSlots)
     ? used === 0 && !enabled
-      ? `0 of ${maxSlots} slots used — room for this one!`
-      : `${used} of ${maxSlots} widget slots used`
-    : `${used} widgets added · unlimited slots`;
+      ? `0 of ${maxSlots} pages used — room for this one!`
+      : `${used} of ${maxSlots} pages on your bar used`
+    : `${used} widgets added · no page limit`;
   const slotNote = free
-    ? `Free — ${item.name} never uses a slot. ${slotCounter}`
+    ? `Free — ${item.name} rides the edge, not a page. ${slotCounter}`
     : slotCounter;
 
   // Shared flow (useRemoveWidget) — same behavior as the sidebar menu.
@@ -169,7 +169,7 @@ function WidgetInfoPage() {
           }
         : slotLocked
           ? {
-              label: "Upgrade for more slots",
+              label: "Upgrade for more pages",
               onClick: () => void open("https://myscrollr.com/uplink"),
               external: true,
             }
@@ -336,8 +336,8 @@ function WidgetInfoPage() {
             },
             {
               icon: Layers,
-              label: "Slot cost",
-              value: free ? "Free · no slot" : "1 slot · unlimited items",
+              label: "On your bar",
+              value: free ? "Free · rides the edge" : "1 page · unlimited items",
             },
             {
               icon: Sparkles,
@@ -417,8 +417,8 @@ function WidgetInfoPage() {
           </div>
           {slotLocked && (
             <p className="text-ui-meta leading-relaxed text-fg-3">
-              All your slots are in use. You can always swap — remove a widget
-              you're not using to free its slot for this one, or{" "}
+              Every page on your bar is in use. You can always swap — remove a
+              widget you're not using to free its page for this one, or{" "}
               <button
                 onClick={() => void open("https://myscrollr.com/uplink")}
                 className="font-semibold text-accent hover:underline"
@@ -430,7 +430,7 @@ function WidgetInfoPage() {
           )}
           {enabled && (
             <p className="text-ui-meta leading-relaxed text-fg-4">
-              {free ? "Remove it any time." : "Removing frees the slot instantly — you can swap widgets any time."}
+              {free ? "Remove it any time." : "Removing frees the page instantly — you can swap widgets any time."}
             </p>
           )}
         </div>

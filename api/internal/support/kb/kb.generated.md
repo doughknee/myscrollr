@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 09211c4f02c5 -->
+<!-- source: desktop/src/components/settings/rows.ts @ 1c39ffaeb0c7 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -237,7 +237,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Profile & plan › Display name: The name shown on your profile *(signed in only)*
 - Settings › Profile & plan › Email: The address on your account *(signed in only)*
 - Settings › Profile & plan › Password: We'll email you a reset link. *(signed in only)*
-- Settings › Profile & plan › Widget slots: Open the Catalog to add, remove, or swap widgets. *(signed in only)*
+- Settings › Profile & plan › Pages on your bar: Open the Catalog to add, remove, or swap widgets. *(signed in only)*
 - Settings › Profile & plan › Sign out: Sign out of this device. Local preferences stay intact. *(signed in only)*
 
 ### Settings › Data & privacy

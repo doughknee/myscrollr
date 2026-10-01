@@ -11,7 +11,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is Scrollr free?",
     answer:
-      "Yes. The free tier streams real-time data to 3 widgets at once, with no ads and no cap on what goes inside each one. Paid plans add widget slots and ticker rows — they do not unlock data, widgets, or live streaming.",
+      "Yes. The free tier streams real-time data to 3 widgets at once, with no ads and no cap on what goes inside each one. Paid plans add pages on your bar and ticker rows — they do not unlock data, widgets, or live streaming.",
   },
   {
     question: "Does it affect my computer's performance?",
@@ -234,7 +234,7 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Upgrade Your Plan",
     iconName: "Zap",
     description:
-      "Free accounts run 3 widgets at once. There is no limit on symbols, feeds or leagues inside a widget. Upgrade for more widget slots and ticker rows.",
+      "Free accounts run 3 widgets at once. There is no limit on symbols, feeds or leagues inside a widget. Upgrade for more pages on your bar and ticker rows.",
   },
 ];
 

@@ -30,13 +30,13 @@ import {
   getCatalogItems,
 } from "../marketplace";
 import type { CatalogItem } from "../marketplace";
-import { dashboardQueryOptions } from "../api/queries";
+import { dashboardQueryOptions, financeCatalogOptions } from "../api/queries";
+import { TIER_LABELS } from "../auth";
 import { useShell, useShellData } from "../shell-context";
 import { useCatalog } from "../hooks/useCatalog";
 import { useAddWidget } from "../hooks/useAddWidget";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
-import { getMaxWidgets, tierMeets } from "../tierLimits";
-import { useSlotUsage } from "../components/SlotMeter";
+import { getMaxWidgets, pagesRoomLine, tierMeets } from "../tierLimits";import { useSlotUsage } from "../components/SlotMeter";
 import WidgetPanel from "../components/marketplace/WidgetPanel";
 import CatalogHub from "../components/marketplace/CatalogHub";
 import CatalogDirectory from "../components/marketplace/CatalogDirectory";
@@ -90,6 +90,12 @@ function CatalogPage() {
   const { prefs, authenticated, tier, onLogin } = useShell();
   const { widgets } = useShellData();
   const { error: dashboardError } = useQuery(dashboardQueryOptions());
+  // The symbol list the Stocks / Crypto watchlists search; only fetched
+  // once someone is actually searching.
+  const { data: symbols = [] } = useQuery({
+    ...financeCatalogOptions(),
+    enabled: Boolean(search.q),
+  });
 
   const addWidget = useAddWidget();
   const removeWidget = useRemoveWidget();
@@ -233,6 +239,29 @@ function CatalogPage() {
     [addWidget, authenticated, lockedFor, setOpen],
   );
 
+  // Symbol rows ("Add AAPL to your Stocks"). Appending to a widget the user
+  // already has needs no slot; only creating one goes through the usual gate.
+  const symbolActions = useMemo(
+    () => ({
+      widgets,
+      gated: (item: CatalogItem) => {
+        const { tierLocked, slotLocked } = lockedFor(item);
+        return !authenticated || tierLocked || slotLocked;
+      },
+      onCreate: (
+        item: CatalogItem,
+        config: Record<string, unknown>,
+        label: string,
+      ) =>
+        void addWidget(item, {
+          config,
+          message: `${item.name} added to your bar with ${label}`,
+        }),
+      onGate: setOpen,
+    }),
+    [widgets, lockedFor, authenticated, addWidget, setOpen],
+  );
+
   const handleRemove = useCallback(
     (item: CatalogItem) => void removeWidget(item),
     [removeWidget],
@@ -267,11 +296,14 @@ function CatalogPage() {
       ? "All widgets"
       : CATEGORY_LABELS[kind];
 
+  const planLine = pagesRoomLine(tier, TIER_LABELS);
+
   const shared = {
     items: allItems,
     addedIds,
     slots,
     capped,
+    planLine,
     onOpen: setOpen,
     onAdd: handleAdd,
     onRemove: handleRemove,
@@ -319,6 +351,8 @@ function CatalogPage() {
           onKindChange={goKind}
           onSortChange={onSortChange}
           onOverview={goHub}
+          symbols={symbols}
+          symbolActions={symbolActions}
         />
       )}
 
@@ -327,6 +361,7 @@ function CatalogPage() {
         added={gating.added}
         tierLocked={gating.tierLocked}
         slotLocked={gating.slotLocked}
+        planLine={planLine}
         authenticated={authenticated}
         related={related}
         onClose={() => setOpen(null)}

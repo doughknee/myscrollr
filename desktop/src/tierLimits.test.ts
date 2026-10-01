@@ -3,6 +3,7 @@ import snapshot from "../../api/internal/widgets/tier_limits.json";
 import {
   TIER_LIMITS,
   getMaxWidgets,
+  pagesRoomLine,
 } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
 
@@ -89,5 +90,30 @@ describe("TIER_LIMITS table", () => {
         expect(superVal >= tierVal).toBe(true);
       }
     }
+  });
+});
+
+// ── pagesRoomLine ──────────────────────────────────────────────
+
+describe("pagesRoomLine", () => {
+  const labels: Record<SubscriptionTier, string> = {
+    free: "Free",
+    uplink: "Uplink",
+    uplink_pro: "Uplink Pro",
+    uplink_ultimate: "Uplink Ultimate",
+    super_user: "Super User",
+  };
+
+  it.each<[SubscriptionTier, string]>([
+    ["free", "Your bar has room for 3 pages on Free · Uplink fits 6"],
+    ["uplink", "Your bar has room for 6 pages on Uplink · Uplink Pro fits 12"],
+    [
+      "uplink_pro",
+      "Your bar has room for 12 pages on Uplink Pro · Uplink Ultimate fits unlimited",
+    ],
+    ["uplink_ultimate", "Your bar has no page limit on Uplink Ultimate"],
+    ["super_user", "Your bar has no page limit on Super User"],
+  ])("%s", (tier, expected) => {
+    expect(pagesRoomLine(tier, labels)).toBe(expected);
   });
 });

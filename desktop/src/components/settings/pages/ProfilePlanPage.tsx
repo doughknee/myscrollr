@@ -411,7 +411,7 @@ export default function ProfilePlanPage({
             !isLifetime && (
               <ActionRow
                 label={tier === "free" ? "Upgrade to Uplink" : "Upgrade plan"}
-                description="More slots — run more widgets at once."
+                description="More pages on your bar — run more widgets at once."
                 action="Upgrade"
                 tone="accent"
                 onClick={() => open("https://myscrollr.com/uplink")}

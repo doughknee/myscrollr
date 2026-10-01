@@ -80,6 +80,28 @@ export const TIER_ORDER: SubscriptionTier[] = [
   "super_user",
 ];
 
+/**
+ * The plan limit in the bar's own words: a slot is a page on your bar.
+ * "Your bar has room for 3 pages on Free · Uplink fits 6". The next tier is
+ * the first public one with a higher cap; the top tier has no limit to show.
+ * `labels` is auth's TIER_LABELS, passed in so this file stays free of auth's
+ * Tauri imports (it is read synchronously during render and in plain tests).
+ */
+export function pagesRoomLine(
+  tier: SubscriptionTier,
+  labels: Record<SubscriptionTier, string>,
+): string {
+  const max = getMaxWidgets(tier);
+  if (!Number.isFinite(max)) return `Your bar has no page limit on ${labels[tier]}`;
+  const next = TIER_ORDER.slice(TIER_ORDER.indexOf(tier) + 1).find(
+    (t) => t !== "super_user" && getMaxWidgets(t) > max,
+  );
+  const upsell = next
+    ? ` · ${labels[next]} fits ${Number.isFinite(getMaxWidgets(next)) ? getMaxWidgets(next) : "unlimited"}`
+    : "";
+  return `Your bar has room for ${max} pages on ${labels[tier]}${upsell}`;
+}
+
 export function tierMeets(
   current: SubscriptionTier,
   required: SubscriptionTier,
