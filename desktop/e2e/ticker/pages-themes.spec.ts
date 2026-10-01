@@ -11,49 +11,34 @@ import { THEME_FAMILIES } from "../../src/preferences";
  *     news, Also) and one item in every state.
  *
  * Each piece of text is measured against what is actually behind it: the
- * bar, plus the label's tint where it sits on the label, and the element's
- * own opacity (a final game is drawn at 80%). Layers are composited by a
+ * bar, plus the label's tint where it sits on the label, a close game's
+ * tint, and the element's own opacity (`@dim`). Layers are composited by a
  * 1x1 canvas, so any CSS colour the palette uses (oklch, color-mix) is
  * resolved by the browser itself. Text is grouped by the palette token it is
- * painted in (fg, fg-2, fg-3, fg-4) or as the widget's accent, because that
- * is where a fix goes: a cell picks a token, a palette defines it.
+ * painted in (fg, fg-2, fg-3, fg-4, up, down, live) or as the widget's
+ * colour (`accent`: `--accent` or its text form `--accent-ink`), because
+ * that is where a fix goes: a cell picks a token, a palette defines it.
  *
  * Floors (WCAG): text 4.5:1; large text (>= 24 px, or >= 18.66 px bold) 3:1;
  * the hairline between columns 1.5:1 (it separates, it does not carry
  * information).
  *
- * ASSERTED in every theme: fg and fg-2 text at 4.5 and the label's name at 3.
- * The palettes that miss (the palette's own fg or fg-2 token is under 4.5
- * on its own bar: the official Tokyo Night Day, Solarized and Everforest
- * values, SCROLLR-275 findings) are listed in LOW with the measured ratio:
- * the CI stays green, a NEW miss fails, and a listed one that starts to pass
- * fails until its entry is deleted. REPORTED, not asserted: fg-3, fg-4, a
- * dimmed final game (`@dim`), small accent text, the semantic greys and the
- * hairline are below their floors in most palettes. The spec prints the
- * table per theme and attaches it to the report; move a group into HARD
- * when its palette is fixed.
+ * ASSERTED in every theme, every reading (SCROLLR-287 emptied the table of
+ * known misses): fg, fg-2 and fg-3 text, finals, the up/down change and the
+ * live clock at 4.5; the label's name at 3; small text in the widget's
+ * colour at 4.5; every hairline at 1.5. A theme that misses fails and names
+ * the group, the ratio and the text, so the fix lands in the palette token
+ * or the cell rule that painted it.
  */
 
 const TEXT_FLOOR = 4.5;
 const LARGE_FLOOR = 3;
 const RULE_FLOOR = 1.5;
 
-/** Groups asserted in every theme. */
-const HARD = ["fg", "fg-2", "label-name"];
-
-/** Known misses in HARD groups: `<theme>|<group>` -> worst ratio measured. */
-const LOW: Record<string, number> = {
-  "tokyo-night-light|fg": 3.33,
-  "solarized-light|fg": 3.82,
-  "everforest-light|fg": 3.81,
-  "catppuccin-light|fg-2": 4.21,
-  "tokyo-night-light|fg-2": 4.38,
-  "solarized-dark|fg-2": 3.85,
-  "solarized-light|fg-2": 3.16,
-  "rose-pine-dark|fg-2": 4.47,
-  "rose-pine-light|fg-2": 3.45,
-  "everforest-light|fg-2": 2.27,
-};
+/** Groups every theme must have measured, so a pass is never vacuous. */
+const MEASURED = ["fg", "fg-2", "fg-3", "label-name", "accent", "rule"];
+/** Parts every theme must have measured: the up/down change and the game clock (live, in the live colour). */
+const PARTS = ["change", "status"];
 
 interface Reading {
   /** The palette token the text is painted in, `accent`, `label-name`, `rule`, or `other:<part>`. */
@@ -120,7 +105,10 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
         const { bg, opacity } = stack(el, root);
         if (el.matches("span.w-px")) {
           const rule = paint([...bg, { color: cs.backgroundColor, alpha: opacity }]);
-          out.push({ group: "rule", role: "rule", text: "", ratio: ratio(rule, paint(bg)), floor: cfg.rule });
+          // Name the rule by where it is, so a miss says which widget's colour.
+          const where = el.closest("[data-widget], [data-bar], [data-strip]");
+          const text = where ? [...where.attributes].filter((a) => /^data-(widget|bar|strip)$/.test(a.name)).map((a) => a.value).join("") : "";
+          out.push({ group: "rule", role: el.closest("[data-part]")?.getAttribute("data-part") ?? "rule", text, ratio: ratio(rule, paint(bg)), floor: cfg.rule });
           continue;
         }
         const own = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent!.trim()).map((n) => n.textContent!.trim()).join(" ");
@@ -130,14 +118,14 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
         const part = el.closest("[data-part]")?.getAttribute("data-part") ?? (el.closest("[data-label]") ? (large ? "label-name" : "label-sub") : "text");
         // Which token is it? Compare the colour at full strength with each token.
         const solid = paint([{ color: cs.color, alpha: 1 }]);
-        const tokens = ["fg", "fg-2", "fg-3", "fg-4"].filter((t) => {
-          const v = cs.getPropertyValue(`--color-${t}`).trim();
-          return v && same(solid, paint([{ color: v, alpha: 1 }]));
-        });
-        const accent = cs.getPropertyValue("--accent").trim();
-        const group = part === "label-name" ? "label-name" : tokens[0] ?? (accent && same(solid, paint([{ color: getComputedStyle(el).getPropertyValue("--accent"), alpha: 1 }])) ? "accent" : `other:${part}`);
+        const is = (prop: string) => {
+          const v = cs.getPropertyValue(prop).trim();
+          return !!v && same(solid, paint([{ color: v, alpha: 1 }]));
+        };
+        const token = ["fg", "fg-2", "fg-3", "fg-4", "up", "down", "live"].find((t) => is(`--color-${t}`));
+        const group = part === "label-name" ? "label-name" : token ?? (is("--accent") || is("--accent-ink") ? "accent" : `other:${part}`);
         out.push({
-          // A cell drawn at reduced opacity (a final game, 80%) is its own group.
+          // Text drawn at reduced opacity is its own group.
           group: opacity < 0.999 ? `${group}@dim` : group, role: part, text: own.slice(0, 40),
           ratio: ratio(paint([...bg, { color: cs.color, alpha: opacity }]), paint(bg)),
           floor: large ? cfg.large : cfg.text,
@@ -181,12 +169,11 @@ for (const family of THEME_FAMILIES) {
         contentType: "application/json",
       });
 
-      const missed = rows.filter(([g, r]) => HARD.includes(g) && r.ratio < r.floor);
-      const fresh = missed.filter(([g]) => !(`${theme}|${g}` in LOW));
-      expect(fresh.map(([g, r]) => `${g} ${r.ratio.toFixed(2)} < ${r.floor} ("${r.text}", ${r.role})`), `${theme}: below the floor`).toEqual([]);
-      const fixed = Object.keys(LOW).filter((k) => k.startsWith(`${theme}|`) && !missed.some(([g]) => `${theme}|${g}` === k));
-      expect(fixed, `${theme}: listed in LOW but now passing; delete the entry`).toEqual([]);
-      for (const g of HARD) expect(worst.has(g), `${theme}: measured ${g}`).toBe(true);
+      const missed = rows.filter(([, r]) => r.ratio < r.floor);
+      expect(missed.map(([g, r]) => `${g} ${r.ratio.toFixed(2)} < ${r.floor} ("${r.text}", ${r.role})`), `${theme}: below the floor`).toEqual([]);
+      for (const g of MEASURED) expect(worst.has(g), `${theme}: measured ${g}`).toBe(true);
+      for (const p of PARTS) expect(all.some((r) => r.role === p), `${theme}: measured ${p}`).toBe(true);
+      expect(all.some((r) => r.text === "FINAL"), `${theme}: measured a final game`).toBe(true);
     });
   }
 }

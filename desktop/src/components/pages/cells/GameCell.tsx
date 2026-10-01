@@ -104,6 +104,9 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
   const live = isLive(g);
   const close = live && isCloseGame(g);
   const pre = isPre(g);
+  // A result steps its leader down to fg-2 instead of dimming the cell:
+  // opacity cost every text contrast in six palettes (SCROLLR-287).
+  const lead = isFinal(g) ? "font-bold text-fg-2" : "font-bold text-fg";
   const away = Number(g.away_team_score);
   const home = Number(g.home_team_score);
   const scored = !pre && g.away_team_score !== "" && g.home_team_score !== "" && Number.isFinite(away) && Number.isFinite(home);
@@ -114,26 +117,26 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
   const roomy = width >= ROOMY_GAME_PX;
   const scoreCh = `${Math.max(2, r.score)}ch`;
 
-  const score = (side: "away" | "home", v: number | string, lead: boolean) => (
+  const score = (side: "away" | "home", v: number | string, leads: boolean) => (
     <span
       data-part={`${side}-score`}
       className={clsx(
         "text-right font-mono leading-none tabular-nums",
         wide ? "text-[20px]" : "text-[15px]",
-        lead ? "font-bold text-fg" : "font-medium text-fg-3",
+        leads ? lead : "font-medium text-fg-3",
       )}
       style={{ minWidth: scoreCh }}
     >
       {scored ? String(v) : ""}
     </span>
   );
-  const name = (side: "away" | "home", n: string, lead: boolean, end?: boolean) => (
+  const name = (side: "away" | "home", n: string, leads: boolean, end?: boolean) => (
     <span
       data-part={`${side}-name`}
       className={clsx(
         "min-w-0 truncate font-sans text-[13.5px] leading-none",
         end ? "text-right" : "text-left",
-        pre ? "font-semibold text-fg" : lead ? "font-bold text-fg" : "font-medium text-fg-3",
+        pre ? "font-semibold text-fg" : leads ? lead : "font-medium text-fg-3",
       )}
       title={n}
     >
@@ -152,7 +155,6 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
       data-mine={mine ? "" : undefined}
       className={clsx(
         "relative flex h-full w-full min-w-0 items-stretch pl-3 pr-2 text-left transition-colors duration-700",
-        isFinal(g) && "opacity-80",
       )}
       style={{
         background: flash ? "color-mix(in srgb, var(--color-live) 18%, transparent)" : close ? mix(10) : undefined,
@@ -170,18 +172,18 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
           <span className="flex min-w-0 items-center justify-end gap-2">
             <span className="flex min-w-0 flex-col items-end gap-[4px]">
               {name("away", g.away_team_name, awayLeads, true)}
-              <span className="truncate font-mono text-[11px] leading-none text-fg-4 tabular-nums">{rec(g.away_standing)}</span>
+              <span className="truncate font-mono text-[11px] leading-none text-fg-3 tabular-nums">{rec(g.away_standing)}</span>
             </span>
             <Crest src={g.away_team_logo} alt={g.away_team_name} size="lg" />
           </span>
           {score("away", g.away_team_score, awayLeads)}
-          <span className="text-center font-mono text-[12px] text-fg-4">{pre ? "@" : "–"}</span>
+          <span className="text-center font-mono text-[12px] text-fg-3">{pre ? "@" : "–"}</span>
           {score("home", g.home_team_score, homeLeads)}
           <span className="flex min-w-0 items-center gap-2">
             <Crest src={g.home_team_logo} alt={g.home_team_name} size="lg" />
             <span className="flex min-w-0 flex-col gap-[4px]">
               {name("home", g.home_team_name, homeLeads)}
-              <span className="truncate font-mono text-[11px] leading-none text-fg-4 tabular-nums">{rec(g.home_standing)}</span>
+              <span className="truncate font-mono text-[11px] leading-none text-fg-3 tabular-nums">{rec(g.home_standing)}</span>
             </span>
           </span>
         </span>
@@ -194,7 +196,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
           {name("home", g.home_team_name, homeLeads)}
           {score("home", g.home_team_score, homeLeads)}
           {/* Before kick-off, where; after it, the table. */}
-          <span data-part="detail" className="col-span-3 truncate font-mono text-[11px] leading-none text-fg-4 tabular-nums">
+          <span data-part="detail" className="col-span-3 truncate font-mono text-[11px] leading-none text-fg-3 tabular-nums">
             {pre && g.venue ? g.venue : [rec(g.away_standing), rec(g.home_standing)].filter(Boolean).join("  ·  ")}
           </span>
         </span>
@@ -208,7 +210,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
         <span
           className={clsx(
             "relative font-bold tracking-[0.04em]",
-            live ? "text-live" : isFinal(g) ? "text-fg-4" : "text-fg-2",
+            live ? "text-live" : isFinal(g) ? "text-fg-3" : "text-fg-2",
           )}
         >
           {/* Always mounted, hung off the text's left edge so it takes no

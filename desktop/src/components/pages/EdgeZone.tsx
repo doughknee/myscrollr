@@ -45,7 +45,7 @@ import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/
 import GameCell, { gameMinCol } from "./cells/GameCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
-import { Rule, accentFor, accentStyle } from "./cells/parts";
+import { Rule, accentFor, accentStyle, inkFor } from "./cells/parts";
 
 const UTILITIES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
 type Utility = (typeof UTILITIES)[number];
@@ -189,7 +189,6 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
       className={clsx(
         "flex min-w-0 flex-col justify-center gap-[4px] px-3 text-left font-mono",
         sizer ? "invisible col-start-1 row-start-1 h-0 overflow-hidden" : "h-full",
-        !sizer && it.dim && "opacity-70",
       )}
     >
       <span className="truncate whitespace-nowrap text-[9.5px] font-bold uppercase leading-none tracking-[0.08em] text-fg-3">
@@ -201,14 +200,14 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
         <span
           className={clsx(
             "text-[16px] font-bold leading-none tabular-nums",
-            it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : "text-fg",
+            it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : it.dim ? "text-fg-2" : "text-fg",
           )}
         >
           {sizer ? it.reserve : it.value}
         </span>
       </span>
       {!sizer && (
-        <span className={clsx("w-0 min-w-full truncate whitespace-nowrap text-[9.5px] leading-none", it.tone === "warning" ? "font-bold uppercase text-warning" : "text-fg-4")}>
+        <span className={clsx("w-0 min-w-full truncate whitespace-nowrap text-[9.5px] leading-none", it.tone === "warning" ? "font-bold uppercase text-warning" : "text-fg-3")}>
           {it.detail ?? ""}
         </span>
       )}
@@ -279,7 +278,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
     <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
       <div ref={strip} data-edge-utils="" className="flex h-full">
         {edge.utilities.map((u, i) => (
-          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark))}>
+          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark))}>
             {i > 0 && <Rule />}
             <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>
@@ -291,7 +290,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
           className="relative h-full shrink-0"
           data-widget={p.widget}
           data-pin-subject={p.pin}
-          style={{ ...accentStyle(accentFor(p.hex, dark)), width: p.width }}
+          style={{ ...accentStyle(accentFor(p.hex, dark), inkFor(p.hex, dark)), width: p.width }}
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
           <PinCell p={p} onChipClick={onChipClick} />

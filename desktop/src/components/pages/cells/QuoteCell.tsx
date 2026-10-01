@@ -77,7 +77,7 @@ const QuoteCell = memo(function QuoteCell({ trade: t, onClick }: QuoteCellProps)
           always there; with no range it stays empty rather than guess. Both
           ends hold PRICE_CH from first render, so a new low or high changes
           the number, never where the rail starts or stops. */}
-      <span data-part="range" className="col-span-2 flex items-center gap-1.5 text-[9.5px] leading-none text-fg-4 tabular-nums">
+      <span data-part="range" className="col-span-2 flex items-center gap-1.5 text-[9.5px] leading-none text-fg-3 tabular-nums">
         <span data-part="range-low" className="shrink-0 text-right" style={{ minWidth: `${PRICE_CH}ch` }}>
           {pos !== null ? formatPriceBare(t.day_low!) : ""}
         </span>
