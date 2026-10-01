@@ -126,9 +126,11 @@ const GAME_STATES: [string, Game][] = [
 ];
 const aapl = stocks[0];
 const QUOTE_STATES: [string, Trade][] = [
-  ["small", { ...aapl, price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }],
-  ["large", { ...aapl, price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 9260.55 }],
-  ["no-range", { ...aapl, price: 253.69, percentage_change: 0, day_low: 0, day_high: 0 }],
+  // One stock through a day (SCROLLR-296 round 5: the price zone is the price's own width, so a
+  // state changes digits, not how many): a one- and a two-digit move, a new low and high, no range.
+  ["up", { ...aapl, price: 253.69, percentage_change: 0.89, day_low: 251.5, day_high: 254.2 }],
+  ["down", { ...aapl, price: 249.1, percentage_change: -12.4, day_low: 201.1, day_high: 289.55 }],
+  ["no-range", { ...aapl, price: 250.01, percentage_change: 0, day_low: 0, day_high: 0 }],
 ];
 const NEWS_STATES: [string, RssItem][] = [
   ["fresh", { ...bbc[0], published_at: new Date(NOW - 9 * 60_000).toISOString() }],

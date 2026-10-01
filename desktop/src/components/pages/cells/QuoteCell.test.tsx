@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import QuoteCell, { changeText, priceCh, rangeText, CHANGE_CH, PRICE_CH, STOCK_PRICE_CH } from "./QuoteCell";
+import QuoteCell, { changeText, rangeText, CHANGE_CH } from "./QuoteCell";
 import type { Trade } from "../../../types";
 
 function trade(over: Partial<Trade> = {}): Trade {
@@ -45,11 +45,15 @@ describe("QuoteCell", () => {
     expect(right.contains(container.querySelector('[data-part="range"]'))).toBe(true);
   });
 
-  it("the price zone is only as wide as the price: the day's line starts a 12px gap after it", () => {
-    const button = render(<QuoteCell trade={trade()} />).container.querySelector("button")!;
+  it("symbol, price and change share one left edge; the price zone is as wide as the price, the line 12px after it", () => {
+    const button = render(<QuoteCell trade={trade()} fill />).container.querySelector("button")!;
     expect(button.className).toContain("grid-cols-[max-content_minmax(0,1fr)]");
     expect(button.className).toContain("gap-x-3");
-    expect(button.querySelector('[data-part="price"]')!.classList.contains("text-right")).toBe(true);
+    const left = button.querySelector('[data-part="price"]')!.parentElement!;
+    expect(left.className).toContain("items-start");
+    for (const p of ["symbol", "price", "change"]) expect(button.querySelector(`[data-part="${p}"]`)!.className).not.toContain("text-right");
+    // The fill's "+" hangs outside the symbol's box, so the symbol starts where everyone's does.
+    expect(button.querySelector('[aria-label="popular"]')!.className).toContain("right-full");
   });
 
   it("flat is neutral: no arrow, no up colour", () => {
@@ -78,21 +82,16 @@ describe("QuoteCell", () => {
     expect(container.querySelector('[data-part="range-rail"]')!.querySelector(".invisible")).toBeTruthy();
   });
 
-  it("width-stable: a one-digit and a two-digit move, a small and a large price, reserve the same", () => {
+  it("width-stable: the price is tabular (a tick changes digits, not width); the change holds its reservation", () => {
     const parts = (t: Trade) => {
       const { container } = render(<QuoteCell trade={t} />);
-      const el = (p: string) => (container.querySelector(`[data-part="${p}"]`) as HTMLElement).style.minWidth;
-      return [el("change"), el("price")];
+      return [(container.querySelector('[data-part="change"]') as HTMLElement).style.minWidth, container.querySelector('[data-part="price"]')!.className];
     };
-    const small = parts(trade({ price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }));
-    const large = parts(trade({ price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 9260.55 }));
-    const none = parts(trade({ day_low: 0, day_high: 0 }));
-    expect(large).toEqual(small);
-    expect(none).toEqual(small);
-    // A stock holds eight characters ("9,999.99"), a coin nine ("79,850.21").
-    expect(small).toEqual([`${CHANGE_CH}ch`, `${STOCK_PRICE_CH}ch`]);
-    expect(parts(trade({ symbol: "BTC/USD", price: 79850.21, day_low: 79002.24, day_high: 81263.52 }))[1]).toBe(`${PRICE_CH}ch`);
-    expect(priceCh("BTC/USD")).toBe(9);
+    const a = parts(trade({ price: 253.69, percentage_change: 0.89 }));
+    const b = parts(trade({ price: 249.1, percentage_change: -12.4, day_low: 0, day_high: 0 }));
+    expect(b).toEqual(a);
+    expect(a[0]).toBe(`${CHANGE_CH}ch`);
+    expect(a[1]).toContain("tabular-nums");
     // The widest change fits its reservation.
     expect(changeText(-12.4).length).toBeLessThanOrEqual(CHANGE_CH);
   });
