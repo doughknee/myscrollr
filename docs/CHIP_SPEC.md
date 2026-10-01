@@ -44,7 +44,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **cell** | One item in one page column: a game, a headline, a quote, an Also entry. No card shell. `desktop/src/components/pages/cells/`. |
 | **column** | One equal-width slot of a page. Its width is `content width / items on the page`. |
 | **label** | The 112px block at the left of a page naming the widget (§P.2). |
-| **visit** | One trip to a widget: its sticky pages and two more, or three when nothing is sticky, continuing where the last visit stopped; then the bar moves to the next widget (§P.6). |
+| **visit** | One trip to a widget: its sticky pages and one more of the rest, continuing where the last visit stopped; then the bar moves to the next widget (§P.6). |
 | **sticky page** | A leading page holding live games or your team's games; it shows on every visit. |
 | **edge zone** | The fixed block at the right of the Pages bar: utilities, then pins (§P.10, §P.11). |
 | **Also page** | The one shared page, last, listing every widget that has nothing on (§P.12). |
@@ -247,17 +247,23 @@ a short watchlist still needs topping up:
 ### P.6 The visit rule
 
 Widgets are visited in ticker order (`activeTabs`), the Also page last, then round again.
-One visit shows (`visitPages`, `MAX_PAGES_PER_VISIT = 3`):
+One visit shows (`visitPages`, `REST_PER_VISIT = 1`; SCROLLR-294):
 
 1. the **sticky pages**, however many, on **every** visit: live games and your team never
    wait a turn;
-2. then **two more** pages of the rest (**three** when nothing is sticky), continuing from
-   that widget's cursor and wrapping, so every page comes round over a few laps;
+2. then **one** page of the rest, continuing from that widget's cursor and wrapping, so
+   every page comes round over the laps;
 3. then the bar moves to the next widget.
 
-A widget whose pages all fit (`pageCount <= sticky + 2`, or `<= 3` with nothing sticky)
-shows whole every visit. 30 NPR headlines at 1920 are 8 pages: visits show 1-3, then 4-6,
-then 7, 8, 1, so every headline is seen within 3 laps (`ceil((pages - sticky) / more)`).
+A widget whose pages all fit in sticky + 1 (`pageCount <= sticky + 1`) shows whole every
+visit. 30 NPR headlines at 1920 are 8 pages, nothing sticky: visits show page 1, then 2,
+then 3 ... 8, then 1 again, so every headline is seen within 8 laps (`pages - sticky`).
+
+Why one (Brandon, 1 Oct 2026, on SCROLLR-293's three a visit: "It takes a hot minute to
+actually get through NPR, there are 8 pages"): three pages of 6 to 12 s held the bar on
+one feed for up to 36 s every lap. One page a visit keeps every widget's turn short and
+the lap brisk; nothing is hidden, the rest is paced over the laps. The cost is "all
+shown": a widget's whole pool now takes `pages - sticky` laps. Measured in §P.15.
 
 **The cursor.** Where the next visit continues, per widget, found by name (`Nav.cursors` in
 the leader's page clock, `newNav`). A cursor starts at `sticky` and is a page index, wrapped
@@ -483,25 +489,47 @@ state and one window owns it.
   digits and final: nothing moves.
 - `e2e/ticker/pages.spec.ts`: per fixture and width under a fake
   clock: no cell moves while its page is up (0.5 px), no cell is cut off, every dwell is 5.98
-  to 12.1 s, live or yours on every lap, a lap of at most 60 s (never raise it: lower
-  `MAX_PAGES_PER_VISIT` instead), two windows in step, the label counts the page
+  to 12.1 s, live or yours on every lap, a lap of at most 60 s (never raise it),
+  **all shown** (`allShown`: every page of every widget up and dwelt, from the first lap's
+  start) within 300 s, two windows in step, the label counts the page
   (`n/m`) and no label fact is cut beside it, and **every page is full** (`unfilled`: one
   page shows `min(columns, available)`; several pages show full pages unless the pool is
   not a multiple of the columns, then the even split). Laps are cut at visit starts
   (`data-visit`), since a visit no longer always opens on page 1. Fixtures: `nflthursday`
   (TNF + Sunday + MNF, your Bears sticky), `googl` (one symbol + popular), `sparsenews`
   (nine headlines over three days, all shown), `onegame` (truly short: one column,
-  left-aligned, measured), `npr` (SCROLLR-293: 30 headlines over six days). The `npr`
-  checks: visits run 1-3, 4-6, 7-8-1 at 1920 through the live sim's 4 s refreshes and an
-  injected refresh with a new headline mid-visit 2 (`window.__shimDashboard`, dev and
-  `?live=1` only); every headline is seen within 3 laps; at 1280 the counter reads `10/15`
-  and NCAAF on the busy Saturday `10/14` with nothing in the label cut. Measured laps
-  (SCROLLR-293, before → after): pages 59.3 → 59.3 s, mixed 52.4 → 52.4, busy 24.6 → 24.6,
-  longnames 44.1 → 44.1, quiet 20.1 → 24.6, default 31.4 → 31.4, nflthursday 9.6 → 18.6
-  (1920) and 7.4 → 18.6 (1280), googl 10.4 → 10.4, sparsenews 6.6 → 18.6, onegame 6.6 →
-  6.6, npr 18.6 (1920 and 1280). The shim serves `/finance/public` from `market.json`. The
-  scorecard gets a `pages` mode: lap, widget share, Also share, cells moved or cut, dwell,
-  dropped swipe frames.
+  left-aligned, measured), `npr` (SCROLLR-293: 30 headlines over six days). `pages+npr30` (SCROLLR-294: the
+  `pages` set with NPR's 3 headlines swapped for `npr`'s 30, the worst case for all shown).
+  The `npr` checks: visits run 1, 2, 3 ... 8, 1 at 1920 through the live sim's 4 s
+  refreshes and an injected refresh with a new headline during visit 4
+  (`window.__shimDashboard`, dev and `?live=1` only); every headline is seen within 8 laps; at 1280 the counter reads `10/15`
+  and NCAAF on the busy Saturday `10/14` with nothing in the label cut. The shim serves
+  `/finance/public` from `market.json`. The scorecard gets a `pages` mode: lap, widget
+  share, Also share, cells moved or cut, dwell, dropped swipe frames.
+
+  Measured (SCROLLR-294, fake clock, seconds; three pages a visit → sticky + 1). A
+  single-widget fixture's lap is one visit, so one page now. Over 300 s all shown, marked
+  `over5` in `RUNS` (measured and must finish, not held to 300 s): **mixed** (the 56-game
+  NCAAF Saturday) and **pages+npr30**. Raising the bound is not the fix; a lever is Home's
+  call (SCROLLR-294).
+
+  | Fixture @ width | Lap before | Lap after | All shown before | All shown after |
+  |---|---|---|---|---|
+  | pages @1920 | 59.3 | 52.5 | 59.3 | 76.6 |
+  | pages+npr30 @1920 | 71.4 | 52.5 | 200.8 | **409.8** |
+  | mixed @1920 | 52.4 | 44.9 | 220.7 | **330.4** |
+  | busy @1280 | 24.6 | 18.6 | 144.9 | 216.6 |
+  | longnames @1280 | 44.1 | 38.1 | 44.1 | 69.6 |
+  | quiet @1920 | 24.6 | 18.6 | 24.6 | 24.6 |
+  | default @1920 | 31.4 | 31.4 | 31.4 | 31.4 |
+  | nflthursday @1920 | 18.6 | 18.6 | 18.6 | 18.6 |
+  | nflthursday @1280 | 18.6 | 12.6 | 30.6 | 36.6 |
+  | googl @1920 | 10.4 | 10.4 | 10.4 | 10.4 |
+  | sparsenews @1280 | 18.6 | 6.6 | 30.6 | 30.6 |
+  | npr @1920 | 18.6 | 6.6 | 48.6 | 48.6 |
+  | npr @1280 | 18.6 | 6.6 | 90.6 | 90.6 |
+  | onegame @1920 | 6.6 | 6.6 | 6.6 | 6.6 |
+
 - `e2e/ticker/pages-themes.spec.ts`: one static frame per theme family x light/dark
   (`?theme=<family>-<mode>`), text measured against what is behind it: every reading is
   asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
@@ -1389,7 +1417,7 @@ needs both until Continuous is retired.
 - [ ] No per-widget slot count; no new setting for how many or which (§1.4).
 - [ ] The pool is the widget page's (§P.4a): no time window under Pages, nothing eligible hidden; the visit cursor continues where the last visit stopped through refreshes and re-plans, leader-owned; the label counts the page (`n/m`) and its fact fits beside it.
 - [ ] Every page is full (§P.4a): the family's pool fills its pages (or a fill tops a short one up), `topUp` adds only the last page's empty columns, a fill is never written to the user's config, and a truly short widget is drawn at a page's column width, left-aligned; `pages.spec.ts` `unfilled` green.
-- [ ] Every fixture's lap is at most 60 s; if one is over, `MAX_PAGES_PER_VISIT` goes down, never the threshold up.
+- [ ] Every fixture's lap is at most 60 s and everything is shown within 300 s (`pages.spec.ts`); a visit is the sticky pages plus one (`REST_PER_VISIT`); never raise a threshold to pass.
 - [ ] The ticker selector reads no feed prefs; pinned subjects dropped from the pages with `dropPinned`; the pin is on the bar once.
 - [ ] A widget with nothing on reaches the Also page with its status words; nothing fabricated.
 - [ ] Edge: one Cycle slot per utility stepping on the turn `seq`; a sizer for every item so the width is constant; edge width read when the page is planned.

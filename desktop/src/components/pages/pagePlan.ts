@@ -54,8 +54,8 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 /** Width of the label block on the left of every page. */
 export const LABEL_W = 112;
 
-/** Pages a visit shows: the sticky ones and two more of the rest, or three of the rest when nothing is sticky. */
-export const MAX_PAGES_PER_VISIT = 3;
+/** Pages of the rest a visit shows after the sticky ones (SCROLLR-294: one, then the bar moves on). */
+export const REST_PER_VISIT = 1;
 
 /** Width left for columns once the label and the edge zone are taken. */
 export function contentWidth(barWidth: number, edgeWidth = 0): number {
@@ -146,17 +146,17 @@ export interface Visit {
 
 /**
  * Which pages one visit to a widget shows. The `sticky` leading pages (live
- * and yours, however many) show every visit; then MAX_PAGES_PER_VISIT - 1 more
- * of the rest (MAX_PAGES_PER_VISIT when nothing is sticky), continuing from
- * `cursor` and wrapping, so every page comes round over a few laps; then the
- * caller moves to the next widget. Start a widget's cursor at `sticky`. A
- * widget small enough to show whole does. A 30-headline feed on 8 pages
- * shows 1-3, then 4-6, then 7, 8, 1 (SCROLLR-293).
+ * and yours, however many) show every visit; then REST_PER_VISIT (one) page
+ * of the rest, continuing from `cursor` and wrapping, so every page comes
+ * round over the laps; then the caller moves to the next widget. Start a
+ * widget's cursor at `sticky`. A widget whose pages fit in sticky + 1 shows
+ * whole. A 30-headline feed on 8 pages shows 1, then 2, then 3 ... then 8,
+ * then 1 again (SCROLLR-294; SCROLLR-293 showed three a visit).
  */
 export function visitPages(pageCount: number, cursor: number, sticky = 0): Visit {
   if (pageCount <= 0) return { pages: [], next: 0 };
   const s = Math.max(0, Math.min(sticky, pageCount));
-  const more = MAX_PAGES_PER_VISIT - Math.min(1, s);
+  const more = REST_PER_VISIT;
   if (pageCount <= s + more) {
     return { pages: Array.from({ length: pageCount }, (_, i) => i), next: s };
   }

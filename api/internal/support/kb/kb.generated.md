@@ -250,7 +250,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 41cbf547e7c3 -->
+<!-- source: docs/CHIP_DESIGN.md @ d0d8d37fde38 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -319,11 +319,12 @@ There's no time window on pages: if NPR has 30 headlines, all 30 come round on t
 - **News:** every headline the feed has (we keep a week of them), newest first.
 - **Stocks and crypto:** your watchlist, in your order.
 
-A visit to a widget shows three pages (live games and your team always among them), then
-the bar moves on. **The next visit carries on where the last one stopped**, so a feed of 8
-pages shows pages 1 to 3, then 4 to 6 on the next trip round, then 7, 8 and 1. New
-headlines arriving in between don't send it back to the start. The label's 2/8 tells you
-where you are.
+A visit to a widget shows its pages with a live game or your team in them, plus **one
+more page**, then the bar moves on. **The next visit carries on where the last one
+stopped**, so a feed of 8 pages shows page 1 this trip round, page 2 the next, and so on
+to page 8, then page 1 again. Nothing is left out; it comes round in turn, and the bar
+doesn't sit on one feed. New headlines arriving in between don't send it back to the
+start. The label's 2/8 tells you where you are.
 
 #### Every page is full
 
@@ -354,10 +355,10 @@ your place under your cursor.
 - **Hover holds the page.** Put your mouse on the bar and it waits. There is no setting for
   it under Pages.
 - **One visit per widget.** When the bar reaches a widget it shows the pages that have a
-  live game or your team in them, every time, then two more pages of the rest in turn
-  (three when nothing is live or yours), then moves on. A busy Saturday of 56 college
-  games takes a few laps to see everyone, but whatever is live and whatever is yours is
-  never more than one lap away. One trip round the whole bar takes at most a minute.
+  live game or your team in them, every time, then one more page of the rest in turn,
+  then moves on. A busy Saturday of 56 college games takes a few laps to see everyone,
+  but whatever is live and whatever is yours is never more than one lap away. One trip
+  round the whole bar takes at most a minute.
 
 #### The edge
 
