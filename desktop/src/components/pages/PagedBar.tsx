@@ -298,6 +298,9 @@ export default function PagedBar({
     broadcast();
   }, [broadcast]);
 
+  // Switching to Keep going while the mouse is over the bar lets go at once.
+  useEffect(updateHold, [holdOnHover, updateHold]);
+
   useTauriListener<{ label: string; on: boolean }>(HOVER_EVENT, (e) => {
     if (!leader || e.payload.label === label) return;
     if (e.payload.on) remoteHover.current.add(e.payload.label);

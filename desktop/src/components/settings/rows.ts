@@ -15,8 +15,8 @@
  * a result may land you on a row that is currently hidden, which is the
  * honest outcome.
  *
- * Some pages override the description at render time (Speed and On
- * hover read differently in Page mode, the widget-slot row shows live
+ * Some pages override the description at render time (On hover reads
+ * differently in Page mode, the widget-slot row shows live
  * counts). The entry here is the resting copy search shows.
  */
 import type { SettingsPage } from "./pages";
@@ -117,9 +117,9 @@ export const SETTINGS_ROWS = {
       keywords: "zoom scale ticker",
     },
     chipColors: {
-      label: "Chip colors",
+      label: "Colors",
       description: "Each widget's own color, the theme accent, or subtle grays.",
-      keywords: "widget theme subtle muted accent",
+      keywords: "chip colors widget theme subtle muted accent",
     },
     scrollMode: {
       label: "Scroll mode",

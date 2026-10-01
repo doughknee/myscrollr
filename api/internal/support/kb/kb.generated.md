@@ -221,7 +221,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Ticker › Monitors: Which screens show the ticker
 - Settings › Ticker › Screen edge: Which edge of the screen the ticker sits on.
 - Settings › Ticker › Size: Resize the bar. The app window has its own size.
-- Settings › Ticker › Chip colors: Each widget's own color, the theme accent, or subtle grays.
+- Settings › Ticker › Colors: Each widget's own color, the theme accent, or subtle grays.
 - Settings › Ticker › Scroll mode: One whole widget per page, or chips that scroll without stopping.
 - Settings › Ticker › Speed: How fast the chips travel.
 - Settings › Ticker › On hover: What the bar does while your mouse is over it.

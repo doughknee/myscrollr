@@ -118,6 +118,12 @@ describe("searchSettings", () => {
     ]);
   });
 
+  /** "Chip colors" became "Colors" (SCROLLR-281); the old name stays a keyword. */
+  it("finds Colors by its old name", () => {
+    expect(searchSettings("chip colors", true).map((h) => h.rowId)).toContain("chipColors");
+    expect(searchSettings("colors", true).map((h) => h.label)).toContain("Colors");
+  });
+
   it("is case-insensitive", () => {
     expect(searchSettings("CATPPUCCIN", true).map((h) => h.rowId)).toEqual([
       "theme",
