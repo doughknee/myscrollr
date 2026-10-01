@@ -25,11 +25,16 @@ MyScrollr aggregates financial market data, sports scores, and RSS feeds. Tauri 
 
 ## Ticker chips
 
-Before building or changing any chip on the ticker (`desktop/src/components/chips/`,
-any `desktop/src/datawidgets/*/ticker.tsx`), read **`docs/CHIP_SPEC.md`** in full and
-follow its build recipe (§12) and review checklist (§13). It is the exact contract:
-geometry, reservations, palette fields, the ticker's horizon/slot/rotation rules, and
-the traps. `docs/CHIP_DESIGN.md` is the short human version.
+Before building or changing anything on the ticker (a page cell, the edge zone or the page
+engine in `desktop/src/components/pages/`; a chip in `desktop/src/components/chips/`; any
+`desktop/src/datawidgets/*/ticker.tsx`), read **`docs/CHIP_SPEC.md`** in full and follow
+the half of its build recipe (§12A page cells, §12B chips) and review checklist (§13A,
+§13B) that matches. The bar has two presentations of one set of selection rules: **Pages**
+(the default: one whole widget per page, equal columns, a fixed edge zone for clocks,
+weather and pins, §P) and **Continuous** chips (rotating slots, §2 to §9). It is the exact
+contract: geometry, reservations, palette fields, the page and visit rules, the
+horizon/slot/rotation rules, and the traps. `docs/CHIP_DESIGN.md` is the short human
+version (and feeds the support KB, so a change to it needs `kbgen`).
 
 ## Repository Layout
 
