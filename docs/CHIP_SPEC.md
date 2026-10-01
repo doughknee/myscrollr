@@ -292,7 +292,7 @@ slots, not five.
 - Clicking a slot opens that widget (`onChipClick(tab, id)`).
 
 Clock and Weather are free of widget slots, so they cost the user none of their plan's
-widget count *(lands with SCROLLR-282)*.
+widget count.
 
 ### P.11 The edge zone: pins
 

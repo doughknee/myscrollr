@@ -85,7 +85,7 @@ A fixed block at the right end of the bar that doesn't swipe away.
   two spots, not five. The spot is as wide as its widest item from the start, so the
   clock reading 12:00 and then 9:07 never shifts anything.
 - **Pins** sit after them (see "Pinning").
-- Clock and Weather don't use up one of your widget slots *(lands with SCROLLR-282)*.
+- Clock and Weather don't use up one of your widget slots.
 - The edge never takes more than 40% of the bar, so the pages always have room *(lands
   with SCROLLR-284)*.
 
