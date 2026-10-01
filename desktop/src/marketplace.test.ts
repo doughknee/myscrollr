@@ -67,7 +67,7 @@ describe("bundled snapshot", () => {
     expect(stocks).toBeDefined();
     // Identity comes from the server…
     expect(stocks!.name).toBe("Stocks");
-    expect(stocks!.hex).toBe("#16a34a");
+    expect(stocks!.hex).toBe("#7c3aed");
     expect(stocks!.category).toBe("finance");
     // …the renderer comes from the client.
     expect(stocks!.icon).toBeDefined();

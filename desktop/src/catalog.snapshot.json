@@ -7,7 +7,7 @@
             "description": "Live stock \u0026 ETF prices with a watchlist you control.",
             "source": "finance",
             "category": "finance",
-            "color": "#16a34a",
+            "color": "#7c3aed",
             "default_config": {
                 "asset_class": "stock",
                 "symbols": [
