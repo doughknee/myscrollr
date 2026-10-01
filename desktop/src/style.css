@@ -217,6 +217,7 @@
   --color-up: #167f3d;
   --color-down: #db1313;
   --color-live: #c60011;
+  --color-warning: #926a03; /* was the default #fbbf24, SCROLLR-290 */
   --color-error: #db1313;
 }
 
@@ -301,7 +302,7 @@
   --color-error: #cb0e37; /* #d20f39, SCROLLR-287 */
   --color-live: #b50d31; /* #d20f39, SCROLLR-287 */
   --color-warn: #df8e1d;
-  --color-warning: #df8e1d;
+  --color-warning: #915c13; /* #df8e1d, SCROLLR-290 */
 }
 
 /* ── Dracula (dark) ──────────────────────────────────────────── */
@@ -385,7 +386,7 @@
   --color-error: #c43a3a;
   --color-live: #aa3232; /* #c43a3a, SCROLLR-287 */
   --color-warn: #b88c1a;
-  --color-warning: #b88c1a;
+  --color-warning: #876613; /* #b88c1a, SCROLLR-290 */
 }
 
 /* ── Tokyo Night (dark) ──────────────────────────────────────── */
@@ -469,7 +470,7 @@
   --color-error: #b3083a; /* #f52a65, SCROLLR-287 */
   --color-live: #a00734; /* #f52a65, SCROLLR-287 */
   --color-warn: #8c6c3e;
-  --color-warning: #8c6c3e;
+  --color-warning: #725832; /* #8c6c3e, SCROLLR-290 */
 }
 
 /* ── Nord (dark) ─────────────────────────────────────────────── */
@@ -553,7 +554,7 @@
   --color-error: #a9444e; /* #bf616a, SCROLLR-287 */
   --color-live: #973d46; /* #bf616a, SCROLLR-287 */
   --color-warn: #b08d3b;
-  --color-warning: #b08d3b;
+  --color-warning: #7d642a; /* #b08d3b, SCROLLR-290 */
 }
 
 /* ── Gruvbox Dark Medium ─────────────────────────────────────── */
@@ -637,7 +638,7 @@
   --color-error: #9d0006;
   --color-live: #9d0006;
   --color-warn: #b57614; /* faded yellow */
-  --color-warning: #b57614;
+  --color-warning: #8c5b0f; /* #b57614, SCROLLR-290 */
 }
 
 /* ── Solarized (dark) ────────────────────────────────────────── */
@@ -679,7 +680,7 @@
   --color-error: #e77370; /* #dc322f, SCROLLR-287 */
   --color-live: #ea8482; /* #dc322f, SCROLLR-287 */
   --color-warn: #b58900; /* yellow */
-  --color-warning: #b58900;
+  --color-warning: #ba8c00; /* #b58900, SCROLLR-290 */
 }
 
 /* ── Solarized (light) ───────────────────────────────────────── */
@@ -721,7 +722,7 @@
   --color-error: #cd2522; /* #dc322f, SCROLLR-287 */
   --color-live: #b5211e; /* #dc322f, SCROLLR-287 */
   --color-warn: #b58900;
-  --color-warning: #b58900;
+  --color-warning: #886700; /* #b58900, SCROLLR-290 */
 }
 
 /* ── Rose Pine (dark, "main") ────────────────────────────────── */
@@ -810,7 +811,7 @@
   --color-error: #ad556e; /* #b4637a, SCROLLR-287 */
   --color-live: #9a4a61; /* #b4637a, SCROLLR-287 */
   --color-warn: #ea9d34; /* gold */
-  --color-warning: #ea9d34;
+  --color-warning: #a26511; /* #ea9d34, SCROLLR-290 */
 }
 
 /* ── One Dark (Atom) ─────────────────────────────────────────── */
@@ -894,7 +895,7 @@
   --color-error: #cf2d1f; /* #e45649, SCROLLR-287 */
   --color-live: #b8291b; /* #e45649, SCROLLR-287 */
   --color-warn: #c18401; /* yellow */
-  --color-warning: #c18401;
+  --color-warning: #956601; /* #c18401, SCROLLR-290 */
 }
 
 /* ── Everforest Dark Medium ──────────────────────────────────── */
@@ -982,7 +983,7 @@
   --color-error: #cf0c08; /* #f85552, SCROLLR-287 */
   --color-live: #b90b07; /* #f85552, SCROLLR-287 */
   --color-warn: #dfa000; /* yellow */
-  --color-warning: #dfa000;
+  --color-warning: #896200; /* #dfa000, SCROLLR-290 */
 }
 
 /* ── High contrast text ──────────────────────────────────────── */

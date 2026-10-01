@@ -291,6 +291,7 @@ export function useWidgetTickerData(
         // sunset move with latitude and season, so a hardcoded hour
         // range would be wrong for most of the planet most of the year.
         night: w?.isDay === false,
+        alert: w?.alert,
       });
     }
 
