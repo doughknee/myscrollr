@@ -61,6 +61,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **lap / cycle** | Continuous: one complete trip of a slot off the right edge, across, and off the left. A slot's content advances once per lap. (Pages measure a lap as one pass through every widget's visits.) |
 | **horizon** | The per-source time rule deciding what is eligible. |
 | **floor** | What a quiet source still shows when nothing is inside its horizon: one item for most sources, the whole next matchday for Sports (§8.1). |
+| **fill** | Pages only: what tops a widget's last page up to its column count once the pool runs out: the next games within 7 days, older headlines within 48 h, popular symbols beside a short watchlist (§P.4a). Never written anywhere; never a setting. |
 | **palette** | The `ChipColors` object for a chip's widget. Page cells take one `--accent` variable instead (§P.13). |
 | **status chip** | Continuous: the single grey chip a widget with nothing on the rail shows: why, and when if known (§8.7). Pages say the same words on the Also page. |
 | **source** | A `TickerSource` in `desktop/src/datawidgets/<source>/ticker.tsx`, registered in `tickerRegistry.ts`. Pages read the same sources through the same selectors. |
@@ -96,7 +97,7 @@ SCROLLR-274. Existing users keep a stored `continuous` until the release flips t
 |---|---|---|
 | What the bar is | One whole widget at a time, in equal columns that fill the bar, swiped to the next | Chips scrolling right to left without stopping |
 | Unit | A page of cells | A chip in a slot |
-| What is eligible | **Shared:** the same `selectXForTicker` selectors, horizons, floors and sort (§8.1) | **Shared** |
+| What is eligible | **Shared:** the same `selectXForTicker` selectors, horizons, floors and sort (§8.1), then the **fill** tops the last page up to its columns (§P.4a) | **Shared** (no fill: slots and rotation absorb a short pool) |
 | Pins and favourites | **Shared meaning** (§8.5): a pin is a subject, bypasses the horizon, leaves the main flow, shows once | **Shared meaning** |
 | An empty widget | The Also page (§P.12) | The status chip (§8.7); same words |
 | How much is on screen | Derived: columns = content width / the family's minimum column (§P.4) | Fixed slots per source (§8.1) |
@@ -122,7 +123,7 @@ pin handling, status words) lives once, in `datawidgets/`, and both presentation
 
 - 112px (`LABEL_W`), widget colour mixed at 16% (dark) or 12% (light) over the bar, right border at 40%, vertically centred, `pl-3.5 pr-2`.
 - **Name:** the widget code in the ink (`--accent-ink`, §P.13), `font-sans font-extrabold`, `text-[19px]`; `text-[15px]` when the code is longer than six characters; truncates. Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance: the catalog name in capitals. Also: `ALSO`.
-- **One fact** beneath, `font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2` (fg-2, not fg-3: it sits on the label's tint): sports `n LIVE`, else the first game's day (`SUN 4 OCT`); news `HEADLINES`; finance `▲up ▼down`; Also `NOTHING ON`. It is read live, so it updates in place while a page is up (a fact, not a layout).
+- **One fact** beneath, `font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2` (fg-2, not fg-3: it sits on the label's tint): sports `n LIVE`, else the first game's day (`SUN 4 OCT`); news `HEADLINES`; finance `▲up ▼down`, or `+n POPULAR` when popular symbols fill the page (`n POPULAR` with no watchlist; `labelFact`, SCROLLR-292); Also `NOTHING ON`. It is read live, so it updates in place while a page is up (a fact, not a layout).
 - **Position** at the right of that line: 2 to 5 pages: one 4px dot per page, the current one in the accent; more than 5: `n/m` in the ink, tabular. One page: nothing.
 - **Dwell line:** a 2px line along the bottom of the label that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held (an active pointer, §P.7), and runs on when the pointer rests.
 - **Wipe:** the label rolls upward (`y` 100% to 0 in, 0 to -100% out, 0.45s, §P.7) only when the widget changes. Pages of the same widget keep it still.
@@ -135,8 +136,10 @@ pin handling, status words) lives once, in `datawidgets/`, and both presentation
 ```
 
 - **Content width** = `bar width - LABEL_W - edge width` (`contentWidth`). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
-- The page block is a grid, `repeat(n, minmax(0, 1fr))` where `n` is the number of items **on that page**. A page of three items on a bar that fits five is three wider columns, not three columns and a gap.
-- `colW = content width / n`, frozen with the page (§P.8) and passed to the cell, which picks its own layout from it.
+- The page block is a grid, `repeat(n, minmax(0, 1fr))` where `n` is the number of items **on that page**. Every page is full (§P.4a), so `n` is the column count except in two cases:
+  - **A widget on several pages whose fill ran out** splits evenly (§P.4): 9 headlines at 8 columns are 5 + 4, each page's columns widened to fill the bar.
+  - **A truly short widget** (one page, fewer items than columns even after the fill: one NFL game all week, a feed with two headlines in 48 h) keeps **a full page's column width**, `content width / columns`, **left-aligned** from the label: `repeat(n, colW px)`, `data-short` on the page. Never one item stretched across the bar, and never centred: a centred cell floats away from the label that names it and reads as one item lost on a page (both drawn on SCROLLR-292; left picked).
+- `colW = content width / n` (a short page: `/ columns`), frozen with the page (§P.8) and passed to the cell, which picks its own layout from it.
 - A hairline `Rule` (`parts.tsx`) sits between columns: 1px, inset 9px top and bottom, the ink at 40% (clears 1.5:1 on every palette). Cells have no border, no background card, no rounded shell.
 - Height is not an input to any of this.
 
@@ -163,6 +166,45 @@ at most one, larger pages first, so there is never a lonely last page (14 at 12 
 There is no per-widget slot count in Pages. How many items a page holds is the width, and
 how many pages a widget has is its pool divided by that.
 
+### P.4a Every page is full (the fill)
+
+SCROLLR-292 (Brandon, 1 Oct 2026: a Thursday NFL page showed one game; a GOOGL-only
+watchlist was one quote across the bar). **A page shows as many items as it has columns,
+unless the widget has fewer items in total than one page holds.** The chip-era horizons
+(§8.1) exist to keep the continuous rail short; under Pages an empty column is waste, so
+the pool is topped up past the horizon, down the same ladder (§P.5), instead of stopping.
+
+- `buildPageWidgets` gives each widget its `items` (the ticker pool, unchanged) and a
+  `fill` (what lies past the horizon, in order). `planAll` calls `topUp(items, fill, cols)`:
+  it adds **exactly the empty columns of the last page**, never a whole extra page, so the
+  page count, the visit rule (§P.6) and the lap are what the pool alone would give. 1 item
+  at 8 columns becomes 8; 9 at 8 becomes 16 (two full pages); 8 at 8 takes nothing.
+- `PagePlan` carries `cols` (a full page's columns) and `avail` (items + every fill it may
+  use); the page publishes `data-cols`, `data-total`, `data-avail`.
+
+| Family | Fill, in order (`selectXFill`, Pages only) | Tier |
+|---|---|---|
+| Sports | Every `pre` game within `TICKER_FLOOR_DAYS` (7) through the widget's day window, not already in the pool: **your team's games first**, then soonest kick-off (`selectSportsFill`). A Thursday is TNF plus Sunday's soonest kick-offs | The ladder (`gameTier`): your team's game is tier 0, so it is on every visit wherever it came from; a later day is tier 3 |
+| News | Every headline within `TICKER_RSS_FLOOR_HOURS` (48) not already in the pool, newest first (`selectRssFill`) | 3 |
+| Stocks, Crypto | **Only when the watchlist (after pins) is shorter than a page.** Popular symbols of the widget's own asset class with a live quote in `/finance/public`: the widget's starter list (SCROLLR-259, `addConfigForWidget(tab).symbols`), then `POPULAR_SYMBOLS` (a constant: nothing counts how many users track a symbol), then the rest of the market by day volume. Never one of the user's own or a pinned one (`selectFinanceFill`) | 3, `fill: true`, no pin subject |
+| Also | None (one entry per quiet widget; a short Also page is a short page, §P.3) | 4 |
+
+- **Fills are never written anywhere.** The watchlist stays exactly what the user saved;
+  each symbol they add pushes one fill out, one for one. A fill cell looks like any other
+  cell; the label says so (`+4 POPULAR`, §P.2). The watchlist screen lists the fills the
+  bar is showing (as many as the narrowest bar's page has columns, from `useEdgeRoom`) as
+  one-click adds, only under Pages with the widget on the ticker.
+- A watchlist as long as a page or longer takes no fill (10 symbols at 9 columns are 5 + 5,
+  not 9 of yours and then 1 + 8 popular).
+- The quotes come from `/finance/public` (`financeMarketOptions`, the query the watchlist
+  screen already uses), fetched only while some finance widget on the ticker is shorter
+  than a page. The **first** page waits for it (or its failure) so a one-symbol watchlist
+  never opens as one quote; after that a refetch only reaches the next page (§P.8).
+- The fill reads no display preference (invariant 5): the watchlist and favourite teams are
+  inputs, the day window is the same one the pool already uses.
+- Continuous is unchanged: no fill, the horizons stand, slots and rotation absorb a short
+  pool.
+
 ### P.5 Order inside a widget: the tier ladder
 
 `planWidget` sorts **stably** by tier and keeps the caller's order inside a tier. The ladder
@@ -184,6 +226,8 @@ how many pages a widget has is its pool divided by that.
   watchlist takes turns like any other widget instead of putting all its pages on every
   visit.
 - News is never tier 0, so its sticky count is the minimum, 1.
+- Fills (§P.4a) are ranked on the same ladder after the pool: a fill never pushes a pool
+  item off its page, because `topUp` only adds the empty columns.
 - `WidgetPlan.sticky` = the number of leading pages needed to cover every tier-0 item, at
   least 1 when there is any page.
 
@@ -230,7 +274,8 @@ swipe-in. Later data goes through `refreshPage` and changes **values only**:
 - the label's fact line is not a layout and does update live.
 
 Call `freezePage` after `planWidget` has ranked and split. Never read the live pool to place
-a cell.
+a cell. `refreshPage` is fed the pool **and** the fill, so a fill cell's price still moves
+in place.
 
 ### P.9 The cells
 
@@ -414,7 +459,12 @@ state and one window owns it.
   digits and final: nothing moves.
 - `e2e/ticker/pages.spec.ts`: per fixture and width under a fake
   clock: no cell moves while its page is up (0.5 px), no cell is cut off, every dwell is 5.98
-  to 12.1 s, live or yours on every lap, a lap of at most 75 s, two windows in step. The
+  to 12.1 s, live or yours on every lap, a lap of at most 75 s, two windows in step, and
+  **every page is full** (`unfilled`: one page shows `min(columns, available)`; several
+  pages show full pages unless the fill ran out, then the even split). Fixtures for the fill
+  (SCROLLR-292): `nflthursday` (TNF + Sunday, your Bears in the fill), `googl` (one symbol +
+  popular), `sparsenews` (two fresh headlines + older), `onegame` (truly short: one column,
+  left-aligned, measured). The shim serves `/finance/public` from `market.json`. The
   scorecard gets a `pages` mode: lap, widget share, Also share, cells moved or cut, dwell,
   dropped swipe frames.
 - `e2e/ticker/pages-themes.spec.ts`: one static frame per theme family x light/dark
@@ -422,7 +472,7 @@ state and one window owns it.
   asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
   text in the widget's colour at 4.5:1, the label name at 3:1, every hairline at 1.5:1.
 - `e2e/ticker/hover.spec.ts`: under the fake clock, a still pointer holds 5 s and then the bar turns, a moving pointer holds the page and the dwell line for 40 s, and moving again after a release grabs the page back.
-- vitest: `activeHover.test.ts`, `pagePlan.test.ts`, `widgetPages.test.ts`, `EdgeZone.test.tsx`, one test per cell.
+- vitest: `activeHover.test.ts`, `pagePlan.test.ts`, `widgetPages.test.ts`, `pageFill.test.ts` (the fill per family), `EdgeZone.test.tsx`, one test per cell.
 
 ---
 
@@ -888,7 +938,8 @@ rotation cadence, slot count or columns per page. The one such control ever adde
 The **Eligible**, **Floor** and **Pool order** columns apply to both presentations: Pages
 call the same selectors (`selectSportsForTicker`, `selectRssForTicker`,
 `selectFinanceForTicker`) and then split the pool into pages (§P.4); the tier ladder in §P.5
-re-ranks it for a page. The **Slots** and **Reserve** columns are **Continuous only**: Pages
+re-ranks it for a page, and the fill (§P.4a) tops a short last page up past the horizon
+(Pages only). The **Slots** and **Reserve** columns are **Continuous only**: Pages
 have no per-widget slot counts, and a page cell reserves inside its fixed column (§P.9).
 
 | Source | Eligible (horizon) | Floor | Slots (Continuous only) | Pool order | Reserve (Continuous only) |
@@ -1299,6 +1350,7 @@ needs both until Continuous is retired.
 - [ ] Every changing value reserves from first render (score `ch`, fixed clock box, price and change `ch`, fixed age column); sometimes-empty parts are always mounted.
 - [ ] Tier ladder respected: only live games and your team are tier 0 (they show on every visit); order inside a tier is the source's own, never a live value.
 - [ ] No per-widget slot count; no new setting for how many or which (§1.4).
+- [ ] Every page is full (§P.4a): the family has a fill (or says why not), `topUp` adds only the last page's empty columns, a fill is never written to the user's config, and a truly short widget is drawn at a page's column width, left-aligned; `pages.spec.ts` `unfilled` green.
 - [ ] The ticker selector reads no feed prefs; pinned subjects dropped from the pages with `dropPinned`; the pin is on the bar once.
 - [ ] A widget with nothing on reaches the Also page with its status words; nothing fabricated.
 - [ ] Edge: one Cycle slot per utility stepping on the turn `seq`; a sizer for every item so the width is constant; edge width read when the page is planned.

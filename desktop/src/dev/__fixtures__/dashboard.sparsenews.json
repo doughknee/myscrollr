@@ -1,0 +1,145 @@
+{
+  "_note": "SCROLLR-292 'sparsenews': one BBC widget on a quiet day. Two headlines inside the 6 h horizon (38 and 170 min old), five more 9 to 41 h old that fill the page, two past the 48 h floor that never show. Titles are real headlines from the other fixtures, retagged to the BBC feed.",
+  "_captured_at": "2026-10-01T15:00:00Z",
+  "data": {
+    "rss": [
+      {
+        "id": 930001,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-0",
+        "title": "Central bank holds rates as inflation cools for third month",
+        "link": "https://example.invalid/sparse/0",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-10-01T14:22:00.000Z",
+        "created_at": "2026-10-01T14:22:00.000Z",
+        "updated_at": "2026-10-01T14:22:00.000Z"
+      },
+      {
+        "id": 930002,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-1",
+        "title": "Storm warnings issued across the north-east ahead of weekend",
+        "link": "https://example.invalid/sparse/1",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-10-01T12:10:00.000Z",
+        "created_at": "2026-10-01T12:10:00.000Z",
+        "updated_at": "2026-10-01T12:10:00.000Z"
+      },
+      {
+        "id": 930003,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-2",
+        "title": "Rail strike talks resume after week of cancelled services",
+        "link": "https://example.invalid/sparse/2",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-10-01T06:00:00.000Z",
+        "created_at": "2026-10-01T06:00:00.000Z",
+        "updated_at": "2026-10-01T06:00:00.000Z"
+      },
+      {
+        "id": 930004,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-3",
+        "title": "Senate advances spending bill with hours to spare before deadline",
+        "link": "https://example.invalid/sparse/3",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-10-01T00:00:00.000Z",
+        "created_at": "2026-10-01T00:00:00.000Z",
+        "updated_at": "2026-10-01T00:00:00.000Z"
+      },
+      {
+        "id": 930005,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-4",
+        "title": "A small town's library reopens after a five-year rebuild",
+        "link": "https://example.invalid/sparse/4",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-09-30T17:00:00.000Z",
+        "created_at": "2026-09-30T17:00:00.000Z",
+        "updated_at": "2026-09-30T17:00:00.000Z"
+      },
+      {
+        "id": 930006,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-5",
+        "title": "Scientists map the ocean floor near a newly found vent field",
+        "link": "https://example.invalid/sparse/5",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-09-30T10:00:00.000Z",
+        "created_at": "2026-09-30T10:00:00.000Z",
+        "updated_at": "2026-09-30T10:00:00.000Z"
+      },
+      {
+        "id": 930007,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-6",
+        "title": "News live: Two more Australians confirmed safe in Nepal-Tibet floods; Bowen calls joint statement on China \u00e2\u20ac\u02dcstrong\u00e2\u20ac\u2122",
+        "link": "https://example.invalid/sparse/6",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-09-29T22:00:00.000Z",
+        "created_at": "2026-09-29T22:00:00.000Z",
+        "updated_at": "2026-09-29T22:00:00.000Z"
+      },
+      {
+        "id": 930008,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-7",
+        "title": "Trump administration asks supreme court to intervene over judge\u00e2\u20ac\u2122s ban on USPS mail-in voting restrictions \u00e2\u20ac\u201c live",
+        "link": "https://example.invalid/sparse/7",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-09-29T08:00:00.000Z",
+        "created_at": "2026-09-29T08:00:00.000Z",
+        "updated_at": "2026-09-29T08:00:00.000Z"
+      },
+      {
+        "id": 930009,
+        "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "guid": "sparse-8",
+        "title": "Missouri supreme court throws out new congressional maps backed by Trump",
+        "link": "https://example.invalid/sparse/8",
+        "description": "",
+        "source_name": "BBC News",
+        "published_at": "2026-09-28T17:00:00.000Z",
+        "created_at": "2026-09-28T17:00:00.000Z",
+        "updated_at": "2026-09-28T17:00:00.000Z"
+      }
+    ]
+  },
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "uplink_pro",
+    "default_widgets_applied": true,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 3,
+      "widget_type": "news_bbc",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "feeds": [
+          {
+            "name": "BBC News",
+            "url": "https://feeds.bbci.co.uk/news/rss.xml"
+          }
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ]
+}

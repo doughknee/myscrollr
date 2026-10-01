@@ -47,15 +47,20 @@ import {
 import {
   applyFinancePipeline,
   searchFinanceCatalog,
+  selectFinanceFill,
   selectStockView,
+  WATCHLIST_FILL_SHOWN,
   STOCK_SECTORS,
   type FinanceSortKey,
   type FinanceView,
 } from "./view";
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { WidgetId } from "../../api/client";
-import { assetClassForWidget } from "../../marketplace";
+import { addConfigForWidget, assetClassForWidget } from "../../marketplace";
 import { FinanceHomeRows, financeHighlight } from "./home";
+import { useEdgeRoom } from "../../lib/edgeMeasure";
+import { columnsFor, contentWidth } from "../../components/pages/pagePlan";
+import { QUOTE_MIN_COL } from "../../components/pages/cells/QuoteCell";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -312,6 +317,25 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
   const isWatchlist = view === "watchlist";
 
+  // The popular symbols the bar is filling a short watchlist with (SCROLLR-292):
+  // not on the list, offered here so any of them is one click from being yours.
+  // Only where the bar really fills: Pages, this widget on the ticker. As many
+  // as the narrowest ticker's page has columns (every bar reports its width,
+  // lib/edgeMeasure); with no bar reporting, a 1920 bar's count.
+  const room = useEdgeRoom();
+  const onBar = prefs.ticker.scrollMode === "pages" && prefs.widgets.widgetsOnTicker.includes(widgetType);
+  const barCols = room ? columnsFor(contentWidth(room.bar, room.util), QUOTE_MIN_COL) : WATCHLIST_FILL_SHOWN;
+  const barFills = useMemo(() => {
+    if (!onBar || !isComfort || !isWatchlist || searchQ || !assetClass || !marketTrades) return [];
+    const starters = addConfigForWidget(widgetType)?.symbols;
+    return selectFinanceFill(
+      marketTrades,
+      trackedSymbols,
+      Array.isArray(starters) ? (starters as string[]) : [],
+      assetClass,
+    ).slice(0, Math.max(0, barCols - trackedSymbols.length));
+  }, [onBar, barCols, isComfort, isWatchlist, searchQ, assetClass, marketTrades, trackedSymbols, widgetType]);
+
   return (
     // NO inner scroll container: the Source page (PageLayout) owns the
     // scroll — an inner scrollport that never scrolls swallows `sticky`
@@ -456,6 +480,28 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
           </div>
           {footer}
         </>
+      )}
+
+      {barFills.length > 0 && (
+        <section aria-label="Popular symbols filling your bar" className="border-t border-edge/30 pb-3">
+          <p className="px-3 pt-3 text-[12px] text-fg-3">
+            Your bar fills its empty space with popular symbols. Add one and it is yours.
+          </p>
+          <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {barFills.map((trade) => (
+              <TradeItem
+                key={trade.symbol}
+                trade={trade}
+                mode={mode}
+                category={categoryMap.get(trade.symbol)}
+                now={now}
+                onAdd={addSymbol}
+                actionVisible
+                saving={symbolsSaving}
+              />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

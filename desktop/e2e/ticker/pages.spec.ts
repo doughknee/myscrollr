@@ -1,5 +1,5 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMouse, readTrace, recordFromStart, startRecording, type PagesTrace } from "./pages";
+import { dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMouse, readTrace, recordFromStart, startRecording, unfilled, type PagesTrace } from "./pages";
 
 /**
  * SCROLLR-275: the widget-pages bar (`?pages=1`), measured in a real layout.
@@ -15,7 +15,8 @@ import { dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMous
  *   2. no cell is cut off the page;
  *   3. every page dwells at least MIN_DWELL_S (and at most MAX_DWELL_S);
  *   4. a live game or your team is on every lap (ids read from the fixture);
- *   5. the lap stays within LAP_MAX_S.
+ *   5. the lap stays within LAP_MAX_S;
+ *   6. every page is full: `min(columns, available)` items (SCROLLR-292).
  * Plus: two windows turn pages in step (real time, 4 turns).
  */
 
@@ -34,13 +35,20 @@ const CAP_MS = 240_000;
 /** Two windows: how far apart their swipe-ins may land. Measured: a few ms; the bound is for a loaded CI box. */
 const SKEW_MS = 400;
 
-const RUNS: { fixture: string; width: number; laps?: number; live?: boolean }[] = [
+const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; full?: boolean }[] = [
   { fixture: "pages", width: 1920, laps: 2, live: true }, // every page kind: NFL (yours + live), stocks, crypto, news, the Also page
   { fixture: "mixed", width: 1920, laps: 2, live: true }, // 56-game Saturday beside stocks and news, live and yours
   { fixture: "busy", width: 1280, live: true }, // the overflow case: 14 pages of 4 games
   { fixture: "longnames", width: 1280 }, // the longest names, in the narrowest columns
   { fixture: "quiet", width: 1920 }, // nothing live: the floor
   { fixture: "default", width: 1920, live: true },
+  // SCROLLR-292, every page is full. One widget, one page, so a lap is one page: three laps measure three dwells.
+  // `full`: the fixture has enough to fill, so every page must have a column per item.
+  { fixture: "nflthursday", width: 1920, laps: 3, live: true, full: true }, // TNF + Sunday (your Bears lead the fill, on every lap)
+  { fixture: "nflthursday", width: 1280, laps: 3, live: true, full: true },
+  { fixture: "googl", width: 1920, laps: 3, full: true }, // GOOGL + popular fills
+  { fixture: "sparsenews", width: 1280, laps: 3, full: true }, // 2 fresh headlines + older ones
+  { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
 ];
 
 test.use({ viewport: { width: 1920, height: 80 } });
@@ -65,7 +73,7 @@ function summarise(tr: PagesTrace) {
   return `pages=${tr.enters.length} laps=[${l.map((x) => x.toFixed(1)).join(", ")}]s dwell=${Math.min(...d).toFixed(2)}..${Math.max(...d).toFixed(2)}s moved=${tr.moved.length} cuts=${tr.cuts.length}`;
 }
 
-for (const { fixture, width, laps: wantLaps = LAPS, live } of RUNS) {
+for (const { fixture, width, laps: wantLaps = LAPS, live, full } of RUNS) {
   test(`pages ${fixture} @${width}: still, whole, long enough, live every lap, short lap`, async ({ page, context }) => {
     test.setTimeout(300_000);
     await context.clock.install();
@@ -85,6 +93,8 @@ for (const { fixture, width, laps: wantLaps = LAPS, live } of RUNS) {
 
     expect.soft(tr.moved, "no cell moves while its page is up").toEqual([]);
     expect.soft(tr.cuts, "no cell is cut off").toEqual([]);
+    expect.soft(unfilled(tr.enters), "every page shows min(columns, available) items").toEqual([]);
+    if (full) expect.soft(tr.enters.filter((e) => e.items.length !== e.cols).map((e) => `${e.page}: ${e.items.length}/${e.cols}`), "a column per item").toEqual([]);
 
     const d = dwells(tr.enters);
     expect.soft(d.length, "pages were measured").toBeGreaterThanOrEqual(3);
@@ -102,6 +112,28 @@ for (const { fixture, width, laps: wantLaps = LAPS, live } of RUNS) {
     }
   });
 }
+
+test("a truly short widget keeps a page's column width, left-aligned (SCROLLR-292)", async ({ page }) => {
+  // One NFL game in the whole week: nothing can fill the page. The game is
+  // drawn at a full page's column width from the label, not stretched across
+  // the bar (and not floated to the middle, away from its label).
+  await parkMouse(page);
+  await page.goto(url("onegame"));
+  await parkMouse(page);
+  const el = page.locator("[data-page]").first();
+  await el.waitFor();
+  await page.evaluate(() => document.fonts.ready);
+  const m = await el.evaluate((p) => {
+    const box = p.getBoundingClientRect();
+    const cells = [...p.querySelectorAll("[data-chip]")].map((c) => c.getBoundingClientRect());
+    return { short: p.hasAttribute("data-short"), cols: Number(p.getAttribute("data-cols")), left: box.left, width: box.width, cells: cells.map((c) => ({ left: c.left, width: c.width })) };
+  });
+  expect(m.short).toBe(true);
+  expect(m.cells).toHaveLength(1);
+  expect(m.cols).toBeGreaterThan(1);
+  expect(Math.abs(m.cells[0].width - m.width / m.cols), "one column of a full page").toBeLessThan(2);
+  expect(Math.abs(m.cells[0].left - m.left), "starts at the label").toBeLessThan(2);
+});
 
 test("two ticker windows turn pages together", async ({ page, context }) => {
   // Real time: the two windows talk over a BroadcastChannel in real time,

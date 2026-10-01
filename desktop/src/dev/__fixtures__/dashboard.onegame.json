@@ -1,0 +1,88 @@
+{
+  "_note": "SCROLLR-292 'onegame': an NFL widget with one game in the whole week (Thursday night), so a page cannot be filled: the truly-short layout. Same captured week as nflthursday.",
+  "_captured_at": "2026-10-08T14:00:00Z",
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "uplink_pro",
+    "default_widgets_applied": true,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 1,
+      "widget_type": "sports_nfl",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "NFL"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ],
+  "data": {
+    "sports": [
+      {
+        "id": 10097632,
+        "league": "NFL",
+        "sport": "american-football",
+        "external_game_id": "21561",
+        "link": "",
+        "home_team_name": "Cleveland Browns",
+        "home_team_logo": "https://media.api-sports.io/american-football/teams/9.png",
+        "home_team_score": "",
+        "home_team_code": "",
+        "away_team_name": "Pittsburgh Steelers",
+        "away_team_logo": "https://media.api-sports.io/american-football/teams/22.png",
+        "away_team_score": "",
+        "away_team_code": "",
+        "start_time": "2026-10-09T00:15:00Z",
+        "short_detail": "Scheduled",
+        "state": "pre",
+        "status_short": "NS",
+        "status_long": "Not Started",
+        "venue": "Huntington Bank Field",
+        "updated_at": "2026-10-08T14:00:00Z",
+        "home_standing": {
+          "rank": 3,
+          "wins": 2,
+          "losses": 1,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 54,
+          "points_against": 71,
+          "otl": 0
+        },
+        "away_standing": {
+          "rank": 1,
+          "wins": 2,
+          "losses": 1,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 53,
+          "points_against": 60,
+          "otl": 0
+        }
+      }
+    ],
+    "sports_meta": {
+      "leagues": [
+        {
+          "name": "NFL",
+          "is_offseason": false,
+          "next_game": "2026-10-09T00:15:00Z",
+          "polling_healthy": true
+        }
+      ]
+    }
+  }
+}

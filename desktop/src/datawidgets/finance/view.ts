@@ -165,6 +165,50 @@ export function selectFinanceForTicker(trades: Trade[], watchlist: readonly stri
   return [...listed, ...rest];
 }
 
+/**
+ * Widely held symbols, after a widget's own starter list (SCROLLR-259), for
+ * the empty columns of a short watchlist under Pages (SCROLLR-292). Nothing
+ * counts how many users track a symbol, so this is a constant; every one is
+ * in the ingester's tracked list. Past it, the rest of the market by today's
+ * volume, so even a 19-column ultrawide page fills.
+ */
+export const POPULAR_SYMBOLS: Record<"stock" | "crypto", readonly string[]> = {
+  stock: ["AAPL", "MSFT", "NVDA", "AMZN", "TSLA", "GOOGL", "META", "SPY", "QQQ", "AVGO", "NFLX", "AMD", "JPM", "V", "COST", "WMT", "DIS", "KO", "MA", "XOM"],
+  crypto: ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "DOGE/USD", "ADA/USD", "BNB/USD", "AVAX/USD", "LINK/USD", "DOT/USD", "LTC/USD", "SHIB/USD", "TRX/USD", "BCH/USD", "XLM/USD", "SUI/USD", "NEAR/USD", "UNI/USD", "ATOM/USD", "HBAR/USD"],
+};
+
+/** How many symbols (the watchlist plus popular fills) the watchlist screen assumes a bar shows when no pages bar reports its width: about a 1920 px bar's columns. */
+export const WATCHLIST_FILL_SHOWN = 10;
+
+/**
+ * Pages only (SCROLLR-292): quotes that may fill a short watchlist's page,
+ * from the whole market (`/finance/public`). The widget's starter list,
+ * then POPULAR_SYMBOLS, then the rest by today's volume; never one of the
+ * user's own, and only the widget's asset class. Fills are NOT added to the
+ * watchlist: each symbol the user adds pushes one fill out.
+ */
+export function selectFinanceFill(
+  market: readonly Trade[],
+  watchlist: readonly string[],
+  starters: readonly string[],
+  assetClass: string | undefined,
+): Trade[] {
+  const crypto = (s: string) => s.includes("/");
+  const bySym = new Map(
+    market
+      .filter((t) => !assetClass || (assetClass === "crypto") === crypto(t.symbol))
+      .map((t) => [t.symbol, t] as const),
+  );
+  const byVolume = [...bySym.values()]
+    .sort((a, b) => (b.day_volume ?? 0) - (a.day_volume ?? 0) || a.symbol.localeCompare(b.symbol))
+    .map((t) => t.symbol);
+  const popular = assetClass === "stock" || assetClass === "crypto" ? POPULAR_SYMBOLS[assetClass] : [];
+  const mine = new Set(watchlist);
+  return [...new Set([...starters, ...popular, ...byVolume])]
+    .filter((s) => !mine.has(s) && bySym.has(s))
+    .map((s) => bySym.get(s)!);
+}
+
 // ── Pipeline for FeedTab ─────────────────────────────────────────
 
 export interface FinancePipelineOptions {
