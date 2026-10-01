@@ -23,11 +23,11 @@ import { dwells, itemsPerLap, laps, lapStarts, mustSeeIds, readTrace, recordFrom
 const MIN_DWELL_S = 5.98;
 const MAX_DWELL_S = 12.1;
 /**
- * One trip round the bar. The SCROLLR-268 prototype measured 23-60 s at
+ * One trip round the bar: the scorecard (SCROLLR-266) says a lap is <= 60 s. Measured 14.6-57.8 s. The SCROLLR-268 prototype measured 23-60 s at
  * 1920 (today's continuous bar: ~170 s); this leaves headroom over that
  * and fails long before a lap drifts back toward the old minutes.
  */
-const LAP_MAX_S = 75;
+const LAP_MAX_S = 60;
 /** Laps to observe by default (needs LAPS + 1 visit starts), and the most virtual time to spend on them. */
 const LAPS = 1;
 const CAP_MS = 240_000;
