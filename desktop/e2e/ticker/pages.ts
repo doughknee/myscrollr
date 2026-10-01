@@ -1,0 +1,224 @@
+import { readFileSync } from "node:fs";
+import type { Page } from "@playwright/test";
+
+/**
+ * What the widget-pages checks measure with (SCROLLR-275), shared by
+ * pages.spec.ts (CI, on a fake clock) and the opt-in scorecard (real rAF).
+ * Ported from the SCROLLR-268 prototype's measure/analyze scripts.
+ *
+ * The rules, learned the hard way:
+ *  - A page is "up" only once it is the ONLY `[data-page]` and its transform
+ *    is none. Anything else is a swipe.
+ *  - A page already showing when the recorder installs is `initial`: its
+ *    real up time is unknown, so it never counts toward a dwell or a lap.
+ *    `recordFromStart` installs before the page exists, so the first page
+ *    is timed exactly and nothing is skipped.
+ *  - Time comes from a MutationObserver (plus a 250 ms poll for layout that
+ *    changes without a mutation), not requestAnimationFrame: a hidden
+ *    window's rAF stalls.
+ */
+
+export interface SeenItem {
+  id: string;
+  live: boolean;
+  mine: boolean;
+}
+
+export interface Enter {
+  /** Epoch ms (timeOrigin + performance.now(), so two windows compare) at which the page became "up". */
+  t: number;
+  /** `sports_nfl:2/3` */
+  page: string;
+  tab: string;
+  /** 0-based */
+  index: number;
+  count: number;
+  items: SeenItem[];
+  initial: boolean;
+}
+
+export interface Moved {
+  t: number;
+  page: string;
+  id: string;
+  dx: number;
+  dy: number;
+  dw: number;
+  dh: number;
+}
+
+export interface Cut {
+  t: number;
+  page: string;
+  id: string;
+}
+
+export interface PagesTrace {
+  enters: Enter[];
+  moved: Moved[];
+  cuts: Cut[];
+  /** Frames seen while a swipe was in flight (real-rAF runs only). */
+  swipeFrames: number;
+  frameDts: number[];
+}
+
+declare global {
+  interface Window {
+    __pg?: PagesTrace & { running: boolean };
+  }
+}
+
+/** Self-contained (serialised into the page). Call after the first page is up. */
+export function installPagesRecorder(opts: { frames: boolean }) {
+  const r: NonNullable<Window["__pg"]> = { enters: [], moved: [], cuts: [], swipeFrames: 0, frameDts: [], running: true };
+  window.__pg = r;
+  let installing = true;
+  let cur: Element | null = null;
+  let rects = new Map<string, { l: number; t: number; w: number; h: number }>();
+
+  const isUp = (pages: NodeListOf<Element>) =>
+    pages.length === 1 && getComputedStyle(pages[0]).transform === "none";
+
+  const check = () => {
+    if (!r.running) return;
+    const pages = document.querySelectorAll("[data-page]");
+    if (!isUp(pages)) return;
+    const el = pages[0];
+    const t = performance.timeOrigin + performance.now();
+    const label = el.getAttribute("data-page")!;
+    const area = el.getBoundingClientRect();
+    const cells = [...el.querySelectorAll<HTMLElement>("[data-chip]")];
+    const fresh = el !== cur;
+    if (fresh) {
+      const [tab, pos] = label.split(":");
+      const [i, n] = pos.split("/").map(Number);
+      cur = el;
+      rects = new Map();
+      r.enters.push({
+        t, page: label, tab, index: i - 1, count: n, initial: installing,
+        items: cells.map((c) => ({ id: c.dataset.item!, live: c.hasAttribute("data-live"), mine: c.hasAttribute("data-mine") })),
+      });
+    }
+    for (const c of cells) {
+      const id = c.dataset.item!;
+      const b = c.getBoundingClientRect();
+      if (b.left < area.left - 1 || b.right > area.right + 1 || b.top < area.top - 1 || b.bottom > area.bottom + 1) r.cuts.push({ t, page: label, id });
+      const o = rects.get(id);
+      if (o && (Math.abs(o.l - b.left) > 0.5 || Math.abs(o.t - b.top) > 0.5 || Math.abs(o.w - b.width) > 0.5 || Math.abs(o.h - b.height) > 0.5))
+        r.moved.push({ t, page: label, id, dx: b.left - o.l, dy: b.top - o.t, dw: b.width - o.w, dh: b.height - o.h });
+      rects.set(id, { l: b.left, t: b.top, w: b.width, h: b.height });
+    }
+  };
+
+  check();
+  installing = false;
+  new MutationObserver(check).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
+  setInterval(check, 250);
+
+  if (opts.frames) {
+    let last = 0;
+    const tick = (t: number) => {
+      if (!r.running) return;
+      if (document.querySelectorAll("[data-page]").length > 1 && last) {
+        r.frameDts.push(t - last);
+        r.swipeFrames++;
+      }
+      last = t;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+}
+
+export async function startRecording(page: Page, frames = false) {
+  await page.waitForSelector("[data-page]");
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(installPagesRecorder, { frames });
+}
+
+/** Install at document start (call before `goto`): the first page is then a real enter. */
+export async function recordFromStart(page: Page, frames = false) {
+  await page.addInitScript(
+    `document.addEventListener("DOMContentLoaded", () => (${installPagesRecorder.toString()})(${JSON.stringify({ frames })}))`,
+  );
+}
+
+export function readTrace(page: Page): Promise<PagesTrace> {
+  return page.evaluate(() => {
+    const r = window.__pg!;
+    return { enters: r.enters, moved: r.moved, cuts: r.cuts, swipeFrames: r.swipeFrames, frameDts: r.frameDts };
+  });
+}
+
+export function stopRecording(page: Page): Promise<PagesTrace> {
+  return page.evaluate(() => {
+    const r = window.__pg!;
+    r.running = false;
+    return { enters: r.enters, moved: r.moved, cuts: r.cuts, swipeFrames: r.swipeFrames, frameDts: r.frameDts };
+  });
+}
+
+// ── Analysis ───────────────────────────────────────────────────────
+
+/** Seconds each page was up before the next one swiped in (an initial page never counts; the last one is still up). */
+export function dwells(enters: readonly Enter[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < enters.length - 1; i++) if (!enters[i].initial) out.push((enters[i + 1].t - enters[i].t) / 1000);
+  return out;
+}
+
+/**
+ * Lap boundaries: each visit to the first widget seen, at its page 1. A
+ * visit always opens on page 1, so these are the beats of one trip round
+ * the bar. An initial page may be mid-visit and is skipped.
+ */
+export function lapStarts(enters: readonly Enter[]): number[] {
+  const w0 = enters[0]?.tab;
+  const out: number[] = [];
+  enters.forEach((e, i) => {
+    if (!e.initial && e.tab === w0 && e.index === 0) out.push(i);
+  });
+  return out;
+}
+
+/** Lap lengths in seconds. */
+export function laps(enters: readonly Enter[]): number[] {
+  const s = lapStarts(enters);
+  return s.slice(1).map((e, k) => (enters[e].t - enters[s[k]].t) / 1000);
+}
+
+/** Ids a lap showed, one set per full lap. */
+export function itemsPerLap(enters: readonly Enter[]): Set<string>[] {
+  const s = lapStarts(enters);
+  return s.slice(1).map((end, k) => new Set(enters.slice(s[k], end).flatMap((e) => e.items.map((i) => i.id))));
+}
+
+/**
+ * Game ids that must be on every visit: live now, or one of the user's
+ * teams (the widget's `favoriteTeams`). Read from the fixture, so a bar
+ * that never drew one cannot hide behind "nothing was seen live".
+ */
+export function mustSeeIds(fixture: string): string[] {
+  const d = JSON.parse(readFileSync(`src/dev/__fixtures__/dashboard.${fixture}.json`, "utf8"));
+  const mine = new Set<string>();
+  for (const w of d.widgets ?? []) {
+    for (const f of Object.values<{ teamName?: string }>(w.config?.favoriteTeams ?? {})) if (f?.teamName) mine.add(f.teamName);
+  }
+  const games: { id: string | number; state: string; home_team_name: string; away_team_name: string }[] = d.data?.sports ?? [];
+  return games
+    .filter((g) => g.state === "in" || g.state === "in_progress" || mine.has(g.home_team_name) || mine.has(g.away_team_name))
+    .map((g) => String(g.id));
+}
+
+/** Seconds on screen per widget, as a share of the run: the "widget share" criterion. */
+export function shareByWidget(enters: readonly Enter[]): Record<string, number> {
+  const secs: Record<string, number> = {};
+  let total = 0;
+  for (let i = 0; i < enters.length - 1; i++) {
+    if (enters[i].initial) continue;
+    const d = (enters[i + 1].t - enters[i].t) / 1000;
+    secs[enters[i].tab] = (secs[enters[i].tab] ?? 0) + d;
+    total += d;
+  }
+  return Object.fromEntries(Object.entries(secs).map(([k, v]) => [k, Math.round((v / (total || 1)) * 1000) / 1000]));
+}

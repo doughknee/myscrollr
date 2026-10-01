@@ -3,6 +3,7 @@ import { test, type Page } from "@playwright/test";
 import { installTickerAudit } from "./audit";
 import { swapsWhileVisible, type AuditEntry } from "../../src/dev/tickerIdentity";
 import { openShim } from "./shim";
+import { dwells, itemsPerLap, laps, mustSeeIds, shareByWidget, startRecording, stopRecording } from "./pages";
 
 /**
  * SCROLLR-266 scorecard: measures the bar against the six criteria
@@ -14,7 +15,10 @@ import { openShim } from "./shim";
  *
  *   SCORECARD=1 SCORECARD_OUT=out SHIM_PORT=5185 npx playwright test scorecard --headed
  *
- * SCORECARD_FIXTURES / SCORECARD_MODES (continuous,shots) /
+ * Modes: continuous (the chip bar), pages (the widget-pages bar,
+ * SCROLLR-275: the same criteria with their pages meanings, below), shots.
+ *
+ * SCORECARD_FIXTURES / SCORECARD_MODES (continuous,pages,shots) /
  * SCORECARD_MS narrow a run. Each fixture x mode takes RUN_MS + ~40 s.
  */
 const ON = !!process.env.SCORECARD;
@@ -22,7 +26,7 @@ const OUT = process.env.SCORECARD_OUT || ".";
 const RUN_MS = Number(process.env.SCORECARD_MS) || 150_000;
 const CPU_MS = 20_000;
 const FIXTURES = (process.env.SCORECARD_FIXTURES || "default,busy,quiet,longnames").split(",");
-const MODES = (process.env.SCORECARD_MODES || "continuous").split(",");
+const MODES = (process.env.SCORECARD_MODES || "continuous,pages").split(",");
 
 test.use({ viewport: { width: 1920, height: 120 } });
 test.describe.configure({ retries: 0 });
@@ -221,6 +225,77 @@ for (const fixture of FIXTURES) {
       );
     });
   }
+}
+
+/**
+ * The widget-pages bar, scored on the same six criteria with the pages
+ * meanings (SCROLLR-268 "scorecard implications"):
+ *   lap                  one visit-start to the next of the first widget (`laps`)
+ *   share per widget     seconds up per widget; the Also page is the stale share
+ *   chips per lap        distinct cells a lap shows
+ *   jumps/resizes/holes  "no cell moves while its page is up" (`moved`) and "no
+ *                        cell is cut off" (`cuts`); no rail, so no holes
+ *   page-mode pauses     dwell per page, and the frames the swipes dropped
+ *   CPU                  as before
+ *   where a click goes   one cell per widget, as before
+ * plus the wait for a live game or your team: every one must be in every lap.
+ * Same fixtures, real rAF (headed), so the dropped-frame count is honest.
+ */
+for (const fixture of FIXTURES) {
+  test(`scorecard ${fixture} pages`, async ({ page }) => {
+    test.skip(!ON || !MODES.includes("pages"), "opt-in: SCORECARD=1, SCORECARD_MODES includes pages, headed");
+    test.setTimeout(RUN_MS + CPU_MS + 120_000);
+    await page.goto(`/ticker-shim.html?pages=1&live=1&fixture=${fixture}`);
+    await startRecording(page, true);
+    const load = await cpu(page, CPU_MS);
+    await page.waitForTimeout(RUN_MS);
+    const shot = `${OUT}/${fixture}-pages.png`;
+    await page.screenshot({ path: shot });
+    const tr = await stopRecording(page);
+
+    const lapLens = laps(tr.enters);
+    const perLap = itemsPerLap(tr.enters);
+    const must = mustSeeIds(fixture);
+    const dts = [...tr.frameDts].sort((a, b) => a - b);
+    const med = dts[dts.length >> 1] || 0;
+    const share = shareByWidget(tr.enters);
+
+    const widgets: string[] = await page.$$eval("[data-page] [data-widget]", (els) => [...new Set(els.map((e) => (e as HTMLElement).dataset.widget || "?"))]);
+    const click: Record<string, string[]> = {};
+    for (const w of widgets) {
+      const n = await page.evaluate(() => (window as unknown as { __shimCalls: string[] }).__shimCalls.length);
+      await page.evaluate((w) => document.querySelector<HTMLElement>(`[data-page] [data-widget="${w}"] [data-chip]`)?.click(), w);
+      await page.waitForTimeout(400);
+      click[w] = await page.evaluate(
+        (n) => (window as unknown as { __shimCalls: string[] }).__shimCalls.slice(n).filter((c) => !c.startsWith("plugin:store") && !c.startsWith("plugin:event")),
+        n,
+      );
+    }
+    writeFileSync(
+      `${OUT}/${fixture}-pages.json`,
+      JSON.stringify(
+        {
+          fixture,
+          mode: "pages",
+          pages: tr.enters.length,
+          lapSeconds: lapLens,
+          chipsPerLap: perLap.map((s) => s.size),
+          liveOrMineMissingPerLap: perLap.map((s) => must.filter((id) => !s.has(id))),
+          dwellSeconds: { min: Math.min(...dwells(tr.enters)), max: Math.max(...dwells(tr.enters)) },
+          share,
+          alsoShare: share.also ?? 0,
+          moved: tr.moved.length,
+          movedSamples: tr.moved.slice(0, 5),
+          cuts: tr.cuts.length,
+          swipe: { frames: tr.swipeFrames, medianFrameMs: med, dropped: dts.filter((d) => d > med * 1.5).length },
+          cpu: load,
+          click,
+        },
+        null,
+        1,
+      ),
+    );
+  });
 }
 
 /** Dark-theme captures of the bar itself, for the report. */

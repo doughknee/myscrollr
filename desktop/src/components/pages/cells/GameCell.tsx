@@ -148,6 +148,8 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
       onClick={onClick}
       data-chip=""
       data-item={String(g.id)}
+      data-live={live ? "" : undefined}
+      data-mine={mine ? "" : undefined}
       className={clsx(
         "relative flex h-full w-full min-w-0 items-stretch pl-3 pr-2 text-left transition-colors duration-700",
         isFinal(g) && "opacity-80",

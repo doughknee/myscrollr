@@ -71,7 +71,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 
 1. **One height.** The bar is 64px in both presentations and there is no other density or setting for it. A page cell fills it; a chip is a 30px top row plus one 20px detail row.
 2. **Nothing moves while it is up.**
-   - **Pages:** nothing on a page moves while it is up. Every cell keeps its x, y, width and height from swipe-in to swipe-out; a value (score, price, age, clock) changes in place and never changes its box; items do not re-sort, appear or vanish on a page being read. A resize, a re-rank or a new item reaches the layout on the next page (§P.8). Verify: `e2e/ticker/cells.spec.ts` (values) and `e2e/ticker/pages.spec.ts` (whole pages, *lands with SCROLLR-275*).
+   - **Pages:** nothing on a page moves while it is up. Every cell keeps its x, y, width and height from swipe-in to swipe-out; a value (score, price, age, clock) changes in place and never changes its box; items do not re-sort, appear or vanish on a page being read. A resize, a re-rank or a new item reaches the layout on the next page (§P.8). Verify: `e2e/ticker/cells.spec.ts` (values) and `e2e/ticker/pages.spec.ts` (whole pages).
    - **Continuous:** a chip never changes width while on screen. Every value that can change reserves its widest plausible width from first render (§4). Verify: render the same fixture in every state it can pass through (pre / live / final; no-score / one-digit / two-digit; short / long swap) side by side; widths must be identical.
 3. **The detail line is never derivable from the top line.** It is what the user would otherwise open the app to find (§6 for chips; §P.9 for cells).
 4. **Nothing on the ticker is user-configurable.** No per-widget or global setting decides what is on the bar or how many. Horizons, floors and slot counts are constants (§8); Pages' columns per page are derived from the bar width and each family's minimum width (§P.4), never set.
@@ -386,11 +386,15 @@ state and one window owns it.
   `?comfort=1` is a no-op. Measure motion with headless Edge, not the hidden browser pane.
 - `e2e/ticker/cells.spec.ts`: every part of every cell across pre, live one digit, live two
   digits and final: nothing moves.
-- `e2e/ticker/pages.spec.ts` *(lands with SCROLLR-275)*: per fixture and width under a fake
+- `e2e/ticker/pages.spec.ts`: per fixture and width under a fake
   clock: no cell moves while its page is up (0.5 px), no cell is cut off, every dwell is 5.98
   to 12.1 s, live or yours on every lap, a lap of at most 75 s, two windows in step. The
   scorecard gets a `pages` mode: lap, widget share, Also share, cells moved or cut, dwell,
   dropped swipe frames.
+- `e2e/ticker/pages-themes.spec.ts`: one static frame per theme family x light/dark
+  (`?theme=<family>-<mode>`), text measured against what is behind it: fg and fg-2 at 4.5:1 and
+  the label name at 3:1 are asserted (the palettes that miss are listed in the spec's `LOW`);
+  fg-3, fg-4, dimmed finals, accent text and the hairline are reported, not asserted.
 - vitest: `pagePlan.test.ts`, `widgetPages.test.ts`, `EdgeZone.test.tsx`, one test per cell.
 
 ---

@@ -4,7 +4,7 @@
  * `?cells=1`, so the cells can be looked at, captured and measured in a
  * plain browser before the page engine (SCROLLR-272) exists.
  *
- *   /ticker-shim.html?cells=1[&theme=light][&colors=widget|theme|subtle]
+ *   /ticker-shim.html?cells=1[&theme=light|<family>-<light|dark>][&colors=widget|theme|subtle]
  *
  * Every bar is one page as the canvas draws it, split by pagePlan.ts: a stand-in label (the real
  * one is the engine's), then equal columns. Data is dashboard.pages.json
@@ -30,7 +30,10 @@ import { Rule, accentFor, accentStyle, mix } from "../components/pages/cells/par
 import fixture from "./__fixtures__/dashboard.pages.json";
 
 const params = new URLSearchParams(location.search);
-const dark = params.get("theme") !== "light";
+// `light`, or a palette: `nord-light`, `rose-pine-dark` (e2e/ticker/pages-themes.spec.ts).
+const themeParam = /^(?:([a-z-]+)-)?(light|dark)$/.exec(params.get("theme") ?? "");
+const dark = themeParam?.[2] !== "light";
+const dataTheme = `${themeParam?.[1] ?? "scrollr"}-${dark ? "dark" : "light"}`;
 const mode = (params.get("colors") ?? "widget") as ChipColorMode;
 const NOW = Date.parse(fixture._captured_at);
 // The shim pins html/body to the window for the bar; the gallery scrolls.
@@ -145,7 +148,7 @@ function Gallery() {
   return (
     <div
       id="desktop-shell"
-      data-theme={dark ? "scrollr-dark" : "scrollr-light"}
+      data-theme={dataTheme}
       className="flex min-h-screen flex-col gap-3 bg-surface p-0 pb-6"
       // The real shell is one window tall; the gallery is a page.
       style={{ height: "auto", overflow: "visible" }}
