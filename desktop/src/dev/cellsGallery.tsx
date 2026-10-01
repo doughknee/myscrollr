@@ -15,7 +15,7 @@
  * bottom hold one item in every state it passes through, in equal fixed
  * columns, for e2e/ticker/cells.spec.ts to measure.
  */
-import { StrictMode, type ReactNode } from "react";
+import { StrictMode, useEffect, useState, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "../style.css";
 import type { Game, RssItem, Trade } from "../types";
@@ -136,6 +136,32 @@ const NEWS_STATES: [string, RssItem][] = [
   ["fresh", { ...bbc[0], published_at: new Date(NOW - 9 * 60_000).toISOString() }],
   ["old", { ...bbc[0], published_at: new Date(NOW - 12 * 3_600_000).toISOString() }],
 ];
+
+/**
+ * A price crossing a digit boundary while its page is up (SCROLLR-296 round 6):
+ * each cell mounts at its first price and, 600ms later, ticks to the second.
+ * cells.spec measures every cell before and after; nothing may move.
+ */
+const CROSSINGS: [string, number, number][] = [
+  ["up 99.99 to 100.01", 99.99, 100.01],
+  ["down 100.01 to 99.99", 100.01, 99.99],
+  ["up 999.99 to 1,000.01", 999.99, 1000.01],
+  ["down 1.00 to 0.99", 1.0, 0.99],
+];
+function CrossingStrip() {
+  const [ticked, setTicked] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setTicked(true), 600);
+    return () => window.clearTimeout(id);
+  }, []);
+  return (
+    <div data-ticked={ticked ? "" : undefined}>
+      <Strip name="quote-cross" width={QUOTE_MIN_COL}>
+        {CROSSINGS.map(([s, a, b]) => [s, <QuoteCell trade={{ ...aapl, price: ticked ? b : a }} />])}
+      </Strip>
+    </div>
+  );
+}
 
 function Strip({ name, width, children }: { name: string; width: number; children: [string, ReactNode][] }) {
   return (
@@ -270,6 +296,7 @@ function Gallery() {
       <Strip name="game-stacked" width={gameMinCol("NFL")}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
       <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <CrossingStrip />
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
       <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}

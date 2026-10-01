@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { clsx } from "clsx";
 import type { Trade } from "../../../types";
 import { formatPriceBare } from "../../../utils/format";
@@ -8,6 +8,21 @@ import { rangePosition } from "../../chips/DayRangeRail";
 
 /** Characters a change holds: "▲ 12.34%" is eight. */
 export const CHANGE_CH = 8;
+
+/**
+ * Characters the price holds, decided once when the cell mounts (a page
+ * mounts its cells at swipe-in, so this is the freeze): the price's own
+ * length plus one, so a digit-boundary crossing while the page is up
+ * (99.99 to 100.01, or back) never moves anything, and the line sits at
+ * most one character further off than the price alone (SCROLLR-296 round 6).
+ * Where the format itself jumps by two near the price (999.99 to 1,000.00
+ * adds a comma; 1.00 to 0.9900 adds two decimals) it holds that too.
+ */
+export function priceReserve(price: number): number {
+  if (!Number.isFinite(price)) return 0;
+  const len = (v: number) => formatPriceBare(v).length;
+  return Math.max(len(price) + 1, len(price * 1.02), len(price * 0.98));
+}
 
 /**
  * Narrowest column a quote cell takes, for pagePlan's `columnsFor`.
@@ -61,13 +76,11 @@ interface QuoteCellProps {
  * starts 12px after the price's last digit (round 4: "too much padding
  * between the number and the line"; round 3 had 54-63px).
  *
- * Nothing moves on a tick: the price is tabular, so a tick changes digits,
- * never its width; the change holds CHANGE_CH; the range ends sit alone at
- * the two edges of their row, so a new low or high grows the number inward
- * and moves nothing else. The one accepted cost (round 5): a price crossing
- * a digit boundary while it is up (99.99 to 100.01) widens the price zone by
- * one character and the day zone starts that much later; holding a 9ch
- * reservation instead put 24-36px back between the price and the line. The line is the chips' own price history
+ * Nothing moves on a tick: the price holds `priceReserve`, fixed when the
+ * page swipes in, so a digit-boundary crossing either way stays inside it;
+ * the change holds CHANGE_CH; the range ends sit alone at the two edges of
+ * their row, so a new low or high grows the number inward and moves nothing
+ * else. The line is the chips' own price history
  * (`pushPrice`), so pages and chips draw the same thing.
  */
 const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: QuoteCellProps) {
@@ -75,6 +88,8 @@ const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: Q
   const text = changeText(t.percentage_change);
   const dir = text.startsWith("▲") ? "up" : text.startsWith("▼") ? "down" : "flat";
   const price = Number(t.price);
+  // Once, at mount: a page's cells mount when it swipes in.
+  const [reserve] = useState(() => priceReserve(price));
   const series = pushPrice(t.symbol, t.price, t.sparkline);
   const pos = rangePosition(price, t.day_low, t.day_high);
   const tone = pct < 0 ? "var(--color-down)" : "var(--color-up)";
@@ -92,7 +107,7 @@ const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: Q
           {fill && <span aria-label="popular" className="absolute right-full mr-px text-fg-3">+</span>}
           <span className="min-w-0 truncate">{t.symbol.replace("/USD", "")}</span>
         </span>
-        <span data-part="price" className="text-[20px] font-bold text-fg tabular-nums">
+        <span data-part="price" className="text-[20px] font-bold text-fg tabular-nums" style={{ minWidth: `${reserve}ch` }}>
           {Number.isFinite(price) ? formatPriceBare(price) : ""}
         </span>
         <span

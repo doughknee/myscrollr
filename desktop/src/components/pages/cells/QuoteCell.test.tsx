@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import QuoteCell, { changeText, rangeText, CHANGE_CH } from "./QuoteCell";
+import QuoteCell, { changeText, priceReserve, rangeText, CHANGE_CH } from "./QuoteCell";
 import type { Trade } from "../../../types";
 
 function trade(over: Partial<Trade> = {}): Trade {
@@ -54,6 +54,20 @@ describe("QuoteCell", () => {
     for (const p of ["symbol", "price", "change"]) expect(button.querySelector(`[data-part="${p}"]`)!.className).not.toContain("text-right");
     // The fill's "+" hangs outside the symbol's box, so the symbol starts where everyone's does.
     expect(button.querySelector('[aria-label="popular"]')!.className).toContain("right-full");
+  });
+
+  it("the price reserves its length plus one at mount, two where the format jumps, so a crossing moves nothing", () => {
+    expect(priceReserve(253.69)).toBe(7); // "253.69" + 1
+    expect(priceReserve(99.99)).toBe(6); // "100.01" fits
+    expect(priceReserve(999.99)).toBe(8); // "1,000.01" fits
+    expect(priceReserve(1.0)).toBe(6); // "0.9900" fits
+    expect(priceReserve(79850.21)).toBe(10);
+    // Taken once: a tick does not change the box.
+    const { container, rerender } = render(<QuoteCell trade={trade({ price: 99.99 })} />);
+    const box = () => (container.querySelector('[data-part="price"]') as HTMLElement).style.minWidth;
+    expect(box()).toBe("6ch");
+    rerender(<QuoteCell trade={trade({ price: 100.01 })} />);
+    expect(box()).toBe("6ch");
   });
 
   it("flat is neutral: no arrow, no up colour", () => {
