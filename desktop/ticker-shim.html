@@ -18,6 +18,15 @@
     ?comfort=1        accepted and ignored: the bar has one height since
                       SCROLLR-278, so old links still open.
     ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
+    ?pages=1          SCROLLR-272: scrollMode "pages", the widget-pages bar.
+    ?colors=<m>       chipColors: widget | theme | subtle.
+    ?live=1           a live update every 4 s (src/dev/liveSim.ts): game
+                      clocks run, a score changes, a third of prices move.
+    ?label=<l>        this window's label (default "ticker"). Open a second
+                      tab with ?label=ticker-2 for a second ticker window:
+                      plugin:event emits are relayed between same-origin
+                      shim tabs over a BroadcastChannel, as Tauri relays
+                      them between windows.
     ?cells=1          SCROLLR-271: the widget-page cells gallery
                       (src/dev/cellsGallery.tsx) instead of the ticker;
                       with ?theme=light and ?colors=widget|theme|subtle.
@@ -126,7 +135,7 @@
     <script>
       // ── Ticker shim ───────────────────────────────────────────────
       (function () {
-        var label = "ticker";
+        var label = new URLSearchParams(location.search).get("label") || "ticker";
         var params = new URLSearchParams(location.search);
         var fixtureName = params.get("fixture") || "default";
         var fixturePath = "/src/dev/__fixtures__/dashboard." + fixtureName + ".json";
@@ -142,7 +151,8 @@
           ["scrollr:settings", {
             ticker: {
               showTicker: true,
-              scrollMode: params.get("mode") === "page" ? "page" : "continuous",
+              scrollMode: params.get("pages") === "1" ? "pages" : params.get("mode") === "page" ? "page" : "continuous",
+              chipColors: params.get("colors") || "widget",
               // Snaps to the nearest preset (20/40/80 px/s) on load.
               tickerSpeed: Number(params.get("speed")) || 40,
             },
@@ -220,9 +230,39 @@
           "set_crash_reports", "plugin:webview|set_webview_zoom", "plugin:window|show",
         ];
 
+        // Events, as Tauri delivers them: emit reaches every window's
+        // listeners, this one included; emit_to only the target's.
+        var callbacks = new Map();
+        var listeners = new Map();
+        var nextId = 1;
+        var bus = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("ticker-shim-events") : null;
+        function deliver(event, payload) {
+          setTimeout(function () {
+            listeners.forEach(function (l, id) {
+              var cb = callbacks.get(l.handler);
+              if (l.event === event && cb) cb({ event: event, id: id, payload: payload });
+            });
+          });
+        }
+        function emitEvent(event, payload, to) {
+          if (!to || to === label) deliver(event, payload);
+          if (bus) bus.postMessage({ event: event, payload: payload, to: to });
+        }
+        if (bus) bus.onmessage = function (m) {
+          if (!m.data.to || m.data.to === label) deliver(m.data.event, m.data.payload);
+        };
+
         window.__shimCalls = [];
         function invoke(cmd, args) {
           window.__shimCalls.push(cmd + " " + JSON.stringify(args || {}).slice(0, 160));
+          if (cmd === "plugin:event|listen") {
+            var lid = nextId++;
+            listeners.set(lid, { event: args.event, handler: args.handler });
+            return Promise.resolve(lid);
+          }
+          if (cmd === "plugin:event|unlisten") { listeners.delete(args.eventId); return Promise.resolve(); }
+          if (cmd === "plugin:event|emit") { emitEvent(args.event, args.payload); return Promise.resolve(); }
+          if (cmd === "plugin:event|emit_to") { emitEvent(args.event, args.payload, args.target && args.target.label); return Promise.resolve(); }
           if (cmd.indexOf("plugin:event|") === 0) return Promise.resolve(1);
           if (noop.indexOf(cmd) !== -1) return Promise.resolve();
           // getAllWindows() maps each entry through `new Window(label)`:
@@ -275,11 +315,19 @@
             windows: [{ label: label }],
             webviews: [{ label: label, windowLabel: label }],
           },
-          transformCallback: function () { return Math.floor(Math.random() * 1e9); },
+          transformCallback: function (cb, once) {
+            var id = nextId++;
+            callbacks.set(id, once ? function (e) { callbacks.delete(id); cb(e); } : cb);
+            return id;
+          },
+          unregisterCallback: function (id) { callbacks.delete(id); },
           convertFileSrc: function (p) { return p; },
           postMessage: function () {},
           unregisterListener: function () {},
           invoke: invoke,
+        };
+        window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+          unregisterListener: function (_event, id) { listeners.delete(id); },
         };
       })();
     </script>

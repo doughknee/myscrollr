@@ -6,7 +6,8 @@ import { test, expect, type Page } from "@playwright/test";
  * The cells gallery (`?cells=1`, src/dev/cellsGallery.tsx) ends with one
  * strip per family holding ONE item in every state it passes through --
  * a game before kick-off, live with one-digit and two-digit scores, final;
- * a quote at 9.99 and 1,253.69 with a one- and two-digit change; a headline
+ * a quote at 9.99 and 1,253.69 with a one- and two-digit change and a short,
+ * a long and no day's range (the rail's ends must not move); a headline
  * nine minutes and twelve hours old -- each in a column of the same width.
  * Every reserved part must sit at the same x with the same width in every
  * state. jsdom cannot see this; a real layout can.
@@ -16,7 +17,7 @@ import { test, expect, type Page } from "@playwright/test";
 const PARTS: Record<string, [string, "box" | "left" | "right"][]> = {
   "game-stacked": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["mine", "box"], ["away-name", "left"], ["home-name", "left"]],
   "game-wide": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "right"], ["home-name", "left"]],
-  quote: [["change", "box"], ["price", "box"], ["range", "box"]],
+  quote: [["change", "box"], ["price", "box"], ["range", "box"], ["range-low", "box"], ["range-rail", "box"], ["range-high", "box"]],
   news: [["age", "box"], ["headline", "box"]],
 };
 

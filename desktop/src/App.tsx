@@ -17,6 +17,7 @@ import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tau
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
+import PagedBar from "./components/pages/PagedBar";
 import { useToggleOnTicker } from "./hooks/useToggleOnTicker";
 import { isOnTicker } from "./utils/tickerMembership";
 import { pinTargetAt } from "./utils/pinTarget";
@@ -847,6 +848,21 @@ export default function App() {
               authenticated &&
               installedWidgetsMeta.length > 0 &&
               !hasAnyPinnedWidget;
+            // Widget pages (SCROLLR-272). Not offered in Settings until
+            // SCROLLR-274; the empty-state CTAs and the fixed zone stay
+            // with the chips bar until then (SCROLLR-273/274).
+            if (prefs.ticker.scrollMode === "pages") {
+              return (
+                <PagedBar
+                  dashboard={dashboard ?? null}
+                  activeTabs={activeTabs}
+                  chipColorMode={prefs.ticker.chipColors}
+                  holdOnHover={prefs.ticker.onHover !== "keep"}
+                  onChipClick={handleChipClick}
+                  onDisplayedWidgetsChange={reportDisplayedWidgets}
+                />
+              );
+            }
             return (
               <ScrollrTicker
                 dashboard={dashboard ?? null}

@@ -71,8 +71,10 @@ export function isThemeMode(value: unknown): value is ThemeMode {
 // `migrateTicker`.
 export type MixMode = "grouped" | "mixed";
 export type ChipColorMode = "widget" | "theme" | "subtle";
-/** Rotate ("flip") folded into Page 2026-09-06 (REL-204). */
-export type ScrollMode = "continuous" | "page";
+/** Rotate ("flip") folded into Page 2026-09-06 (REL-204). "pages" is the
+ *  widget-pages bar (SCROLLR-272): stored and honoured, but not offered in
+ *  Settings until SCROLLR-274 (the ticker shim's `?pages=1` sets it). */
+export type ScrollMode = "continuous" | "page" | "pages";
 /** What the bar does under the mouse. Continuous: keep / slow to 30 % /
  *  stop. Page: keep advancing / hold the page (slow and pause alike). */
 export type HoverBehavior = "keep" | "slow" | "pause";
@@ -1131,9 +1133,11 @@ export function migrateTicker(raw: unknown): TickerPrefs {
           ? "subtle"
           : "widget",
     scrollMode:
-      scrollMode === "page" || scrollMode === "step" || scrollMode === "flip"
-        ? "page"
-        : "continuous",
+      scrollMode === "pages"
+        ? "pages"
+        : scrollMode === "page" || scrollMode === "step" || scrollMode === "flip"
+          ? "page"
+          : "continuous",
     tickerSpeed: snapToPreset(
       rest.tickerSpeed,
       Object.values(TICKER_SPEEDS),

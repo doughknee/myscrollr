@@ -16,9 +16,10 @@
  *    (`edgeWidth`, 0 until the edge zone ships). `columnsFor` takes the CONTENT
  *    width. Height does not enter: comfort mode changes the row height, not how
  *    many columns fit.
- *  - COLUMN OVERRIDE. A cell family whose content is wider than its kind's
- *    default (college team names) passes `minCol` to `columnsFor`. It replaces
- *    MIN_COL[kind] for that widget only.
+ *  - MINIMUM COLUMN. The caller always passes the cell family's own minimum
+ *    width (`gameMinCol(league)`, `QUOTE_MIN_COL`, `NEWS_MIN_COL`,
+ *    `ALSO_MIN_COL` in ./cells). Those exports are the one source of truth;
+ *    this file holds no per-kind defaults to disagree with them.
  *  - ITEMS. A page holds opaque items `T`. The caller supplies `tierOf(item)`
  *    (the SCROLLR-267 importance ladder below) and `keyOf(item)` (a stable id:
  *    game id, symbol, article url) for freezing.
@@ -49,16 +50,6 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 
 // ── Columns ────────────────────────────────────────────────────────
 
-/** Narrowest a column may get before the page takes one column fewer. */
-export const MIN_COL: Readonly<Record<PageKind, number>> = {
-  sports: 212,
-  news: 400,
-  finance: 158,
-  clock: 176,
-  weather: 196,
-  quiet: 300,
-};
-
 /** Width of the label block on the left of every page. */
 export const LABEL_W = 112;
 
@@ -70,9 +61,12 @@ export function contentWidth(barWidth: number, edgeWidth = 0): number {
   return Math.max(0, barWidth - LABEL_W - edgeWidth);
 }
 
-/** Columns that fit `contentW` (never fewer than one). */
-export function columnsFor(kind: PageKind, contentW: number, minCol?: number): number {
-  return Math.max(1, Math.floor(contentW / (minCol ?? MIN_COL[kind])));
+/**
+ * Columns of at least `minCol` px that fit `contentW` (never fewer than one).
+ * `minCol` is the cell family's exported minimum (see the header).
+ */
+export function columnsFor(contentW: number, minCol: number): number {
+  return Math.max(1, Math.floor(contentW / minCol));
 }
 
 // ── Pages ──────────────────────────────────────────────────────────

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   LABEL_W,
   MAX_PAGES_PER_VISIT,
-  MIN_COL,
   TIER,
   columnsFor,
   contentWidth,
@@ -13,40 +12,40 @@ import {
   planWidget,
   refreshPage,
   visitPages,
-  type PageKind,
   type Tier,
 } from "./pagePlan";
 
-const KINDS = Object.keys(MIN_COL) as PageKind[];
+// The cell families' minimums (cells/*: quote, game US-pro, game other, also, news).
+const MINS = [172, 212, 244, 300, 400];
 const range = (n: number) => [...Array(n).keys()];
 
 describe("columns", () => {
-  it("come from the content width and the kind", () => {
-    expect(columnsFor("sports", 1920 - LABEL_W)).toBe(8);
-    expect(columnsFor("news", 1280 - LABEL_W)).toBe(2);
-    expect(columnsFor("finance", 0)).toBe(1);
+  it("come from the content width and the family's minimum", () => {
+    expect(columnsFor(1920 - LABEL_W, 212)).toBe(8);
+    expect(columnsFor(1280 - LABEL_W, 400)).toBe(2);
+    expect(columnsFor(0, 172)).toBe(1);
     expect(contentWidth(1920, 300)).toBe(1920 - LABEL_W - 300);
     expect(contentWidth(50)).toBe(0);
   });
 
   it("every width 1280..3440 fits its columns, never starves them, and only grows", () => {
-    for (const kind of KINDS) {
+    for (const min of MINS) {
       let prev = 0;
       for (let bar = 1280; bar <= 3440; bar++) {
         const w = contentWidth(bar);
-        const c = columnsFor(kind, w);
+        const c = columnsFor(w, min);
         expect(c).toBeGreaterThanOrEqual(1);
-        expect(c * MIN_COL[kind]).toBeLessThanOrEqual(w); // each column is wide enough
-        expect((c + 1) * MIN_COL[kind]).toBeGreaterThan(w); // and one more would not be
+        expect(c * min).toBeLessThanOrEqual(w); // each column is wide enough
+        expect((c + 1) * min).toBeGreaterThan(w); // and one more would not be
         expect(c).toBeGreaterThanOrEqual(prev);
         prev = c;
       }
     }
   });
 
-  it("a per-widget minCol replaces the kind default", () => {
-    expect(columnsFor("sports", contentWidth(1280))).toBe(5);
-    expect(columnsFor("sports", contentWidth(1280), 244)).toBe(4);
+  it("a wider family minimum takes a column fewer", () => {
+    expect(columnsFor(contentWidth(1280), 212)).toBe(5);
+    expect(columnsFor(contentWidth(1280), 244)).toBe(4);
   });
 });
 
@@ -76,7 +75,7 @@ describe("paginate", () => {
   });
 
   it("the 56-game busy Saturday is 14 pages of 4 at 1280", () => {
-    const cols = columnsFor("sports", contentWidth(1280), 244);
+    const cols = columnsFor(contentWidth(1280), 244);
     const pages = paginate(range(56), cols);
     expect(pages).toHaveLength(14);
     expect(pages.every((p) => p.length === 4)).toBe(true);

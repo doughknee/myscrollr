@@ -50,12 +50,14 @@ describe("QuoteCell", () => {
     const parts = (t: Trade) => {
       const { container } = render(<QuoteCell trade={t} />);
       const el = (p: string) => (container.querySelector(`[data-part="${p}"]`) as HTMLElement).style.minWidth;
-      return [el("change"), el("price")];
+      return [el("change"), el("price"), el("range-low"), el("range-high")];
     };
-    const small = parts(trade({ price: 9.99, percentage_change: 0.89 }));
-    const large = parts(trade({ price: 1253.69, percentage_change: -12.4 }));
+    const small = parts(trade({ price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }));
+    const large = parts(trade({ price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 61260.55 }));
+    const none = parts(trade({ day_low: 0, day_high: 0 }));
     expect(large).toEqual(small);
-    expect(small).toEqual([`${CHANGE_CH}ch`, `${PRICE_CH}ch`]);
+    expect(none).toEqual(small);
+    expect(small).toEqual([`${CHANGE_CH}ch`, `${PRICE_CH}ch`, `${PRICE_CH}ch`, `${PRICE_CH}ch`]);
     // The widest change fits its reservation.
     expect(changeText(-12.4).length).toBeLessThanOrEqual(CHANGE_CH);
   });

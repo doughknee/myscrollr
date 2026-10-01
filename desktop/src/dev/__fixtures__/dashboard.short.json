@@ -1,0 +1,157 @@
+{
+ "_note": "SCROLLR-266/267 'short': one BBC widget with 10 fresh headlines (6 to 105 min old) -- a bar whose content is narrower than a wide screen. Titles are real headlines from the other fixtures, retagged to the BBC feed.",
+ "_captured_at": "2026-09-18T21:40:00Z",
+ "data": {
+  "rss": [
+   {
+    "id": 920001,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-0",
+    "title": "Central bank holds rates as inflation cools for third month",
+    "link": "https://example.invalid/short/0",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T21:34:00.000Z",
+    "created_at": "2026-09-18T21:34:00.000Z",
+    "updated_at": "2026-09-18T21:34:00.000Z"
+   },
+   {
+    "id": 920002,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-1",
+    "title": "Storm warnings issued across the north-east ahead of weekend",
+    "link": "https://example.invalid/short/1",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T21:23:00.000Z",
+    "created_at": "2026-09-18T21:23:00.000Z",
+    "updated_at": "2026-09-18T21:23:00.000Z"
+   },
+   {
+    "id": 920003,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-2",
+    "title": "Rail strike talks resume after week of cancelled services",
+    "link": "https://example.invalid/short/2",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T21:12:00.000Z",
+    "created_at": "2026-09-18T21:12:00.000Z",
+    "updated_at": "2026-09-18T21:12:00.000Z"
+   },
+   {
+    "id": 920004,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-3",
+    "title": "Senate advances spending bill with hours to spare before deadline",
+    "link": "https://example.invalid/short/3",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T21:01:00.000Z",
+    "created_at": "2026-09-18T21:01:00.000Z",
+    "updated_at": "2026-09-18T21:01:00.000Z"
+   },
+   {
+    "id": 920005,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-4",
+    "title": "A small town's library reopens after a five-year rebuild",
+    "link": "https://example.invalid/short/4",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T20:50:00.000Z",
+    "created_at": "2026-09-18T20:50:00.000Z",
+    "updated_at": "2026-09-18T20:50:00.000Z"
+   },
+   {
+    "id": 920006,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-5",
+    "title": "Scientists map the ocean floor near a newly found vent field",
+    "link": "https://example.invalid/short/5",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T20:39:00.000Z",
+    "created_at": "2026-09-18T20:39:00.000Z",
+    "updated_at": "2026-09-18T20:39:00.000Z"
+   },
+   {
+    "id": 920007,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-6",
+    "title": "News live: Two more Australians confirmed safe in Nepal-Tibet floods; Bowen calls joint statement on China ‘strong’",
+    "link": "https://example.invalid/short/6",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T20:28:00.000Z",
+    "created_at": "2026-09-18T20:28:00.000Z",
+    "updated_at": "2026-09-18T20:28:00.000Z"
+   },
+   {
+    "id": 920008,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-7",
+    "title": "Trump administration asks supreme court to intervene over judge’s ban on USPS mail-in voting restrictions – live",
+    "link": "https://example.invalid/short/7",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T20:17:00.000Z",
+    "created_at": "2026-09-18T20:17:00.000Z",
+    "updated_at": "2026-09-18T20:17:00.000Z"
+   },
+   {
+    "id": 920009,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-8",
+    "title": "Missouri supreme court throws out new congressional maps backed by Trump",
+    "link": "https://example.invalid/short/8",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T20:06:00.000Z",
+    "created_at": "2026-09-18T20:06:00.000Z",
+    "updated_at": "2026-09-18T20:06:00.000Z"
+   },
+   {
+    "id": 920010,
+    "feed_url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "guid": "short-9",
+    "title": "Genetically modified pig kidney keeps man alive for record nine months",
+    "link": "https://example.invalid/short/9",
+    "description": "",
+    "source_name": "BBC News",
+    "published_at": "2026-09-18T19:55:00.000Z",
+    "created_at": "2026-09-18T19:55:00.000Z",
+    "updated_at": "2026-09-18T19:55:00.000Z"
+   }
+  ]
+ },
+ "preferences": {
+  "feed_mode": "compact",
+  "feed_position": "bottom",
+  "feed_behavior": "overlay",
+  "feed_enabled": true,
+  "enabled_sites": [],
+  "disabled_sites": [],
+  "subscription_tier": "uplink_pro",
+  "default_widgets_applied": true,
+  "updated_at": "2026-09-01T00:00:00Z"
+ },
+ "widgets": [
+  {
+   "id": 3,
+   "widget_type": "news_bbc",
+   "enabled": true,
+   "ticker_enabled": true,
+   "config": {
+    "feeds": [
+     {
+      "name": "BBC News",
+      "url": "https://feeds.bbci.co.uk/news/rss.xml"
+     }
+    ]
+   },
+   "created_at": "2026-09-01T00:00:00Z",
+   "updated_at": "2026-09-01T00:00:00Z"
+  }
+ ]
+}

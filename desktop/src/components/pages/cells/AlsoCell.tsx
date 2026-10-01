@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { accentStyle, mix } from "./parts";
 
-/** Narrowest column an Also cell takes (pagePlan's default; a dated status line). */
+/** Narrowest column an Also cell takes (a dated status line), for pagePlan's `columnsFor`. */
 export const ALSO_MIN_COL = 300;
 
 interface AlsoCellProps {
