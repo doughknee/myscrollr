@@ -11,7 +11,9 @@
  *    layout on the next page. Nothing in a page moves while it is up.
  *  - The label names the widget in its colour and wipes upward only when
  *    the widget changes. The line under it fills over the page's dwell.
- *  - Hover holds the page (and the line). Reduced motion (the OS setting,
+ *  - An ACTIVE pointer holds the page (and the line): over the bar and
+ *    entering or moving within the last 5 s (activeHover.ts, SCROLLR-291). A
+ *    pointer that rests 5 s releases it; moving again grabs it back. Reduced motion (the OS setting,
  *    read directly: main.tsx pins Motion's own flag off for the marquee)
  *    turns the swipe and the wipe into crossfades.
  *  - One clock for every ticker window. App renders once per window
@@ -55,6 +57,7 @@ import AlsoCell from "./cells/AlsoCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
 import { stepBack } from "./edgeRule";
+import { useActiveHover } from "./activeHover";
 
 /** The swipe (canvas "Motion"): 0.6 s on a soft ease. */
 export const SWIPE_S = 0.6;
@@ -315,14 +318,16 @@ export default function PagedBar({
     return () => window.clearTimeout(id);
   }, [leader, label]);
 
-  const onHover = (on: boolean) => {
+  // Each window times its own pointer and reports only the transitions, so the
+  // leader holds while ANY window's pointer is active and releases on the last idle.
+  const hover = useActiveHover((on) => {
     if (leader) {
       localHover.current = on;
       updateHold();
     } else {
       emit(HOVER_EVENT, { label, on }).catch(() => {});
     }
-  };
+  });
 
   // ── Presence: widgets that have pages ───────────────────────────
   const displayedKey = [...new Set([...widgets.filter((w) => w.tab !== ALSO_TAB).map((w) => w.tab), ...edgeTabs(edge)])].sort().join("\0");
@@ -371,8 +376,9 @@ export default function PagedBar({
       data-pages=""
       data-motion-style={reduced ? "fade" : "swipe"}
       className="ticker-container relative flex h-16 w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150"
-      onMouseEnter={() => onHover(true)}
-      onMouseLeave={() => onHover(false)}
+      onMouseEnter={hover.move}
+      onMouseMove={hover.move}
+      onMouseLeave={hover.leave}
     >
       {cur && (
         <>
