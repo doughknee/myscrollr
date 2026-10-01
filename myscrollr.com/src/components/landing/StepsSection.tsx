@@ -22,12 +22,12 @@ export function StepsSection() {
             {
               num: '02',
               title: 'Pick your widgets',
-              body: `Leagues, markets, feeds, your favorite outlets: ${widgets.length} widgets and counting. Each costs one slot. Three are free.`,
+              body: `Leagues, markets, feeds, your favorite outlets: ${widgets.length} widgets and counting. Each one is a page on your bar, and your bar has room for 3 pages on Free. Clock and Weather sit on its edge, free.`,
             },
             {
               num: '03',
               title: 'Get back to work',
-              body: 'The bar floats above every window. It takes 40 pixels of your screen and none of your attention until something happens.',
+              body: 'The bar floats above every window. It takes 64 pixels of your screen and none of your attention until something happens.',
             },
           ]}
         />

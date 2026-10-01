@@ -351,8 +351,7 @@ try {
         // New-layout mobile invariants (terminal-editorial redesign):
         //  - hero heading + approved sub copy actually render
         //  - the persistent demo ticker bar is pinned full-width at the
-        //    viewport edge with its duplicated marquee intact (the 2x
-        //    chip duplication is what makes the -50% loop seamless)
+        //    viewport edge, 64px tall, with a page of cells up
         const layout = await page.evaluate(() => {
           const heading = document.querySelector('h1')
           const heroCopy = Array.from(document.querySelectorAll('p')).find(
@@ -369,7 +368,7 @@ try {
             barLeft: Math.round(barRect.left),
             barRight: Math.round(barRect.right),
             barHeight: Math.round(barRect.height),
-            chipCount: bar.querySelectorAll('.demo-chip').length,
+            chipCount: bar.querySelectorAll('[data-chip]').length,
             clientWidth: document.documentElement.clientWidth,
             clientHeight: document.documentElement.clientHeight,
           }
@@ -385,10 +384,10 @@ try {
             layout.pos === 'top'
               ? Math.abs(layout.barTop) <= 1
               : Math.abs(layout.barBottom - layout.clientHeight) <= 1
-          if (!pinnedEdgeOk || layout.barHeight !== 48) {
+          if (!pinnedEdgeOk || layout.barHeight !== 64) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
-                `demo bar not pinned to the ${layout.pos} viewport edge at 48px — ` +
+                `demo bar not pinned to the ${layout.pos} viewport edge at 64px — ` +
                 `top=${layout.barTop}, bottom=${layout.barBottom}, ` +
                 `height=${layout.barHeight}, clientHeight=${layout.clientHeight}`,
             )
@@ -404,13 +403,11 @@ try {
             failures += 1
           }
 
-          // Motion+ Ticker clones however many chips it needs to fill
-          // the viewport (no fixed 2x duplication anymore) — assert
-          // the bar holds a non-empty chip run.
+          // Widget pages (SCROLLR-198): a page of cells is up.
           if (layout.chipCount === 0) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
-                `demo bar should hold a non-empty chip run — ` +
+                `demo bar should hold a page of cells — ` +
                 `chips=${layout.chipCount}`,
             )
             failures += 1

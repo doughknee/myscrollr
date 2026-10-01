@@ -1,6 +1,6 @@
 /**
- * SEC 04 ／ MAKE IT YOURS — theme family swatches + mode/pin/density/
- * direction controls, all driving the persistent demo bar (and, for
+ * SEC 04 ／ MAKE IT YOURS — theme family swatches + mode/pin controls,
+ * all driving the persistent demo bar (and, for
  * theme + mode, the whole site) through useDemoTicker + useTheme.
  * Mirrors the app's Appearance settings: theme FAMILY and color MODE
  * are separate controls, exactly like the desktop app.
@@ -64,16 +64,7 @@ function ControlRow<T extends string>({
 }
 
 export function MakeItYours() {
-  const {
-    theme,
-    pos,
-    density,
-    direction,
-    setTheme,
-    setPos,
-    setDensity,
-    setDirection,
-  } = useDemoTicker()
+  const { theme, pos, setTheme, setPos } = useDemoTicker()
   const { theme: mode, setTheme: setMode } = useTheme()
 
   return (
@@ -88,8 +79,9 @@ export function MakeItYours() {
               <span className="text-primary">Dress it, park it.</span>
             </h2>
             <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
-              Twenty palettes. Top or bottom of any monitor. Speed, density, all
-              of it tunable. Try it right here. The bar takes orders.
+              Twenty palettes, light or dark. Top or bottom of any monitor.
+              Pages, or a continuous scroll if you prefer. Try it right here.
+              The bar takes orders.
             </p>
             <div className="flex flex-col gap-3">
               <ControlRow
@@ -109,24 +101,6 @@ export function MakeItYours() {
                   { id: 'top' as const, label: 'TOP' },
                 ]}
                 onChange={setPos}
-              />
-              <ControlRow
-                label="DENSITY"
-                value={density}
-                options={[
-                  { id: 'compact' as const, label: 'COMPACT' },
-                  { id: 'detailed' as const, label: 'DETAILED' },
-                ]}
-                onChange={setDensity}
-              />
-              <ControlRow
-                label="DIRECTION"
-                value={direction}
-                options={[
-                  { id: 'left' as const, label: '← LEFT' },
-                  { id: 'right' as const, label: 'RIGHT →' },
-                ]}
-                onChange={setDirection}
               />
             </div>
           </div>
@@ -166,14 +140,10 @@ export function MakeItYours() {
                         className="min-w-0 truncate font-mono text-[11px]"
                         style={{ color: pal.text }}
                       >
-                        <span style={{ color: pal.chips.fin }}>
-                          AAPL 232.14
-                        </span>
+                        <span style={{ color: pal.fg }}>AAPL 253.69</span>
                         <span style={{ color: pal.up }}> ▲</span>
                         {' · '}
-                        <span style={{ color: pal.chips.spt }}>
-                          KC 24—BUF 21
-                        </span>
+                        <span style={{ color: pal.fg }}>NYJ 24—CHI 20</span>
                       </span>
                     </span>
                     <span className="flex justify-between px-0.5 font-mono text-[10px] tracking-[0.1em] text-base-content/45">

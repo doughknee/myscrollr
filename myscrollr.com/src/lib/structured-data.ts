@@ -173,7 +173,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Is it really free?',
     answer:
-      'Yes. The free tier includes three widget slots forever. You can download and browse without an account; sign in to add live data widgets and sync settings. Clock and Weather are free and never use a slot. Uplink exists if you outgrow three.',
+      'Yes. Your bar has room for three pages on the free tier, forever, and each widget is one page. You can download and browse without an account; sign in to add live data widgets and sync settings. Clock and Weather sit on the edge of the bar and are free. Uplink exists if you outgrow three.',
   },
   {
     question: 'Will it slow my computer down?',

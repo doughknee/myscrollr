@@ -200,12 +200,12 @@ function RootLayout() {
 
   const hasDemoBar = showsDemoBar(pathname)
   // /business renders its OWN DemoTickerBar instance (white-label
-  // override) but it follows the shared store's pin/density, so for
+  // override) but it follows the shared store's pin, so for
   // layout purposes (padding, header offset, drawer insets) it counts
   // as a bar-having route like any other.
   const hasAnyBar = hasDemoBar || pathname.startsWith('/business')
   const isConsole = hydrated && !usesSiteChrome(pathname)
-  const { theme: demoFamily, density, pos } = useDemoTicker()
+  const { theme: demoFamily, pos } = useDemoTicker()
 
   // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
   // the whole site (the [data-theme-family] token blocks in styles.css).
@@ -225,19 +225,11 @@ function RootLayout() {
       <MotionConfig reducedMotion="user">
         <div
           className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
-            hasAnyBar
-              ? density === 'detailed'
-                ? 'pb-[88px]'
-                : 'pb-[72px]'
-              : ''
+            hasAnyBar ? 'pb-[88px]' : ''
           } ${
             // Top-pinned bar is fixed; pad the page so it doesn't sit
             // on top of the (sticky) header at scroll 0.
-            hasAnyBar && pos === 'top'
-              ? density === 'detailed'
-                ? 'pt-16'
-                : 'pt-12'
-              : ''
+            hasAnyBar && pos === 'top' ? 'pt-16' : ''
           }`}
         >
           {/* Skip to main content — first focusable element */}

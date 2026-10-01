@@ -21,7 +21,8 @@ import {
   widgetAbbr,
   widgetAccent,
 } from '@/lib/catalog'
-import { chipText, chipsFor, useDemoTicker } from '@/hooks/useDemoTicker'
+import { useDemoTicker } from '@/hooks/useDemoTicker'
+import { sampleText } from '@/lib/demoData'
 import {
   DeparturesRow,
   PageHeader,
@@ -57,8 +58,8 @@ function ChannelsPage() {
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
 
-  // Local 3s tick driving the jittering sample-chip column (same
-  // cadence as useDemoChips; `now` stays null through SSR/first paint
+  // Local 3s tick driving the moving sample column (same cadence as
+  // the demo bar; `now` stays null through SSR/first paint
   // to avoid a timezone hydration mismatch on the Clock row).
   const [tick, setTick] = useState(0)
   const [now, setNow] = useState<Date | null>(null)
@@ -262,8 +263,16 @@ function CatalogRow({
   onToggle: () => void
 }) {
   const accent = widgetAccent(widget)
-  const chip = chipsFor(widget.id, tick, now).at(0)
-  const sample = chip ? `⋯ ${chipText(chip)} ⋯` : ''
+  const text = now
+    ? sampleText(
+        widget.id,
+        () => widget.color,
+        () => widget.name,
+        tick,
+        now,
+      )
+    : ''
+  const sample = text ? `⋯ ${text} ⋯` : ''
 
   return (
     // Whole-row click target — on a 35-row catalog the small button is

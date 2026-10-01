@@ -2,8 +2,9 @@
  * SEC 01 ／ THE CATALOG — the featured-widget picker that drives the
  * persistent demo bar. Toggling a pill writes the shared
  * `scrollr-marketing-demo` state, so the bar at the bottom of the page
- * updates immediately. Past 3 active widgets the slot meter flips amber
- * and the Uplink upsell strip appears — adding is never blocked.
+ * updates immediately. Each widget is a page on the bar; past 3 pages the
+ * meter flips amber and the Uplink upsell strip appears — adding is never
+ * blocked. Clock and Weather sit on the bar's edge and take no page.
  */
 
 import { useState } from 'react'
@@ -47,7 +48,7 @@ export function CatalogPicker() {
   const [expanded, setExpanded] = useState(false)
 
   const counts = categoryCounts(widgets)
-  // Free-slot widgets (Clock, Weather) never use a slot.
+  // Clock and Weather sit on the edge and never take a page.
   const freeIds = new Set(widgets.filter((w) => w.free_slot).map((w) => w.id))
   const used = active.filter((id) => !freeIds.has(id)).length
   const featured = FEATURED_IDS.map((id) =>
@@ -73,7 +74,7 @@ export function CatalogPicker() {
             </>
           }
           stat={
-            // Crossfade between the free-slots meter and the amber
+            // Crossfade between the free-pages meter and the amber
             // over-limit stat instead of hard-swapping mid-glance.
             <AnimatePresence mode="wait" initial={false}>
               {used <= 3 ? (
@@ -85,7 +86,7 @@ export function CatalogPicker() {
                   transition={{ duration: 0.18, ease: EASE }}
                   className="inline-block text-primary"
                 >
-                  {`SLOTS ${'▓'.repeat(used)}${'░'.repeat(3 - used)} `}
+                  {`PAGES ${'▓'.repeat(used)}${'░'.repeat(3 - used)} `}
                   <CountUp value={used} />
                   {'/3 FREE'}
                 </motion.span>
@@ -99,7 +100,7 @@ export function CatalogPicker() {
                   className="inline-block text-warning"
                 >
                   <CountUp value={used} />
-                  {' RUNNING · UPLINK TERRITORY'}
+                  {' PAGES · UPLINK TERRITORY'}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -267,11 +268,11 @@ export function CatalogPicker() {
             >
               <div className="mb-7 flex flex-wrap items-center gap-3.5 rounded-[4px] border border-dashed border-warning/40 px-[18px] py-3.5">
                 <span className="font-mono text-xs tracking-[0.1em] text-warning">
-                  {used} RUNNING ▓ UPLINK TERRITORY
+                  {used} PAGES ▓ UPLINK TERRITORY
                 </span>
                 <span className="min-w-0 flex-[1_1_260px] text-sm text-base-content/75">
-                  This is what Uplink feels like: 6, 12, or unlimited slots.
-                  From $6.67/mo, 7-day free trial.
+                  Your bar has room for 3 pages on Free · Uplink fits 6, Pro 12,
+                  Ultimate unlimited. From $6.67/mo, 7-day free trial.
                 </span>
                 <Link
                   to="/uplink"

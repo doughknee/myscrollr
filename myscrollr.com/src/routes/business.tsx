@@ -6,7 +6,7 @@ import type { FormEvent } from 'react'
 
 import type { BusinessUseCase } from '@/api/client'
 import type { DemoTickerBarOverride } from '@/components/DemoTickerBar'
-import type { DemoChip } from '@/hooks/useDemoTicker'
+import type { DemoBarData, DemoItem } from '@/lib/demoPages'
 import type {
   BackdropBeam,
   BackdropParticle,
@@ -22,6 +22,8 @@ import {
   TerminalContainer,
 } from '@/components/terminal'
 import { EASE } from '@/lib/animations'
+import { financeWidget, sportsWidget } from '@/lib/demoData'
+import { ALSO_MIN_COL, TIER } from '@/lib/demoPages'
 import { seededRandom } from '@/lib/seededRandom'
 import { seo } from '@/lib/seo'
 import { organization } from '@/lib/structured-data'
@@ -63,83 +65,82 @@ type BrandId = 'scrollr' | 'acme' | 'dugout' | 'novax'
 interface BrandDef {
   label: string
   accent: string
-  bar: { bg: string; border: string; text: string; muted: string }
+  bar: {
+    bg: string
+    border: string
+    fg: string
+    text: string
+    muted: string
+    fg4: string
+  }
 }
 
 // prettier-ignore
 const BRAND_DEFS: Record<BrandId, BrandDef> = {
-  scrollr: { label: 'SCROLLR', accent: '#34d399', bar: { bg: 'rgba(16,16,24,.9)', border: '#2e2e42', text: '#c8c8d8', muted: '#5a5a72' } },
-  acme: { label: 'ACME CAPITAL', accent: '#00d4ff', bar: { bg: 'rgba(8,16,28,.93)', border: '#1c3450', text: '#c9dcf0', muted: '#4a6a8a' } },
-  dugout: { label: 'THE DUGOUT', accent: '#fbbf24', bar: { bg: 'rgba(22,14,8,.93)', border: '#4a3418', text: '#f0e2c9', muted: '#8a7a5a' } },
-  novax: { label: 'NOVAX', accent: '#a855f7', bar: { bg: 'rgba(16,10,26,.93)', border: '#362050', text: '#ddc9f0', muted: '#6f5a8a' } },
+  scrollr: { label: 'SCROLLR', accent: '#34d399', bar: { bg: 'rgba(16,16,24,.9)', border: '#2e2e42', fg: '#ececf4', text: '#c8c8d8', muted: '#8a8aa2', fg4: '#5a5a72' } },
+  acme: { label: 'ACME CAPITAL', accent: '#00d4ff', bar: { bg: 'rgba(8,16,28,.93)', border: '#1c3450', fg: '#e6f0fa', text: '#c9dcf0', muted: '#7a9aba', fg4: '#4a6a8a' } },
+  dugout: { label: 'THE DUGOUT', accent: '#fbbf24', bar: { bg: 'rgba(22,14,8,.93)', border: '#4a3418', fg: '#faf0de', text: '#f0e2c9', muted: '#b0a080', fg4: '#8a7a5a' } },
+  novax: { label: 'NOVAX', accent: '#a855f7', bar: { bg: 'rgba(16,10,26,.93)', border: '#362050', fg: '#f0e6fa', text: '#ddc9f0', muted: '#9f8aba', fg4: '#6f5a8a' } },
 }
 
 const BRAND_IDS = Object.keys(BRAND_DEFS) as Array<BrandId>
 
-function jitter(tick: number, base: number, seed: number, spread: number) {
-  return base + Math.sin(tick * 0.9 + seed) * spread
+/** A brand's own messages, on one page (the app's Also cells). */
+function messages(
+  tab: string,
+  code: string,
+  accent: string,
+  rows: Array<[string, string]>,
+) {
+  return {
+    tab,
+    code,
+    sub: 'FROM US',
+    hex: accent,
+    minCol: ALSO_MIN_COL,
+    items: rows.map(
+      ([tag, text]): DemoItem => ({
+        key: `${tab}:${tag}`,
+        tier: TIER.status,
+        cell: { kind: 'also', code: tag, text, hex: accent },
+      }),
+    ),
+  }
 }
 
-/** Audience-specific chips per white-label brand (mockup `brandChips`),
- *  in the app-faithful structured chip shape rendered by DemoTickerBar. */
-function brandChips(brand: BrandId, tick: number): Array<DemoChip> {
-  const t = tick
+/** Audience-specific pages per white-label brand, in the app's page
+ *  shape rendered by DemoTickerBar. */
+function brandBar(brand: BrandId, tick: number, now: Date): DemoBarData {
+  const accent = BRAND_DEFS[brand].accent
   if (brand === 'acme') {
-    const cyan = '#00d4ff'
-    return [
-      // prettier-ignore
-      { kind: 'text', accent: cyan, label: 'ACME MODEL PORTFOLIO', value: '▲+0.8% TODAY' },
-      // prettier-ignore
-      { kind: 'trade', accent: cyan, symbol: 'SPY', price: '$' + jitter(t, 612.4, 1, 0.8).toFixed(2), delta: '▲+0.4%', up: true },
-      // prettier-ignore
-      { kind: 'trade', accent: cyan, symbol: 'QQQ', price: '$' + jitter(t, 482.1, 3, 1.2).toFixed(2), delta: '▲+0.9%', up: true },
-      // prettier-ignore
-      { kind: 'trade', accent: cyan, symbol: '10Y YIELD', price: '3.84%', delta: '▼-2BP', up: false },
-      // prettier-ignore
-      { kind: 'text', accent: cyan, label: 'YOUR ADVISOR', value: 'QUARTERLY REVIEW THU 2PM' },
-    ]
+    // prettier-ignore
+    return { edge: [], widgets: [
+      financeWidget('acme_markets', 'MARKETS', accent, [['SPY', 612.4, 0.4], ['QQQ', 482.1, 0.9], ['DIA', 448.2, 0.3], ['IWM', 231.6, -0.2]], tick),
+      messages('acme_desk', 'ACME', accent, [['PORTFOLIO', 'model portfolio up 0.8% today'], ['REVIEW', 'quarterly review Thu 2:00 PM']]),
+    ] }
   }
   if (brand === 'dugout') {
-    const amber = '#fbbf24'
-    return [
-      // prettier-ignore
-      { kind: 'game', accent: amber, away: 'NYY', awayScore: '5', home: 'BOS', homeScore: '3', status: '▲7', live: true, winner: 'away' },
-      // prettier-ignore
-      { kind: 'game', accent: amber, away: 'MIA', awayScore: '2', home: 'LA', homeScore: '1', status: '63′', live: true, winner: 'away' },
-      // prettier-ignore
-      { kind: 'text', accent: amber, label: 'TONIGHT', value: 'TRIVIA 8PM', sub: 'WINGS ½ OFF DURING ANY OT' },
-      {
-        kind: 'game',
-        accent: amber,
-        away: 'KC',
-        awayScore: '24',
-        home: 'BUF',
-        homeScore: '21',
-        status:
-          'Q4 ' +
-          (2 - (t % 3)) +
-          ':' +
-          String(59 - ((t * 7) % 60)).padStart(2, '0'),
-        live: true,
-        winner: 'away',
-      },
-    ]
+    // prettier-ignore
+    return { edge: [], widgets: [
+      sportsWidget('dugout_mlb', { league: 'MLB', code: 'MLB', close: 2, clock: 'inning', games: [
+        ['New York Yankees', 'Boston Red Sox', '5', '3', 'live', -150, '7', 0, 'Fenway Park', '88-60', '81-67'],
+        ['Los Angeles Dodgers', 'San Diego Padres', '2', '2', 'live', -90, '5', 0, 'Petco Park', '90-58', '84-64'],
+      ] }, accent, tick, now),
+      sportsWidget('dugout_nfl', { league: 'NFL', code: 'NFL', close: 8, clock: 'down', games: [
+        ['Kansas City Chiefs', 'Buffalo Bills', '24', '21', 'live', -170, 'Q4', 179, 'Highmark Stadium', '3-0', '3-0'],
+      ] }, accent, tick, now),
+      messages('dugout_tonight', 'TONIGHT', accent, [['TRIVIA', 'trivia night at 8:00 PM'], ['WINGS', 'half-price wings during any overtime']]),
+    ] }
   }
   if (brand === 'novax') {
-    const purple = '#a855f7'
-    return [
-      // prettier-ignore
-      { kind: 'trade', accent: purple, symbol: 'BTC/USDT', price: '$' + Math.round(jitter(t, 118240, 4, 180)).toLocaleString(), delta: '▲+2.4%', up: true },
-      // prettier-ignore
-      { kind: 'trade', accent: purple, symbol: 'ETH/USDT', price: '$' + Math.round(jitter(t, 4120, 5, 14)).toLocaleString(), delta: '▼-0.8%', up: false },
-      // prettier-ignore
-      { kind: 'trade', accent: purple, symbol: 'SOL/USDT', price: '$' + jitter(t, 212.5, 6, 2.4).toFixed(2), delta: '▲+5.1%', up: true },
-      // prettier-ignore
-      { kind: 'text', accent: purple, label: 'NOVAX', value: 'MAKER FEES 0% THROUGH SEPTEMBER' },
-    ]
+    // prettier-ignore
+    return { edge: [], widgets: [
+      financeWidget('novax_pairs', 'PAIRS', accent, [['BTC/USDT', 118240, 2.4], ['ETH/USDT', 4120, -0.8], ['SOL/USDT', 212.5, 5.1]], tick),
+      messages('novax_news', 'NOVAX', accent, [['FEES', 'maker fees 0% through September']]),
+    ] }
   }
   // 'scrollr' renders <DemoTickerBar /> with no override instead.
-  return []
+  return { widgets: [], edge: [] }
 }
 
 // ── Section content (copy verbatim from the mockup) ─────────────
@@ -869,7 +870,7 @@ function BusinessPage() {
   const [brand, setBrand] = useState<BrandId>('scrollr')
   const [tick, setTick] = useState(0)
 
-  // 3s jitter tick for the branded chip text (mirrors useDemoChips).
+  // 3s tick for the branded pages' moving values (as the shared bar's).
   useEffect(() => {
     const iv = setInterval(() => setTick((v) => v + 1), 3000)
     return () => clearInterval(iv)
@@ -881,10 +882,14 @@ function BusinessPage() {
     brand === 'scrollr'
       ? undefined
       : {
-          label: BRAND_DEFS[brand].label,
-          accent: BRAND_DEFS[brand].accent,
-          palette: BRAND_DEFS[brand].bar,
-          chips: brandChips(brand, tick),
+          palette: {
+            ...BRAND_DEFS[brand].bar,
+            accent: BRAND_DEFS[brand].accent,
+            up: '#22c55e',
+            down: '#ef4444',
+            live: '#ff4757',
+          },
+          data: brandBar(brand, tick, new Date()),
         }
 
   return (

@@ -34,17 +34,17 @@ export default function Header({
   /**
    * Whether the current route shows a demo ticker bar (the shared one,
    * or /business's white-label instance — both follow the shared
-   * store's pin/density).
+   * store's pin).
    */
   hasBar?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
   // Sticky offset: when the demo bar is pinned top, the header slots
   // in directly beneath it — the bar stays "on top of everything".
-  // Bar height tracks density (h-12 compact / h-16 detailed).
-  const { pos, density } = useDemoTicker()
-  const barTopInset = density === 'detailed' ? 'top-16' : 'top-12'
-  const barBottomInset = density === 'detailed' ? 'bottom-16' : 'bottom-12'
+  // The bar is one height, 64px (h-16), like the app's.
+  const { pos } = useDemoTicker()
+  const barTopInset = 'top-16'
+  const barBottomInset = 'bottom-16'
   const stickyTop = hasBar && pos === 'top' ? barTopInset : 'top-0'
   // The mobile drawer and the bar are both z-50 with the bar later in
   // the DOM, so the bar paints on top — inset the drawer on the bar's

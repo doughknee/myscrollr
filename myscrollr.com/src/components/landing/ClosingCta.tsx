@@ -43,7 +43,7 @@ export function ClosingCta() {
             <span className="type-outline">your desktop.</span>
           </h2>
           <p className="m-0 mt-[18px] font-mono text-base-content/60">
-            three slots free, forever · nothing between you and the download
+            three pages free, forever · nothing between you and the download
           </p>
         </div>
         <div className="pb-[72px]">
