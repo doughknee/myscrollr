@@ -1,0 +1,397 @@
+{
+  "_note": "SCROLLR-293 'npr': one NPR widget holding 30 headlines from 12 minutes to 140 hours old (about six days, inside the rss ingester's 7-day storage), the way a busy feed looks on the app's widget page. Representative headlines written for this fixture, not captured. Under Pages the bar shows all 30: 8 pages of 4 or 3 at 1920 (4 columns), a visit takes 3, the next visit continues where it left off.",
+  "_captured_at": "2026-10-01T17:00:00.000Z",
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "free",
+    "default_widgets_applied": true,
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 1,
+      "widget_type": "news_npr",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "feeds": [
+          {
+            "name": "NPR News",
+            "url": "https://feeds.npr.org/1001/rss.xml"
+          }
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ],
+  "data": {
+    "rss": [
+      {
+        "id": 940001,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-0",
+        "title": "Central bank holds rates as inflation cools for a third month",
+        "link": "https://example.invalid/npr/0",
+        "description": "Policymakers said they want more evidence before cutting, and signalled two cuts next year.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T16:48:00.000Z",
+        "created_at": "2026-10-01T16:48:00.000Z",
+        "updated_at": "2026-10-01T16:48:00.000Z"
+      },
+      {
+        "id": 940002,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-1",
+        "title": "Storm warnings issued along the Gulf Coast ahead of the weekend",
+        "link": "https://example.invalid/npr/1",
+        "description": "Forecasters expect heavy rain and tidal flooding from Friday night into Sunday.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T16:30:00.000Z",
+        "created_at": "2026-10-01T16:30:00.000Z",
+        "updated_at": "2026-10-01T16:30:00.000Z"
+      },
+      {
+        "id": 940003,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-2",
+        "title": "Senate advances spending bill with hours to spare before the deadline",
+        "link": "https://example.invalid/npr/2",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T16:06:00.000Z",
+        "created_at": "2026-10-01T16:06:00.000Z",
+        "updated_at": "2026-10-01T16:06:00.000Z"
+      },
+      {
+        "id": 940004,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-3",
+        "title": "A small town's library reopens after a five-year rebuild",
+        "link": "https://example.invalid/npr/3",
+        "description": "Residents raised half the cost themselves after the 2021 flood.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T15:36:00.000Z",
+        "created_at": "2026-10-01T15:36:00.000Z",
+        "updated_at": "2026-10-01T15:36:00.000Z"
+      },
+      {
+        "id": 940005,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-4",
+        "title": "Rail strike talks resume after a week of cancelled services",
+        "link": "https://example.invalid/npr/4",
+        "description": "Union leaders and operators met for the first time since the walkout began.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T14:54:00.000Z",
+        "created_at": "2026-10-01T14:54:00.000Z",
+        "updated_at": "2026-10-01T14:54:00.000Z"
+      },
+      {
+        "id": 940006,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-5",
+        "title": "Supreme Court agrees to hear a case on state social media laws",
+        "link": "https://example.invalid/npr/5",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T14:12:00.000Z",
+        "created_at": "2026-10-01T14:12:00.000Z",
+        "updated_at": "2026-10-01T14:12:00.000Z"
+      },
+      {
+        "id": 940007,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-6",
+        "title": "Researchers map the oldest known cave paintings in Indonesia",
+        "link": "https://example.invalid/npr/6",
+        "description": "The images are at least 51,000 years old, the team reports in Nature.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T13:30:00.000Z",
+        "created_at": "2026-10-01T13:30:00.000Z",
+        "updated_at": "2026-10-01T13:30:00.000Z"
+      },
+      {
+        "id": 940008,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-7",
+        "title": "Wildfire near Los Angeles is 60% contained as winds ease",
+        "link": "https://example.invalid/npr/7",
+        "description": "Evacuation orders for three neighbourhoods were lifted on Wednesday morning.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T12:36:00.000Z",
+        "created_at": "2026-10-01T12:36:00.000Z",
+        "updated_at": "2026-10-01T12:36:00.000Z"
+      },
+      {
+        "id": 940009,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-8",
+        "title": "Hospitals report a rise in early flu cases across the Midwest",
+        "link": "https://example.invalid/npr/8",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T11:42:00.000Z",
+        "created_at": "2026-10-01T11:42:00.000Z",
+        "updated_at": "2026-10-01T11:42:00.000Z"
+      },
+      {
+        "id": 940010,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-9",
+        "title": "Jobs report: employers added 187,000 positions in September",
+        "link": "https://example.invalid/npr/9",
+        "description": "Unemployment held at 3.9%, and wage growth slowed slightly.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T10:30:00.000Z",
+        "created_at": "2026-10-01T10:30:00.000Z",
+        "updated_at": "2026-10-01T10:30:00.000Z"
+      },
+      {
+        "id": 940011,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-10",
+        "title": "Lawmakers weigh new rules for AI in hiring decisions",
+        "link": "https://example.invalid/npr/10",
+        "description": "A House committee heard from employers, unions and researchers.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T09:00:00.000Z",
+        "created_at": "2026-10-01T09:00:00.000Z",
+        "updated_at": "2026-10-01T09:00:00.000Z"
+      },
+      {
+        "id": 940012,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-11",
+        "title": "The world's largest iceberg is drifting toward South Georgia",
+        "link": "https://example.invalid/npr/11",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T07:30:00.000Z",
+        "created_at": "2026-10-01T07:30:00.000Z",
+        "updated_at": "2026-10-01T07:30:00.000Z"
+      },
+      {
+        "id": 940013,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-12",
+        "title": "Farmers brace for a smaller harvest after a dry summer",
+        "link": "https://example.invalid/npr/12",
+        "description": "Corn and soybean estimates were cut for the second month in a row.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T06:00:00.000Z",
+        "created_at": "2026-10-01T06:00:00.000Z",
+        "updated_at": "2026-10-01T06:00:00.000Z"
+      },
+      {
+        "id": 940014,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-13",
+        "title": "City councils test four-day weeks for public workers",
+        "link": "https://example.invalid/npr/13",
+        "description": "Early results show fewer sick days and no drop in service, officials say.",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T04:00:00.000Z",
+        "created_at": "2026-10-01T04:00:00.000Z",
+        "updated_at": "2026-10-01T04:00:00.000Z"
+      },
+      {
+        "id": 940015,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-14",
+        "title": "NASA delays the next crewed lunar flyby to spring",
+        "link": "https://example.invalid/npr/14",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-10-01T01:30:00.000Z",
+        "created_at": "2026-10-01T01:30:00.000Z",
+        "updated_at": "2026-10-01T01:30:00.000Z"
+      },
+      {
+        "id": 940016,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-15",
+        "title": "How one school district cut chronic absenteeism by half",
+        "link": "https://example.invalid/npr/15",
+        "description": "Text reminders, free breakfast and a bus route redesign all played a part.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T23:00:00.000Z",
+        "created_at": "2026-09-30T23:00:00.000Z",
+        "updated_at": "2026-09-30T23:00:00.000Z"
+      },
+      {
+        "id": 940017,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-16",
+        "title": "Housing starts fall to their lowest level in two years",
+        "link": "https://example.invalid/npr/16",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T20:00:00.000Z",
+        "created_at": "2026-09-30T20:00:00.000Z",
+        "updated_at": "2026-09-30T20:00:00.000Z"
+      },
+      {
+        "id": 940018,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-17",
+        "title": "A new study links sleep timing to heart health",
+        "link": "https://example.invalid/npr/17",
+        "description": "People who went to bed between 10 and 11 p.m. had the lowest risk.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T17:00:00.000Z",
+        "created_at": "2026-09-30T17:00:00.000Z",
+        "updated_at": "2026-09-30T17:00:00.000Z"
+      },
+      {
+        "id": 940019,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-18",
+        "title": "Volunteers count monarch butterflies on their way south",
+        "link": "https://example.invalid/npr/18",
+        "description": "The western population is up for a third straight year.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T14:00:00.000Z",
+        "created_at": "2026-09-30T14:00:00.000Z",
+        "updated_at": "2026-09-30T14:00:00.000Z"
+      },
+      {
+        "id": 940020,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-19",
+        "title": "Trade talks stall over steel and aluminum tariffs",
+        "link": "https://example.invalid/npr/19",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T10:00:00.000Z",
+        "created_at": "2026-09-30T10:00:00.000Z",
+        "updated_at": "2026-09-30T10:00:00.000Z"
+      },
+      {
+        "id": 940021,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-20",
+        "title": "The quiet comeback of the neighbourhood hardware store",
+        "link": "https://example.invalid/npr/20",
+        "description": "Independent stores are opening again in towns big chains left.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T06:00:00.000Z",
+        "created_at": "2026-09-30T06:00:00.000Z",
+        "updated_at": "2026-09-30T06:00:00.000Z"
+      },
+      {
+        "id": 940022,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-21",
+        "title": "Drought pushes the Mississippi River near record lows",
+        "link": "https://example.invalid/npr/21",
+        "description": "Barges are carrying lighter loads, raising shipping costs.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-30T01:00:00.000Z",
+        "created_at": "2026-09-30T01:00:00.000Z",
+        "updated_at": "2026-09-30T01:00:00.000Z"
+      },
+      {
+        "id": 940023,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-22",
+        "title": "Museum returns looted bronzes to Nigeria",
+        "link": "https://example.invalid/npr/22",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-09-29T19:00:00.000Z",
+        "created_at": "2026-09-29T19:00:00.000Z",
+        "updated_at": "2026-09-29T19:00:00.000Z"
+      },
+      {
+        "id": 940024,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-23",
+        "title": "Election officials test new ballot scanners before November",
+        "link": "https://example.invalid/npr/23",
+        "description": "Every county will run a public accuracy test next month.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-29T13:00:00.000Z",
+        "created_at": "2026-09-29T13:00:00.000Z",
+        "updated_at": "2026-09-29T13:00:00.000Z"
+      },
+      {
+        "id": 940025,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-24",
+        "title": "Scientists sequence the genome of the American chestnut",
+        "link": "https://example.invalid/npr/24",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-09-29T05:00:00.000Z",
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "updated_at": "2026-09-29T05:00:00.000Z"
+      },
+      {
+        "id": 940026,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-25",
+        "title": "The cost of child care now tops rent in 30 states",
+        "link": "https://example.invalid/npr/25",
+        "description": "A new report compares prices for infants and toddlers by state.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-28T19:00:00.000Z",
+        "created_at": "2026-09-28T19:00:00.000Z",
+        "updated_at": "2026-09-28T19:00:00.000Z"
+      },
+      {
+        "id": 940027,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-26",
+        "title": "Airlines add winter routes as holiday bookings climb",
+        "link": "https://example.invalid/npr/26",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-09-28T05:00:00.000Z",
+        "created_at": "2026-09-28T05:00:00.000Z",
+        "updated_at": "2026-09-28T05:00:00.000Z"
+      },
+      {
+        "id": 940028,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-27",
+        "title": "A century-old shipwreck is found in Lake Superior",
+        "link": "https://example.invalid/npr/27",
+        "description": "Divers identified the freighter by the name on its bow.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-27T13:00:00.000Z",
+        "created_at": "2026-09-27T13:00:00.000Z",
+        "updated_at": "2026-09-27T13:00:00.000Z"
+      },
+      {
+        "id": 940029,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-28",
+        "title": "Teachers' unions reach a deal in the Portland strike",
+        "link": "https://example.invalid/npr/28",
+        "description": "Classes resume Monday after three weeks out.",
+        "source_name": "NPR News",
+        "published_at": "2026-09-26T17:00:00.000Z",
+        "created_at": "2026-09-26T17:00:00.000Z",
+        "updated_at": "2026-09-26T17:00:00.000Z"
+      },
+      {
+        "id": 940030,
+        "feed_url": "https://feeds.npr.org/1001/rss.xml",
+        "guid": "npr-29",
+        "title": "Why the price of eggs is falling again",
+        "link": "https://example.invalid/npr/29",
+        "description": "",
+        "source_name": "NPR News",
+        "published_at": "2026-09-25T21:00:00.000Z",
+        "created_at": "2026-09-25T21:00:00.000Z",
+        "updated_at": "2026-09-25T21:00:00.000Z"
+      }
+    ]
+  }
+}

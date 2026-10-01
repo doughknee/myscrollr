@@ -110,8 +110,11 @@ export function selectRssForTicker(items: RssItem[], now: number = Date.now()): 
   for (const [feed, top] of newest) {
     if (!perFeed.has(feed)) perFeed.set(feed, [top]);
   }
-  // Interleave: feeds in order of their newest item, one item from each in turn.
-  const lists = [...perFeed.values()];
+  return interleave([...perFeed.values()]);
+}
+
+/** Feeds in order of their newest item, one item from each in turn. */
+function interleave(lists: RssItem[][]): RssItem[] {
   const out: RssItem[] = [];
   for (let i = 0; lists.some((l) => i < l.length); i++) {
     for (const l of lists) if (i < l.length) out.push(l[i]);
@@ -120,14 +123,22 @@ export function selectRssForTicker(items: RssItem[], now: number = Date.now()): 
 }
 
 /**
- * Pages only (SCROLLR-292): headlines that may fill a page's empty columns
- * past the 6 h horizon, newest first, down to the 48 h floor. Undated items
- * are current and already in the pool; the caller skips anything that is.
+ * Pages only (SCROLLR-293, CHIP_SPEC §P.4a): every headline the widget
+ * holds, as the app's widget page shows it, with no ticker horizon or
+ * floor (the ingester's 7-day storage is the only bound). Newest first,
+ * interleaved by feed like the ticker pool; an undated item counts as
+ * current. A page holds what fits; the visit cursor brings the rest round.
  */
-export function selectRssFill(items: RssItem[], now: number = Date.now()): RssItem[] {
-  const floorCutoff = now - TICKER_RSS_FLOOR_HOURS * 3_600_000;
-  const at = (it: RssItem) => new Date(it.published_at ?? it.created_at).getTime();
-  return items.filter((it) => at(it) >= floorCutoff).sort((a, b) => at(b) - at(a));
+export function selectRssForPages(items: RssItem[]): RssItem[] {
+  const at = (it: RssItem) => {
+    const t = new Date(it.published_at ?? it.created_at).getTime();
+    return Number.isFinite(t) ? t : Infinity;
+  };
+  const perFeed = new Map<string, RssItem[]>();
+  for (const it of [...items].sort((a, b) => at(b) - at(a))) {
+    perFeed.set(it.feed_url, [...(perFeed.get(it.feed_url) ?? []), it]);
+  }
+  return interleave([...perFeed.values()]);
 }
 
 /**

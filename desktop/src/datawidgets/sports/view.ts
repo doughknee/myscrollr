@@ -280,24 +280,16 @@ function onTicker(games: Game[], now: number): Game[] {
 }
 
 /**
- * Pages only (SCROLLR-292, CHIP_SPEC §P.5): what may fill a page's empty
- * columns once the ticker pool above has run out. Every upcoming game
- * within TICKER_FLOOR_DAYS, soonest first, through the same day window; the
- * caller skips any already in the pool. So a Thursday's NFL page is the
- * Thursday-night game plus Sunday's soonest kick-offs, not one game
- * stretched across the bar. Continuous never calls this: its slots and
- * rotation keep the horizon.
+ * Pages only (SCROLLR-293, CHIP_SPEC §P.4a): everything the widget page
+ * shows by default, with no ticker horizon. The app's own day window
+ * (SPORTS_WINDOW_DEFAULTS: yesterday through seven days ahead, local
+ * calendar days), never the user's: selection reads no display prefs
+ * (§8.0). Live first, then soonest kick-off, then the newest finals. A
+ * page holds what fits; the visit rule and its cursor bring the rest round.
+ * Continuous never calls this: its slots and rotation keep the horizon.
  */
-export function selectSportsFill(
-  games: Game[],
-  config: SportsDisplayConfig | null | undefined,
-  now: number = Date.now(),
-): Game[] {
-  const at = (g: Game) => new Date(g.start_time).getTime();
-  const limit = now + TICKER_FLOOR_DAYS * DAY_MS;
-  return withinDayWindow(games, config, now)
-    .filter((g) => g.state === "pre" && at(g) > now && at(g) <= limit)
-    .sort((a, b) => at(a) - at(b));
+export function selectSportsForPages(games: Game[], now: number = Date.now()): Game[] {
+  return sortForDisplay(withinDayWindow(games, null, now));
 }
 
 /** The day-window filter, shared by the ticker and the feed. */

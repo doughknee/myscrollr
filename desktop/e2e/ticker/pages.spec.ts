@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMouse, readTrace, recordFromStart, startRecording, unfilled, type PagesTrace } from "./pages";
+import { dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMouse, readTrace, recordFromStart, startRecording, unfilled, visits, type PagesTrace } from "./pages";
 
 /**
  * SCROLLR-275: the widget-pages bar (`?pages=1`), measured in a real layout.
@@ -45,9 +46,12 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   // SCROLLR-292, every page is full. One widget, one page, so a lap is one page: three laps measure three dwells.
   // `full`: the fixture has enough to fill, so every page must have a column per item.
   { fixture: "nflthursday", width: 1920, laps: 3, live: true, full: true }, // TNF + Sunday (your Bears lead the fill, on every lap)
-  { fixture: "nflthursday", width: 1280, laps: 3, live: true, full: true },
+  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 5 columns: four pages of 4 (the whole week, SCROLLR-293)
   { fixture: "googl", width: 1920, laps: 3, full: true }, // GOOGL + popular fills
-  { fixture: "sparsenews", width: 1280, laps: 3, full: true }, // 2 fresh headlines + older ones
+  { fixture: "sparsenews", width: 1280, laps: 3 }, // 9 headlines over 3 days: all of them now (SCROLLR-293), 5 pages at 2 columns
+  // SCROLLR-293: a 30-headline feed, the whole of it. One widget, so a lap is one visit (3 pages).
+  { fixture: "npr", width: 1920, laps: 3 },
+  { fixture: "npr", width: 1280, laps: 3 },
   { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
 ];
 
@@ -94,6 +98,8 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full } of RUNS) {
     expect.soft(tr.moved, "no cell moves while its page is up").toEqual([]);
     expect.soft(tr.cuts, "no cell is cut off").toEqual([]);
     expect.soft(unfilled(tr.enters), "every page shows min(columns, available) items").toEqual([]);
+    expect.soft(tr.enters.filter((e) => e.pos !== (e.count > 1 ? `${e.index + 1}/${e.count}` : null)).map((e) => `${e.page}: label says ${e.pos}`), "the label counts the page").toEqual([]);
+    expect.soft(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}" beside ${e.pos}`), "the label's fact fits beside the counter").toEqual([]);
     if (full) expect.soft(tr.enters.filter((e) => e.items.length !== e.cols).map((e) => `${e.page}: ${e.items.length}/${e.cols}`), "a column per item").toEqual([]);
 
     const d = dwells(tr.enters);
@@ -133,6 +139,67 @@ test("a truly short widget keeps a page's column width, left-aligned (SCROLLR-29
   expect(m.cols).toBeGreaterThan(1);
   expect(Math.abs(m.cells[0].width - m.width / m.cols), "one column of a full page").toBeLessThan(2);
   expect(Math.abs(m.cells[0].left - m.left), "starts at the label").toBeLessThan(2);
+});
+
+test("a 30-headline feed: 1-3, then 4-6, then 7, 8, 1, a mid-visit refresh keeps the place, every headline in 3 laps (SCROLLR-293)", async ({ page, context }) => {
+  // NPR with 30 headlines over six days, at 1920: 4 columns, 8 pages. Nothing
+  // is live, so nothing is sticky and a visit is three pages of the rest,
+  // continuing where the last one stopped. The live sim writes the dashboard
+  // every 4 s (a refresh, a re-plan); on top of that a refresh with a NEW
+  // headline lands in the middle of visit 2. Neither may send the widget
+  // back to page 1.
+  test.setTimeout(300_000);
+  await context.clock.install();
+  await page.setViewportSize({ width: 1920, height: 80 });
+  await recordFromStart(page);
+  await page.goto(url("npr"));
+  await page.waitForSelector("[data-page]");
+  const ids: string[] = JSON.parse(readFileSync("src/dev/__fixtures__/dashboard.npr.json", "utf8")).data.rss.map((r: { id: number }) => String(r.id));
+  expect(ids).toHaveLength(30);
+
+  await runUntil(context.clock, async () => (await readTrace(page)).enters.some((e) => e.visit === 2 && e.index === 3), CAP_MS, 500);
+  await page.evaluate(() =>
+    window.__shimDashboard!((d) => {
+      const rss = d.data.rss as { id: number }[];
+      const now = new Date().toISOString();
+      return { ...d, data: { ...d.data, rss: [{ ...rss[0], id: 949999, guid: "npr-new", title: "A refresh landed in the middle of a visit", published_at: now, created_at: now }, ...rss] } };
+    }),
+  );
+  await runUntil(context.clock, async () => visits((await readTrace(page)).enters).length > 3);
+  const tr = await readTrace(page);
+  const v = visits(tr.enters);
+  console.log(`[npr visits] ${v.map((x) => x.pages.map((p) => p + 1).join(",")).join(" | ")}`);
+  expect(v.slice(0, 3).map((x) => x.pages)).toEqual([[0, 1, 2], [3, 4, 5], [6, 7, 0]]);
+  expect(tr.enters.find((e) => e.visit === 2 && e.index === 4)?.pos, "the label counts the page").toBe("5/8");
+  const seen = new Set(tr.enters.filter((e) => e.visit <= 3).flatMap((e) => e.items.map((i) => i.id)));
+  expect(ids.filter((id) => !seen.has(id)), "every headline seen within 3 laps").toEqual([]);
+  expect(seen.has("949999"), "the refresh's new headline reached the bar").toBe(true);
+});
+
+test("the label's counter fits its 112 px at two-digit pages, beside the fact (SCROLLR-293)", async ({ page, context }) => {
+  // At 1280: NPR is 15 pages of 2 (the fact gives way to "10/15"), and the
+  // busy Saturday's NCAAF is 14 pages of 4 ("n LIVE" or "SAT 3" beside
+  // "10/14"). Run until each shows a two-digit page; nothing in the label is cut.
+  test.setTimeout(300_000);
+  await context.clock.install();
+  await page.setViewportSize({ width: 1280, height: 80 });
+  for (const fixture of ["npr", "busy"]) {
+    await recordFromStart(page);
+    await page.goto(url(fixture));
+    await page.waitForSelector("[data-page]");
+    await runUntil(context.clock, async () => (await readTrace(page)).enters.some((e) => e.index >= 9 && e.count >= 10));
+    const tr = await readTrace(page);
+    const two = tr.enters.find((e) => e.index >= 9 && e.count >= 10)!;
+    console.log(`[label ${fixture}] ${two.page}: "${two.fact}" ${two.pos}`);
+    expect(two.pos).toBe(`${two.index + 1}/${two.count}`);
+    expect(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}" beside ${e.pos}`), `${fixture}: the fact fits beside the counter`).toEqual([]);
+    const fits = await page.evaluate(() => {
+      const label = document.querySelector("[data-label]")!.getBoundingClientRect();
+      const pos = document.querySelector("[data-label] [data-pos]")?.getBoundingClientRect();
+      return !pos || pos.right <= label.right;
+    });
+    expect(fits, `${fixture}: the counter is inside the label`).toBe(true);
+  }
 });
 
 test("two ticker windows turn pages together", async ({ page, context }) => {
