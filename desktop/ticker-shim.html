@@ -18,6 +18,9 @@
     ?comfort=1        tickerMode "detailed" (one extra row per chip)
                       instead of "compact".
     ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
+    ?cells=1          SCROLLR-271: the widget-page cells gallery
+                      (src/dev/cellsGallery.tsx) instead of the ticker;
+                      with ?theme=light and ?colors=widget|theme|subtle.
     ?pin=<w>:<subj>   pin one subject to the fixed zone, repeatable
                       (e.g. ?pin=sports_mlb:Milwaukee Brewers). Only
                       the first ':' splits, so a feed url works.
@@ -285,6 +288,10 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      // ?cells=1 swaps the ticker for the page-cells gallery (SCROLLR-271).
+      if (new URLSearchParams(location.search).get("cells") === "1") import("/src/dev/cellsGallery.tsx");
+      else import("/src/main.tsx");
+    </script>
   </body>
 </html>
