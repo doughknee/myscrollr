@@ -42,7 +42,7 @@ import { useQuery } from "@tanstack/react-query";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { WidgetPin } from "../../preferences";
 import { financeMarketOptions } from "../../api/queries";
@@ -538,7 +538,18 @@ export default function PagedBar({
     exit: "out",
     transition: { duration: SWIPE_S, ease: EASE },
   };
-  const wipe = { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: LABEL_S, ease: EASE } };
+  // Upward, except a step back, which wipes down (SCROLLR-301): the block reads `custom` like the page does.
+  const wipe = {
+    variants: {
+      in: (back: boolean) => ({ y: back ? "-100%" : "100%" }),
+      up: { y: "0%" },
+      out: (back: boolean) => ({ y: back ? "100%" : "-100%" }),
+    },
+    initial: "in",
+    animate: "up",
+    exit: "out",
+    transition: { duration: LABEL_S, ease: EASE },
+  };
 
   // A clock or a pin on the edge is something to show: the bar stays.
   if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
@@ -562,15 +573,38 @@ export default function PagedBar({
               rule between them says so. Page controls off (SCROLLR-301): no pager, and the
               block is the label's width alone. */}
           <div className="relative shrink-0 overflow-hidden" style={{ width: (pageControls ? PAGER_W : 0) + LABEL_W }}>
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} custom={cur.back}>
               <motion.div
                 key={cur.widget.tab}
+                custom={cur.back}
                 className="absolute inset-0 flex items-stretch"
                 style={{ ...accentStyle(accent, ink), background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
                 {...(reduced ? fade : wipe)}
               >
                 {pageControls && <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={{ borderRight: `1px solid ${mix(dark ? 26 : 22)}` }} />}
-                <div data-label={cur.widget.tab} className="flex min-w-0 flex-1 flex-col justify-center gap-[3px] pl-3.5 pr-2">
+                <div data-label={cur.widget.tab} className="relative flex min-w-0 flex-1 flex-col justify-center gap-[3px] pl-3.5 pr-2">
+                  {/* Up and down change the widget, so they bracket its name: one in the band
+                      above it, one in the band below, shown with the pointer over the bar (SCROLLR-301). */}
+                  {pageControls &&
+                    ([-1, 1] as const).map((dir) => {
+                      const Icon = dir > 0 ? ChevronDown : ChevronUp;
+                      return (
+                        <button
+                          key={dir}
+                          type="button"
+                          data-jump={dir > 0 ? "next" : "prev"}
+                          aria-label={dir > 0 ? "Next widget" : "Previous widget"}
+                          onClick={() => step(dir, true)}
+                          className={clsx(
+                            "absolute inset-x-0 z-10 flex h-[12px] cursor-pointer items-center justify-center opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover/bar:opacity-100",
+                            dir > 0 ? "bottom-[3px]" : "top-[1px]",
+                          )}
+                          style={{ color: "var(--accent-ink)" }}
+                        >
+                          <Icon size={11} strokeWidth={2.75} aria-hidden />
+                        </button>
+                      );
+                    })}
                   <span
                     className={
                       cur.widget.code.length > 6
@@ -582,14 +616,8 @@ export default function PagedBar({
                     {cur.widget.code}
                   </span>
                   {/* fg-2, not fg-3: it sits on the label's tint, which costs contrast (SCROLLR-287). */}
-                  <span className="flex items-center justify-between gap-[3px] font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
-                    <span data-fact="" className="truncate">{fact}</span>
-                    {/* Where this page sits in the widget, "2/6": there is more, and it comes round (SCROLLR-293). */}
-                    {cur.count > 1 && (
-                      <span data-pos="" className="shrink-0 tabular-nums tracking-normal" style={{ color: "var(--accent-ink)" }} aria-label={`page ${cur.index + 1} of ${cur.count}`}>
-                        {cur.index + 1}/{cur.count}
-                      </span>
-                    )}
+                  <span data-fact="" className="truncate font-mono text-[9px] font-semibold uppercase tabular-nums text-fg-2">
+                    {fact}
                   </span>
                 </div>
                 {turn && <DwellLine seq={turn.seq} dwell={turn.dwell} held={held} accent={accent} />}

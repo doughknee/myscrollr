@@ -251,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ aa62b67828e9 -->
+<!-- source: docs/CHIP_DESIGN.md @ 592f34905b95 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -302,11 +302,12 @@ once, at the release, with a one-time notice that Continuous is one click away i
   a ‹ and a › appear either side of it to go back or forward a page. Don't want it? Turn
   off **Page controls** in Settings › Ticker, or right-click the bar and untick it: the
   columns get its space, and the wheel and arrow keys still page.
-- **The label** right after it is 112 pixels: the widget's name in its own colour (NFL, BBC,
-  Stocks), one fact beneath it (6 LIVE, SUN 4, how many stocks are up and down), and
-  where you are in the widget when it has more than one page: 2/8 means page 2 of 8, so
-  you can see there's more and that it comes round. A line along its bottom edge fills as
-  the page runs out of time.
+- **The label** right after it is 168 pixels: the widget's name in its own colour (NFL, BBC,
+  Stocks) and, beneath it, what the widget has on the bar and how many pages that takes
+  (56 GAMES · 19 PAGES, 3 STORIES · 1 PAGE), so you can see there's more and how much.
+  The pager and the label are one block; a line along its bottom edge fills as the page
+  runs out of time. Hover the bar and a ˄ above the name and a ˅ below it jump to the
+  previous or next widget (so do ↑ and ↓, and Shift+wheel).
 - **The page** is one widget's items in equal columns that fill the bar. How many columns
   is a matter of your screen width and how much room that kind of thing needs: four NFL
   games on a 1280-pixel bar, six on a 1920 one, but only two headlines, because a
@@ -338,7 +339,7 @@ are.
 
 A page always has an item in every column, unless the widget really has fewer things than
 one page holds. If your watchlist is shorter than a page, the empty spaces show popular
-symbols. They are **not** added to your watchlist: the label says so ("+4 POPULAR"), the
+symbols. They are **not** added to your watchlist: each one wears a small + before its symbol, the
 watchlist screen offers each one as a one-click add, and every symbol you add takes the
 place of one of them. Filling only ever uses the empty spaces on the last page, so a widget
 never gets extra pages from it and the bar takes no longer to go round.

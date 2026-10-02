@@ -43,7 +43,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **page** | One widget's items laid across the bar in equal columns, shown whole, then swiped away (§P). |
 | **cell** | One item in one page column: a game, a headline, a quote, an Also entry. No card shell. `desktop/src/components/pages/cells/`. |
 | **column** | One equal-width slot of a page. Its width is `content width / items on the page`. |
-| **label** | The 112px block at the left of a page naming the widget (§P.2). |
+| **label** | The 168px block at the left of a page naming the widget (§P.2). |
 | **visit** | One trip to a widget: exactly one page, the next after the last visit's; then the bar moves to the next widget (§P.6). |
 | **edge zone** | The fixed block at the right of the Pages bar: utilities, then pins (§P.10, §P.11). |
 | **Also page** | The one shared page, last, listing every widget that has nothing on (§P.12). |
@@ -116,24 +116,25 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 ### P.1 The bar
 
 - Height `h-16`, 64px, `ticker-container relative flex w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150`. One height: no density branch (invariant 1).
-- Left to right: **pager** (`PAGER_W` = 88px, `shrink-0`, §P.7a), **label** (112px, `shrink-0`), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
+- Left to right: **pager** (`PAGER_W` = 88px, `shrink-0`, §P.7a), **label** (168px, `shrink-0`), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
 - The edge sits outside the page block, so it shows with no page at all.
 - `data-pages` on the bar; `data-motion-style` is `"swipe"` or `"fade"` (reduced motion, §P.7).
 - Nothing to draw (no widget page, no utility, no pin): `EmptyBar` in its Pages look (a label block in the theme accent, then the same one-row message). Two states, decided in `App.tsx`: **sourceless** (signed in, no widgets installed: browse the catalog) and **installedOff** (installed, none showing: open one to turn it on). A clock or a pin on the edge counts as something to show: the bar stays.
 
 ### P.2 The label
 
-- 112px (`LABEL_W`), widget colour mixed at 16% (dark) or 12% (light) over the bar, right border at 40%, vertically centred, `pl-3.5 pr-2`.
+- 168px (`LABEL_W`; 112 until the cells line, SCROLLR-301), widget colour mixed at 16% (dark) or 12% (light) over the bar, right border at 40%, vertically centred, `pl-3.5 pr-2`. With the pager it is one anchor block (§P.7a): the pager wears the same tint, a 1px rule at 26% (dark) or 22% (light) between them, and the block's right border is the only hard edge.
 - **Name:** the widget code in the ink (`--accent-ink`, §P.13), `font-sans font-extrabold`, `text-[19px]`; `text-[15px]` when the code is longer than six characters; truncates. Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance: the catalog name in capitals. Also: `ALSO`.
-- **One fact** beneath, `font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2` (`data-fact`; fg-2, not fg-3: it sits on the label's tint): sports `n LIVE`, else the first game's day (`SUN 4`: a game is at most a week away, so no month); news `HEADLINES` on one page, nothing on several (the counter says it all); finance `▲up ▼down`, or `+n POPULAR` when popular symbols fill the page (`n POPULAR` with no watchlist; `labelFact`, SCROLLR-292); Also `NOTHING ON`. It is read live, so it updates in place while a page is up (a fact, not a layout).
-- **Position** at the right of that line, on every widget with more than one page: `n/m` (`2/8`, `data-pos`) in the ink, `tabular-nums tracking-normal`, `shrink-0`, after a 3px gap (SCROLLR-293; the dots are gone: they did not say how many, and three already cut `HEADLINES`). One page: nothing. The line has 90px; the fact truncates before the counter does, but every fact the bar produces fits beside a two-digit counter (measured at the bar's rendered size: `12 LIVE` + `10/14` = 89.9px; `pages.spec.ts` asserts no fact is cut on any fixture).
-- **Dwell line:** a 2px line along the bottom of the label that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held (an active pointer, §P.7), and runs on when the pointer rests.
-- **Wipe:** the label rolls upward (`y` 100% to 0 in, 0 to -100% out, 0.45s, §P.7) only when the widget changes. Pages of the same widget keep it still.
+- **The cells line** beneath, `font-mono text-[9px] font-semibold uppercase tabular-nums text-fg-2`, no letter-spacing (`data-fact`; fg-2, not fg-3: it sits on the label's tint): what the widget has on the bar and how many pages it takes, `56 GAMES · 19 PAGES` (`labelFact`: sports GAMES, news STORIES, finance STOCKS, Also WIDGETS; singular at one). Cells count fills: they are on the bar (a fill's own `+` in the cell says which, §P.4b). It is read live from the plan, so it updates in place while a page is up (a fact, not a layout). It replaced `6 LIVE` + `3/8` (SCROLLR-301): a second x/y beside the widget arrows read as a widget count, and `6 LIVE` said less than the cells do.
+- **No position in the label.** The lap counter in the pager (§P.7a) is the bar's only x/y. The cells line has 145px; two-digit cells and pages (`30 STORIES · 15 PAGES`, 21 characters) measure 139px at the bar's rendered size (`scrollWidth`, Chromium and Edge, DPR 1 and 2), and `pages.spec.ts` asserts the line is cut on no fixture. 160px left 137px, two short.
+- **Widget jump:** with the pointer over the bar, a `ChevronUp` (11px, `data-jump="prev"`) in the band above the name and a `ChevronDown` (`data-jump="next"`) in the band below it, both full label width, 12px tall, in the ink, hidden otherwise (`opacity-0`, `group-hover/bar:opacity-100`, `focus-visible`). They step a whole widget (§P.7a); they sit on the name because that is what they change, so the pager's arrows and the lap counter stay about pages.
+- **Dwell line:** a 2px line along the bottom of the whole anchor block (pager and label) that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held (an active pointer, §P.7), and runs on when the pointer rests.
+- **Wipe:** the whole anchor block (pager, label and dwell line, one `motion.div` keyed on the widget) rolls upward (`y` 100% to 0 in, 0 to -100% out, 0.45s, §P.7) only when the widget changes; a step back to the previous widget rolls it downward (`custom={cur.back}`, the same way the page swipes the other way, §P.7a). Pages of the same widget keep it still.
 
 ### P.3 Geometry of a page
 
 ```
-|<- 88 ->|<- 112 ->|<---------- content width ---------->|<- edge ->|
+|<- 88 ->|<- 168 ->|<---------- content width ---------->|<- edge ->|
 |‹ 7/23 ›| label   | col 1 | col 2 | col 3 | ... all equal | edge     |
 ```
 
@@ -212,7 +213,7 @@ a short watchlist still needs topping up:
 
 - **Fills are never written anywhere.** The watchlist stays exactly what the user saved;
   each symbol they add pushes one fill out, one for one. A fill cell looks like any other
-  cell; the label says so (`+4 POPULAR`, §P.2). The watchlist screen lists the fills the
+  cell but for the `+` before its symbol (§P.4b). The watchlist screen lists the fills the
   bar is showing (as many as the narrowest bar's page has columns, from `useEdgeRoom`) as
   one-click adds, only under Pages with the widget on the ticker.
 - A watchlist as long as a page or longer takes no fill (10 symbols at 9 columns are 5 + 5,
@@ -533,7 +534,7 @@ status chip (§8.7); each cell says what the status chip would, in the same word
   `accentStyle(accent, ink)`: the same hue and saturation, HSL lightness moved only until
   relative luminance is at most 0.07 (light) or at least 0.45 (dark), which reads at 4.5:1
   on every palette's bar, bare and under the label's tint (`chipAccent.ink.test.ts` checks
-  every catalog colour against every palette). The label's name, `n/m`, the Also code and
+  every catalog colour against every palette). The label's name, the lap counter, the Also code and
   the hairline (ink at 40%, 1.5:1) use it; tints never do. No colour: the ink is `fg`.
 - **Contrast floors, every palette** (SCROLLR-287; `pages-themes.spec.ts` asserts every
   reading): text 4.5:1 against what is really behind it (the bar, the label's tint, a close
@@ -588,8 +589,8 @@ state and one window owns it.
 (`pageOrder`), **live and yours lead their widget** (`topFirst`: page 1; every live game and
 your team from the fixture is drawn and marked), a lap of at most 60 s (never raise it),
   **all shown** (`allShown`: every page of every widget up and dwelt, from the first lap's
-  start) within 300 s, two windows in step, the label counts the page
-  (`n/m`) and no label fact is cut beside it, and **every page is full** (`unfilled`: one
+  start) within 300 s, two windows in step, the label's cells line is cut
+  nowhere, and **every page is full** (`unfilled`: one
   page shows `min(columns, available)`; several pages show full pages unless the pool is
   not a multiple of the columns, then the even split). Laps are cut at visit starts
   (`data-visit`), since a visit no longer always opens on page 1. Fixtures: `nflthursday`
@@ -599,8 +600,8 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   `pages` set with NPR's 3 headlines swapped for `npr`'s 30, the worst case for all shown).
   The `npr` checks: visits run 1, 2, 3 ... 8, 1 at 1920 through the live sim's 4 s
   refreshes and an injected refresh with a new headline during visit 4
-  (`window.__shimDashboard`, dev and `?live=1` only); every headline is seen within 8 laps; at 1280 the counter reads `10/15`
-  and NCAAF on the busy Saturday `10/14` with nothing in the label cut. The shim serves
+  (`window.__shimDashboard`, dev and `?live=1` only); every headline is seen within 8 laps; at 1280 NPR reads `30 STORIES · 15 PAGES`
+  and NCAAF on the busy Saturday `56 GAMES · 14 PAGES` with nothing in the label cut. The shim serves
   `/finance/public` from `market.json`. The scorecard gets a `pages` mode: lap, widget
   share, Also share, cells moved or cut, dwell, dropped swipe frames.
 
@@ -1525,7 +1526,7 @@ needs both until Continuous is retired.
 - [ ] Every changing value reserves from first render (score `ch`, fixed clock box, price and change `ch`, fixed age column); sometimes-empty parts are always mounted.
 - [ ] Tier ladder respected: only live games and your team are tier 0 (they lead page 1; no page is on every lap); order inside a tier is the source's own, never a live value.
 - [ ] No per-widget slot count; no new setting for how many or which (§1.4).
-- [ ] The pool is the widget page's (§P.4a): no time window under Pages, nothing eligible hidden; the visit cursor continues where the last visit stopped through refreshes and re-plans, leader-owned; the label counts the page (`n/m`) and its fact fits beside it.
+- [ ] The pool is the widget page's (§P.4a): no time window under Pages, nothing eligible hidden; the visit cursor continues where the last visit stopped through refreshes and re-plans, leader-owned; the label's cells line (`56 GAMES · 19 PAGES`) is cut nowhere.
 - [ ] Every page is full (§P.4a): the family's pool fills its pages (or a fill tops a short one up), `topUp` adds only the last page's empty columns, a fill is never written to the user's config, and a truly short widget is drawn at a page's column width, left-aligned; `pages.spec.ts` `unfilled` green.
 - [ ] Every fixture's lap is at most 60 s and everything is shown within 300 s (`pages.spec.ts`); a visit is exactly one page (`nextTurn`, `pageOrder`); never raise a threshold to pass.
 - [ ] The ticker selector reads no feed prefs; pinned subjects dropped from the pages with `dropPinned`; the pin is on the bar once.

@@ -281,19 +281,23 @@ export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWi
   );
 }
 
+const NOUN: Record<PageWidgetKind, [one: string, many: string]> = {
+  sports: ["GAME", "GAMES"],
+  news: ["STORY", "STORIES"],
+  finance: ["STOCK", "STOCKS"],
+  also: ["WIDGET", "WIDGETS"],
+};
+
 /**
- * The label's fact for this plan. A watchlist filled with popular symbols
- * says so, in the 11 characters the label has: "+4 POPULAR" (the rest are the
- * user's own), or "10 POPULAR" when none is (a filled widget is one page, so
- * there is no counter beside it). A feed on several pages says only where it
- * is ("NPR / 2/8", SCROLLR-293): "HEADLINES" told nothing and left the
- * counter no room.
+ * The label's second line: what this widget has on the ticker and how many
+ * pages it takes, "19 GAMES · 5 PAGES". Cells count fills too: they are on
+ * the bar. (It replaced "6 LIVE" + "3/8": a second x/y beside the widget
+ * arrows read as a widget count.)
  */
 export function labelFact(widget: PageWidget, plan: WidgetPlan<PageItem> | undefined): string {
-  const fills = plan ? plan.pages.reduce((n, p) => n + p.filter((i) => i.fill).length, 0) : 0;
-  if (widget.kind === "news" && plan && plan.pages.length > 1) return "";
-  if (!fills) return widget.sub;
-  return `${widget.items.length ? "+" : ""}${fills} POPULAR`;
+  const cells = plan ? plan.pages.reduce((n, p) => n + p.length, 0) : widget.items.length + widget.fill.length;
+  const pages = plan ? plan.pages.length : 1;
+  return `${cells} ${NOUN[widget.kind][cells === 1 ? 0 : 1]} · ${pages} ${pages === 1 ? "PAGE" : "PAGES"}`;
 }
 
 /**

@@ -194,10 +194,11 @@ describe("stepTurn (SCROLLR-298)", () => {
 describe("planAll with the pager hidden (SCROLLR-301)", () => {
   it("gives the pager's 88px to the columns", () => {
     const ws = buildPageWidgets(dash, TABS, NOW);
-    const on = planAll(ws, 1280, 102);
-    const off = planAll(ws, 1280, 102, false);
-    expect(on.get("sports_nfl")!.cols).toBe(3);
-    expect(off.get("sports_nfl")!.cols, "1280 with the Clock: 4 NFL columns again").toBe(4);
+    // 1920: at 1280 the 160px label (SCROLLR-301) leaves 3 NFL columns either way.
+    const on = planAll(ws, 1920, 102);
+    const off = planAll(ws, 1920, 102, false);
+    expect(on.get("sports_nfl")!.cols).toBe(5);
+    expect(off.get("sports_nfl")!.cols, "1920 with the Clock: 6 NFL columns again").toBe(6);
   });
 });
 

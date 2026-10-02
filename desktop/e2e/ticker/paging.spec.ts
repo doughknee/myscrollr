@@ -11,8 +11,9 @@ import { parkMouse } from "./pages";
  */
 const MIN_DWELL_S = 6;
 const SWIPE_MS = 600;
-/** pagePlan's PAGER_W. */
+/** pagePlan's PAGER_W and LABEL_W. */
 const PAGER_W = 88;
+const LABEL_W = 168;
 
 test.use({ viewport: { width: 1920, height: 80 } });
 
@@ -47,9 +48,9 @@ test("the pager reads the page's place in the lap, at the left end before the la
   expect(box!.x, "at the bar's left end, before the label (SCROLLR-300)").toBe(0);
   expect(box!.width).toBe(PAGER_W);
   const labelBox = await page.locator("[data-label]").first().boundingBox();
-  expect(labelBox!.x, "the 112px label right after the pager").toBe(PAGER_W);
+  expect(labelBox!.x, "the 168px label right after the pager").toBe(PAGER_W);
   const pageBox = await page.locator("[data-pages] [data-page]").first().boundingBox();
-  expect(pageBox!.x, "the page after both").toBe(PAGER_W + 112);
+  expect(pageBox!.x, "the page after both").toBe(PAGER_W + LABEL_W);
   const label = page.locator("[data-lap-pos]");
   const first = await label.boundingBox();
   for (let i = 0; i < 9; i++) await wheel(page, context, 100); // 1/n .. 10/n: one digit to two
@@ -148,6 +149,29 @@ test("a step back swipes left to right; forward and the clock's own turns swipe 
   );
   expect(xs).toHaveLength(2);
   expect(xs[1].x, "an automatic turn comes in from the right").toBeGreaterThan(0);
+
+  // The anchor block (pager + label) wipes with the widget: up on a jump forward, down on a jump back (SCROLLR-301).
+  const midWipe = async () => {
+    await context.clock.runFor(200);
+    const ys = await page.evaluate(() => {
+      const pages = [...document.querySelectorAll("[data-pages] [data-page]")].sort((a, b) => Number(a.getAttribute("data-visit")) - Number(b.getAttribute("data-visit")));
+      const now = pages[pages.length - 1].getAttribute("data-page")!.split(":")[0];
+      return [...document.querySelectorAll("[data-label]")].map((e) => ({ now: e.getAttribute("data-label") === now, y: new DOMMatrix(getComputedStyle(e.parentElement!).transform).m42 }));
+    });
+    await context.clock.runFor(SWIPE_MS);
+    expect(ys, "two blocks mid-wipe").toHaveLength(2);
+    return { in: ys.find((b) => b.now)!.y, out: ys.find((b) => !b.now)!.y };
+  };
+  await context.clock.runFor(1000); // the automatic turn's wipe has finished
+  await page.keyboard.press("ArrowDown");
+  const fwdWipe = await midWipe();
+  expect(fwdWipe.in, "forward: the new block comes up from below").toBeGreaterThan(0);
+  expect(fwdWipe.out, "and the old one leaves upward").toBeLessThan(0);
+  await context.clock.runFor(1000);
+  await page.keyboard.press("ArrowUp");
+  const backWipe = await midWipe();
+  expect(backWipe.in, "back: the new block comes down from above").toBeLessThan(0);
+  expect(backWipe.out, "and the old one leaves downward").toBeGreaterThan(0);
 });
 
 test("← and → step when the window has focus", async ({ page, context }) => {
@@ -228,7 +252,7 @@ test("Page controls off: no pager, the label at the left end, the pager's 88px g
   expect(await off.locator("[data-pager]").count(), "the cluster is gone").toBe(0);
   expect((await off.locator("[data-label]").first().boundingBox())!.x, "the label at the bar's left end").toBe(0);
   const wide = (await off.locator("[data-pages] [data-page]").boundingBox())!;
-  expect(wide.x).toBe(112);
+  expect(wide.x).toBe(LABEL_W);
   expect(wide.width, "the columns get the pager's width").toBe(on.width + PAGER_W);
 
   const before = await visit(off);

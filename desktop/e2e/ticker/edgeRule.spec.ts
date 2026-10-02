@@ -44,7 +44,7 @@ test("1280: a game pin beside clocks and weather leaves every family its columns
   const m = await measure(page);
   expect(m.edge).toBeLessThanOrEqual(Math.floor(m.bar * 0.4));
   // Pro games (264) and quotes (260) keep 2 or more columns.
-  expect(Math.floor((m.bar - 112 - m.edge) / 264)).toBeGreaterThanOrEqual(2);
+  expect(Math.floor((m.bar - 168 - m.edge) / 264)).toBeGreaterThanOrEqual(2);
 });
 
 test("a shrinking window steps the newest pin back; widening brings it back", async ({ page }) => {

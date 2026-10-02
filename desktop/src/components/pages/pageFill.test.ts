@@ -104,7 +104,8 @@ describe("finance: popular symbols fill a short watchlist", () => {
     expect(new Set(syms).size).toBe(syms.length);
     expect(syms.some((s) => s.includes("/"))).toBe(false);
     expect(page.slice(1).every((i) => i.fill && !i.pin)).toBe(true);
-    expect(labelFact(w, plan)).toBe(`+${plan.cols - 1} POPULAR`);
+    // The cells line counts the fills too: they are on the bar (SCROLLR-301).
+    expect(labelFact(w, plan)).toBe(`${plan.cols} STOCKS · 1 PAGE`);
   });
 
   it("each symbol the user adds pushes one fill out", () => {

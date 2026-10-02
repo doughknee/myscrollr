@@ -43,8 +43,8 @@ describe("columns", () => {
   });
 
   it("a wider family minimum takes a column fewer", () => {
-    expect(columnsFor(contentWidth(1280), 212)).toBe(5);
-    expect(columnsFor(contentWidth(1280), 244)).toBe(4);
+    expect(columnsFor(contentWidth(1920), 212)).toBe(7);
+    expect(columnsFor(contentWidth(1920), 244)).toBe(6);
   });
 });
 

@@ -135,8 +135,7 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr }
     expect.soft(tr.moved, "no cell moves while its page is up").toEqual([]);
     expect.soft(tr.cuts, "no cell is cut off").toEqual([]);
     expect.soft(unfilled(tr.enters), "every page shows min(columns, available) items").toEqual([]);
-    expect.soft(tr.enters.filter((e) => e.pos !== (e.count > 1 ? `${e.index + 1}/${e.count}` : null)).map((e) => `${e.page}: label says ${e.pos}`), "the label counts the page").toEqual([]);
-    expect.soft(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}" beside ${e.pos}`), "the label's fact fits beside the counter").toEqual([]);
+    expect.soft(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}"`), "the label's cells line is not cut").toEqual([]);
     if (full) expect.soft(tr.enters.filter((e) => e.items.length !== e.cols).map((e) => `${e.page}: ${e.items.length}/${e.cols}`), "a column per item").toEqual([]);
 
     const d = dwells(tr.enters);
@@ -212,10 +211,10 @@ test("a 30-headline feed: one page a visit, 1, 2, 3 ... 8, 1, a refresh keeps th
   expect(seen.has("949999"), "the refresh's new headline reached the bar").toBe(true);
 });
 
-test("the label's counter fits its 112 px at two-digit pages, beside the fact (SCROLLR-293)", async ({ page, context }) => {
-  // At 1280: NPR is 15 pages of 2 (the fact gives way to "10/15"), and the
-  // busy Saturday's NCAAF is 14 pages of 4 ("n LIVE" or "SAT 3" beside
-  // "10/14"). Run until each shows a two-digit page; nothing in the label is cut.
+test("the label's cells line fits its 168 px at two-digit cells and pages (SCROLLR-293, SCROLLR-301)", async ({ page, context }) => {
+  // At 1280: NPR is 15 pages of 2 ("30 STORIES · 15 PAGES"), and the busy
+  // Saturday's NCAAF is 14 pages of 4 ("56 GAMES · 14 PAGES"). Run until each
+  // shows a two-digit page; nothing in the label is cut.
   test.setTimeout(300_000);
   await context.clock.install();
   await page.setViewportSize({ width: 1280, height: 80 });
@@ -226,15 +225,11 @@ test("the label's counter fits its 112 px at two-digit pages, beside the fact (S
     await runUntil(context.clock, async () => (await readTrace(page)).enters.some((e) => e.index >= 9 && e.count >= 10));
     const tr = await readTrace(page);
     const two = tr.enters.find((e) => e.index >= 9 && e.count >= 10)!;
-    console.log(`[label ${fixture}] ${two.page}: "${two.fact}" ${two.pos}`);
-    expect(two.pos).toBe(`${two.index + 1}/${two.count}`);
-    expect(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}" beside ${e.pos}`), `${fixture}: the fact fits beside the counter`).toEqual([]);
-    const fits = await page.evaluate(() => {
-      const label = document.querySelector("[data-label]")!.getBoundingClientRect();
-      const pos = document.querySelector("[data-label] [data-pos]")?.getBoundingClientRect();
-      return !pos || pos.right <= label.right;
-    });
-    expect(fits, `${fixture}: the counter is inside the label`).toBe(true);
+    console.log(`[label ${fixture}] ${two.page}: "${two.fact}"`);
+    expect(two.fact).toMatch(/^[0-9]+ (GAMES|STORIES|STOCKS) · [0-9]+ PAGES$/);
+    expect(two.fact!.endsWith(`· ${two.count} PAGES`), "the line counts the plan's pages").toBe(true);
+    expect(two.pos, "no x/y in the label: the lap counter is the bar's only one").toBeNull();
+    expect(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}"`), `${fixture}: the cells line is not cut`).toEqual([]);
   }
 });
 

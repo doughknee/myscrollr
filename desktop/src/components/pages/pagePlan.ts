@@ -53,7 +53,7 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 // ── Columns ────────────────────────────────────────────────────────
 
 /** Width of the label block on the left of every page. */
-export const LABEL_W = 112;
+export const LABEL_W = 168;
 
 /**
  * Width of the pager at the bar's left end, before the label, `‹ 7/23 ›`
