@@ -85,6 +85,8 @@ export const SWIPE_S = 0.6;
 const BAND_S = 0.45;
 /** Reduced motion: a crossfade instead of either. */
 const FADE_S = 0.4;
+/** With no page to turn, the edge steps on the wall clock this often (8 s: within the 6–12 s dwell). */
+const EDGE_IDLE_MS = 8_000;
 const EASE = [0.32, 0.72, 0, 1] as const;
 
 /** Leader → every window: the page now up, and whether it is held. */
@@ -472,6 +474,17 @@ export default function PagedBar({
   const [planEdge, setPlanEdge] = useState(0);
   const [held, setHeld] = useState(false);
   const heldRef = useRef(false);
+  // No page to turn (the edge alone: GitHub with 1–2 repos and nothing else on the bar):
+  // the edge's slots still step, on the wall clock so every window steps together
+  // without a message, and not while the bar is held.
+  const [wallTick, setWallTick] = useState(0);
+  useEffect(() => {
+    if (turn) return;
+    const id = setInterval(() => {
+      if (!heldRef.current) setWallTick(Math.floor(Date.now() / EDGE_IDLE_MS));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [turn]);
   const nav = useRef(newNav());
   const localHover = useRef(false);
   const remoteHover = useRef(new Set<string>());
@@ -732,7 +745,7 @@ export default function PagedBar({
         </>
       )}
       {/* The fixed edge: outside the page block, so it shows with no page at all. */}
-      <EdgeZone edge={edge} tick={turn?.seq ?? 0} reduced={reduced} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} onChipClick={onChipClick} />
+      <EdgeZone edge={edge} tick={turn ? turn.seq : wallTick} reduced={reduced} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} onChipClick={onChipClick} />
     </div>
   );
 }
