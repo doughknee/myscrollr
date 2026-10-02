@@ -714,7 +714,7 @@ var catalog = []WidgetDef{
 		ID: "github", Name: "GitHub", Category: "utility", Color: "#f97316",
 		Group: "Dev", AddedAt: addedV110,
 		Keywords:    []string{"actions", "ci", "pull requests"},
-		Description: "CI/Actions status for your repos",
+		Description: "CI status for your repos — connect GitHub for private ones",
 		LogoURL:     "https://icon.horse/icon/github.com",
 	},
 }

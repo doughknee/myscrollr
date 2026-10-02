@@ -13,12 +13,36 @@ import (
 //
 // See AGENTS.md "Error Monitoring — Sentry" for invariants.
 func TestScrubSentryEventRemovesPII(t *testing.T) {
+	scrubWorstCase(t, "https://api.myscrollr.com/ops/release?key=ops-release-key", "code=logto-auth-code&state=csrf123")
+}
+
+// TestScrubSentryEventGitHubPaths runs the worst case through the Connect
+// GitHub routes (SCROLLR-304): the callback carries GitHub's OAuth code and
+// state in its query, and every route a bearer token.
+func TestScrubSentryEventGitHubPaths(t *testing.T) {
+	for _, path := range []string{
+		"/github/connect",
+		"/github/callback?code=gh-oauth-code&state=gh-state-secret",
+		"/github/runs?repos=victim/private-repo",
+	} {
+		t.Run(path, func(t *testing.T) {
+			query := ""
+			if i := strings.Index(path, "?"); i >= 0 {
+				query = path[i+1:]
+			}
+			scrubWorstCase(t, "https://api.myscrollr.com"+path, query)
+		})
+	}
+}
+
+func scrubWorstCase(t *testing.T, url, query string) {
+	t.Helper()
 	event := &sentry.Event{
 		Request: &sentry.Request{
-			URL:         "https://api.myscrollr.com/ops/release?key=ops-release-key",
+			URL:         url,
 			Cookies:     "session=abc; AUTH_TOKEN=very-secret",
-			QueryString: "code=logto-auth-code&state=csrf123",
-			Data:        `{"access_token":"REPLACE_ME"}`,
+			QueryString: query,
+			Data:        `{"access_token":"REPLACE_ME","refresh_token":"refresh-leak"}`,
 			Headers: map[string]string{
 				"Authorization":   "Bearer leaking-token",
 				"Cookie":          "session=abc",
@@ -44,11 +68,11 @@ func TestScrubSentryEventRemovesPII(t *testing.T) {
 	if event.Request.Cookies != "" {
 		t.Errorf("Cookies not scrubbed: %q", event.Request.Cookies)
 	}
+	if want, _, _ := strings.Cut(url, "?"); event.Request.URL != want {
+		t.Errorf("URL query not scrubbed (ops key / OAuth code+state leak risk): %q", event.Request.URL)
+	}
 	if event.Request.QueryString != "" {
 		t.Errorf("QueryString not scrubbed (Logto code/state leak risk): %q", event.Request.QueryString)
-	}
-	if event.Request.URL != "https://api.myscrollr.com/ops/release" {
-		t.Errorf("URL query not scrubbed (ops key leak risk): %q", event.Request.URL)
 	}
 	if event.Request.Data != "" {
 		t.Errorf("Data not scrubbed: %q", event.Request.Data)

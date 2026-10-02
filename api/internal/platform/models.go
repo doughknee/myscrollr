@@ -91,6 +91,19 @@ type HealthResponse struct {
 	Database string            `json:"database"`
 	Redis    string            `json:"redis"`
 	Services map[string]string `json:"services"`
+	// GitHub connections (SCROLLR-304). Informational: a user's broken
+	// token never degrades core's readiness.
+	GitHub *GitHubHealth `json:"github,omitempty"`
+}
+
+// GitHubHealth is the Connect GitHub fleet at a glance: how many accounts
+// are connected, how many GitHub stopped accepting, and when GitHub last
+// answered any of them. The Yahoo lesson (SCROLLR-196): an upstream that
+// starts refusing everyone must show up somewhere a person looks.
+type GitHubHealth struct {
+	Connections int    `json:"connections"`
+	Broken      int    `json:"broken"`
+	LastOK      string `json:"last_ok,omitempty"`
 }
 
 // ErrorResponse represents a standard API error.

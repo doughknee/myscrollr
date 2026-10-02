@@ -119,7 +119,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ 00365f6c5036cb4e -->
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ a22929a8d89e5073 -->
 56 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
@@ -188,7 +188,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 - **Weather** (Desk) — Current conditions for your locations
 - **System Monitor** (Dev) — Live CPU, memory, and GPU stats
 - **Uptime** (Dev) — Monitor status from Uptime Kuma
-- **GitHub** (Dev) — CI/Actions status for your repos
+- **GitHub** (Dev) — CI status for your repos — connect GitHub for private ones
 
 ## Settings
 

@@ -1,11 +1,15 @@
 /**
  * GitHub Actions widget FeedTab.
  *
- * Tracks CI/Actions workflow run status for user-configured public
- * GitHub repos. Repos are added individually via URL input. Data is
- * cached in the Tauri store for cross-window ticker sync.
+ * Tracks CI/Actions workflow run status for user-configured GitHub repos.
+ * Repos are added individually via URL input. Connecting GitHub (the
+ * Scrollr Desktop GitHub App, brokered by core) adds private repos and the
+ * user's own rate limit (SCROLLR-304). Data is cached in the Tauri store
+ * for cross-window ticker sync.
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
 import { clsx } from "clsx";
 import { Github, Plus, X, ExternalLink } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -19,7 +23,7 @@ import type { GitHubRepo } from "./types";
 import {
   parseRepoUrl,
   repoKey,
-  fetchAllRepos,
+  fetchRepos,
   loadRepoData,
   saveRepoData,
   CI_STATUS_LABELS,
@@ -30,6 +34,7 @@ import { useShell } from "../../shell-context";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_GITHUB_REPOS } from "../../constants";
+import { githubApi } from "../../api/client";
 
 // ── Widget manifest ─────────────────────────────────────────────
 
@@ -37,15 +42,16 @@ export const githubWidget: WidgetManifest = {
   id: "github",
   name: "GitHub",
   tabLabel: "GitHub",
-  description: "CI/Actions status for your repos",
+  description: "CI status for your repos — connect GitHub for private ones",
   hex: "#f97316",
   icon: Github,
   info: {
     about:
       "The GitHub widget tracks the latest workflow run status for " +
-      "your public GitHub repositories.",
+      "your GitHub repositories. Connect GitHub to include private ones.",
     usage: [
       "Paste a GitHub repo URL to add it (e.g. https://github.com/org/repo).",
+      "Connect GitHub to see private repos; disconnect any time.",
       "Each repo shows its latest GitHub Actions workflow run status.",
       "Click a repo row to open the workflow run on GitHub.",
     ],
@@ -89,8 +95,8 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
     storeKey: LS_GITHUB_REPOS,
     loadFn: loadRepoData,
     saveFn: saveRepoData,
-    queryKey: ["github-actions", configRepos.map(repoKey)],
-    queryFn: () => fetchAllRepos(configRepos),
+    queryKey: ["github-actions", shell.authenticated, configRepos.map(repoKey)],
+    queryFn: () => fetchRepos(configRepos),
     enabled: configRepos.length > 0,
     pollInterval: POLL_INTERVAL,
     retry: 1,
@@ -149,6 +155,10 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
           Add a GitHub repo to track CI status
         </span>
 
+        <div className="w-full max-w-sm">
+          <GitHubAccount />
+        </div>
+
         <div className="w-full max-w-sm space-y-2">
           <input
             type="url"
@@ -195,6 +205,8 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
           </span>
         </div>
       </div>
+
+      <GitHubAccount />
 
       {/* Status summary */}
       <div className="flex items-center gap-3 px-1 text-[11px] font-mono text-fg-3">
@@ -267,6 +279,124 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
           })}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+// ── GitHubAccount ───────────────────────────────────────────────
+
+/** After Connect opens the browser: check every 5 s, for 2 minutes. */
+const CONNECT_POLL_MS = 5_000;
+const CONNECT_WINDOW_MS = 120_000;
+
+const ACCOUNT_BUTTON =
+  "shrink-0 text-[11px] font-mono font-semibold px-2.5 py-1 rounded-md border disabled:opacity-40 disabled:cursor-not-allowed";
+
+/**
+ * Connect GitHub (SCROLLR-304). Core holds the token; this only shows the
+ * state and starts or ends the connection. Signed out there is no account
+ * to connect, so nothing renders and public repos work as they always did.
+ */
+function GitHubAccount() {
+  const shell = useShell();
+  const queryClient = useQueryClient();
+  const [waitUntil, setWaitUntil] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const waiting = waitUntil > Date.now();
+
+  const { data: status } = useQuery({
+    queryKey: ["github-status"],
+    queryFn: githubApi.status,
+    enabled: shell.authenticated,
+    refetchInterval: waiting ? CONNECT_POLL_MS : POLL_INTERVAL * 1000,
+  });
+
+  // Connected while waiting: stop polling and refetch runs with the token.
+  useEffect(() => {
+    if (waiting && status?.connected) {
+      setWaitUntil(0);
+      void queryClient.invalidateQueries({ queryKey: ["github-actions"] });
+    }
+  }, [waiting, status?.connected, queryClient]);
+
+  // End the 5 s cadence when the window closes without a connection.
+  useEffect(() => {
+    if (!waitUntil) return;
+    const t = setTimeout(() => setWaitUntil(0), Math.max(0, waitUntil - Date.now()));
+    return () => clearTimeout(t);
+  }, [waitUntil]);
+
+  const connect = useCallback(async () => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const { url } = await githubApi.connect();
+      await invoke("open_external", { url });
+      setWaitUntil(Date.now() + CONNECT_WINDOW_MS);
+    } catch {
+      setActionError("Couldn't start the GitHub connection. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const disconnect = useCallback(async () => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await githubApi.disconnect();
+      await queryClient.invalidateQueries({ queryKey: ["github-status"] });
+      await queryClient.invalidateQueries({ queryKey: ["github-actions"] });
+    } catch {
+      setActionError("Couldn't disconnect GitHub. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [queryClient]);
+
+  if (!shell.authenticated || !status) return null;
+
+  return (
+    <div className="px-1 space-y-1">
+      <div className="flex items-center justify-between gap-2 rounded-md bg-surface-2 border border-edge px-2.5 py-1.5">
+        <span className="min-w-0 truncate text-[11px] font-mono text-fg-3">
+          {status.connected
+            ? `Connected as @${status.login}`
+            : waiting
+              ? "Finish in your browser…"
+              : status.reason
+                ? "GitHub needs reconnecting"
+                : "Connect GitHub for private repos"}
+        </span>
+        {status.connected ? (
+          <button
+            type="button"
+            onClick={() => void disconnect()}
+            disabled={busy}
+            className={clsx(ACCOUNT_BUTTON, "text-fg-3 border-edge hover:text-fg")}
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void connect()}
+            disabled={busy}
+            className={clsx(
+              ACCOUNT_BUTTON,
+              "text-widget-github bg-widget-github/10 border-widget-github/25 hover:bg-widget-github/15",
+            )}
+          >
+            {status.reason ? "Reconnect GitHub" : "Connect GitHub"}
+          </button>
+        )}
+      </div>
+      {(actionError || (!status.connected && status.reason)) && (
+        <p className="text-[10px] font-mono text-error">
+          {actionError ?? status.reason}
+        </p>
+      )}
     </div>
   );
 }

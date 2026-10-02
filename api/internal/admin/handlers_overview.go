@@ -9,6 +9,7 @@ import (
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
+	"github.com/brandon-relentnet/myscrollr/api/internal/githubapp"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
@@ -49,6 +50,8 @@ type OverviewResponse struct {
 	ConnectedNow ConnectedTile `json:"connected_now"`
 	Demand       DemandTile    `json:"demand"`
 	Ingest       []IngestRow   `json:"ingest"`
+	// Connect GitHub fleet (SCROLLR-304); absent when unreadable.
+	GitHub *platform.GitHubHealth `json:"github,omitempty"`
 }
 
 // AccountsTile carries two counts because they answer two questions.
@@ -203,6 +206,13 @@ func HandleGetOverview(c *fiber.Ctx) error {
 	run("downloads", func() { out.Downloads = downloadsTile(ctx) })
 	run("demand", func() { out.Demand = demandTile(ctx) })
 	run("ingest", func() { out.Ingest = ingestRows(ctx) })
+	run("github", func() {
+		if gh, err := githubapp.ReadHealth(ctx); err == nil {
+			out.GitHub = &gh
+		} else {
+			log.Printf("[Admin] github: %v", err)
+		}
+	})
 	run("connected", func() {
 		count, replicas := events.FleetClientCount(ctx)
 		out.ConnectedNow = ConnectedTile{Count: count, Replicas: replicas}
