@@ -9,7 +9,7 @@ import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
 import { dwellFor } from "./pagePlan";
-import { ALSO_TAB, buildPageWidgets, followPage, newNav, nextTurn, planAll, stepTurn, type PageWidget, type Turn } from "./widgetPages";
+import { ALSO_TAB, buildPageWidgets, chip, followPage, newNav, nextTurn, planAll, stepTurn, usMarketOpen, type PageWidget, type Turn } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;
 const NOW = Date.parse(fixture._captured_at);
@@ -50,7 +50,6 @@ describe("buildPageWidgets", () => {
     expect(nfl.items.slice(0, firstNotLive).every((i) => i.mine || isLive(i.data as Game))).toBe(true);
     expect(games.slice(firstNotLive).some(isLive)).toBe(false);
     expect(JSON.parse(nfl.items[0].pin!)).toMatchObject({ widget: "sports_nfl", subject: games[0].home_team_name });
-    expect(nfl.sub).toMatch(/^\d+ LIVE$/);
   });
 
   it("before the dashboard is in, no Also page (nothing is known yet)", () => {
@@ -126,39 +125,38 @@ describe("nextTurn", () => {
   });
 });
 
-describe("stepTurn (SCROLLR-298)", () => {
+describe("stepTurn (SCROLLR-298, SCROLLR-303)", () => {
   const widgets = buildPageWidgets(dash, TABS, NOW);
   const plans = planAll(widgets, 1280);
-  // Reading order: every page of every widget, in ticker order.
-  const flat = widgets.flatMap((w) => plans.get(w.tab)!.pages.map((_, p) => `${w.tab}:${p}`));
   const key = (t: Turn) => `${t.tab}:${t.page}`;
+  const multi = widgets.find((w) => plans.get(w.tab)!.pages.length >= 3)!;
+  const pages = plans.get(multi.tab)!.pages.length;
+  const on = (page: number): Turn => ({ seq: 5, tab: multi.tab, page, pages, dwell: 6 });
 
-  it("forward walks every page of every widget in reading order and wraps; back walks it in reverse", () => {
+  it("‹ › turn this widget's page and wrap inside it; the widget never changes", () => {
     const nav = newNav();
-    let t = nextTurn(null, widgets, plans, nav)!;
-    const fwd = [key(t)];
-    for (let i = 0; i < flat.length; i++) fwd.push(key((t = stepTurn(t, 1, widgets, plans, nav)!)));
-    expect(fwd).toEqual([...flat, flat[0]]);
-    const back = [key(t)];
-    for (let i = 0; i < flat.length; i++) back.push(key((t = stepTurn(t, -1, widgets, plans, nav)!)));
-    expect(back).toEqual([flat[0], ...[...flat].reverse()]);
+    let t = on(0);
+    const fwd = [];
+    for (let i = 0; i < pages; i++) fwd.push((t = stepTurn(t, { dir: 1 }, widgets, plans, nav)!).page);
+    expect(fwd).toEqual([...Array(pages).keys()].map((i) => (i + 1) % pages));
+    expect(t.tab).toBe(multi.tab);
+    t = stepTurn(on(0), { dir: -1 }, widgets, plans, nav)!;
+    expect([t.tab, t.page, t.back], "back from page 1 is this widget's last page, swiped in from the left").toEqual([multi.tab, pages - 1, true]);
   });
 
-  it("back from a widget's first page is the previous widget's last page", () => {
-    const tab = widgets[1].tab;
-    const onSecond: Turn = { seq: 5, tab, page: 0, pages: plans.get(tab)!.pages.length, dwell: 6 };
-    const back = stepTurn(onSecond, -1, widgets, plans, newNav())!;
-    expect(back.tab).toBe(widgets[0].tab);
-    expect(back.page).toBe(plans.get(widgets[0].tab)!.pages.length - 1);
+  it("a page turn on a one-page widget, or a widget change with one widget, is nothing", () => {
+    const one = widgets.find((w) => plans.get(w.tab)!.pages.length === 1)!;
+    expect(stepTurn({ seq: 1, tab: one.tab, page: 0, pages: 1, dwell: 6 }, { dir: 1 }, widgets, plans, newNav())).toBeNull();
+    expect(stepTurn(on(0), { dir: 1, whole: true }, [multi], plans, newNav())).toBeNull();
   });
 
-  it("a step is a new turn with its page's dwell; the clock then moves on to the next widget and the widget's next turn continues after it", () => {
+  it("a turn is a new turn with its page's dwell; the clock then moves on to the next widget and the widget's next turn continues after it", () => {
     const ws = buildPageWidgets(npr as unknown as DashboardResponse, ["news_npr", ...TABS], Date.parse(npr._captured_at));
     const ps = planAll(ws, 1920);
     const nav = newNav();
     let t = nextTurn(null, ws, ps, nav)!; // NPR 1
-    t = stepTurn(t, 1, ws, ps, nav)!; // NPR 2
-    t = stepTurn(t, 1, ws, ps, nav)!; // NPR 3, read by hand
+    t = stepTurn(t, { dir: 1 }, ws, ps, nav)!; // NPR 2
+    t = stepTurn(t, { dir: 1 }, ws, ps, nav)!; // NPR 3, read by hand
     expect([t.tab, t.page, t.seq]).toEqual(["news_npr", 2, 3]);
     expect(t.dwell).toBe(dwellFor(ps.get("news_npr")!.pages[2].length));
     t = nextTurn(t, ws, ps, nav)!;
@@ -167,38 +165,100 @@ describe("stepTurn (SCROLLR-298)", () => {
     expect(t.page, "NPR's next turn continues after the page read by hand").toBe(3);
   });
 
-  it("nothing up yet: the first turn; nothing to show: no turn", () => {
-    expect(key(stepTurn(null, 1, widgets, plans, newNav())!)).toBe(flat[0]);
-    expect(stepTurn(null, -1, [], new Map(), newNav())).toBeNull();
+  it("a pill shows that page, back when it is before this one; the sender's count maps by share", () => {
+    const nav = newNav();
+    const t = stepTurn(on(2), { page: 0, of: pages }, widgets, plans, nav)!;
+    expect([t.tab, t.page, t.back]).toEqual([multi.tab, 0, true]);
+    expect(stepTurn(on(0), { page: 2, of: pages }, widgets, plans, nav)!.back).toBeUndefined();
+    expect(stepTurn(on(0), { page: 0, of: pages }, widgets, plans, nav), "the lit pill is nothing").toBeNull();
+    expect(stepTurn(on(0), { page: 1, of: 2 }, widgets, plans, nav)!.page, "half way on the sender is half way here").toBe(Math.floor(pages / 2));
   });
 
-  it("a whole-widget jump (SCROLLR-301): forward to the next widget's next page, back to the previous widget's last-shown page, wrapping both ways", () => {
+  it("nothing up yet: the first turn; nothing to show: no turn", () => {
+    expect(key(stepTurn(null, { dir: 1 }, widgets, plans, newNav())!)).toBe(`${widgets[0].tab}:0`);
+    expect(stepTurn(null, { dir: -1 }, [], new Map(), newNav())).toBeNull();
+  });
+
+  it("˄ ˅ (SCROLLR-301): forward to the next widget's next page, back to the previous widget's last-shown page, wrapping both ways", () => {
     const ws = buildPageWidgets(dash, TABS, NOW);
     const ps = planAll(ws, 1920);
     const tabs = ws.map((w) => w.tab);
     const nav = newNav();
     let t = nextTurn(null, ws, ps, nav)!; // first widget, page 1
-    t = stepTurn(t, 1, ws, ps, nav, true)!;
+    t = stepTurn(t, { dir: 1, whole: true }, ws, ps, nav)!;
     expect([t.tab, t.page, t.back]).toEqual([tabs[1], 0, undefined]);
-    t = stepTurn(t, -1, ws, ps, nav, true)!;
+    t = stepTurn(t, { dir: -1, whole: true }, ws, ps, nav)!;
     expect([t.tab, t.page, t.back], "down then up: back on the page you were reading, swiped in from the left").toEqual([tabs[0], 0, true]);
-    t = stepTurn(t, -1, ws, ps, nav, true)!;
+    t = stepTurn(t, { dir: -1, whole: true }, ws, ps, nav)!;
     const last = tabs.at(-1)!;
     expect([t.tab, t.page], "back from the first widget wraps to the last, at its last page (not up yet)").toEqual([last, ps.get(last)!.pages.length - 1]);
-    t = stepTurn(t, 1, ws, ps, nav, true)!;
+    t = stepTurn(t, { dir: 1, whole: true }, ws, ps, nav)!;
     expect(t.tab, "forward wraps to the first").toBe(tabs[0]);
     expect(t.page, "at the page after the one already read").toBe(1 % ps.get(tabs[0])!.pages.length);
   });
+
+  it("an edge-bar segment jumps the shortest way round: forward lands on the next page, back on the last shown", () => {
+    const tabs = widgets.map((w) => w.tab);
+    expect(tabs.length).toBe(6);
+    const nav = newNav();
+    const first = nextTurn(null, widgets, plans, nav)!;
+    const fwd = stepTurn(first, { tab: tabs[2] }, widgets, plans, nav)!;
+    expect([fwd.tab, fwd.page, fwd.back]).toEqual([tabs[2], 0, undefined]);
+    const back = stepTurn(first, { tab: tabs[5] }, widgets, plans, nav)!;
+    expect([back.tab, back.back], "five ahead is one behind: a jump back").toEqual([tabs[5], true]);
+    expect(stepTurn(first, { tab: tabs[0] }, widgets, plans, nav), "the widget already up").toBeNull();
+  });
 });
 
-describe("planAll with the pager hidden (SCROLLR-301)", () => {
-  it("gives the pager's 88px to the columns", () => {
+describe("chip (SCROLLR-303)", () => {
+  const widgets = buildPageWidgets(dash, TABS, NOW);
+  const nfl = widgets.find((w) => w.tab === "sports_nfl")!;
+  // Thursday 1 Oct 2026: 14:00 ET is 18:00 UTC; Saturday 3 Oct is a weekend.
+  const OPEN = Date.parse("2026-10-01T18:00:00Z");
+  const CLOSED = Date.parse("2026-10-01T21:30:00Z");
+  const WEEKEND = Date.parse("2026-10-03T18:00:00Z");
+
+  it("sports: red, counting the games live now; nothing when none is", () => {
+    const live = nfl.items.filter((i) => isLive(i.data as Game)).length;
+    expect(live).toBeGreaterThan(0);
+    expect(chip(nfl)).toEqual({ kind: "live", count: live });
+    expect(chip({ ...nfl, items: nfl.items.filter((i) => !isLive(i.data as Game)) })).toBeNull();
+  });
+
+  it("finance: open in US regular hours, no count; never for crypto", () => {
+    const stocks = widgets.find((w) => w.tab === "finance_stocks")!;
+    const crypto = widgets.find((w) => w.tab === "finance_crypto")!;
+    expect(usMarketOpen(OPEN)).toBe(true);
+    expect(usMarketOpen(Date.parse("2026-10-01T13:29:00Z")), "09:29 ET").toBe(false);
+    expect(usMarketOpen(Date.parse("2026-10-01T13:30:00Z")), "09:30 ET").toBe(true);
+    expect(usMarketOpen(CLOSED)).toBe(false);
+    expect(usMarketOpen(WEEKEND)).toBe(false);
+    expect(chip(stocks, OPEN)).toEqual({ kind: "open" });
+    expect(chip(stocks, CLOSED)).toBeNull();
+    expect(chip(crypto, OPEN)).toBeNull();
+  });
+
+  it("news: the stories published in the last hour", () => {
+    const bbc = widgets.find((w) => w.tab === "news_bbc")!;
+    const at = (i: number) => Date.parse((bbc.items[i].data as RssItem).published_at!);
+    const newest = Math.max(...bbc.items.map((_, i) => at(i)));
+    expect(chip(bbc, newest + 1000)?.kind).toBe("fresh");
+    const n = bbc.items.filter((_, i) => newest + 1000 - at(i) < 3_600_000).length;
+    expect(chip(bbc, newest + 1000)).toEqual({ kind: "fresh", count: n });
+    expect(chip(bbc, newest + 2 * 3_600_000)).toBeNull();
+  });
+
+  it("the Also page has none", () => {
+    expect(chip(widgets.at(-1)!)).toBeNull();
+  });
+});
+
+describe("column counts with the band (SCROLLR-303)", () => {
+  it("1920 with the Clock: one more NFL column than with the pager; 1280 loses nothing", () => {
     const ws = buildPageWidgets(dash, TABS, NOW);
-    // 1920: at 1280 the 160px label (SCROLLR-301) leaves 3 NFL columns either way.
-    const on = planAll(ws, 1920, 102);
-    const off = planAll(ws, 1920, 102, false);
-    expect(on.get("sports_nfl")!.cols).toBe(5);
-    expect(off.get("sports_nfl")!.cols, "1920 with the Clock: 6 NFL columns again").toBe(6);
+    expect(planAll(ws, 1920, 102).get("sports_nfl")!.cols, "1920 - 192 - 102 = 1626: 6 (5 with the 88px pager)").toBe(6);
+    expect(planAll(ws, 1280, 102).get("sports_nfl")!.cols, "1280 - 192 - 102 = 986: 3, as before").toBe(3);
+    expect(planAll(ws, 1280).get("sports_nfl")!.cols, "1280 bare: 1088, 4 (3 with the pager)").toBe(4);
   });
 });
 

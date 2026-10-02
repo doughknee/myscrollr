@@ -12,8 +12,8 @@
  *
  *  - WIDTHS. Every width in this file is in CSS pixels. `barWidth` is the full
  *    width of the ticker window. `contentWidth(barWidth, edgeWidth)` is what is
- *    left for columns after the label block (LABEL_W), the pager (PAGER_W) and the fixed edge zone
- *    (`edgeWidth`, 0 until the edge zone ships). `columnsFor` takes the CONTENT
+ *    left for columns after the band (BAND_W) and the fixed edge zone
+ *    (`edgeWidth`). `columnsFor` takes the CONTENT
  *    width. Height does not enter: comfort mode changes the row height, not how
  *    many columns fit.
  *  - MINIMUM COLUMN. The caller always passes the cell family's own minimum
@@ -52,19 +52,29 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 
 // ── Columns ────────────────────────────────────────────────────────
 
-/** Width of the label block on the left of every page. */
-export const LABEL_W = 168;
-
 /**
- * Width of the pager at the bar's left end, before the label, `‹ 7/23 ›`
- * (SCROLLR-298, SCROLLR-300): two 22px arrows
- * around a counter reserved for `99/99` at 12px mono.
+ * Width of the band at the bar's left end (SCROLLR-303): edge bar, widget
+ * name, live chip and page pills, one fixed block. The hover keypad takes no
+ * width at rest and the Page controls setting does not change it.
  */
-export const PAGER_W = 88;
+export const BAND_W = 192;
 
-/** Width left for columns once the label, the pager (unless hidden, SCROLLR-301) and the edge zone are taken. */
-export function contentWidth(barWidth: number, edgeWidth = 0, pager = true): number {
-  return Math.max(0, barWidth - LABEL_W - (pager ? PAGER_W : 0) - edgeWidth);
+/** Width left for columns once the band and the edge zone are taken. */
+export function contentWidth(barWidth: number, edgeWidth = 0): number {
+  return Math.max(0, barWidth - BAND_W - edgeWidth);
+}
+
+/** One pill per page holds at its 3px floor up to this many pages; past it the row is one track with a marker. */
+export const PILLS_MAX = 24;
+
+/** The edge bar's segments: 1px gaps up to 12 widgets; from 13 no gaps and the active segment twice as tall. */
+export function edgeBar(widgets: number): { gap: number; activeGrow: number } {
+  return widgets > 12 ? { gap: 0, activeGrow: 2 } : { gap: 1, activeGrow: 1 };
+}
+
+/** The 25+ track's marker, as fractions of the track: at `index / count`, never thinner than 4%. */
+export function trackMarker(index: number, count: number): { left: number; width: number } {
+  return { left: index / Math.max(1, count), width: Math.max(1 / Math.max(1, count), 0.04) };
 }
 
 /**

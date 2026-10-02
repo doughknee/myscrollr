@@ -19,7 +19,8 @@ const SWIPE_S = 0.6;
 test.use({ viewport: { width: 1920, height: 80 } });
 
 const pageUp = (page: Page) => page.locator("[data-pages] [data-page]").evaluateAll((els) => els.map((e) => e.getAttribute("data-page")).join("|"));
-const dwellLine = (page: Page) => page.locator("[data-dwell]").first().evaluate((e) => getComputedStyle(e).transform);
+/** The lit pill's fill (SCROLLR-303: the dwell line became the band's lit pill). */
+const dwellLine = (page: Page) => page.locator("[data-band] [data-lit] > span").first().evaluate((e) => getComputedStyle(e).transform);
 
 async function open(page: Page, ctx: import("@playwright/test").BrowserContext, hover = "keep") {
   await ctx.clock.install();

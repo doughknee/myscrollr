@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ aaf2f728a28f -->
+<!-- source: desktop/src/components/settings/rows.ts @ 7785b9630a71 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -220,7 +220,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Ticker › Screen edge: Which edge of the screen the ticker sits on.
 - Settings › Ticker › Size: Resize the bar. The app window has its own size.
 - Settings › Ticker › Scroll mode: One whole widget per page, or chips that scroll without stopping.
-- Settings › Ticker › Page controls: The page count and arrows at the bar's left end. The mouse wheel and arrow keys page either way.
+- Settings › Ticker › Page controls: The arrows that show on the widget's name when you hover the bar. The mouse wheel and arrow keys page either way.
 - Settings › Ticker › Speed: How fast the chips travel.
 - Settings › Ticker › On hover: What the bar does while your mouse is over it.
 - Settings › Ticker › Stay above other windows: Keep the ticker visible over whatever else is open.
@@ -251,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 592f34905b95 -->
+<!-- source: docs/CHIP_DESIGN.md @ a6142ba696e7 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -294,20 +294,29 @@ once, at the release, with a one-time notice that Continuous is one click away i
 #### What a page looks like
 
 ```
-‹ 7/23 › [ label ] [ game ] [ game ] [ game ] [ game ] [ game ] | [ clock ] [ pin ]
+▌NFL ● 6  [ game ] [ game ] [ game ] [ game ] [ game ] [ game ] | [ clock ] [ pin ]
+▌▬ ▬ ▬
 ```
 
-- **The pager** at the far left says where this page is in the whole trip round the bar:
-  7/23 means the seventh of 23 pages across every widget. While your mouse is on the bar,
-  a ‹ and a › appear either side of it to go back or forward a page. Don't want it? Turn
-  off **Page controls** in Settings › Ticker, or right-click the bar and untick it: the
-  columns get its space, and the wheel and arrow keys still page.
-- **The label** right after it is 168 pixels: the widget's name in its own colour (NFL, BBC,
-  Stocks) and, beneath it, what the widget has on the bar and how many pages that takes
-  (56 GAMES · 19 PAGES, 3 STORIES · 1 PAGE), so you can see there's more and how much.
-  The pager and the label are one block; a line along its bottom edge fills as the page
-  runs out of time. Hover the bar and a ˄ above the name and a ˅ below it jump to the
-  previous or next widget (so do ↑ and ↓, and Shift+wheel).
+- **The band** at the far left, 192 pixels, says which widget this is, whether anything is
+  happening, how much of it there is and where you are in it, with nothing to read at
+  rest:
+  - **A thin bar down its left edge** has one segment per widget on the bar, each in that
+    widget's colour; the one you're on is solid. Click a segment to go to that widget.
+  - **The widget's name** in its own colour (NFL, BBC, STOCKS), and after it **a dot
+    when something is happening now**: red with the number of games live, green while
+    the US stock market is open (crypto never gets one), or the feed's own colour with
+    the number of stories from the last hour. No dot means nothing is on right now.
+  - **A row of small pills** along the bottom, one per page of this widget. The one
+    you're on fills up as the page runs out of time; the ones you've seen are dimmer than
+    the ones still to come. Click a pill to go to that page. A widget with more than 24
+    pages gets one track with a marker instead, and the only number on the band: 31/50.
+  - **Hover the bar** and four small arrows appear beside the name: ‹ › for the page
+    before or after **in this widget**, ˄ ˅ for the widget before or after. Pointing at
+    ˄ or ˅ lights up the segment it would go to. Arrows that would do nothing don't show
+    (no ˄ ˅ with one widget, no ‹ › on a one-page widget). Don't want them? Turn off
+    **Page controls** in Settings › Ticker, or right-click the bar and untick it; the
+    band looks the same and the wheel and arrow keys still work.
 - **The page** is one widget's items in equal columns that fill the bar. How many columns
   is a matter of your screen width and how much room that kind of thing needs: four NFL
   games on a 1280-pixel bar, six on a 1920 one, but only two headlines, because a
@@ -332,8 +341,8 @@ trip round, page 2 the next, and so on to page 8, then page 1 again. Sports work
 way: live games and your team are on page 1, so they come round first after the last
 page, but a widget with 4 pages shows them every fourth lap, not every lap. Nothing is
 left out; it comes round in turn, and the bar doesn't sit on one feed. New headlines
-arriving in between don't send it back to the start. The label's 2/8 tells you where you
-are.
+arriving in between don't send it back to the start. The band's lit pill tells you where
+you are.
 
 #### Every page is full
 
@@ -345,7 +354,7 @@ place of one of them. Filling only ever uses the empty spaces on the last page, 
 never gets extra pages from it and the bar takes no longer to go round.
 
 If a widget truly has fewer things than a page (one game all week), they keep the width
-they'd have on a full page, starting next to the label, rather than one item stretched
+they'd have on a full page, starting next to the band, rather than one item stretched
 across the whole bar.
 
 #### Pages stay still
@@ -368,15 +377,16 @@ your place under your cursor.
   alike. A busy Saturday of 56 college games takes many laps to see everyone, and a live
   game waits its turn with the rest: it is on page 1, so it shows each time the widget
   comes back round to the start. One trip round the whole bar takes at most a minute.
-- **Page through it yourself.** Scroll the mouse wheel over the bar: down for the next
-  page, up for the one before (one page per notch; a trackpad swipe sideways works too).
-  Or click the ‹ › at the far left of the bar, or press ← → once you've clicked the bar.
-  Going back slides the bar the other way, and from a widget's first page takes you to
-  the previous widget's last. To skip a whole widget, press ↓ (or hold Shift while you
-  scroll); ↑ goes back to the widget before, on the page you were reading. Each page you step
-  to gets its full time, and when the bar moves on by itself it carries on from there, so
-  it won't show you again what you just paged through. With a bar on several monitors,
-  they all turn together.
+- **Page through it yourself.** Scroll the mouse wheel over the bar: down for this
+  widget's next page, up for the one before (one page per notch; a trackpad swipe sideways
+  works too). Or click ‹ › beside the name, or a pill, or press ← → once you've clicked
+  the bar. Paging stays inside the widget: past its last page is its first again. Going
+  back slides the bar the other way. To change widget, press ↓ (or hold Shift while you
+  scroll, or click ˅ or a segment on the left edge); ↑ goes back to the widget before, on
+  the page you were reading. A new widget rolls the name and the pills up, going back rolls
+  them down. Each page you go to gets its full time, and when the bar moves on by itself it
+  goes to the next widget and carries on from there, so it won't show you again what you
+  just paged through. With a bar on several monitors, they all turn together.
 
 #### The edge
 
@@ -610,9 +620,11 @@ you read them. Ranking a page by how close a game is. A page for a widget with n
 say. Dropping items instead of taking turns. Pinning a whole widget. A pin icon on the
 chip. Auto-pinning what you just added. Merging pins with stars and favourites. A pinned
 zone that scrolls. Evicting someone's pin to make room for a new one. A hover setting under
-Pages. One item stretched across a page. Centring a short page away from its label. Adding
+Pages. One item stretched across a page. Centring a short page away from the band. Adding
 popular symbols to your watchlist for you. A time window on pages that hides part of what
-the widget page shows. Starting a widget from its first page on every visit.
+the widget page shows. Starting a widget from its first page on every visit. A page counter
+for the whole lap (7/23), and a line of text counting a widget's games and pages: the band's
+pills say how much there is without anything to read.
 
 ### Still to do
 

@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  LABEL_W,
-  PAGER_W,
+  BAND_W,
   TIER,
   columnsFor,
   contentWidth,
   dwellFor,
+  edgeBar,
   freezePage,
   pageItems,
   paginate,
   planWidget,
   refreshPage,
+  trackMarker,
   type Tier,
 } from "./pagePlan";
 
@@ -20,10 +21,10 @@ const range = (n: number) => [...Array(n).keys()];
 
 describe("columns", () => {
   it("come from the content width and the family's minimum", () => {
-    expect(columnsFor(1920 - LABEL_W, 212)).toBe(8);
-    expect(columnsFor(1280 - LABEL_W, 400)).toBe(2);
+    expect(columnsFor(1920 - BAND_W, 212)).toBe(8);
+    expect(columnsFor(1280 - BAND_W, 400)).toBe(2);
     expect(columnsFor(0, 172)).toBe(1);
-    expect(contentWidth(1920, 300)).toBe(1920 - LABEL_W - PAGER_W - 300);
+    expect(contentWidth(1920, 300)).toBe(1920 - 192 - 300);
     expect(contentWidth(50)).toBe(0);
   });
 
@@ -43,8 +44,25 @@ describe("columns", () => {
   });
 
   it("a wider family minimum takes a column fewer", () => {
-    expect(columnsFor(contentWidth(1920), 212)).toBe(7);
-    expect(columnsFor(contentWidth(1920), 244)).toBe(6);
+    expect(columnsFor(contentWidth(1920), 212)).toBe(8);
+    expect(columnsFor(contentWidth(1920), 244)).toBe(7);
+  });
+});
+
+describe("the band (SCROLLR-303)", () => {
+  it("the edge bar: 1px gaps up to 12 widgets; from 13 none, and the active segment twice as tall", () => {
+    expect(edgeBar(1)).toEqual({ gap: 1, activeGrow: 1 });
+    expect(edgeBar(12)).toEqual({ gap: 1, activeGrow: 1 });
+    expect(edgeBar(13)).toEqual({ gap: 0, activeGrow: 2 });
+    expect(edgeBar(16)).toEqual({ gap: 0, activeGrow: 2 });
+  });
+
+  it("24 pills hold their 3px floor in the band's row; the 25+ marker sits at index/count, never under 4%", () => {
+    const row = BAND_W - 1 - 14 - 10; // border, left and right padding
+    expect(24 * 3 + 23 * 3).toBeLessThanOrEqual(row);
+    expect(trackMarker(30, 50)).toEqual({ left: 0.6, width: 0.04 });
+    expect(trackMarker(0, 25)).toEqual({ left: 0, width: 0.04 });
+    expect(trackMarker(1, 2)).toEqual({ left: 0.5, width: 0.5 });
   });
 });
 

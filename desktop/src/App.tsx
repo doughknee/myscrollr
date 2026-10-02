@@ -759,7 +759,7 @@ export default function App() {
         }),
       );
 
-      // Pages only, like the Settings row: the ‹ 7/23 › at the bar's left end (SCROLLR-301).
+      // Pages only, like the Settings row: the band's hover keypad (SCROLLR-301, SCROLLR-303).
       if (prefsRef.current.ticker.scrollMode === "pages") {
         items.push(
           await CheckMenuItem.new({
