@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/githubapp"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -115,6 +116,18 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		log.Printf("[Export] subscription for %s: %v", userID, err)
 	}
 	archive["subscription"] = subscription
+
+	// Connect GitHub (SCROLLR-304): which GitHub account, since when. The
+	// tokens themselves are credentials, not the user's data, and stay out.
+	var ghLogin string
+	var ghSince time.Time
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT github_login, created_at FROM github_connections WHERE logto_sub = $1`, userID,
+	).Scan(&ghLogin, &ghSince); err == nil {
+		archive["github"] = map[string]any{"login": ghLogin, "connected_at": ghSince}
+	} else if err != pgx.ErrNoRows {
+		log.Printf("[Export] github for %s: %v", userID, err)
+	}
 
 	// deletion status, if any
 	if status, _ := getUserDeletionStatus(ctx, userID); status != nil {
@@ -533,6 +546,10 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		return fmt.Errorf("delete logto user: %w", err)
 	}
 
+	// The GitHub grant is revoked at GitHub before its row goes (best
+	// effort: GitHub being down must not block a purge).
+	githubapp.RevokeGrant(ctx, logtoSub)
+
 	// Step 2: Local DB cascade in a transaction.
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
@@ -577,6 +594,13 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		}
 	} else if err != pgx.ErrNoRows {
 		return fmt.Errorf("read stripe_customers: %w", err)
+	}
+
+	// Connect GitHub tokens (SCROLLR-304).
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM github_connections WHERE logto_sub = $1`, logtoSub,
+	); err != nil {
+		return fmt.Errorf("delete github_connections: %w", err)
 	}
 
 	// Catalog requests ("tell me when X ships") are keyed on the user.
@@ -631,6 +655,7 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	// User row is gone; drop any cached overview so a stale background
 	// poll doesn't briefly return data for a purged account.
 	platform.InvalidateOverviewCache(ctx, logtoSub)
+	githubapp.ForgetCache(ctx, logtoSub)
 	removeRecentPresence(logtoSub)
 	RemoveLivePresence(ctx, logtoSub)
 	if deletionStatus == "pending" && postHogDeletionConfigured() {

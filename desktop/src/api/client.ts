@@ -584,4 +584,57 @@ export const rssApi = {
     }),
 };
 
+// ── GitHub (SCROLLR-304) ────────────────────────────────────────
+
+/** One repo's latest workflow run, as core serves it from GitHub. */
+export interface GitHubRunRow {
+  repo: string;
+  available: boolean;
+  status?: string;
+  conclusion?: string;
+  name?: string;
+  html_url?: string;
+  head_branch?: string;
+  run_started_at?: string;
+  updated_at?: string;
+  commit_message?: string;
+  /** GitHub's rate limit is spent; this is the last good answer. */
+  stale?: boolean;
+}
+
+export interface GitHubRunsResponse {
+  /** Answered with the user's own GitHub token. */
+  connected: boolean;
+  /** Offer Connect (or Reconnect) GitHub. */
+  connect?: boolean;
+  login?: string;
+  reason?: string;
+  runs: GitHubRunRow[];
+}
+
+export interface GitHubStatus {
+  connected: boolean;
+  login?: string;
+  since?: string;
+  /** Set when GitHub stopped accepting the connection. */
+  reason?: string;
+}
+
+/**
+ * Core brokers the Scrollr Desktop GitHub App and holds the token; the app
+ * only ever sees runs. Unconnected accounts still get their public repos
+ * through core's shared fallback.
+ */
+export const githubApi = {
+  runs: (repos: string[]) =>
+    authFetch<GitHubRunsResponse>(
+      `/github/runs?repos=${encodeURIComponent(repos.join(","))}`,
+    ),
+  status: () => authFetch<GitHubStatus>("/github/status"),
+  /** The GitHub authorize URL to open in the system browser. */
+  connect: () => authFetch<{ url: string }>("/github/connect"),
+  disconnect: () =>
+    authFetch<GitHubStatus>("/github/connection", { method: "DELETE" }),
+};
+
 

@@ -1,14 +1,18 @@
 /**
  * GitHub Actions widget types, fetch logic, and storage helpers.
  *
- * Fetches the latest workflow run status for user-configured public
- * GitHub repos. Uses @tauri-apps/plugin-http to bypass CORS.
- * Each repo is fetched independently so a single failure doesn't
- * break the entire widget.
+ * Signed in, runs come from core's GET /github/runs (SCROLLR-304): with
+ * the user's own GitHub token once they connect the Scrollr Desktop GitHub
+ * App (private repos included), through core's shared fallback otherwise.
+ * Signed out there is no core session to ask, so the app still calls
+ * GitHub directly for public repos, exactly as before.
  */
 import { fetch } from "@tauri-apps/plugin-http";
 import { LS_GITHUB_REPOS } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
+import { isSignedOut } from "../../auth";
+import { githubApi } from "../../api/client";
+import type { GitHubRunRow } from "../../api/client";
 
 // ── GitHub Actions API response ────────────────────────────────
 
@@ -191,6 +195,38 @@ export async function fetchAllRepos(
           startedAt: null,
         },
   );
+}
+
+/** Map core's run row onto the widget model. */
+export function fromRunRow(
+  r: { owner: string; repo: string },
+  row: GitHubRunRow | undefined,
+): GitHubRepo {
+  return {
+    owner: r.owner,
+    repo: r.repo,
+    status: row?.available
+      ? toCIStatus(row.status ?? "", row.conclusion || null)
+      : "unavailable",
+    workflowName: row?.name || null,
+    runUrl: row?.html_url || null,
+    commitMessage: row?.commit_message || null,
+    updatedAt: row?.updated_at || null,
+    branch: row?.head_branch || null,
+    startedAt: row?.run_started_at || null,
+  };
+}
+
+/**
+ * The widget's fetch: core when signed in, GitHub directly when signed out.
+ */
+export async function fetchRepos(
+  repos: Array<{ owner: string; repo: string }>,
+): Promise<GitHubRepo[]> {
+  if (isSignedOut()) return fetchAllRepos(repos);
+  const res = await githubApi.runs(repos.map(repoKey));
+  const byKey = new Map(res.runs.map((row) => [row.repo.toLowerCase(), row]));
+  return repos.map((r) => fromRunRow(r, byKey.get(repoKey(r).toLowerCase())));
 }
 
 // ── Store persistence ──────────────────────────────────────────

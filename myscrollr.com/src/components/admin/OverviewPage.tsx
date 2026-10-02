@@ -810,6 +810,7 @@ function feedsRow(
         svc ? `${svc.connected_now.replicas} of ${EXPECTED_REPLICAS}` : null,
       ),
       fact('Latest app version', version),
+      fact('GitHub connections', githubFact(svc?.github)),
     ],
     note: 'How long since each feed last received new data. Sports scores can sit for hours overnight when no games are being played, and that is normal.',
     action: (
@@ -820,6 +821,22 @@ function feedsRow(
     problem: problemOf(service),
     loading: service.loading,
   }
+}
+
+// The Yahoo lesson (SCROLLR-196): an upstream that starts refusing every
+// connection must show up where someone looks. A fact, not a verdict.
+function githubFact(gh: AdminOverview['github']): string | null {
+  if (!gh) return null
+  if (gh.connections === 0) return 'none yet'
+  const broken = gh.broken > 0 ? `, ${num(gh.broken)} need reconnecting` : ''
+  const age = gh.last_ok
+    ? Math.max(0, Math.floor((Date.now() - Date.parse(gh.last_ok)) / 1000))
+    : null
+  const last =
+    age === null
+      ? ', GitHub has not answered yet'
+      : `, GitHub last answered ${formatAgeWords(age)}`
+  return `${num(gh.connections)}${broken}${last}`
 }
 
 function oldestClause(hours: number): string {

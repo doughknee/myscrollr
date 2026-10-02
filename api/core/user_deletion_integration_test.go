@@ -48,7 +48,7 @@ func setupIntegrationDB(t *testing.T) {
 	}
 	_, err := platform.DBPool.Exec(context.Background(), `
 		TRUNCATE TABLE product_analytics_enrollments, user_widgets, user_preferences, stripe_customers,
-		               stripe_webhook_events, user_deletion_requests CASCADE
+		               stripe_webhook_events, user_deletion_requests, github_connections CASCADE
 	`)
 	if err != nil {
 		t.Fatalf("truncate test tables: %v", err)
@@ -178,6 +178,8 @@ func seedPurgeableUser(t *testing.T, sub string, lifetime bool) {
 	testsupport.MustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime)
 	             VALUES ($1, $2, $3, 'canceled', $4)`,
 		sub, "cus_"+sub, map[bool]string{true: "lifetime", false: "monthly"}[lifetime], lifetime)
+	testsupport.MustExec(t, `INSERT INTO github_connections (logto_sub, github_user_id, github_login, access_token)
+	             VALUES ($1, 42, 'octo', 'ciphertext')`, sub)
 	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
 	             VALUES ($1, now() - interval '31 days', now() - interval '1 day', 'pending')`, sub)
 }
@@ -204,6 +206,7 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
+		{"github_connections", `SELECT count(*) FROM github_connections WHERE logto_sub = $1`},
 	} {
 		if n := queryCount(t, q.sql, sub); n != 0 {
 			t.Errorf("%s rows after purge = %d, want 0", q.name, n)

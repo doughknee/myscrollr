@@ -12,6 +12,7 @@
  * to visitors, not about security.
  */
 
+import type { GitHubHealth } from '@/types/api.generated'
 import { API_BASE } from '@/api/client'
 
 /** An API error that kept its status code, so 403 can be told from 500. */
@@ -178,6 +179,8 @@ export interface AdminOverview {
   connected_now: ConnectedTile
   demand: DemandTile
   ingest: Array<IngestRow> | null
+  /** Connect GitHub fleet (SCROLLR-304); absent when unreadable. */
+  github?: GitHubHealth
 }
 
 // ── Accounts (read-only) ──────────────────────────────────────────

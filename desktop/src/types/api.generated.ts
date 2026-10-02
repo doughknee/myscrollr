@@ -46,11 +46,18 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface GitHubHealth {
+  connections: number;
+  broken: number;
+  last_ok?: string;
+}
+
 export interface HealthResponse {
   status: string;
   database: string;
   redis: string;
   services: Record<string, string>;
+  github?: GitHubHealth;
 }
 
 export interface OverviewGDPR {

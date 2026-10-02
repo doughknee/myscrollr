@@ -13,6 +13,7 @@ import (
 	"github.com/brandon-relentnet/myscrollr/api/internal/admin"
 	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
+	"github.com/brandon-relentnet/myscrollr/api/internal/githubapp"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ops"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
@@ -282,6 +283,16 @@ func (s *Server) setupRoutes() {
 
 	s.App.Get("/dashboard", platform.LogtoAuth, s.getDashboard)
 
+	// Connect GitHub (SCROLLR-304). Core brokers the Scrollr Desktop GitHub
+	// App's OAuth and holds the token; the desktop only ever sees runs. The
+	// callback is public: GitHub sends the browser there, and the single-use
+	// state in Redis is what ties it to the account that started it.
+	s.App.Get("/github/connect", platform.LogtoAuth, githubapp.HandleConnect)
+	s.App.Get("/github/callback", githubapp.HandleCallback)
+	s.App.Get("/github/status", platform.LogtoAuth, githubapp.HandleStatus)
+	s.App.Delete("/github/connection", platform.LogtoAuth, githubapp.HandleDisconnect)
+	s.App.Get("/github/runs", platform.LogtoAuth, githubapp.HandleRuns)
+
 	// Support
 	s.App.Post("/support/ticket", platform.LogtoAuth, support.HandleSubmitSupportTicket)
 	// Anonymous support endpoint for the marketing /support page. NOT
@@ -401,6 +412,12 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 			if !h.Healthy {
 				res.Status = "degraded"
 			}
+		}
+
+		// Informational only: never flips Status (a user's revoked token
+		// must not take core out of the load balancer).
+		if gh, err := githubapp.ReadHealth(context.Background()); err == nil {
+			res.GitHub = &gh
 		}
 
 		cacheData, _ := json.Marshal(res)

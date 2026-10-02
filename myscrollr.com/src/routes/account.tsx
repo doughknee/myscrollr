@@ -45,6 +45,29 @@ export function AccountHub() {
     if (isAuthenticated) void fetchOverview()
     else setOverview(null)
   }, [isAuthenticated, fetchOverview])
+  // Connect GitHub (SCROLLR-304) ends here: core redirects the browser to
+  // /account?github=connected|error after the desktop app opened GitHub.
+  // That browser may not be signed in to the website, so this answers
+  // before any session check. Read in an effect: the shell is SSR-built.
+  const [github, setGithub] = useState<string | null>(null)
+  useEffect(() => {
+    setGithub(new URLSearchParams(window.location.search).get('github'))
+  }, [])
+  if (github === 'connected' || github === 'error')
+    return (
+      <section className="mx-auto max-w-lg px-6 py-20 text-center">
+        <h1 className="text-3xl font-bold">
+          {github === 'connected'
+            ? 'GitHub is connected'
+            : 'GitHub was not connected'}
+        </h1>
+        <p className="mt-3 text-base-content/65">
+          {github === 'connected'
+            ? 'Head back to Scrollr. The GitHub widget picks it up within a few seconds.'
+            : 'Head back to Scrollr and press Connect GitHub in the GitHub widget to try again.'}
+        </p>
+      </section>
+    )
   if (isLoading)
     return <LoadingSpinner variant="spin" label="Checking your session" />
   if (!isAuthenticated)
