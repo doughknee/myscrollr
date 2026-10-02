@@ -64,3 +64,34 @@ export function ChipFlash({
     />
   );
 }
+
+// What each item last flashed for, per window: survives a chip leaving the
+// rail or a slot rolling to another item and back.
+const flashed = new Map<string, number>();
+
+/**
+ * Flashes once per new `token` for an item, however often it remounts (an
+ * edge slot rolls its items in and out; a rail chip laps). The token is
+ * counted upstream (GitHub: `nextFlash`), so a poll that changed nothing
+ * never flashes, and the first sight of an item never does either.
+ */
+export function OnceFlash({
+  id,
+  token,
+  tone,
+  seen = flashed,
+}: {
+  id: string;
+  token: number;
+  tone?: "up" | "down";
+  /** Tests pass their own. */
+  seen?: Map<string, number>;
+}) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const last = seen.get(id);
+    seen.set(id, token);
+    if (last !== undefined && token > last) setShown(token);
+  }, [id, token, seen]);
+  return <ChipFlash token={shown} tone={tone} />;
+}

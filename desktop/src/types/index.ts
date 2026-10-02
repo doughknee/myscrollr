@@ -5,7 +5,7 @@
  * extension/widgets/types, and myscrollr.com/src/datawidgets/types.
  * The desktop is a standalone codebase — no cross-project imports.
  */
-import type { DataWidgetRow } from "../api/client";
+import type { DataWidgetRow, GitHubDefaultCI, GitHubPRRow } from "../api/client";
 import type { SportsMeta } from "../api/queries";
 
 // ── Finance ──────────────────────────────────────────────────────
@@ -377,6 +377,21 @@ export interface GitHubChipData {
   elapsed?: string;
   /** Name of the step that failed, when known. */
   failedStep?: string;
+  // ── Connected GitHub (SCROLLR-308); all absent when not connected ──
+  /** Needs you › broken › running on yours › passing (`chipState`). */
+  state?: "needs" | "broken" | "running" | "passing";
+  /** PRs that need you, each once (`needsYou`). */
+  needs?: number;
+  /** The age the state shows ("12m"): since the default-branch run, or your run started. */
+  age?: string;
+  defaultCi?: GitHubDefaultCI;
+  mineRunning?: number;
+  mineBranch?: string;
+  /** Open PRs, for the GitHub page (SCROLLR-309). */
+  prs?: GitHubPRRow[];
+  /** Counts worthy changes (`nextFlash`); 0 until the first. */
+  flash?: number;
+  flashTone?: "up" | "down";
 }
 
 export interface WidgetTickerData {

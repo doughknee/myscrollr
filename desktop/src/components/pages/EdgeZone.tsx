@@ -42,6 +42,8 @@ import { leagueCode } from "../../utils/gameHelpers";
 import { formatTempRange } from "../../utils/format";
 import { teamShortName } from "../../utils/teamShortName";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
+import { needsYou } from "../../widgets/github/types";
+import { OnceFlash } from "../chips/ChipFlash";
 import GameCell, { gameMinCol } from "./cells/GameCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
@@ -50,7 +52,8 @@ import { Rule, accentFor, accentStyle, inkFor } from "./cells/parts";
 const UTILITIES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
 type Utility = (typeof UTILITIES)[number];
 
-type Tone = "live" | "down" | "error" | "warning" | undefined;
+/** `ink`: the widget's own readable colour (`--accent-ink`). */
+type Tone = "live" | "down" | "error" | "warning" | "ink" | undefined;
 
 /** One thing a utility slot can show. */
 export interface SlotItem {
@@ -63,6 +66,15 @@ export interface SlotItem {
   detail?: string;
   tone?: Tone;
   dim?: boolean;
+  /**
+   * A mark before the value (GitHub, SCROLLR-308): a dot (`up`, `down`), a
+   * ring breathing in the accent (`run`), or a count pill (`count`).
+   */
+  mark?: "up" | "down" | "run" | "count";
+  count?: number;
+  /** Counts worthy changes; the slot flashes once per new token. */
+  flash?: number;
+  flashTone?: "up" | "down";
 }
 
 export interface EdgeUtility {
@@ -98,6 +110,37 @@ export function reserveOf(value: string, digits: number): string {
 
 const GH_GLYPH: Record<GitHubChipData["status"], string> = { success: "✓", failure: "✗", in_progress: "●", unavailable: "○" };
 
+/**
+ * Every connected GitHub state reserves the widest one, a broken branch: a
+ * workflow name of up to eight characters and its age, behind a dot. So a
+ * repo going passing → broken → needs you never changes the slot's width.
+ */
+export const GH_RESERVE = "00000000 · 00m";
+const GH_WORKFLOW_CH = 8;
+
+const firstLine = (s: string | undefined) => s?.split("\n")[0] || undefined;
+
+/** The four connected states (SCROLLR-308, canvas board 1). Never says "passing". */
+function githubSlot(g: GitHubChipData): SlotItem {
+  const base = { id: g.id, label: g.label, reserve: GH_RESERVE, flash: g.flash, flashTone: g.flashTone };
+  const ci = g.defaultCi;
+  switch (g.state) {
+    case "needs":
+      return { ...base, mark: "count", count: g.needs, value: "for you", tone: "ink", detail: needsYou(g.prs)[0]?.title };
+    case "broken": {
+      const wf = ci?.workflow ?? "CI";
+      const name = wf.length > GH_WORKFLOW_CH ? `${wf.slice(0, GH_WORKFLOW_CH - 1)}…` : wf;
+      return { ...base, mark: "down", value: `${name} · ${g.age ?? ""}`, tone: "down", detail: firstLine(ci?.commit_message) ?? wf };
+    }
+    case "running": {
+      const more = (g.mineRunning ?? 0) > 1 ? ` +${(g.mineRunning ?? 0) - 1}` : "";
+      return { ...base, mark: "run", value: `yours · ${g.age ?? ""}`, tone: "ink", detail: g.mineBranch ? `${g.mineBranch}${more}` : undefined };
+    }
+    default:
+      return { ...base, mark: "up", value: g.age ?? "", dim: true, detail: firstLine(ci?.commit_message) ?? ci?.workflow };
+  }
+}
+
 function slotOf(tab: Utility, raw: unknown): SlotItem {
   switch (tab) {
     case "clock": {
@@ -127,6 +170,7 @@ function slotOf(tab: Utility, raw: unknown): SlotItem {
     }
     case "github": {
       const g = raw as GitHubChipData;
+      if (g.state) return githubSlot(g);
       const value = `${GH_GLYPH[g.status]} ${g.elapsed ?? ""}`.trim();
       return { id: g.id, label: g.label, value, reserve: reserveOf(value, 2), detail: g.failedStep ?? g.workflowName, tone: g.status === "failure" ? "down" : undefined };
     }
@@ -180,6 +224,35 @@ export function edgeTabs(edge: Edge): string[] {
 
 const EASE = [0.32, 0.72, 0, 1] as const;
 
+/** The mark before a value. A sizer holds a dot's room: the widest state is a dot's. */
+function Mark({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
+  if (!it.mark) return null;
+  if (it.mark === "count" && !sizer) {
+    const n = it.count ?? 0;
+    return (
+      <span
+        data-mark="count"
+        className="inline-flex h-[18px] min-w-[20px] shrink-0 items-center justify-center rounded-full px-[5px] text-[13px] font-bold leading-none tabular-nums"
+        style={{ background: "var(--accent)", color: "var(--color-base-150)" }}
+      >
+        {n > 99 ? "99+" : n}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-mark={sizer ? undefined : it.mark}
+      className={clsx(
+        "size-[8px] shrink-0 rounded-full",
+        !sizer && it.mark === "up" && "bg-up",
+        !sizer && it.mark === "down" && "bg-down",
+        !sizer && it.mark === "run" && "gh-ring",
+      )}
+      style={!sizer && it.mark === "run" ? { background: "var(--accent)" } : undefined}
+    />
+  );
+}
+
 function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
   return (
     <span
@@ -193,13 +266,15 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
         {it.label}
         {!sizer && it.dim && it.id.startsWith("clock") ? " ☾" : ""}
       </span>
-      <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+      <span className={clsx("inline-flex whitespace-nowrap", it.mark ? "items-center gap-[6px]" : "items-baseline gap-1")}>
         {it.icon && <span className="text-[12px] leading-none">{it.icon}</span>}
+        <Mark it={it} sizer={sizer} />
         <span
           className={clsx(
             "text-[16px] font-bold leading-none tabular-nums",
-            it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : it.dim ? "text-fg-2" : "text-fg",
+            it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : it.tone === "ink" ? "" : it.dim ? "text-fg-2" : "text-fg",
           )}
+          style={it.tone === "ink" && !sizer ? { color: "var(--accent-ink)" } : undefined}
         >
           {sizer ? it.reserve : it.value}
         </span>
@@ -227,6 +302,7 @@ const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility;
       <AnimatePresence initial={false}>
         <motion.span key={it.id} data-item={it.id} className="absolute inset-0" {...roll}>
           <SlotFace it={it} />
+          {it.flash !== undefined && <OnceFlash id={it.id} token={it.flash} tone={it.flashTone} />}
         </motion.span>
       </AnimatePresence>
     </button>
