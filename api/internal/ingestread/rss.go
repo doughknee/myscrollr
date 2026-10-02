@@ -530,9 +530,10 @@ func curatedFeedURLs() []string {
 }
 
 // PublicRSS is the rss section of /public/feed: the newest PublicRSSPerFeed
-// items of each curated feed, newest first, in the dashboard's item shape.
-// Uncached here; the whole feed is cached by HandlePublicFeed.
-func PublicRSS(ctx context.Context) ([]RssItem, error) {
+// items of each of `feedURLs` (the curated feeds, or a ?widgets= list's),
+// newest first, in the dashboard's item shape. Uncached here; the whole
+// feed is cached by HandlePublicFeed.
+func PublicRSS(ctx context.Context, feedURLs []string) ([]RssItem, error) {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT i.id, i.feed_url, i.guid, i.title, i.link, i.description, i.source_name, i.published_at, i.created_at, i.updated_at
 		FROM (SELECT DISTINCT unnest($1::text[]) AS url) f
@@ -543,7 +544,7 @@ func PublicRSS(ctx context.Context) ([]RssItem, error) {
 			LIMIT $2
 		) i
 		ORDER BY i.published_at DESC NULLS LAST
-	`, curatedFeedURLs(), PublicRSSPerFeed)
+	`, feedURLs, PublicRSSPerFeed)
 	if err != nil {
 		return nil, fmt.Errorf("public rss query: %w", err)
 	}

@@ -30,7 +30,7 @@ func TestPublicFeedSharesLeaguesAndCarriesRSS(t *testing.T) {
 		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM games WHERE league = ANY($1)`, []string{busy, quiet})
 		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM tracked_leagues WHERE name = ANY($1)`, []string{busy, quiet})
 		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM rss_items WHERE guid LIKE 'scrollr-313-%'`)
-		_ = platform.Rdb.Del(ctx, PublicFeedCacheKey, CacheKeySports).Err()
+		_ = platform.Rdb.Del(ctx, PublicFeedCacheKey, PublicFeedCacheKey+":news_npr", CacheKeySports).Err()
 	}
 	cleanup()
 	defer cleanup()
@@ -107,5 +107,40 @@ func TestPublicFeedSharesLeaguesAndCarriesRSS(t *testing.T) {
 	}
 	if perFeed[npr] != PublicRSSPerFeed || perFeed[bbc] != 2 {
 		t.Errorf("rss per feed = npr %d, bbc %d; want %d and 2", perFeed[npr], perFeed[bbc], PublicRSSPerFeed)
+	}
+
+	// ?widgets= (SCROLLR-315): only NPR's items and no leagues, and the
+	// same set spelled differently is the same cache entry.
+	for i, q := range []string{"news_npr,clock,bogus", "bogus,news_npr"} {
+		res, err := app.Test(httptest.NewRequest("GET", "/public/feed?widgets="+q, nil), 10_000)
+		if err != nil || res.StatusCode != 200 {
+			t.Fatalf("GET ?widgets=%s: %v %v", q, res, err)
+		}
+		if want := []string{"MISS", "HIT"}[i]; res.Header.Get("X-Cache") != want {
+			t.Errorf("?widgets=%s: X-Cache %s, want %s", q, res.Header.Get("X-Cache"), want)
+		}
+		var narrow struct {
+			Data struct {
+				Finance []Trade        `json:"finance"`
+				Sports  SportsResponse `json:"sports"`
+				RSS     []RssItem      `json:"rss"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&narrow); err != nil {
+			t.Fatal(err)
+		}
+		if len(narrow.Data.Finance) != 0 || len(narrow.Data.Sports.Sports) != 0 || len(narrow.Data.Sports.Meta.Leagues) != 0 {
+			t.Errorf("?widgets=%s served %d trades, %d games: want none", q, len(narrow.Data.Finance), len(narrow.Data.Sports.Sports))
+		}
+		n := 0
+		for _, it := range narrow.Data.RSS {
+			if it.FeedURL != npr {
+				t.Errorf("?widgets=%s served an item of %s", q, it.FeedURL)
+			}
+			n++
+		}
+		if n < PublicRSSPerFeed {
+			t.Errorf("?widgets=%s served %d NPR items, want %d", q, n, PublicRSSPerFeed)
+		}
 	}
 }
