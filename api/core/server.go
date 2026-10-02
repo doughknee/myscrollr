@@ -21,6 +21,7 @@ import (
 	"github.com/brandon-relentnet/myscrollr/api/internal/widgets"
 	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"golang.org/x/sync/singleflight"
@@ -179,7 +180,8 @@ func (s *Server) setupRoutes() {
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)
 	s.App.Get("/public/analytics-policy", s.analyticsPolicy)
-	s.App.Get("/public/feed", ingestread.HandlePublicFeed)
+	// gzip per route, never app-wide: /events is SSE (SCROLLR-313).
+	s.App.Get("/public/feed", compress.New(), ingestread.HandlePublicFeed)
 	s.App.Get("/events", events.StreamEvents)
 	s.App.Get("/events/count", events.GetActiveViewers)
 	s.App.Post("/webhooks/sequin", events.HandleSequinWebhook)
@@ -281,7 +283,7 @@ func (s *Server) setupRoutes() {
 	// is why the page reads this with fetch rather than EventSource.
 	s.App.Get("/admin/support/stream", platform.LogtoAuth, admin.RequireAdmin, events.StreamAdminEvents)
 
-	s.App.Get("/dashboard", platform.LogtoAuth, s.getDashboard)
+	s.App.Get("/dashboard", platform.LogtoAuth, compress.New(), s.getDashboard)
 
 	// Connect GitHub (SCROLLR-304). Core brokers the Scrollr Desktop GitHub
 	// App's OAuth and holds the token; the desktop only ever sees runs. The

@@ -41,9 +41,6 @@ func TestReadQueriesMatchTheSchema(t *testing.T) {
 	})
 
 	t.Run("sports", func(t *testing.T) {
-		if _, err := querySportsGames(ctx, 20, nil); err != nil {
-			t.Errorf("querySportsGames: %v", err)
-		}
 		if _, err := queryGamesByLeagues(ctx, []string{"NFL"}, 20, nil, false); err != nil {
 			t.Errorf("queryGamesByLeagues: %v", err)
 		}
@@ -68,5 +65,8 @@ func TestReadQueriesMatchTheSchema(t *testing.T) {
 		}
 		getUserRSSFeedURLs(ctx, noSuchUser)
 		queryRSSItems(ctx, []string{"https://example.com/feed.xml"})
+		if _, err := PublicRSS(ctx); err != nil {
+			t.Errorf("PublicRSS: %v", err)
+		}
 	})
 }

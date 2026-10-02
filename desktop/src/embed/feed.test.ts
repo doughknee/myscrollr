@@ -44,6 +44,8 @@ describe("embed feed", () => {
       rss: [{ title: "x" }],
     });
     expect(d.widgets.map((w) => w.widget_type)).toEqual(["sports_nhl"]);
+    const live = { data: { ...feed.data, rss: [{ title: "real" }] } };
+    expect(fromPublicFeed(live, [], [{ title: "x" }])!.data.rss).toEqual([{ title: "real" }]);
     expect(fromPublicFeed({ data: {} }, [], [])).toBeNull();
     expect(fromPublicFeed(null, [], [])).toBeNull();
   });

@@ -10,6 +10,7 @@ package ingestread
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -509,6 +510,58 @@ func queryRSSItems(ctx context.Context, feedURLs []string) []RssItem {
 		items = append(items, item)
 	}
 	return items
+}
+
+// PublicRSSPerFeed caps each curated feed's share of /public/feed's rss
+// section. Per feed, not overall: one global newest-first LIMIT would let
+// the busiest feeds crowd a slow one (NPR) off the website's bar.
+const PublicRSSPerFeed = 20
+
+// curatedFeedURLs is every feed a catalog news widget serves by default --
+// the feeds a ?widgets= on the website's bar can name.
+func curatedFeedURLs() []string {
+	var urls []string
+	for _, w := range platform.Catalog() {
+		if w.Source == "rss" {
+			urls = append(urls, widgetFeedURLs(w.ID, nil)...)
+		}
+	}
+	return urls
+}
+
+// PublicRSS is the rss section of /public/feed: the newest PublicRSSPerFeed
+// items of each curated feed, newest first, in the dashboard's item shape.
+// Uncached here; the whole feed is cached by HandlePublicFeed.
+func PublicRSS(ctx context.Context) ([]RssItem, error) {
+	rows, err := platform.DBPool.Query(ctx, `
+		SELECT i.id, i.feed_url, i.guid, i.title, i.link, i.description, i.source_name, i.published_at, i.created_at, i.updated_at
+		FROM (SELECT DISTINCT unnest($1::text[]) AS url) f
+		CROSS JOIN LATERAL (
+			SELECT * FROM rss_items
+			WHERE feed_url = f.url
+			ORDER BY published_at DESC NULLS LAST
+			LIMIT $2
+		) i
+		ORDER BY i.published_at DESC NULLS LAST
+	`, curatedFeedURLs(), PublicRSSPerFeed)
+	if err != nil {
+		return nil, fmt.Errorf("public rss query: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]RssItem, 0)
+	for rows.Next() {
+		var item RssItem
+		if err := rows.Scan(
+			&item.ID, &item.FeedURL, &item.GUID, &item.Title, &item.Link,
+			&item.Description, &item.SourceName, &item.PublishedAt,
+			&item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("public rss scan: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 // syncRSSFeedsToTracked upserts feed URLs from a user's RSS channel config

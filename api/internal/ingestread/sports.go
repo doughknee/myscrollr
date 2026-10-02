@@ -64,11 +64,19 @@ const (
 	TeamsCacheTTL = 24 * time.Hour
 
 	// DefaultSportsLimit caps the number of games returned for /sports
-	// (authenticated full channel page + public route). High enough to fit
-	// a week of MLB (~105 rows) plus other leagues with headroom. The full
-	// channel page disables per-league fair share at this limit so users
-	// see every game for every selected league.
+	// (the authenticated full channel page). High enough to fit a week of
+	// MLB (~105 rows) plus other leagues with headroom. The full channel
+	// page disables per-league fair share at this limit so users see every
+	// game for every selected league.
 	DefaultSportsLimit = 200
+
+	// PublicSportsPerLeague is each enabled league's share of the public
+	// payload (/sports/public, /public/feed): half upcoming (live first,
+	// then soonest), half the newest finals (fairShareSideSplit). It was
+	// one global LIMIT 200 over every league, which a college-football
+	// Saturday (~150 fixtures) filled on its own, so the website's bar had
+	// no NFL on a Friday (SCROLLR-313).
+	PublicSportsPerLeague = 40
 
 	// DashboardSportsLimit caps the number of games returned in the
 	// /dashboard payload — the desktop's only sports data source. Raised
@@ -338,11 +346,12 @@ func PublicSports(ctx context.Context) (resp SportsResponse, cacheHit bool, err 
 	if cacheGetJSON(ctx, CacheKeySports, &resp) {
 		return resp, true, nil
 	}
-	games, err := querySportsGames(ctx, DefaultSportsLimit, nil)
+	leagues := allEnabledLeagueNames(ctx)
+	games, err := queryGamesByLeagues(ctx, leagues, PublicSportsPerLeague*len(leagues), nil, true)
 	if err != nil {
 		return SportsResponse{}, false, err
 	}
-	meta := loadLeagueMeta(ctx, allEnabledLeagueNames(ctx))
+	meta := loadLeagueMeta(ctx, leagues)
 	resp = SportsResponse{Sports: games, Meta: SportsMeta{Leagues: meta}}
 	cacheSetJSON(ctx, CacheKeySports, resp, SportsCacheTTL)
 	return resp, false, nil
@@ -630,35 +639,6 @@ func invalidateSportsUserCache(userSub string) {
 	}
 }
 
-// querySportsGames fetches games prioritized by relevance: live games
-// first, then soonest upcoming, then most recently finished. If
-// favoriteTeams is provided, those teams' games are prioritized.
-func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]FavoriteTeam) ([]Game, error) {
-	favNames := extractFavoriteTeamNames(favoriteTeams)
-
-	rows, err := platform.DBPool.Query(ctx, fmt.Sprintf(`
-		SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
-			home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
-			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
-			start_time, COALESCE(short_detail, ''), state,
-			COALESCE(status_short, ''), COALESCE(status_long, ''),
-			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at`+standingsColumns+`
-		FROM games g`+standingsJoin+`
-		WHERE %s
-		ORDER BY
-			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
-			CASE WHEN home_team_name = ANY($1) OR away_team_name = ANY($1) THEN 0 ELSE 1 END,
-			CASE WHEN state = 'pre' THEN start_time END ASC,
-			CASE WHEN state != 'pre' THEN start_time END DESC
-		LIMIT %d`, notStaleUpcoming, limit), favNames)
-	if err != nil {
-		return nil, fmt.Errorf("sports query failed: %w", err)
-	}
-	defer rows.Close()
-
-	return scanGames(rows), nil
-}
-
 // notStaleUpcoming excludes games still marked 'pre' whose start time has
 // already passed -- which is never a real state. It is a fixture that
 // finished without anyone fetching the result: poll_schedule only reads
@@ -708,7 +688,8 @@ func fairShareSideSplit(perLeague int) (upcoming, past int) {
 
 // queryGamesByLeagues fetches games for specific leagues.
 //
-// When `fairShare` is true (used by the dashboard with limit=60): each
+// When `fairShare` is true (the dashboard with limit=60, and the public
+// payload with limit=PublicSportsPerLeague x N, so exactly 40 each): each
 // league gets max(MinPerLeagueShare, ceil(limit/N)) candidate rows via a
 // window function — split between soonest-upcoming and newest-finals (see
 // fairShareSideSplit), favorites boosted within each side. The global
