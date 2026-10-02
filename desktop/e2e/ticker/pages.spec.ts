@@ -50,7 +50,7 @@ const ALL_CAP_MS = 600_000;
 
 const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; full?: boolean; npr30?: boolean }[] = [
   { fixture: "pages", width: 1920, laps: 2, live: true }, // every page kind: NFL (yours + live), stocks, crypto, news, the Also page
-  { fixture: "mixed", width: 1920, laps: 2, live: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 249 s since SCROLLR-297; 314 s before)
+  { fixture: "mixed", width: 1920, laps: 2, live: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 293.5 s with the pager, SCROLLR-298: NCAAF 5 columns, 12 pages; 249 s before it)
   // SCROLLR-296 round 2: college cells at 276px give 3 columns at 1280 with the Clock (was 4), 19 pages: all shown 306.6 s. Flagged to Home (their call; 264 would keep 4 columns and ~217 s).
   { fixture: "busy", width: 1280, live: true }, // the overflow case: 19 pages of 3 games (all shown 115 s since SCROLLR-297; 307 s before)
   { fixture: "longnames", width: 1280 }, // the longest names, in the narrowest columns

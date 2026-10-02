@@ -580,15 +580,15 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
 
   Measured (SCROLLR-297, fake clock, seconds; sticky + 1 → one page a visit). Before is
   main at SCROLLR-296 (CI, `browser (rest)` on #473); after is this rule. A
-  single-widget fixture's lap is one page. Every fixture now shows everything within 300 s;
-  **mixed**, **busy** and **pages+npr30** keep their `over5` marks in `RUNS` (measured and
-  must finish, not held to 300 s) as decided on SCROLLR-294. Raising a bound is never the fix.
+  single-widget fixture's lap is one page. Every fixture now shows everything within 300 s,
+  and every run is held to it: the `over5` exemptions on **mixed**, **busy** and
+  **pages+npr30** are gone (Home, on SCROLLR-298). Raising a bound is never the fix.
 
   | Fixture @ width | Lap before | Lap after | All shown before | All shown after |
   |---|---|---|---|---|
   | pages @1920 | 51.8 | 38.2 | 85.0 | 82.6 |
   | pages+npr30 @1920 | 51.8 | 38.2 | 404.2 | 295.4 |
-  | mixed @1920 | 42.6 | 27.6 | 314.3 | 248.9 |
+  | mixed @1920 | 42.6 | 27.6 | 314.3 | 248.9; **293.5** with the pager (SCROLLR-298: NCAAF 6 → 5 columns, 12 pages) |
   | busy @1280 | 18.6 | 6.6 | 306.6 | 114.6 |
   | longnames @1280 | 36.6 | 36.6 | 66.6 | 66.6 |
   | quiet @1920 | 19.4 | 18.6 | 25.4 | 24.6 |
