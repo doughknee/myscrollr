@@ -207,7 +207,7 @@ function Pager({ at, of, onStep, style }: { at: number; of: number; onStep: (dir
       <span
         data-lap-pos={`${at}/${of}`}
         aria-label={`page ${at} of ${of} in the lap`}
-        className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums text-fg-3"
+        className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums text-fg-2"
       >
         {at}/{of}
       </span>
@@ -543,43 +543,45 @@ export default function PagedBar({
     >
       {cur && (
         <>
-          {/* The pager first: the whole lap is the bar's, not the widget's (SCROLLR-300). */}
-          <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={accentStyle(accent, ink)} />
-
-          {/* The label:the widget's name in its colour. Pages of the same
-              widget keep it; a new widget wipes it upward. */}
-          <div className="relative shrink-0 overflow-hidden" style={{ width: LABEL_W }}>
+          {/* The anchor: pager, then the widget's label, one tinted block at the bar's
+              left end (SCROLLR-300). Pages of the same widget keep it; a new widget wipes
+              the whole block upward, dwell line and all, so nothing stands still under the
+              wipe. The pager is the bar's (the whole lap), the label the widget's; a faint
+              rule between them says so. */}
+          <div className="relative shrink-0 overflow-hidden" style={{ width: PAGER_W + LABEL_W }}>
             <AnimatePresence initial={false}>
               <motion.div
                 key={cur.widget.tab}
-                data-label={cur.widget.tab}
-                className="absolute inset-0 flex flex-col justify-center gap-[3px] pl-3.5 pr-2"
+                className="absolute inset-0 flex items-stretch"
                 style={{ ...accentStyle(accent, ink), background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
                 {...(reduced ? fade : wipe)}
               >
-                <span
-                  className={
-                    cur.widget.code.length > 6
-                      ? "truncate font-sans text-[15px] font-extrabold leading-none tracking-[0.04em]"
-                      : "truncate font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]"
-                  }
-                  style={{ color: "var(--accent-ink)" }}
-                >
-                  {cur.widget.code}
-                </span>
-                {/* fg-2, not fg-3: it sits on the label's tint, which costs contrast (SCROLLR-287). */}
-                <span className="flex items-center justify-between gap-[3px] font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
-                  <span data-fact="" className="truncate">{fact}</span>
-                  {/* Where this page sits in the widget, "2/6": there is more, and it comes round (SCROLLR-293). */}
-                  {cur.count > 1 && (
-                    <span data-pos="" className="shrink-0 tabular-nums tracking-normal" style={{ color: "var(--accent-ink)" }} aria-label={`page ${cur.index + 1} of ${cur.count}`}>
-                      {cur.index + 1}/{cur.count}
-                    </span>
-                  )}
-                </span>
+                <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={{ borderRight: `1px solid ${mix(dark ? 26 : 22)}` }} />
+                <div data-label={cur.widget.tab} className="flex min-w-0 flex-1 flex-col justify-center gap-[3px] pl-3.5 pr-2">
+                  <span
+                    className={
+                      cur.widget.code.length > 6
+                        ? "truncate font-sans text-[15px] font-extrabold leading-none tracking-[0.04em]"
+                        : "truncate font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]"
+                    }
+                    style={{ color: "var(--accent-ink)" }}
+                  >
+                    {cur.widget.code}
+                  </span>
+                  {/* fg-2, not fg-3: it sits on the label's tint, which costs contrast (SCROLLR-287). */}
+                  <span className="flex items-center justify-between gap-[3px] font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">
+                    <span data-fact="" className="truncate">{fact}</span>
+                    {/* Where this page sits in the widget, "2/6": there is more, and it comes round (SCROLLR-293). */}
+                    {cur.count > 1 && (
+                      <span data-pos="" className="shrink-0 tabular-nums tracking-normal" style={{ color: "var(--accent-ink)" }} aria-label={`page ${cur.index + 1} of ${cur.count}`}>
+                        {cur.index + 1}/{cur.count}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {turn && <DwellLine seq={turn.seq} dwell={turn.dwell} held={held} accent={accent} />}
               </motion.div>
             </AnimatePresence>
-            {turn && <DwellLine seq={turn.seq} dwell={turn.dwell} held={held} accent={accent} />}
           </div>
 
           {/* The page: equal columns, full width, swiped in whole. */}
