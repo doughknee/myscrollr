@@ -46,6 +46,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, type LucideIcon } from "lucide-react";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { WidgetPin } from "../../preferences";
+import type { GitHubPagePR } from "../../widgets/github/types";
 import { financeMarketOptions } from "../../api/queries";
 import { sourceForWidget } from "../../marketplace";
 import { isPrimaryTicker } from "../../lib/windowRole";
@@ -72,6 +73,7 @@ import GameCell from "./cells/GameCell";
 import NewsCell from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
+import PRCell from "./cells/PRCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
 import { stepBack } from "./edgeRule";
@@ -200,8 +202,8 @@ function Key({ icon: Icon, label, onClick, onPeek, off, ...data }: { icon: Lucid
  * SCROLLR-287). On scrollr-dark that is #ff6271 and #43ce77, the canvas's
  * #ff6b6b and #5fd38d; the canvas hexes themselves read 3.8:1 on gruvbox-dark.
  */
-function chipColor(kind: "live" | "open" | "fresh", dark: boolean): string {
-  if (kind === "fresh") return "var(--accent-ink)";
+function chipColor(kind: "live" | "open" | "fresh" | "needs", dark: boolean): string {
+  if (kind === "fresh" || kind === "needs") return "var(--accent-ink)";
   const token = kind === "live" ? "var(--color-live)" : "var(--color-up)";
   return `color-mix(in srgb, ${token} 85%, ${dark ? "white" : "black"})`;
 }
@@ -273,7 +275,7 @@ function Band({ cur, live, widgets, turn, held, dark, keypad, reduced, onMove, w
                 data-part="chip"
                 className={showKeypad ? "flex shrink-0 items-center gap-[5px] group-hover/bar:hidden group-has-[[data-keypad]_:focus-visible]/bar:hidden" : "flex shrink-0 items-center gap-[5px]"}
               >
-                <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 3px color-mix(in srgb, ${hue} ${c.kind === "fresh" ? 25 : 22}%, transparent)` }} />
+                <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 3px color-mix(in srgb, ${hue} ${c.kind === "fresh" || c.kind === "needs" ? 25 : 22}%, transparent)` }} />
                 {c.count !== undefined && (
                   <span className="font-mono text-[11px] font-semibold leading-none tabular-nums" style={{ color: hue }}>
                     {c.count}
@@ -385,6 +387,10 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
       const t = item.data as Trade;
       return <QuoteCell trade={t} fill={item.fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
     }
+    case "github": {
+      const pr = item.data as GitHubPagePR;
+      return <PRCell pr={pr} dark={dark} onClick={() => onChipClick?.("github", item.key, pr.html_url || undefined)} />;
+    }
     case "also": {
       const a = item.data as AlsoItem;
       return <AlsoCell code={a.code} text={a.text} hex={a.hex} dark={dark} onClick={() => onChipClick?.(a.tab, a.tab)} />;
@@ -433,8 +439,8 @@ export default function PagedBar({
   const awaitingMarket = shortWatchlist && !!dashboard && marketPending;
 
   const widgets = useMemo(
-    () => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge, shortWatchlist ? market : undefined),
-    [dashboard, activeTabs, onEdge, market, shortWatchlist],
+    () => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge, shortWatchlist ? market : undefined, widgetData?.github),
+    [dashboard, activeTabs, onEdge, market, shortWatchlist, widgetData?.github],
   );
   const edge = useMemo(() => buildEdge(widgetData, onEdge, dashboard, activeTabs), [widgetData, onEdge, dashboard, activeTabs]);
   const widgetsRef = useRef(widgets);

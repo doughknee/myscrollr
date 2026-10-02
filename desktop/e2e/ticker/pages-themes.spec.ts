@@ -206,6 +206,34 @@ for (const family of THEME_FAMILIES) {
 }
 
 /**
+ * SCROLLR-309: the GitHub page in every palette, all six of github.prs.json's
+ * PRs on one page (`otherPRs` on, 2400px): the three tags (Review requested
+ * in the ink on the accent wash, Changes requested and Approved in red and
+ * green on their own washes), the three checks (`✓` up, `✗` down, `◌` the
+ * ink), the band's needs-you count and the GitHub edge slot's count pill.
+ * Every reading at its floor against what is really behind it.
+ */
+for (const family of THEME_FAMILIES) {
+  for (const mode of ["dark", "light"] as const) {
+    const theme = `${family}-${mode}`;
+    test(`${theme}: the github page's tags, checks and band chip clear 4.5:1`, async ({ page }) => {
+      // Wide enough for all six PRs on one page (6 columns of PR_MIN_COL beside the GitHub edge slot).
+      await page.setViewportSize({ width: 2400, height: 200 });
+      const all = await readings(page, `/ticker-shim.html?pages=1&fixture=github&gh=otherPRs&utils=&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]");
+      const tags = await page.locator("[data-page] [data-part=tag]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tag")));
+      expect(new Set(tags), `${theme}: all three tags drawn`).toEqual(new Set(["review", "changes", "approved"]));
+      const glyphs = all.filter((r) => r.role === "checks").map((r) => r.text[0]);
+      expect(new Set(glyphs), `${theme}: all three checks drawn`).toEqual(new Set(["✓", "✗", "◌"]));
+      expect(all.some((r) => r.role === "chip"), `${theme}: the band's count measured`).toBe(true);
+      // Everything on the bar, the GitHub edge slot (its count pill) included.
+      const missed = all.filter((r) => r.ratio < r.floor);
+      console.log(`[${theme} github] worst ${[...new Set(all.map((r) => r.role))].map((role) => `${role} ${Math.min(...all.filter((r) => r.role === role).map((r) => r.ratio)).toFixed(2)}`).join("  ")}`);
+      expect(missed.map((r) => `${r.role} ${r.ratio.toFixed(2)} < ${r.floor} ("${r.text}", ${r.group})`), `${theme}: below the floor`).toEqual([]);
+    });
+  }
+}
+
+/**
  * SCROLLR-286: the pages follow a LIVE light/dark switch. Color mode
  * "system" tracks the OS (useTheme flips `data-theme` on <html> from a
  * matchMedia listener); the pages' accent has to follow without a reload.

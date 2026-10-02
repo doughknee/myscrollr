@@ -266,35 +266,137 @@ export function withPRs(r: GitHubRepo, p: GitHubRepoPRs | undefined): GitHubRepo
   };
 }
 
+// ── What goes on the bar (SCROLLR-309) ─────────────────────────
+
+/**
+ * The developer's own say over what the GitHub widget puts on the bar, kept
+ * in the widget's prefs (`prefs.widgets.github.bar`) and set in its FeedTab.
+ * Quiet by default: nothing that is green and waiting on others.
+ */
+export interface GitHubBarPrefs {
+  /** The default branch failing turns the edge chip red. */
+  failingCi: boolean;
+  /** A review asked of you (or your team). */
+  reviews: boolean;
+  /** Your PRs with changes requested. */
+  changes: boolean;
+  /** Your PRs with failing checks. */
+  failingChecks: boolean;
+  /** A run in progress on one of your branches (the pulse). */
+  pulse: boolean;
+  /** Your other open PRs, after the ones that need you, on the GitHub page. */
+  otherPRs: boolean;
+  /** The chip flashes once when something changes. */
+  flash: boolean;
+  /** Between `quietFrom` and `quietTo` (local, "HH:MM") the chip and the page go silent. */
+  quiet: boolean;
+  quietFrom: string;
+  quietTo: string;
+}
+
+export const GITHUB_BAR_DEFAULTS: GitHubBarPrefs = {
+  failingCi: true,
+  reviews: true,
+  changes: true,
+  failingChecks: true,
+  pulse: false,
+  otherPRs: false,
+  flash: true,
+  quiet: false,
+  quietFrom: "22:00",
+  quietTo: "08:00",
+};
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Stored prefs over the defaults, each field type-checked (prefs come from disk). */
+export function barPrefs(raw: unknown): GitHubBarPrefs {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const out = { ...GITHUB_BAR_DEFAULTS };
+  for (const k of Object.keys(out) as (keyof GitHubBarPrefs)[]) {
+    const v = o[k];
+    if (typeof out[k] === "boolean" ? typeof v === "boolean" : typeof v === "string" && HHMM.test(v)) {
+      (out as Record<string, unknown>)[k] = v;
+    }
+  }
+  return out;
+}
+
+/** Inside quiet hours at local time `now`. A window may wrap midnight; from = to is never. */
+export function inQuietHours(bar: GitHubBarPrefs, now: Date = new Date()): boolean {
+  if (!bar.quiet || bar.quietFrom === bar.quietTo) return false;
+  const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return bar.quietFrom < bar.quietTo
+    ? t >= bar.quietFrom && t < bar.quietTo
+    : t >= bar.quietFrom || t < bar.quietTo;
+}
+
+/**
+ * Why a PR is on the GitHub page, which is also its place in the page's
+ * order: 0 a review asked of you, 1 yours with changes requested, 2 yours
+ * with failing checks, 3 your other open PRs (only with `otherPRs`).
+ * Null: not on the page. Each PR once, at its first reason.
+ */
+export function whyOn(p: GitHubPRRow, bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS): 0 | 1 | 2 | 3 | null {
+  if (bar.reviews && p.review_requested) return 0;
+  if (!p.is_mine) return null;
+  if (bar.changes && p.review_state === "changes_requested") return 1;
+  if (bar.failingChecks && p.checks_state === "failing") return 2;
+  return bar.otherPRs ? 3 : null;
+}
+
 // ── The edge chip's state (SCROLLR-308) ────────────────────────
 
 /**
  * The PRs that need you, each once: a review asked of you (or your team),
- * or yours with changes requested or failing checks.
+ * or yours with changes requested or failing checks, as far as the bar
+ * prefs let each reason count.
  */
-export function needsYou(prs: GitHubPRRow[] = []): GitHubPRRow[] {
-  return prs.filter(
-    (p) =>
-      p.review_requested ||
-      (p.is_mine &&
-        (p.review_state === "changes_requested" ||
-          p.checks_state === "failing")),
-  );
+export function needsYou(prs: GitHubPRRow[] = [], bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS): GitHubPRRow[] {
+  return prs.filter((p) => {
+    const why = whyOn(p, bar);
+    return why !== null && why < 3;
+  });
 }
 
-export type GitHubChipState = "needs" | "broken" | "running" | "passing";
+/** One PR on the GitHub page: the row, its repo's name and why it is there. */
+export interface GitHubPagePR extends GitHubPRRow {
+  repo: string;
+  why: 0 | 1 | 2 | 3;
+}
+
+/** A repo's PRs for the GitHub page, in the page's order. None in quiet hours. */
+export function pagePRs(r: GitHubRepo, bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS, quiet = false): GitHubPagePR[] {
+  if (quiet || !r.prs) return [];
+  const out: GitHubPagePR[] = [];
+  for (const p of r.prs) {
+    const why = whyOn(p, bar);
+    if (why !== null) out.push({ ...p, repo: r.repo, why });
+  }
+  return out.sort((a, b) => a.why - b.why);
+}
+
+/** `quiet`: quiet hours, or the default branch failing with that toggle off: a grey dot and the age. */
+export type GitHubChipState = "needs" | "broken" | "running" | "passing" | "quiet";
 
 /**
- * Needs you › broken › running on yours › passing. Undefined without PR
- * data (not connected) or with no settled default-branch run: the chip
- * keeps its latest-run form.
+ * Needs you › broken › running on yours › passing, each as far as the bar
+ * prefs allow. Undefined without PR data (not connected) or with no settled
+ * default-branch run: the chip keeps its latest-run form.
  */
-export function chipState(r: GitHubRepo): GitHubChipState | undefined {
+export function chipState(
+  r: GitHubRepo,
+  bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS,
+  quiet = false,
+): GitHubChipState | undefined {
   if (!r.prs) return undefined;
-  if (needsYou(r.prs).length > 0) return "needs";
-  if (r.defaultCi?.state === "failing") return "broken";
-  if ((r.mineRunning ?? 0) > 0) return "running";
-  if (r.defaultCi?.state === "passing") return "passing";
+  if (quiet) return "quiet";
+  if (needsYou(r.prs, bar).length > 0) return "needs";
+  const ci = r.defaultCi?.state;
+  if (ci === "failing" && bar.failingCi) return "broken";
+  if (bar.pulse && (r.mineRunning ?? 0) > 0) return "running";
+  if (ci === "passing") return "passing";
+  if (ci === "failing") return "quiet";
   return undefined;
 }
 

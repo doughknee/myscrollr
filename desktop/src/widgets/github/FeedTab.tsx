@@ -20,7 +20,7 @@ import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
 import LoadingGlyph from "../../components/LoadingGlyph";
 import { controlTransition, tooltipMotion } from "../../lib/motion";
-import type { GitHubRepo } from "./types";
+import type { GitHubBarPrefs, GitHubRepo } from "./types";
 import {
   parseRepoUrl,
   repoKey,
@@ -29,6 +29,7 @@ import {
   saveRepoData,
   toggleRepo,
   autoPick,
+  barPrefs,
   CI_STATUS_LABELS,
   CI_STATUS_COLORS,
   CI_STATUS_TEXT,
@@ -47,7 +48,7 @@ export const githubWidget: WidgetManifest = {
   id: "github",
   name: "GitHub",
   tabLabel: "GitHub",
-  description: "CI status for your repos — connect GitHub for private ones",
+  description: "CI and pull requests that need you, from your GitHub",
   hex: "#f97316",
   icon: Github,
   info: {
@@ -132,12 +133,32 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
     queryFn: githubApi.status,
     enabled: shell.authenticated,
   });
-  const { data: yours } = useQuery({
+  const { data: yours, refetch: refetchYours } = useQuery({
     queryKey: ["github-repos"],
     queryFn: githubApi.repos,
     enabled: shell.authenticated && !!status?.connected,
     retry: false,
   });
+
+  // Back from "Choose repos on GitHub" (SCROLLR-309): the window regaining
+  // focus re-reads the list (core dropped its cached copy on the callback).
+  useEffect(() => {
+    if (!status?.connected) return;
+    const onFocus = () => void refetchYours();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [status?.connected, refetchYours]);
+
+  // ── What goes on the bar (SCROLLR-309) ────────────────────────
+  const bar = barPrefs(shell.prefs.widgets.github.bar);
+  const setBar = useCallback(
+    (patch: Partial<GitHubBarPrefs>) => {
+      const next = updateWidgetPrefs(shell.prefs, "github", { bar: { ...barPrefs(shell.prefs.widgets.github.bar), ...patch } });
+      shell.onPrefsChange(next);
+      savePrefs(next);
+    },
+    [shell],
+  );
 
   // First load only, and only into an empty list. The ref lives here, not
   // in the picker, so unticking the last repo does not re-tick the rest.
@@ -151,7 +172,10 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
 
   const picker =
     status?.connected && yours ? (
-      <YourRepos rows={yours.repos} configRepos={configRepos} onChange={setRepos} />
+      <>
+        <YourRepos rows={yours.repos} configRepos={configRepos} onChange={setRepos} />
+        <OnTheBar bar={bar} onChange={setBar} />
+      </>
     ) : null;
 
   // ── Add repo handler ──────────────────────────────────────────
@@ -350,8 +374,6 @@ function YourRepos({
   onChange: (next: Array<{ owner: string; repo: string }>) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
-  if (rows.length === 0) return null;
-
   const ticked = new Set(configRepos.map((r) => repoKey(r).toLowerCase()));
   const isTicked = (r: GitHubRepoRow) => ticked.has(r.full_name.toLowerCase());
   const hiddenCount = rows.filter((r) => !r.active && !isTicked(r)).length;
@@ -392,6 +414,90 @@ function YourRepos({
           {showAll ? "Show active only" : `Show all (${hiddenCount} more)`}
         </button>
       )}
+      {/* The app sees only the repos it is installed on (SCROLLR-309). */}
+      <p className="text-[10px] font-mono text-fg-3">
+        Not seeing a repo?{" "}
+        <button
+          type="button"
+          onClick={() => void invoke("open_external", { url: INSTALL_URL }).catch(() => {})}
+          className="font-semibold text-widget-github hover:underline"
+        >
+          Choose repos on GitHub
+        </button>
+      </p>
+    </div>
+  );
+}
+
+/** The app's install page: choose which repos it may see (the window re-reads the list on focus). */
+const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
+
+const BAR_TOGGLES: Array<[keyof GitHubBarPrefs, string]> = [
+  ["failingCi", "Failing CI on main"],
+  ["reviews", "Review requests to me"],
+  ["changes", "Changes requested on my PRs"],
+  ["failingChecks", "My PRs with failing checks"],
+  ["pulse", "Runs on my branches (the pulse)"],
+  ["otherPRs", "My other open PRs on the page"],
+  ["flash", "Flash when something changes"],
+];
+
+/**
+ * What goes on the bar (SCROLLR-309): the developer decides, quiet by
+ * default. Lives in the widget, not Settings (and so not in the settings
+ * search). Quiet hours silence the bar's chip and page between two local
+ * times; this page still shows everything.
+ */
+function OnTheBar({ bar, onChange }: { bar: GitHubBarPrefs; onChange: (patch: Partial<GitHubBarPrefs>) => void }) {
+  const row = "flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2 cursor-pointer";
+  return (
+    <div className="px-1 space-y-1" data-section="on-the-bar">
+      <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-fg-4">
+        What goes on the bar
+      </div>
+      <div className="space-y-0.5">
+        {BAR_TOGGLES.map(([key, label]) => (
+          <label key={key} className={row}>
+            <input
+              type="checkbox"
+              checked={bar[key] as boolean}
+              onChange={(e) => onChange({ [key]: e.target.checked })}
+              className="shrink-0 accent-widget-github"
+            />
+            <span className="min-w-0 flex-1 text-left text-[11px] font-mono text-fg">{label}</span>
+          </label>
+        ))}
+        <div className={clsx(row, "flex-wrap")}>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={bar.quiet}
+              onChange={(e) => onChange({ quiet: e.target.checked })}
+              className="shrink-0 accent-widget-github"
+            />
+            <span className="text-[11px] font-mono text-fg">Quiet hours</span>
+          </label>
+          {bar.quiet && (
+            <span className="flex items-center gap-1 text-[11px] font-mono text-fg-3">
+              <input
+                type="time"
+                aria-label="Quiet from"
+                value={bar.quietFrom}
+                onChange={(e) => e.target.value && onChange({ quietFrom: e.target.value })}
+                className="rounded bg-surface-2 border border-edge px-1 text-fg"
+              />
+              to
+              <input
+                type="time"
+                aria-label="Quiet until"
+                value={bar.quietTo}
+                onChange={(e) => e.target.value && onChange({ quietTo: e.target.value })}
+                className="rounded bg-surface-2 border border-edge px-1 text-fg"
+              />
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

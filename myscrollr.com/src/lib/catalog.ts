@@ -75,7 +75,7 @@ export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
     ['weather', 'Weather', 'utility', '#0ea5e9', 'Current conditions for your locations', true],
     ['sysmon', 'System Monitor', 'utility', '#06b6d4', 'Live CPU, memory, and GPU stats'],
     ['uptime', 'Uptime', 'utility', '#10b981', 'Monitor status from Uptime Kuma'],
-    ['github', 'GitHub', 'utility', '#f97316', 'CI status for your repos — connect GitHub for private ones'],
+    ['github', 'GitHub', 'utility', '#f97316', 'CI and pull requests that need you, from your GitHub'],
     // A trailing `true` is the catalog's FreeSlot flag (free_slot): the widget
     // never uses a plan slot. Mirrors api/internal/platform/widgets.go.
   ] as Array<[string, string, string, string, string, boolean?]>).map(

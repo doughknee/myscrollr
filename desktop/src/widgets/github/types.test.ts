@@ -107,7 +107,7 @@ describe("fetchRepos (SCROLLR-304)", () => {
 
 // ── SCROLLR-308: pull requests and the chip's state ─────────────
 
-const { needsYou, chipState, nextFlash, shortAge, withPRs } = await import("./types");
+const { needsYou, chipState, nextFlash, shortAge, withPRs, pagePRs, barPrefs, inQuietHours, GITHUB_BAR_DEFAULTS } = await import("./types");
 
 const pr = (n: number, over: Partial<GitHubPRRow> = {}): GitHubPRRow => ({
   number: n,
@@ -159,10 +159,11 @@ describe("chipState (SCROLLR-308)", () => {
 
   it("needs you beats broken beats running on yours beats passing", () => {
     const all = { prs: [pr(1, { review_requested: true })], defaultCi: failing, mineRunning: 2 };
-    expect(chipState(repo(all))).toBe("needs");
-    expect(chipState(repo({ ...all, prs: [] }))).toBe("broken");
-    expect(chipState(repo({ ...all, prs: [], defaultCi: passing }))).toBe("running");
-    expect(chipState(repo({ ...all, prs: [], defaultCi: passing, mineRunning: 0 }))).toBe("passing");
+    const pulse = { ...GITHUB_BAR_DEFAULTS, pulse: true };
+    expect(chipState(repo(all), pulse)).toBe("needs");
+    expect(chipState(repo({ ...all, prs: [] }), pulse)).toBe("broken");
+    expect(chipState(repo({ ...all, prs: [], defaultCi: passing }), pulse)).toBe("running");
+    expect(chipState(repo({ ...all, prs: [], defaultCi: passing, mineRunning: 0 }), pulse)).toBe("passing");
   });
 
   it("not connected, or no settled default-branch run: today's latest-run form", () => {
@@ -175,6 +176,92 @@ describe("chipState (SCROLLR-308)", () => {
     const p = { repo: "o/r", available: true, prs: [pr(1)], default_ci: passing, mine_running: 1, mine_since: "x", mine_branch: "b" };
     expect(withPRs(repo(), p)).toMatchObject({ prs: [pr(1)], defaultCi: passing, mineRunning: 1, mineSince: "x", mineBranch: "b" });
     expect(withPRs(repo(), { ...p, available: false }).prs).toBeUndefined();
+  });
+});
+
+// ── SCROLLR-309: the GitHub page and what goes on the bar ─────────
+
+describe("pagePRs: the GitHub page's items and their order (SCROLLR-309)", () => {
+  // Input deliberately out of order.
+  const prs = [
+    pr(1, { is_mine: true, checks_state: "failing" }), // yours, failing: 2
+    pr(2, { is_mine: true, review_state: "approved", checks_state: "passing" }), // yours, quiet: 3
+    pr(3, { is_mine: true, review_state: "changes_requested", checks_state: "failing" }), // changes (and failing): 1, once
+    pr(4, { review_requested: true }), // review asked of you: 0
+    pr(5, { review_state: "changes_requested" }), // someone else's: never
+    pr(6, { review_requested: true, checks_state: "running" }), // review: 0
+  ];
+  const nums = (bar = GITHUB_BAR_DEFAULTS, quiet = false) => pagePRs(repo({ prs }), bar, quiet).map((p) => p.number);
+
+  it("review requests, then changes requested, then failing checks; each PR once; never someone else's quiet PR", () => {
+    expect(nums()).toEqual([4, 6, 3, 1]);
+    expect(pagePRs(repo({ prs })).map((p) => [p.repo, p.why])).toEqual([["r", 0], ["r", 0], ["r", 1], ["r", 2]]);
+  });
+
+  it("'My other open PRs' adds yours after the ones that need you; the needs-you count does not change", () => {
+    const bar = { ...GITHUB_BAR_DEFAULTS, otherPRs: true };
+    expect(nums(bar)).toEqual([4, 6, 3, 1, 2]);
+    expect(needsYou(prs, bar)).toHaveLength(4);
+  });
+
+  it("each switch takes its reason off the page and out of the chip's count", () => {
+    expect(nums({ ...GITHUB_BAR_DEFAULTS, reviews: false })).toEqual([3, 1]);
+    // PR 3 has changes requested AND failing checks: with changes off it is on the page for its checks.
+    expect(nums({ ...GITHUB_BAR_DEFAULTS, changes: false })).toEqual([4, 6, 1, 3]);
+    expect(nums({ ...GITHUB_BAR_DEFAULTS, changes: false, failingChecks: false })).toEqual([4, 6]);
+    expect(needsYou(prs, { ...GITHUB_BAR_DEFAULTS, reviews: false, changes: false, failingChecks: false })).toEqual([]);
+  });
+
+  it("quiet hours: nothing on the page; not connected: nothing", () => {
+    expect(nums(GITHUB_BAR_DEFAULTS, true)).toEqual([]);
+    expect(pagePRs(repo())).toEqual([]);
+  });
+});
+
+describe("chipState with the bar prefs (SCROLLR-309)", () => {
+  const failing = { state: "failing" as const, workflow: "deploy", updated_at: "2026-10-02T08:00:00Z" };
+  const passing = { state: "passing" as const, workflow: "CI", updated_at: "2026-10-02T08:00:00Z" };
+  const review = [pr(1, { review_requested: true })];
+
+  it("the pulse is off by default: a run on your branch alone is not a state", () => {
+    expect(chipState(repo({ prs: [], defaultCi: passing, mineRunning: 1 }))).toBe("passing");
+  });
+
+  it("review requests off: a review alone is not 'needs you'", () => {
+    expect(chipState(repo({ prs: review, defaultCi: passing }), { ...GITHUB_BAR_DEFAULTS, reviews: false })).toBe("passing");
+  });
+
+  it("failing CI off: a red main is quiet (grey), never the green dot", () => {
+    expect(chipState(repo({ prs: [], defaultCi: failing }), { ...GITHUB_BAR_DEFAULTS, failingCi: false })).toBe("quiet");
+  });
+
+  it("quiet hours silence every state", () => {
+    expect(chipState(repo({ prs: review, defaultCi: failing, mineRunning: 1 }), { ...GITHUB_BAR_DEFAULTS, pulse: true }, true)).toBe("quiet");
+    expect(chipState(repo(), GITHUB_BAR_DEFAULTS, true)).toBeUndefined(); // not connected: today's form
+  });
+});
+
+describe("barPrefs and quiet hours (SCROLLR-309)", () => {
+  it("defaults: quiet by default, the four that need you on, the pulse and other PRs off", () => {
+    expect(barPrefs(undefined)).toEqual(GITHUB_BAR_DEFAULTS);
+    expect(GITHUB_BAR_DEFAULTS).toMatchObject({ failingCi: true, reviews: true, changes: true, failingChecks: true, pulse: false, otherPRs: false, flash: true, quiet: false });
+  });
+
+  it("keeps only well-typed stored fields", () => {
+    expect(barPrefs({ pulse: true, reviews: "yes", quietFrom: "25:00", quietTo: "07:30" })).toEqual({ ...GITHUB_BAR_DEFAULTS, pulse: true, quietTo: "07:30" });
+  });
+
+  const at = (h: number, m = 0) => new Date(2026, 9, 2, h, m);
+  it("a window inside one day", () => {
+    const bar = { ...GITHUB_BAR_DEFAULTS, quiet: true, quietFrom: "12:00", quietTo: "13:30" };
+    expect([at(11, 59), at(12), at(13, 29), at(13, 30)].map((d) => inQuietHours(bar, d))).toEqual([false, true, true, false]);
+  });
+
+  it("a window across midnight, and off when the switch is off or the times are equal", () => {
+    const bar = { ...GITHUB_BAR_DEFAULTS, quiet: true, quietFrom: "22:00", quietTo: "08:00" };
+    expect([at(21, 59), at(22), at(2), at(7, 59), at(8)].map((d) => inQuietHours(bar, d))).toEqual([false, true, true, true, false]);
+    expect(inQuietHours({ ...bar, quiet: false }, at(2))).toBe(false);
+    expect(inQuietHours({ ...bar, quietTo: "22:00" }, at(22))).toBe(false);
   });
 });
 

@@ -172,3 +172,71 @@ describe("GitHub widget: Connect GitHub", () => {
     expect(screen.queryByRole("button", { name: /Connect GitHub/ })).toBeNull();
   });
 });
+
+describe("GitHub widget: what goes on the bar (SCROLLR-309)", () => {
+  const lastBar = (shell: ShellState) => {
+    const calls = vi.mocked(shell.onPrefsChange).mock.calls;
+    return calls[calls.length - 1]?.[0].widgets.github.bar;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.runs.mockResolvedValue({ connected: true, runs: [] });
+    api.repos.mockResolvedValue({ connected: true, login: "octo", repos: [{ full_name: "o/r", private: false, active: true }] });
+    api.status.mockResolvedValue({ connected: true, login: "octo" });
+  });
+
+  it("the switches start at their defaults and write the widget's prefs", async () => {
+    const { shell } = mount();
+    const on = ["Failing CI on main", "Review requests to me", "Changes requested on my PRs", "My PRs with failing checks", "Flash when something changes"];
+    const off = ["Runs on my branches (the pulse)", "My other open PRs on the page", "Quiet hours"];
+    for (const name of on) expect(await screen.findByRole("checkbox", { name })).toBeChecked();
+    for (const name of off) expect(screen.getByRole("checkbox", { name })).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "My other open PRs on the page" }));
+    expect(lastBar(shell)).toMatchObject({ otherPRs: true, reviews: true, pulse: false });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Review requests to me" }));
+    expect(lastBar(shell)).toMatchObject({ reviews: false });
+  });
+
+  it("quiet hours: turning it on keeps the default times", async () => {
+    const { shell } = mount();
+    expect(screen.queryByLabelText("Quiet from")).toBeNull();
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Quiet hours" }));
+    expect(lastBar(shell)).toMatchObject({ quiet: true, quietFrom: "22:00", quietTo: "08:00" });
+  });
+
+  it("quiet hours stored: two time fields show the times and edit them", async () => {
+    const base = loadPrefs();
+    const prefs = { ...base, widgets: { ...base.widgets, github: { repos: [{ owner: "o", repo: "r" }], bar: { quiet: true, quietFrom: "23:00", quietTo: "07:00" } } } };
+    const shell = { prefs, authenticated: true, onPrefsChange: vi.fn() } as unknown as ShellState;
+    const FeedTab = githubWidget.FeedTab;
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ShellContext.Provider value={shell}>
+          <FeedTab mode="comfort" feedContext={{}} />
+        </ShellContext.Provider>
+      </QueryClientProvider>,
+    );
+    const from = (await screen.findByLabelText("Quiet from")) as HTMLInputElement;
+    expect(from.value).toBe("23:00");
+    expect((screen.getByLabelText("Quiet until") as HTMLInputElement).value).toBe("07:00");
+    fireEvent.change(from, { target: { value: "21:30" } });
+    expect(lastBar(shell)).toMatchObject({ quiet: true, quietFrom: "21:30", quietTo: "07:00" });
+  });
+
+  it("Choose repos on GitHub opens the app's install page; the list re-reads when the window regains focus", async () => {
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Choose repos on GitHub" }));
+    expect(api.invoke).toHaveBeenCalledWith("open_external", { url: "https://github.com/apps/scrollr-desktop/installations/new" });
+    const calls = api.repos.mock.calls.length;
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => expect(api.repos.mock.calls.length).toBeGreaterThan(calls));
+  });
+
+  it("a connected account whose install sees no repos still gets the link", async () => {
+    api.repos.mockResolvedValue({ connected: true, login: "octo", repos: [] });
+    mount(true, []);
+    expect(await screen.findByRole("button", { name: "Choose repos on GitHub" })).toBeTruthy();
+  });
+});

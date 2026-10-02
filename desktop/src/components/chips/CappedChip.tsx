@@ -59,6 +59,7 @@ const GITHUB_STATE_CAP: Record<
   broken: { tone: "down", text: "✗", label: "Default branch failing" },
   running: { tone: "warning", text: "●", label: "Running on yours", pulse: true },
   passing: { tone: "up", text: "✓", label: "Default branch green" },
+  quiet: { tone: "neutral", text: "○", label: "Quiet" },
 };
 
 // ── Shared shell ────────────────────────────────────────────────
@@ -308,7 +309,7 @@ function GitHubStateChip({
         : (ci?.workflow ?? item.workflowName);
   const detail =
     state === "needs"
-      ? needsYou(item.prs)[0]?.title
+      ? (item.page ?? needsYou(item.prs))[0]?.title
       : state === "running"
         ? item.mineBranch
         : ci?.commit_message?.split("\n")[0];

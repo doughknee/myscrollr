@@ -4,6 +4,7 @@
 
 import { getStore, removeStore, setStore } from "./lib/store";
 import { LS_CLOCK_FORMAT, LS_WEATHER_UNIT } from "./constants";
+import type { GitHubBarPrefs } from "./widgets/github/types";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -247,6 +248,8 @@ export interface UptimeWidgetConfig {
 export interface GitHubWidgetConfig {
   /** Configured repos to track. */
   repos: Array<{ owner: string; repo: string }>;
+  /** What goes on the bar (SCROLLR-309): read through `barPrefs`, which applies the defaults. */
+  bar?: Partial<GitHubBarPrefs>;
 }
 
 /**
@@ -753,6 +756,8 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
               typeof (r as Record<string, unknown>).repo === "string",
           )
         : DEFAULT_WIDGETS.github.repos,
+      // Kept as stored; `barPrefs` type-checks each field when it is read.
+      ...(obj(ghb?.bar) ? { bar: obj(ghb?.bar) as Partial<GitHubBarPrefs> } : {}),
     },
   };
 }

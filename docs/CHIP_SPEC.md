@@ -75,7 +75,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
    - **Pages:** nothing on a page moves while it is up. Every cell keeps its x, y, width and height from swipe-in to swipe-out; a value (score, price, age, clock) changes in place and never changes its box; items do not re-sort, appear or vanish on a page being read. A resize, a re-rank or a new item reaches the layout on the next page (§P.8). Verify: `e2e/ticker/cells.spec.ts` (values) and `e2e/ticker/pages.spec.ts` (whole pages).
    - **Continuous:** a chip never changes width while on screen. Every value that can change reserves its widest plausible width from first render (§4). Verify: render the same fixture in every state it can pass through (pre / live / final; no-score / one-digit / two-digit; short / long swap) side by side; widths must be identical.
 3. **The detail line is never derivable from the top line.** It is what the user would otherwise open the app to find (§6 for chips; §P.9 for cells).
-4. **Nothing on the ticker is user-configurable.** No per-widget or global setting decides what is on the bar or how many. Horizons, floors and slot counts are constants (§8); Pages' columns per page are derived from the bar width and each family's minimum width (§P.4), never set.
+4. **Nothing on the ticker is user-configurable.** No per-widget or global setting decides what is on the bar or how many. Horizons, floors and slot counts are constants (§8); Pages' columns per page are derived from the bar width and each family's minimum width (§P.4), never set. The one exception is GitHub's **What goes on the bar** (SCROLLR-309, §P.10): switches for which *kinds of event* reach the bar (they are inputs, like a watchlist), never how many or in what order.
 5. **The ticker is independent of the widget page's display settings.** A source's selector must not read any feed-page display preference (`defaultSort`, `articlesPerSource`, `maxArticles`, `maxArticleAgeDays`, filters). Verify: `selectXForTicker` (Continuous) and `selectXForPages` (Pages) take no prefs argument; Pages do not read a sports widget's `display` day window either (the Continuous sports selector still takes it as config). Pages show the widget page's *pool* (what it holds, at the app's default window), never the user's view of it.
 6. **Red means live or urgent, and nothing else.** Never use `live`, `down`, `error` or `warning` tokens for brand or emphasis.
 7. **Never fabricate a value.** Missing data reserves its space and renders empty. No "—" placeholders for scores. No single-point sparklines. No synthetic history.
@@ -158,6 +158,7 @@ with nothing to read at rest. `Band` in `PagedBar.tsx`.
   | `live` | A game of this widget is live | `--color-live` | Games live now |
   | `open` | Stocks: US regular hours, 09:30 to 16:00 ET, Mon to Fri (`usMarketOpen`; no holiday calendar). Never crypto | `--color-up` | None |
   | `fresh` | A story published in the last hour | the ink | Those stories |
+  | `needs` | GitHub: PRs that need you (SCROLLR-309; `needsYou` summed over the repos, your other open PRs not counted) | the ink | Those PRs |
 
   The red and green are the palette's tokens moved 15% toward white (dark) or black
   (light), `color-mix`, so the count clears 4.5:1 on the band's tint in all 20 palettes
@@ -223,6 +224,7 @@ cell family's own export**, never a default in `pagePlan.ts`:
 | Game, every other league | 276px | `gameMinCol(league)` |
 | Quote (stock, coin) | 260px | `QUOTE_MIN_COL` |
 | Headline | 400px | `NEWS_MIN_COL` |
+| Pull request | 300px | `PR_MIN_COL` |
 | Also entry | 300px | `ALSO_MIN_COL` |
 
 Worked columns (NFL, college, quotes, headlines), with the band (SCROLLR-303, 192px): at
@@ -259,6 +261,7 @@ rest round on later laps. Nothing eligible is hidden.
 | Sports | Every game in the app's **default** day window (`SPORTS_WINDOW_DEFAULTS`: yesterday through seven days ahead, local calendar days), never the user's `display` window. `sortForDisplay`: live, then soonest kick-off, then newest finals (`selectSportsForPages`). A Thursday is TNF, Sunday and MNF | The week |
 | News | Every headline the widget holds, newest first, interleaved by feed like the ticker pool; undated counts as current (`selectRssForPages`) | The rss ingester's 7-day storage |
 | Stocks, Crypto | The watchlist, in the user's order (`selectFinanceForTicker`, unchanged) | The watchlist |
+| GitHub | The PRs that need you across every ticked repo: review requested to you, then yours with changes requested, then yours with failing checks; then your other open PRs only with that switch on (`pagePRs`, carried on each edge chip as `page`; `githubWidget` in `widgetPages.ts`). Nothing: no page and no Also entry, the edge chips carry on. Quiet hours: none | core's `/github/prs` (20 detailed PRs a repo) |
 
 **Every page is full** (SCROLLR-292): a page shows as many items as it has columns, unless
 the widget has fewer items in total than one page holds. With the whole pool on pages, only
@@ -450,6 +453,7 @@ data-chip data-item>`, `text-left`. The widget's colour reaches a cell only thro
 | **GameCell** | Stacked: away over home, each row crest, name (14.5px) and score (18px); the home row carries an `@`, hung in the gutter before its crest (away at home). No stadium and no third line (SCROLLR-296: "it adds nothing"; the type is bigger instead). The clock box sits **left-aligned right after the scores, with no rule**, and its 16px gutters (the left one holding the `@`) put the page's column rule between one game and the next, so a clock is never read as the next game's. Wide: one scoreboard line centred on its content, names (15px) and records either side, the scores (22px) with the clock box **between them** (centred), the `@` before the home crest. The clock: live `Q4` over `2:14` (baseball `7th` over `INN`), `FINAL`, `PPD`, today's kick-off over `in 3h05` (ten hours or more out: `TODAY`), a later day's weekday over its time | Wide from a column of 430px (`WIDE_GAME_PX`). A name is the full short name when it sets whole in the room the layout leaves it (`nameRoom`, `nameFits`: measured off-screen on a canvas at the bold weight before paint, never after), else the nickname in US pro leagues (`cellName`) |
 | **NewsCell** | A fixed grid, top-anchored: the headline (15px at every width, up to 2 lines, `font-sans font-semibold`) always starts on the first line, and the meta line (12px) sits at the same y under a one-line and a two-line headline: the age (`9m`, `4h`, `3d`, mono in a 3ch box, `AGE_CH`) then the summary, or the feed's name when there is none. The headline has the column's whole width (the old 26px age column and its gap cost 36px). Real news columns are 426 to 584px, so the old 560px switch to 15px almost never fired | One layout |
 | **QuoteCell** | Price first (SCROLLR-296, three rounds; Brandon: "name top left, value under in large letters, with sparkline and day range on the right"). Two zones read as one cell: the price zone is as wide as the price's reservation (its length plus one), and the day zone takes the rest after a 12px gap (round 4, Brandon: "too much padding between the number and the line"; half and half left 54-63px). Left: the symbol (14px, `fg-2`; a popular fill prefixes it with a `fg-3` `+`, as the label says `+4 POPULAR`), **the price under it, the largest thing in the cell** (20px bold), the change under that (12px), all three on one left edge (round 5: "align left"; a fill's `+` hangs in the gutter): `up`/`down` with its arrow, flat `0.00%` in `fg-3` with none. Right: the day's line across the zone (70%), a 3px track under it filled up to the price in the direction's colour with a 2px marker, and the day's low and high (12px, `fg-3`, whole units from 1,000 so each is at most seven characters, `rangeText`) right under it at the zone's two edges, on the change's baseline | One layout |
+| **PRCell** | SCROLLR-309, canvas board 2. The title (15px semibold, one line, ellipsis, `fg`); the meta line (12px): `repo #number · author · age` (`yours` for your own) mono in `fg-3`, truncating, then right-aligned the state tag (`Review requested` the ink on `mix(16/12)`, `Changes requested` / `Approved` the `down` / `up` token moved 15% toward white or black on its own 12% wash) and the checks (`✓ 5/5` `text-up`, `✗ 1 failing` `text-down`, `◌ 2 running` the ink). The tag is why the PR is on the page, taken at mount; the checks hold their mount-time width (running and failing are the same length). Click: the PR on GitHub | One layout |
 | **AlsoCell** | A code tag (12px) in the widget's colour, then the status text (13px) on one truncating line | One layout (§P.12) |
 
 **Type on a cell** (SCROLLR-296): nothing under 12px, and at most three sizes per cell
@@ -529,6 +533,17 @@ slots, not five.
   (`OnceFlash`, the chips' `chip-flash`) when the default branch breaks or recovers or the
   needs-you count goes up (`nextFlash`), never on a poll that changed nothing, never on a
   roll-in. Not connected, or no settled default-branch run: the latest-run form above.
+- **GitHub, what goes on the bar** (SCROLLR-309; the widget's FeedTab, `prefs.widgets.github.bar`,
+  read through `barPrefs`; not in Settings or its search): Failing CI on main (on), Review
+  requests to me (on), Changes requested on my PRs (on), My PRs with failing checks (on), Runs
+  on my branches (off: the running state needs it), My other open PRs on the page (off),
+  Flash when something changes (on), Quiet hours (off; two local times, may wrap midnight).
+  `chipState(repo, bar, quiet)` and `needsYou(prs, bar)` read them, and so does the page
+  (`pagePRs`). A fifth state, **quiet**, is a grey dot (`bg-fg-3`) and the age: quiet hours,
+  or a failing default branch with its switch off (never the green dot, which would say
+  passing). Quiet hours: the chip is quiet, nothing flashes and the GitHub page goes; the
+  widget's own page still shows everything. The shim takes `?gh=` (`otherPRs`, `-reviews`,
+  `quiet=HH:MM-HH:MM`, comma-separated).
 - Clicking a slot opens that widget (`onChipClick(tab, id)`).
 
 Clock and Weather are free of widget slots, so they cost the user none of their plan's
@@ -660,7 +675,7 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   page shows `min(columns, available)`; several pages show full pages unless the pool is
   not a multiple of the columns, then the even split). Laps are cut at visit starts
   (`data-visit`), since a visit no longer always opens on page 1. Fixtures: `nflthursday`
-  (TNF + Sunday + MNF, your Bears on page 1), `googl` (one symbol + popular), `sparsenews`
+  (TNF + Sunday + MNF, your Bears on page 1), `github` (SCROLLR-309: `github.prs.json`, 6 PRs across 2 repos, 2 review requests, 1 changes requested, 1 failing, 2 quiet; the shim seeds it for `fixture=github` or `github=page`), `googl` (one symbol + popular), `sparsenews`
   (nine headlines over three days, all shown), `onegame` (truly short: one column,
   left-aligned, measured), `npr` (SCROLLR-293: 30 headlines over six days). `pages+npr30` (SCROLLR-294: the
   `pages` set with NPR's 3 headlines swapped for `npr`'s 30, the worst case for all shown).

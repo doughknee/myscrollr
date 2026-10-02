@@ -70,7 +70,7 @@ export interface SlotItem {
    * A mark before the value (GitHub, SCROLLR-308): a dot (`up`, `down`), a
    * ring breathing in the accent (`run`), or a count pill (`count`).
    */
-  mark?: "up" | "down" | "run" | "count";
+  mark?: "up" | "down" | "run" | "count" | "idle";
   count?: number;
   /** Counts worthy changes; the slot flashes once per new token. */
   flash?: number;
@@ -126,7 +126,7 @@ function githubSlot(g: GitHubChipData): SlotItem {
   const ci = g.defaultCi;
   switch (g.state) {
     case "needs":
-      return { ...base, mark: "count", count: g.needs, value: "for you", tone: "ink", detail: needsYou(g.prs)[0]?.title };
+      return { ...base, mark: "count", count: g.needs, value: "for you", tone: "ink", detail: (g.page ?? needsYou(g.prs))[0]?.title };
     case "broken": {
       const wf = ci?.workflow ?? "CI";
       const name = wf.length > GH_WORKFLOW_CH ? `${wf.slice(0, GH_WORKFLOW_CH - 1)}…` : wf;
@@ -136,6 +136,9 @@ function githubSlot(g: GitHubChipData): SlotItem {
       const more = (g.mineRunning ?? 0) > 1 ? ` +${(g.mineRunning ?? 0) - 1}` : "";
       return { ...base, mark: "run", value: `yours · ${g.age ?? ""}`, tone: "ink", detail: g.mineBranch ? `${g.mineBranch}${more}` : undefined };
     }
+    case "quiet":
+      // Quiet hours, or a red default branch the user asked not to hear about (SCROLLR-309): a grey dot.
+      return { ...base, mark: "idle", value: g.age ?? "", dim: true, detail: firstLine(ci?.commit_message) ?? ci?.workflow };
     default:
       return { ...base, mark: "up", value: g.age ?? "", dim: true, detail: firstLine(ci?.commit_message) ?? ci?.workflow };
   }
@@ -233,7 +236,8 @@ function Mark({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
       <span
         data-mark="count"
         className="inline-flex h-[18px] min-w-[20px] shrink-0 items-center justify-center rounded-full px-[5px] text-[13px] font-bold leading-none tabular-nums"
-        style={{ background: "var(--accent)", color: "var(--color-base-150)" }}
+        // The ink, not the accent: the bar colour on it is the pair inkFor proves at 4.5:1 (the raw accent read 2.6:1 on light, SCROLLR-309).
+        style={{ background: "var(--accent-ink)", color: "var(--color-base-150)" }}
       >
         {n > 99 ? "99+" : n}
       </span>
@@ -246,6 +250,7 @@ function Mark({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
         "size-[8px] shrink-0 rounded-full",
         !sizer && it.mark === "up" && "bg-up",
         !sizer && it.mark === "down" && "bg-down",
+        !sizer && it.mark === "idle" && "bg-fg-3",
         !sizer && it.mark === "run" && "gh-ring",
       )}
       style={!sizer && it.mark === "run" ? { background: "var(--accent)" } : undefined}

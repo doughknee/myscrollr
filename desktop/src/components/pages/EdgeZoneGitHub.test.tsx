@@ -8,6 +8,8 @@ import type { GitHubChipData, WidgetTickerData } from "../../types";
 import type { GitHubPRRow } from "../../api/client";
 import { GitHubCappedChip } from "../chips/CappedChip";
 import EdgeZone, { GH_RESERVE, buildEdge } from "./EdgeZone";
+import { connectedChip } from "../../hooks/useWidgetTickerData";
+import { GITHUB_BAR_DEFAULTS, type GitHubRepo } from "../../widgets/github/types";
 
 const pr = (n: number, over: Partial<GitHubPRRow> = {}): GitHubPRRow => ({
   number: n,
@@ -107,6 +109,37 @@ describe("GitHub flash", () => {
     unmount();
     const again = render(<EdgeZone edge={one(1)} tick={0} reduced dark />); // rolls back in
     expect(flashes(again.container)).toBe(0);
+  });
+});
+
+describe("what goes on the bar, on the chip (SCROLLR-309)", () => {
+  const repo: GitHubRepo = {
+    owner: "o", repo: "bar-prefs", status: "failure", workflowName: "CI", runUrl: null, commitMessage: null,
+    updatedAt: null, branch: null, startedAt: null,
+    prs: [pr(1), pr(2, { review_requested: false, is_mine: true, review_state: "approved" })],
+    defaultCi: { state: "failing", workflow: "deploy", updated_at: new Date().toISOString() },
+  };
+
+  it("defaults: needs you, the page holds the review only, it can flash", () => {
+    const c = connectedChip(repo, "bp-1");
+    expect(c).toMatchObject({ state: "needs", needs: 1, flash: 0 });
+    expect(c.page!.map((p) => p.number)).toEqual([1]);
+  });
+
+  it("quiet hours: a grey dot, no count, nothing on the page, no flash", () => {
+    const c = connectedChip(repo, "bp-2", GITHUB_BAR_DEFAULTS, true);
+    expect(c).toMatchObject({ state: "quiet", page: [], flash: undefined });
+    expect(edgeOf([chip("q", c)]).utilities[0].items[0]).toMatchObject({ mark: "idle", dim: true });
+  });
+
+  it("flash off: the state stays, the flash does not", () => {
+    expect(connectedChip(repo, "bp-3", { ...GITHUB_BAR_DEFAULTS, flash: false })).toMatchObject({ state: "needs", flash: undefined });
+  });
+
+  it("other PRs on: the page gains yours, the count does not", () => {
+    const c = connectedChip(repo, "bp-4", { ...GITHUB_BAR_DEFAULTS, otherPRs: true });
+    expect(c.needs).toBe(1);
+    expect(c.page!.map((p) => p.number)).toEqual([1, 2]);
   });
 });
 
