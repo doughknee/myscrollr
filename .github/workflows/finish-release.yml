@@ -1,0 +1,93 @@
+# The "I did it" button for a desktop release that stalled on something outside
+# the repo (2 Oct 2026: macOS notarization failed because Apple wanted a new
+# developer agreement accepted; only the Account Holder can do that, and he is
+# not the one who cuts releases).
+#
+# Someone with push access opens Actions -> "Finish Desktop Release" -> Run
+# workflow, leaves the defaults, and presses the green button. This then:
+#   1. re-runs the failed jobs of the build run (macOS build, Windows publish);
+#   2. waits for them;
+#   3. checks the draft release has every platform;
+#   4. publishes it as the latest release;
+#   5. fires what `release: published` would have fired. A publish made with
+#      the default GITHUB_TOKEN raises no events, so the three workflows that
+#      hang off that event are dispatched by name instead.
+# If any step fails, nothing is published and the draft is left as it was.
+name: Finish Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The draft release to finish"
+        required: true
+        default: "desktop-v1.7.0"
+      run_id:
+        description: "The build run to re-run (blank: the latest Desktop Release run on main)"
+        required: false
+        default: ""
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: finish-release-${{ inputs.tag }}
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Find the build run
+        id: run
+        run: |
+          RUN_ID='${{ inputs.run_id }}'
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --workflow desktop-release.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          [ -n "$RUN_ID" ] || { echo "::error::No Desktop Release run found"; exit 1; }
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          gh run view "$RUN_ID" --json status,conclusion,url --jq '"Build run: \(.url) (\(.status) \(.conclusion // ""))"'
+
+      - name: Re-run the failed jobs and wait
+        env:
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: |
+          conclusion=$(gh run view "$RUN_ID" --json conclusion --jq .conclusion)
+          if [ "$conclusion" = "success" ]; then
+            echo "The build already succeeded; nothing to re-run."
+          else
+            gh run rerun "$RUN_ID" --failed
+            sleep 30
+            gh run watch "$RUN_ID" --exit-status --interval 60
+          fi
+
+      - name: Check the draft has every platform
+        run: |
+          assets=$(gh release view "$TAG" --json assets,isDraft --jq '.assets[].name')
+          echo "$assets"
+          for want in 'latest.json' '\.dmg$|\.app\.tar\.gz$' '\.msi$|\.exe$' '\.AppImage$'; do
+            printf '%s\n' "$assets" | grep -Eq "$want" || { echo "::error::Draft $TAG is missing an asset matching $want"; exit 1; }
+          done
+          [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = "true" ] || { echo "::error::$TAG is not a draft"; exit 1; }
+
+      - name: Publish the release
+        run: |
+          gh release edit "$TAG" --draft=false --latest
+          gh release view "$TAG" --json url,publishedAt --jq '"Published \(.url) at \(.publishedAt)"'
+
+      # What `release: published` would have started, by name (GITHUB_TOKEN
+      # publishes raise no events): the Discord announcement, the support KB
+      # refresh (which redeploys core-api itself), and the website rebuild so
+      # the download button shows the new version.
+      - name: Fire the publish-time workflows
+        run: |
+          gh workflow run discord-release.yml --ref main -f tag="$TAG"
+          gh workflow run support-kb-refresh.yml --ref main -f tag="$TAG"
+          gh workflow run deploy.yml --ref main -f services=website
+          echo "Dispatched discord-release, support-kb-refresh and the website deploy for $TAG"

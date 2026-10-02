@@ -19,23 +19,52 @@ name: Announce Release
 on:
   release:
     types: [published]
+  # A release published by finish-release.yml (GITHUB_TOKEN) raises no
+  # `release` event, so that workflow dispatches this one with the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The published release to announce (desktop-v…)"
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   announce:
-    if: startsWith(github.event.release.tag_name, 'desktop-v')
+    if: startsWith(github.event.release.tag_name, 'desktop-v') || startsWith(inputs.tag, 'desktop-v')
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      # The event carries the release; a dispatch carries only its tag.
+      - name: Resolve the release
+        id: rel
+        env:
+          EV_TAG: ${{ github.event.release.tag_name }}
+          EV_NAME: ${{ github.event.release.name }}
+          EV_URL: ${{ github.event.release.html_url }}
+          EV_BODY: ${{ github.event.release.body }}
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          TAG="${EV_TAG:-$IN_TAG}"
+          if [ -n "$EV_TAG" ]; then
+            NAME="$EV_NAME"; URL="$EV_URL"; printf '%s' "$EV_BODY" > body.raw
+          else
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name,url,body,isDraft > rel.json
+            [ "$(jq -r .isDraft rel.json)" = "false" ] || { echo "::error::$TAG is still a draft"; exit 1; }
+            NAME=$(jq -r .name rel.json); URL=$(jq -r .url rel.json); jq -r .body rel.json > body.raw
+          fi
+          { echo "tag=$TAG"; echo "name=$NAME"; echo "url=$URL"; } >> "$GITHUB_OUTPUT"
+
       - name: Post release to Discord
         env:
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-          NAME: ${{ github.event.release.name }}
-          URL: ${{ github.event.release.html_url }}
-          BODY: ${{ github.event.release.body }}
+          NAME: ${{ steps.rel.outputs.name }}
+          URL: ${{ steps.rel.outputs.url }}
         run: |
           if [ -z "$WEBHOOK" ]; then echo "No webhook configured, skipping"; exit 0; fi
+          BODY=$(cat body.raw)
 
           # Discord embeds do not render markdown headings; promote them to
           # bold. Notes typed in the web editor arrive with CRLF, which
@@ -70,8 +99,8 @@ jobs:
       # the release announcement.
       - name: Queue shipped-fix follow-ups
         env:
-          TAG: ${{ github.event.release.tag_name }}
-          URL: ${{ github.event.release.html_url }}
+          TAG: ${{ steps.rel.outputs.tag }}
+          URL: ${{ steps.rel.outputs.url }}
           API_BASE: ${{ vars.SCROLLR_API_BASE_URL }}
           WEBHOOK_SECRET: ${{ secrets.OSTICKET_PR_WEBHOOK_SECRET }}
         run: |

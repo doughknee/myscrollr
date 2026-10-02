@@ -18,6 +18,13 @@ name: Refresh Support Knowledge Base
 on:
   release:
     types: [published]
+  # A release published by finish-release.yml (GITHUB_TOKEN) raises no
+  # `release` event, so that workflow dispatches this one with the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The published release the KB should know about (desktop-v…)"
+        required: true
 
 permissions:
   contents: write
@@ -33,7 +40,7 @@ concurrency:
 jobs:
   refresh:
     name: Regenerate and commit the knowledge base
-    if: startsWith(github.event.release.tag_name, 'desktop-v')
+    if: startsWith(github.event.release.tag_name, 'desktop-v') || startsWith(inputs.tag, 'desktop-v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -58,7 +65,7 @@ jobs:
       - name: Commit and push the regenerated knowledge base
         id: push
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           if git diff --quiet -- api/internal/support/kb/kb.generated.md; then
             echo "Knowledge base is already current for $TAG; nothing to commit."
