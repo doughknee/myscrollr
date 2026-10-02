@@ -115,7 +115,15 @@ const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: Q
           className={clsx("text-[12px] font-semibold tabular-nums", dir === "up" ? "text-up" : dir === "down" ? "text-down" : "text-fg-3")}
           style={{ minWidth: `${CHANGE_CH}ch` }}
         >
-          {text}
+          {/* The arrow is not in IBM Plex Mono: the fallback font draws it at a
+              different width per OS, so it gets a box of exactly one character
+              (CI's Linux Chromium measured the ▼ wider than the ▲). */}
+          {dir === "flat" ? text : (
+            <>
+              <span className="inline-block w-[1ch] overflow-hidden text-center">{text[0]}</span>
+              {text.slice(1)}
+            </>
+          )}
         </span>
       </span>
       {/* 31 + 4 + 3 + 4 + 12 = 54, the price zone's height: the low and high share the change's baseline. */}
