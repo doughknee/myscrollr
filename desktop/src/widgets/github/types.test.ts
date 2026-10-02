@@ -168,6 +168,8 @@ describe("the picker's first load and URLs", () => {
     ];
     expect(autoPick([], rows)).toEqual([{ repo: "o/a", prs: "mine", issues: "off" }]);
     expect(autoPick([{ repo: "x/y", prs: "off", issues: "off" }], rows)).toBeNull();
+    const many = Array.from({ length: 12 }, (_, i) => ({ ...rows[0], full_name: `o/r${i}`, active: true }));
+    expect(autoPick([], many)).toHaveLength(6); // AUTO_PICK_MAX: the rate budget, not MAX_REPOS
   });
 
   it("parseRepoUrl: URLs and owner/name, nothing else", () => {
