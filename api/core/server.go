@@ -292,6 +292,7 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/github/status", platform.LogtoAuth, githubapp.HandleStatus)
 	s.App.Delete("/github/connection", platform.LogtoAuth, githubapp.HandleDisconnect)
 	s.App.Get("/github/runs", platform.LogtoAuth, githubapp.HandleRuns)
+	s.App.Get("/github/repos", platform.LogtoAuth, githubapp.HandleRepos)
 
 	// Support
 	s.App.Post("/support/ticket", platform.LogtoAuth, support.HandleSubmitSupportTicket)

@@ -8,7 +8,45 @@ vi.mock("../../auth", () => ({ isSignedOut: () => signedOut() }));
 vi.mock("../../api/client", () => ({ githubApi: { runs: (r: string[]) => runs(r) } }));
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: (...a: unknown[]) => directFetch(...a) }));
 
-const { fetchRepos } = await import("./types");
+const { fetchRepos, toggleRepo, autoPick } = await import("./types");
+
+describe("Your repos → prefs (SCROLLR-307)", () => {
+  const row = (full_name: string, active: boolean) => ({ full_name, private: false, active });
+
+  it("ticking appends owner/repo; unticking removes it, case-insensitively", () => {
+    const config = [{ owner: "o", repo: "pasted" }];
+    expect(toggleRepo(config, "Org/App", true)).toEqual([
+      { owner: "o", repo: "pasted" },
+      { owner: "Org", repo: "App" },
+    ]);
+    expect(toggleRepo([{ owner: "org", repo: "app" }, ...config], "Org/App", false)).toEqual(config);
+  });
+
+  it("ticking a repo already in the list (pasted with other casing) adds nothing", () => {
+    const config = [{ owner: "org", repo: "app" }];
+    expect(toggleRepo(config, "Org/App", true)).toBe(config);
+  });
+
+  it("first load with no repos configured ticks the active ones", () => {
+    expect(autoPick([], [row("o/a", true), row("o/b", false), row("o/c", true)])).toEqual([
+      { owner: "o", repo: "a" },
+      { owner: "o", repo: "c" },
+    ]);
+  });
+
+  it("never adds to an existing list", () => {
+    expect(autoPick([{ owner: "x", repo: "y" }], [row("o/a", true)])).toBeNull();
+  });
+
+  it("nothing active: leaves the list empty", () => {
+    expect(autoPick([], [row("o/a", false)])).toBeNull();
+  });
+
+  it("caps the auto-pick at the 20 repos core's runs endpoint answers", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => row(`o/r${i}`, true));
+    expect(autoPick([], rows)).toHaveLength(20);
+  });
+});
 
 describe("fetchRepos (SCROLLR-304)", () => {
   beforeEach(() => {

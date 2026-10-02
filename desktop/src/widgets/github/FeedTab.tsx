@@ -2,16 +2,17 @@
  * GitHub Actions widget FeedTab.
  *
  * Tracks CI/Actions workflow run status for user-configured GitHub repos.
- * Repos are added individually via URL input. Connecting GitHub (the
- * Scrollr Desktop GitHub App, brokered by core) adds private repos and the
- * user's own rate limit (SCROLLR-304). Data is cached in the Tauri store
+ * Repos are added via URL input, or, once connected, ticked in the Your
+ * repos picker (SCROLLR-307). Connecting GitHub (the Scrollr Desktop GitHub
+ * App, brokered by core) adds private repos and the user's own rate limit
+ * (SCROLLR-304). Data is cached in the Tauri store
  * for cross-window ticker sync.
  */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { clsx } from "clsx";
-import { Github, Plus, X, ExternalLink } from "lucide-react";
+import { Github, Plus, X, ExternalLink, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
@@ -26,6 +27,8 @@ import {
   fetchRepos,
   loadRepoData,
   saveRepoData,
+  toggleRepo,
+  autoPick,
   CI_STATUS_LABELS,
   CI_STATUS_COLORS,
   CI_STATUS_TEXT,
@@ -35,6 +38,8 @@ import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_GITHUB_REPOS } from "../../constants";
 import { githubApi } from "../../api/client";
+import { relativeTime } from "../../utils/format";
+import type { GitHubRepoRow } from "../../api/client";
 
 // ── Widget manifest ─────────────────────────────────────────────
 
@@ -50,8 +55,9 @@ export const githubWidget: WidgetManifest = {
       "The GitHub widget tracks the latest workflow run status for " +
       "your GitHub repositories. Connect GitHub to include private ones.",
     usage: [
-      "Paste a GitHub repo URL to add it (e.g. https://github.com/org/repo).",
-      "Connect GitHub to see private repos; disconnect any time.",
+      "Connect GitHub and tick your repos under Your repos; the ones with recent Actions runs start ticked.",
+      "Paste a GitHub repo URL to add any other public repo (e.g. https://github.com/org/repo).",
+      "Disconnect GitHub any time.",
       "Each repo shows its latest GitHub Actions workflow run status.",
       "Click a repo row to open the workflow run on GitHub.",
     ],
@@ -102,6 +108,52 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
     retry: 1,
   });
 
+  // ── Write the configured repos (URL box, Remove and the picker) ──
+
+  const setRepos = useCallback(
+    (nextRepos: Array<{ owner: string; repo: string }>) => {
+      const next = updateWidgetPrefs(shell.prefs, "github", { repos: nextRepos });
+      shell.onPrefsChange(next);
+      savePrefs(next);
+
+      // Drop removed repos from the cached data the ticker reads.
+      const keep = new Set(nextRepos.map(repoKey));
+      if (repoData.some((r) => !keep.has(repoKey(r)))) {
+        saveRepoData(repoData.filter((r) => keep.has(repoKey(r))));
+      }
+    },
+    [repoData, shell],
+  );
+
+  // ── Your repos (SCROLLR-307) ──────────────────────────────────
+
+  const { data: status } = useQuery({
+    queryKey: ["github-status"],
+    queryFn: githubApi.status,
+    enabled: shell.authenticated,
+  });
+  const { data: yours } = useQuery({
+    queryKey: ["github-repos"],
+    queryFn: githubApi.repos,
+    enabled: shell.authenticated && !!status?.connected,
+    retry: false,
+  });
+
+  // First load only, and only into an empty list. The ref lives here, not
+  // in the picker, so unticking the last repo does not re-tick the rest.
+  const autoPicked = useRef(false);
+  useEffect(() => {
+    if (autoPicked.current || !yours) return;
+    autoPicked.current = true;
+    const picked = autoPick(configRepos, yours.repos);
+    if (picked) setRepos(picked);
+  }, [yours, configRepos, setRepos]);
+
+  const picker =
+    status?.connected && yours ? (
+      <YourRepos rows={yours.repos} configRepos={configRepos} onChange={setRepos} />
+    ) : null;
+
   // ── Add repo handler ──────────────────────────────────────────
 
   const handleAddRepo = useCallback(() => {
@@ -118,31 +170,19 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
       return;
     }
 
-    // Save to prefs
-    const nextRepos = [...configRepos, parsed];
-    const next = updateWidgetPrefs(shell.prefs, "github", { repos: nextRepos });
-    shell.onPrefsChange(next);
-    savePrefs(next);
-
+    setRepos([...configRepos, parsed]);
     setInputUrl("");
     setInputError(null);
-  }, [inputUrl, configRepos, shell]);
+  }, [inputUrl, configRepos, setRepos]);
 
   // ── Remove repo handler ───────────────────────────────────────
 
   const removeRepo = useCallback(
     (owner: string, repo: string) => {
       const key = repoKey({ owner, repo });
-      const nextRepos = configRepos.filter((r) => repoKey(r) !== key);
-      const next = updateWidgetPrefs(shell.prefs, "github", { repos: nextRepos });
-      shell.onPrefsChange(next);
-      savePrefs(next);
-
-      // Also remove from cached data
-      const nextData = repoData.filter((r) => repoKey(r) !== key);
-      saveRepoData(nextData);
+      setRepos(configRepos.filter((r) => repoKey(r) !== key));
     },
-    [configRepos, repoData, shell],
+    [configRepos, setRepos],
   );
 
   // ── Empty state ───────────────────────────────────────────────
@@ -158,6 +198,8 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
         <div className="w-full max-w-sm">
           <GitHubAccount />
         </div>
+
+        {picker && <div className="w-full max-w-sm">{picker}</div>}
 
         <div className="w-full max-w-sm space-y-2">
           <input
@@ -225,6 +267,8 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
         retrying={isFetching}
       />
 
+      {picker}
+
       {/* Add repo input */}
       <div className="flex gap-1.5 px-1">
         <input
@@ -279,6 +323,75 @@ function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
           })}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+// ── YourRepos (SCROLLR-307) ─────────────────────────────────────
+
+function activityLabel(r: GitHubRepoRow, now: number): string {
+  if (r.last_run_at) return `last run ${relativeTime(r.last_run_at, now, { suffix: true })}`;
+  if (r.pushed_at) return `pushed ${relativeTime(r.pushed_at, now, { suffix: true })}`;
+  return "";
+}
+
+/**
+ * The connected user's repos as checkboxes. Ticking writes the same list
+ * the URL box writes. Active repos (and anything already ticked) show by
+ * default; "Show all" reveals the rest.
+ */
+function YourRepos({
+  rows,
+  configRepos,
+  onChange,
+}: {
+  rows: GitHubRepoRow[];
+  configRepos: Array<{ owner: string; repo: string }>;
+  onChange: (next: Array<{ owner: string; repo: string }>) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  if (rows.length === 0) return null;
+
+  const ticked = new Set(configRepos.map((r) => repoKey(r).toLowerCase()));
+  const isTicked = (r: GitHubRepoRow) => ticked.has(r.full_name.toLowerCase());
+  const hiddenCount = rows.filter((r) => !r.active && !isTicked(r)).length;
+  const visible = showAll ? rows : rows.filter((r) => r.active || isTicked(r));
+  const now = Date.now();
+
+  return (
+    <div className="px-1 space-y-1">
+      <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-fg-4">
+        Your repos
+      </div>
+      <div className="space-y-0.5">
+        {visible.map((r) => (
+          <label
+            key={r.full_name}
+            className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={isTicked(r)}
+              onChange={(e) => onChange(toggleRepo(configRepos, r.full_name, e.target.checked))}
+              className="shrink-0 accent-widget-github"
+            />
+            <span className="min-w-0 flex-1 truncate text-left text-[11px] font-mono text-fg">
+              {r.full_name}
+            </span>
+            {r.private && <Lock size={10} aria-label="Private" className="shrink-0 text-fg-4" />}
+            <span className="shrink-0 text-[10px] font-mono text-fg-4">{activityLabel(r, now)}</span>
+          </label>
+        ))}
+      </div>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-[10px] font-mono text-widget-github hover:underline"
+        >
+          {showAll ? "Show active only" : `Show all (${hiddenCount} more)`}
+        </button>
+      )}
     </div>
   );
 }

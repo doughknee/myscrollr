@@ -3,6 +3,7 @@ package githubapp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,8 @@ type fakeGitHub struct {
 	valid       map[string]bool // access tokens GitHub accepts
 	refreshOK   bool
 	exhausted   bool // answer runs with a spent rate limit
+	repoCount   int  // repos /user/repos lists (SCROLLR-307)
+	listCalls   int
 	runsCalls   int
 	runsTokens  []string
 	tokenGrants []string // grant_type of each token call ("" = code exchange)
@@ -80,9 +83,45 @@ func (f *fakeGitHub) handler(t *testing.T) http.Handler {
 			return
 		}
 		w.Header().Set("X-Ratelimit-Remaining", "59")
+		switch {
+		case strings.Contains(r.URL.Path, "/quiet"): // Actions never ran
+			_, _ = io.WriteString(w, `{"total_count":0,"workflow_runs":[]}`)
+			return
+		case strings.Contains(r.URL.Path, "/old"): // last run months ago
+			_, _ = io.WriteString(w, `{"total_count":1,"workflow_runs":[{"name":"CI","status":"completed","conclusion":"success",
+				"run_started_at":"2026-06-01T00:00:00Z","updated_at":"2026-06-01T00:05:00Z"}]}`)
+			return
+		}
 		_, _ = io.WriteString(w, `{"total_count":1,"workflow_runs":[{"name":"CI","status":"completed","conclusion":"success",
 			"html_url":"https://github.com/o/r/actions/runs/1","head_branch":"main","run_started_at":"2026-10-02T08:00:00Z",
 			"updated_at":"2026-10-02T08:05:00Z","head_commit":{"message":"fix: the thing"}}]}`)
+	})
+	// The user's repos, every third one active (o/rNN), old (o/oldNN) or
+	// without Actions (o/quietNN); pushed an hour apart, sent oldest first
+	// so the handler's own ordering is what decides which 30 get checked.
+	mux.HandleFunc("/user/repos", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		f.listCalls++
+		n := f.repoCount
+		f.mu.Unlock()
+		if !f.accepts(r) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if q := r.URL.Query(); q.Get("sort") != "pushed" || q.Get("per_page") != "100" ||
+			q.Get("affiliation") != "owner,collaborator,organization_member" {
+			t.Errorf("repos query = %s", r.URL.RawQuery)
+		}
+		repos := make([]map[string]any, 0, n)
+		for i := n - 1; i >= 0; i-- {
+			repos = append(repos, map[string]any{
+				"full_name":      fakeRepoName(i),
+				"private":        i%2 == 0,
+				"pushed_at":      fakeNow.Add(-time.Duration(i+1) * time.Hour).Format(time.RFC3339),
+				"default_branch": "main",
+			})
+		}
+		_ = json.NewEncoder(w).Encode(repos)
 	})
 	mux.HandleFunc("/applications/", func(w http.ResponseWriter, r *http.Request) {
 		if user, pass, ok := r.BasicAuth(); !ok || user != "Iv-test" || pass != "test-secret" {
@@ -98,6 +137,14 @@ func (f *fakeGitHub) handler(t *testing.T) http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	return mux
+}
+
+// fakeNow is the clock the repo tests pin: the fake's "recent" run
+// (2026-10-02T08:00Z) is inside the 30-day window, "old" is not.
+var fakeNow = time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+
+func fakeRepoName(i int) string {
+	return fmt.Sprintf("o/%s%02d", []string{"r", "old", "quiet"}[i%3], i)
 }
 
 func (f *fakeGitHub) accepts(r *http.Request) bool {
@@ -143,6 +190,7 @@ func setup(t *testing.T) (*fakeGitHub, *miniredis.Miniredis, *fiber.App) {
 	app.Get("/github/status", auth, HandleStatus)
 	app.Delete("/github/connection", auth, HandleDisconnect)
 	app.Get("/github/runs", auth, HandleRuns)
+	app.Get("/github/repos", auth, HandleRepos)
 	return f, mr, app
 }
 
@@ -440,5 +488,98 @@ func TestDisconnectRevokesAndDeletes(t *testing.T) {
 		if strings.Contains(k, "sub_bye") {
 			t.Errorf("cache survived disconnect: %s", k)
 		}
+	}
+}
+
+// ── Your repos (SCROLLR-307) ──────────────────────────────────────
+
+func pinClock(t *testing.T) {
+	t.Helper()
+	prev := now
+	now = func() time.Time { return fakeNow }
+	t.Cleanup(func() { now = prev })
+}
+
+// TestReposListCapAndCache: 40 repos cost 31 GitHub calls (the list + the
+// 30 most recently pushed), the rest are inactive without a call, and the
+// answer is cached for ten minutes per account.
+func TestReposListCapAndCache(t *testing.T) {
+	f, mr, app := setupDB(t)
+	pinClock(t)
+	f.valid["ghu_first"] = true
+	f.repoCount = 40
+	seedConnection(t, "sub_repos", "ghu_first", 28800)
+
+	resp := do(t, app, "GET", "/github/repos", "sub_repos")
+	if resp.StatusCode != 200 {
+		t.Fatalf("repos: HTTP %d", resp.StatusCode)
+	}
+	out := decode[ReposResponse](t, resp)
+	if !out.Connected || out.Login != "octo" || out.Stale || len(out.Repos) != 40 {
+		t.Fatalf("response = connected:%v login:%q stale:%v repos:%d", out.Connected, out.Login, out.Stale, len(out.Repos))
+	}
+	if f.listCalls != 1 || f.calls() != maxActiveChecks {
+		t.Errorf("calls = %d list + %d runs, want 1 + 30", f.listCalls, f.calls())
+	}
+	t.Logf("GitHub calls for 40 repos: %d (cap 31)", f.listCalls+f.calls())
+	for i, r := range out.Repos {
+		checked := i < maxActiveChecks
+		if r.FullName != fakeRepoName(i) {
+			t.Fatalf("repos[%d] = %s, want %s (most recently pushed first)", i, r.FullName, fakeRepoName(i))
+		}
+		if want := checked && i%3 == 0; r.Active != want {
+			t.Errorf("%s active = %v, want %v", r.FullName, r.Active, want)
+		}
+		if want := checked && i%3 != 2; (r.LastRunAt != "") != want {
+			t.Errorf("%s last_run_at = %q", r.FullName, r.LastRunAt)
+		}
+		if r.Private != (i%2 == 0) || r.DefaultBranch != "main" || r.PushedAt == "" {
+			t.Errorf("%s fields = %+v", r.FullName, r)
+		}
+	}
+
+	do(t, app, "GET", "/github/repos", "sub_repos")
+	if f.listCalls != 1 || f.calls() != maxActiveChecks {
+		t.Errorf("a cached answer called GitHub: %d list + %d runs", f.listCalls, f.calls())
+	}
+	mr.FastForward(reposTTL + time.Second)
+	do(t, app, "GET", "/github/repos", "sub_repos")
+	if f.listCalls != 2 || f.calls() != 2*maxActiveChecks {
+		t.Errorf("after 10 min: %d list + %d runs, want 2 + 60", f.listCalls, f.calls())
+	}
+}
+
+func TestReposNotConnectedIs409(t *testing.T) {
+	f, _, app := setupDB(t)
+	resp := do(t, app, "GET", "/github/repos", "sub_nobody")
+	if resp.StatusCode != fiber.StatusConflict {
+		t.Fatalf("HTTP %d, want 409", resp.StatusCode)
+	}
+	if out := decode[ReposResponse](t, resp); !out.Connect || out.Connected || out.Repos == nil {
+		t.Errorf("body = %+v", out)
+	}
+	if f.listCalls != 0 {
+		t.Errorf("called GitHub for an unconnected account")
+	}
+}
+
+func TestReposMarksBrokenWhenGitHubRefuses(t *testing.T) {
+	f, _, app := setupDB(t)
+	pinClock(t)
+	f.repoCount = 3
+	seedConnection(t, "sub_repos_broken", "ghu_revoked", 28800)
+
+	resp := do(t, app, "GET", "/github/repos", "sub_repos_broken")
+	if resp.StatusCode != fiber.StatusConflict {
+		t.Fatalf("HTTP %d, want 409", resp.StatusCode)
+	}
+	if out := decode[ReposResponse](t, resp); !out.Connect || out.Reason == "" {
+		t.Errorf("body = %+v", out)
+	}
+	if len(f.tokenGrants) != 1 || f.tokenGrants[0] != "refresh_token" {
+		t.Errorf("token calls = %v, want one refresh attempt", f.tokenGrants)
+	}
+	if status, _ := rowStatus(t, "sub_repos_broken"); status != "broken" {
+		t.Errorf("status = %q, want broken", status)
 	}
 }
