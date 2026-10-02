@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { allShown, dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds, parkMouse, readTrace, recordFromStart, startRecording, unfilled, visits, type PagesTrace } from "./pages";
+import { allShown, dwells, hoverReport, laps, lapStarts, mustSeeIds, pageOrder, parkMouse, readTrace, recordFromStart, startRecording, topFirst, unfilled, visits, type PagesTrace } from "./pages";
 
 /**
  * SCROLLR-275: the widget-pages bar (`?pages=1`), measured in a real layout.
@@ -15,7 +15,9 @@ import { allShown, dwells, hoverReport, itemsPerLap, laps, lapStarts, mustSeeIds
  *   1. no cell moves while its page is up (live updates land every 4 s);
  *   2. no cell is cut off the page;
  *   3. every page dwells at least MIN_DWELL_S (and at most MAX_DWELL_S);
- *   4. a live game or your team is on every lap (ids read from the fixture);
+ *   4. one page per widget per lap, its pages running 1, 2 ... N, 1, and
+ *      live and yours lead their widget (page 1; ids read from the fixture).
+ *      A live game is NOT on every lap any more (SCROLLR-297);
  *   5. the lap stays within LAP_MAX_S;
  *   6. every page is full: `min(columns, available)` items (SCROLLR-292).
  * Plus: two windows turn pages in step (real time, 4 turns).
@@ -40,33 +42,34 @@ const SKEW_MS = 400;
  * Every page of every widget has been up within this (the scorecard's "all
  * shown", SCROLLR-266/294), and the virtual time to spend finding out. A run
  * marked `over5` is measured and must still show everything, but is known to
- * take longer than ALL_SHOWN_MAX_S under one page a visit (SCROLLR-294: the
- * lever is Home's call, never a raised threshold).
+ * take longer than ALL_SHOWN_MAX_S (SCROLLR-294; all three are under it since
+ * SCROLLR-297's one page a lap, and keep the mark as decided: dropping it is
+ * Home's call, never a raised threshold).
  */
 const ALL_SHOWN_MAX_S = 300;
 const ALL_CAP_MS = 600_000;
 
 const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; full?: boolean; npr30?: boolean; over5?: boolean }[] = [
   { fixture: "pages", width: 1920, laps: 2, live: true }, // every page kind: NFL (yours + live), stocks, crypto, news, the Also page
-  { fixture: "mixed", width: 1920, laps: 2, live: true, over5: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 330 s)
+  { fixture: "mixed", width: 1920, laps: 2, live: true, over5: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 249 s since SCROLLR-297; 314 s before)
   // SCROLLR-296 round 2: college cells at 276px give 3 columns at 1280 with the Clock (was 4), 19 pages: all shown 306.6 s. Flagged to Home (their call; 264 would keep 4 columns and ~217 s).
-  { fixture: "busy", width: 1280, live: true, over5: true }, // the overflow case: 19 pages of 3 games (all shown 307 s)
+  { fixture: "busy", width: 1280, live: true, over5: true }, // the overflow case: 19 pages of 3 games (all shown 115 s since SCROLLR-297; 307 s before)
   { fixture: "longnames", width: 1280 }, // the longest names, in the narrowest columns
   { fixture: "quiet", width: 1920 }, // nothing live: the floor
   { fixture: "default", width: 1920, live: true },
   // SCROLLR-292, every page is full. One widget, one page, so a lap is one page: three laps measure three dwells.
   // `full`: the fixture has enough to fill, so every page must have a column per item.
   // 16 games at 6 columns (SCROLLR-296 round 2: fewer, roomier game cells) split evenly 6/5/5: `unfilled` holds, "a column per item" cannot.
-  { fixture: "nflthursday", width: 1920, laps: 3, live: true }, // TNF + Sunday (your Bears lead, on every lap)
-  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 4 columns: four pages of 4 (the whole week, SCROLLR-293)
+  { fixture: "nflthursday", width: 1920, laps: 3, live: true }, // TNF + Sunday (your Bears lead: page 1)
+  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 4 columns: four pages of 4 (the whole week, SCROLLR-293), one a lap
   { fixture: "googl", width: 1920, laps: 3, full: true }, // GOOGL + popular fills
   { fixture: "sparsenews", width: 1280, laps: 3 }, // 9 headlines over 3 days: all of them now (SCROLLR-293), 5 pages at 2 columns
-  // SCROLLR-293: a 30-headline feed, the whole of it. One widget, so a lap is one visit (one page, SCROLLR-294).
+  // SCROLLR-293: a 30-headline feed, the whole of it. One widget, so a lap is one visit (one page).
   { fixture: "npr", width: 1920, laps: 3 },
   { fixture: "npr", width: 1280, laps: 3 },
   { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
   // SCROLLR-294: the worst case for "all shown": every page kind, with NPR's 30 headlines (8 pages at 1920) among them.
-  { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true, over5: true }, // all shown 410 s
+  { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true, over5: true }, // all shown 295 s since SCROLLR-297 (404 s before)
 ];
 
 /** dashboard.npr.json's 30 headlines, rebased onto now as the shim rebases a fixture. */
@@ -100,7 +103,7 @@ function summarise(tr: PagesTrace) {
 }
 
 for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr, over5 } of RUNS) {
-  test(`pages ${fixture}${swapNpr ? "+npr30" : ""} @${width}: still, whole, long enough, live every lap, short lap, all shown`, async ({ page, context }) => {
+  test(`pages ${fixture}${swapNpr ? "+npr30" : ""} @${width}: still, whole, long enough, one page a lap, live first, short lap, all shown`, async ({ page, context }) => {
     test.setTimeout(600_000);
     await context.clock.install();
     await page.setViewportSize({ width, height: 80 });
@@ -144,13 +147,12 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr, 
 
     for (const [i, len] of lapLens.entries()) expect.soft(len, `lap ${i + 1} (s)`).toBeLessThanOrEqual(LAP_MAX_S);
 
+    expect.soft(pageOrder(tr.enters), "one page per widget per lap, 1, 2 ... N, 1").toEqual([]);
+    expect.soft(topFirst(tr.enters), "live and yours lead their widget (page 1)").toEqual([]);
     const must = mustSeeIds(fixture);
     if (live) expect(must.length, "the fixture has live games or yours (else this check is vacuous)").toBeGreaterThan(0);
-    if (must.length) {
-      for (const [i, seen] of itemsPerLap(tr.enters).entries()) {
-        expect.soft(must.filter((id) => !seen.has(id)), `live games and your team missing from lap ${i + 1}`).toEqual([]);
-      }
-    }
+    const marked = new Set(tr.enters.flatMap((e) => e.items.filter((i) => i.live || i.mine).map((i) => i.id)));
+    expect.soft(must.filter((id) => !marked.has(id)), "every live game and your team shown, marked live or yours").toEqual([]);
   });
 }
 
@@ -177,9 +179,8 @@ test("a truly short widget keeps a page's column width, left-aligned (SCROLLR-29
 });
 
 test("a 30-headline feed: one page a visit, 1, 2, 3 ... 8, 1, a refresh keeps the place, every headline in 8 laps (SCROLLR-293/294)", async ({ page, context }) => {
-  // NPR with 30 headlines over six days, at 1920: 4 columns, 8 pages. Nothing
-  // is live, so nothing is sticky and a visit is one page of the rest,
-  // continuing where the last one stopped. The live sim writes the dashboard
+  // NPR with 30 headlines over six days, at 1920: 4 columns, 8 pages. A
+  // visit is one page, continuing where the last one stopped. The live sim writes the dashboard
   // every 4 s (a refresh, a re-plan); on top of that a refresh with a NEW
   // headline lands while page 4 is up. Neither may send the widget back to
   // page 1.

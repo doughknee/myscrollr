@@ -33,7 +33,7 @@ export interface Enter {
   /** 0-based */
   index: number;
   count: number;
-  /** The leader's visit counter (`data-visit`): consecutive pages of one widget's visit share it. */
+  /** The leader's turn counter (`data-visit`): one page is one visit (SCROLLR-297). */
   visit: number;
   /** The label's position counter ("2/8"), or null when the widget has one page. */
   pos: string | null;
@@ -274,6 +274,49 @@ export function allShown(enters: readonly Enter[]): number | null {
   return null;
 }
 
+/**
+ * One page per widget per lap, in order (SCROLLR-297). Each full lap shows
+ * every widget once, and each widget's pages run 1, 2 ... N, 1 from its
+ * first visit: the next is the last one plus one, wrapped on the count it
+ * had then and on the count it has now (a refresh may re-plan). Returns
+ * what broke it.
+ */
+export function pageOrder(enters: readonly Enter[]): string[] {
+  const out: string[] = [];
+  const s = lapStarts(enters);
+  for (let k = 1; k < s.length; k++) {
+    const tabs = enters.slice(s[k - 1], s[k]).map((e) => e.tab);
+    if (new Set(tabs).size !== tabs.length) out.push(`lap ${k}: ${tabs.join(",")}`);
+  }
+  const last = new Map<string, Enter>();
+  for (const e of enters) {
+    if (e.initial) continue;
+    const p = last.get(e.tab);
+    const want = p ? ((p.index + 1) % p.count) % e.count : 0;
+    if (e.index !== want) out.push(`${e.page} after ${p?.page ?? "nothing"}: want page ${want + 1}`);
+    last.set(e.tab, e);
+  }
+  return out;
+}
+
+/**
+ * Live and yours lead their widget (SCROLLR-297): across each widget's
+ * pages in order, the items marked live or yours come before every other
+ * item, so page 1 is the live/yours page. Returns what broke it.
+ */
+export function topFirst(enters: readonly Enter[]): string[] {
+  const byTab = new Map<string, Map<number, SeenItem[]>>();
+  for (const e of enters) byTab.set(`${e.tab}/${e.count}`, (byTab.get(`${e.tab}/${e.count}`) ?? new Map()).set(e.index, e.items));
+  const out: string[] = [];
+  for (const [tab, pages] of byTab) {
+    const flat = [...pages.keys()].sort((a, b) => a - b).flatMap((i) => pages.get(i)!.map((it) => ({ i, top: it.live || it.mine, id: it.id })));
+    const firstRest = flat.findIndex((x) => !x.top);
+    const late = firstRest < 0 ? [] : flat.slice(firstRest).filter((x) => x.top);
+    if (late.length) out.push(`${tab}: ${late.map((x) => `${x.id} on page ${x.i + 1}`).join(", ")} after other items`);
+  }
+  return out;
+}
+
 /** Ids a lap showed, one set per full lap. */
 export function itemsPerLap(enters: readonly Enter[]): Set<string>[] {
   const s = lapStarts(enters);
@@ -281,9 +324,9 @@ export function itemsPerLap(enters: readonly Enter[]): Set<string>[] {
 }
 
 /**
- * Game ids that must be on every visit: live now, or one of the user's
- * teams (the widget's `favoriteTeams`). Read from the fixture, so a bar
- * that never drew one cannot hide behind "nothing was seen live".
+ * Game ids that lead their widget: live now, or one of the user's teams
+ * (the widget's `favoriteTeams`). Read from the fixture, so a bar that
+ * never drew one cannot hide behind "nothing was seen live".
  */
 export function mustSeeIds(fixture: string): string[] {
   const d = JSON.parse(readFileSync(`src/dev/__fixtures__/dashboard.${fixture}.json`, "utf8"));

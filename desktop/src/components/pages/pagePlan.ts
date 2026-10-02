@@ -27,9 +27,10 @@
  *    order is kept (soonest kick-off, newest headline), so give it the source
  *    order. The ladder has no per-score ranking on purpose: closeness changes
  *    with every score and would reshuffle a page (it is shown as a tint).
- *  - STICKY. `WidgetPlan.sticky` is how many leading pages hold tier-0 items
- *    (live or yours), 0 when none does. They show on EVERY visit;
- *    `visitPages` takes it.
+ *  - VISITS. Every widget shows exactly ONE page per lap, then the bar moves
+ *    on; its cursor continues on the next lap (SCROLLR-297, `nextTurn`). The
+ *    ladder only orders: tier 0 (live, yours) fills page 1, so it comes round
+ *    first after a wrap, but it is not on every lap.
  *  - FREEZE. A page on screen is a `FrozenPage`: its keys and their order are
  *    fixed at swipe-in; later data only updates values in place.
  */
@@ -53,9 +54,6 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 
 /** Width of the label block on the left of every page. */
 export const LABEL_W = 112;
-
-/** Pages of the rest a visit shows after the sticky ones (SCROLLR-294: one, then the bar moves on). */
-export const REST_PER_VISIT = 1;
 
 /** Width left for columns once the label and the edge zone are taken. */
 export function contentWidth(barWidth: number, edgeWidth = 0): number {
@@ -110,11 +108,9 @@ export function topUp<T>(items: readonly T[], fill: readonly T[], cols: number):
 export interface WidgetPlan<T> {
   /** Items split into pages, tier order kept. */
   pages: T[][];
-  /** Leading pages that hold live items; 0 when none does (SCROLLR-293: a feed does not repeat its page 1 every visit). */
-  sticky: number;
 }
 
-/** Rank by tier (stable), split at `cols`, and count the sticky pages. */
+/** Rank by tier (stable) and split at `cols`. */
 export function planWidget<T>(
   items: readonly T[],
   tierOf: (item: T) => Tier,
@@ -123,51 +119,12 @@ export function planWidget<T>(
   const ranked = items
     .map((item, i) => ({ item, i, t: tierOf(item) }))
     .sort((a, b) => a.t - b.t || a.i - b.i);
-  const pages = paginate(ranked.map((r) => r.item), cols);
-  const top = ranked.filter((r) => r.t === TIER.live).length;
-  let sticky = 0;
-  for (let covered = 0; covered < top; sticky++) covered += pages[sticky].length;
-  return { pages, sticky };
+  return { pages: paginate(ranked.map((r) => r.item), cols) };
 }
 
 /** Seconds a page holds: longer for a fuller page, within 6..12 s. */
 export function dwellFor(itemsOnPage: number): number {
   return Math.min(12, Math.max(6, 3 + itemsOnPage * 0.75));
-}
-
-// ── Visits ─────────────────────────────────────────────────────────
-
-export interface Visit {
-  /** Page indexes to show this visit, in order. */
-  pages: number[];
-  /** Cursor to pass to the next visit of the same widget. */
-  next: number;
-}
-
-/**
- * Which pages one visit to a widget shows. The `sticky` leading pages (live
- * and yours, however many) show every visit; then REST_PER_VISIT (one) page
- * of the rest, continuing from `cursor` and wrapping, so every page comes
- * round over the laps; then the caller moves to the next widget. Start a
- * widget's cursor at `sticky`. A widget whose pages fit in sticky + 1 shows
- * whole. A 30-headline feed on 8 pages shows 1, then 2, then 3 ... then 8,
- * then 1 again (SCROLLR-294; SCROLLR-293 showed three a visit).
- */
-export function visitPages(pageCount: number, cursor: number, sticky = 0): Visit {
-  if (pageCount <= 0) return { pages: [], next: 0 };
-  const s = Math.max(0, Math.min(sticky, pageCount));
-  const more = REST_PER_VISIT;
-  if (pageCount <= s + more) {
-    return { pages: Array.from({ length: pageCount }, (_, i) => i), next: s };
-  }
-  const rest = pageCount - s;
-  const pages = Array.from({ length: s }, (_, i) => i);
-  let c = (((cursor - s) % rest) + rest) % rest;
-  for (let k = 0; k < more; k++) {
-    pages.push(s + c);
-    c = (c + 1) % rest;
-  }
-  return { pages, next: s + c };
 }
 
 // ── Freeze ─────────────────────────────────────────────────────────
