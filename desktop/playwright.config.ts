@@ -19,7 +19,9 @@ const port = Number(process.env.SHIM_PORT) || 5180;
  * gets a job and `rest` is everything else BY COMPLEMENT, so a new spec file
  * can never fall between the slices. Unset runs it all (the local default).
  */
-const SLICES: Record<string, RegExp> = { coverage: /coverage\.spec/, rail: /(width|rule6)\.spec/ };
+// Five slices, balanced by CI time (2 Oct 2026: rest alone was 14 min; the
+// pages laps are its long pole, the themes sweep its second).
+const SLICES: Record<string, RegExp> = { coverage: /coverage\.spec/, rail: /(width|rule6)\.spec/, pages: /\/pages\.spec/, themes: /pages-themes\.spec/ };
 const slice = process.env.SPEC_SLICE;
 if (slice && slice !== "rest" && !SLICES[slice]) throw new Error(`SPEC_SLICE=${slice}: expected ${Object.keys(SLICES).join(", ")} or rest`);
 

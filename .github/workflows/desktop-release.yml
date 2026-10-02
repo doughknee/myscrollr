@@ -79,10 +79,23 @@ jobs:
           if [ "$IS_DRAFT" = "false" ]; then
             echo "proceed=false" >> "$GITHUB_OUTPUT"
             echo "::warning::$TAG is already published — skipping the build so its assets are never overwritten. Bump the version in desktop/src-tauri/tauri.conf.json to cut a new release."
-          else
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-            echo "$TAG release state: $IS_DRAFT (missing or draft) — proceeding."
+            exit 0
           fi
+          # A push builds only when it changed the version (the cut itself). While
+          # a draft is open, every later push touching desktop/ used to rebuild all
+          # three platforms (19 min of runners) and overwrite the draft's assets
+          # (2 Oct 2026). A manual run always builds.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE='${{ github.event.before }}'
+            PREV=$(gh api "repos/$GITHUB_REPOSITORY/contents/desktop/src-tauri/tauri.conf.json?ref=$BEFORE" --jq .content 2>/dev/null | base64 -d | jq -r .version || echo "")
+            if [ -n "$PREV" ] && [ "desktop-v$PREV" = "$TAG" ]; then
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              echo "Version unchanged ($TAG) on this push — not rebuilding the draft. Bump the version to cut, or run this workflow by hand to rebuild."
+              exit 0
+            fi
+          fi
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+          echo "$TAG release state: $IS_DRAFT (missing or draft) — proceeding."
 
   # ── Resolve the build matrix based on the selected platform ────
   # Push triggers and "all" both build every target. Selecting a single
