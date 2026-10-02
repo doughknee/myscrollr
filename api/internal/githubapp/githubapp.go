@@ -24,13 +24,16 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -320,6 +323,26 @@ type upstream struct {
 	resetAt   time.Time
 }
 
+// rateLimit reports whether the budget behind this token is spent, and
+// until when (GitHub's x-ratelimit-reset, or a minute if it gave none).
+func rateLimit(resp *http.Response) (exhausted bool, resetAt time.Time) {
+	if resp.Header.Get("X-Ratelimit-Remaining") != "0" && resp.StatusCode != http.StatusTooManyRequests {
+		return false, time.Time{}
+	}
+	resetAt = now().Add(time.Minute)
+	if s, err := strconv.ParseInt(resp.Header.Get("X-Ratelimit-Reset"), 10, 64); err == nil {
+		resetAt = time.Unix(s, 0)
+	}
+	return true, resetAt
+}
+
+// holdLimit stops every call for this namespace until GitHub's reset.
+func holdLimit(ctx context.Context, ns string, resetAt time.Time) {
+	if wait := resetAt.Sub(now()); wait > 0 {
+		_ = platform.Rdb.Set(ctx, keyLimited+ns, "1", wait+time.Second).Err()
+	}
+}
+
 func fetchRun(ctx context.Context, repo, token string) (upstream, error) {
 	resp, err := githubRequest(ctx, http.MethodGet, "/repos/"+repo+"/actions/runs?per_page=1", token, nil)
 	if err != nil {
@@ -327,13 +350,7 @@ func fetchRun(ctx context.Context, repo, token string) (upstream, error) {
 	}
 	defer resp.Body.Close()
 	up := upstream{status: resp.StatusCode, run: Run{Repo: repo}}
-	if resp.Header.Get("X-Ratelimit-Remaining") == "0" || resp.StatusCode == http.StatusTooManyRequests {
-		up.exhausted = true
-		up.resetAt = now().Add(time.Minute)
-		if s, err := strconv.ParseInt(resp.Header.Get("X-Ratelimit-Reset"), 10, 64); err == nil {
-			up.resetAt = time.Unix(s, 0)
-		}
-	}
+	up.exhausted, up.resetAt = rateLimit(resp)
 	if resp.StatusCode != http.StatusOK {
 		return up, nil
 	}
@@ -406,7 +423,7 @@ func forgetUser(ctx context.Context, sub string) {
 			_ = platform.Rdb.Del(ctx, iter.Val()).Err()
 		}
 	}
-	_ = platform.Rdb.Del(ctx, keyLimited+userNS(sub)).Err()
+	_ = platform.Rdb.Del(ctx, keyLimited+userNS(sub), keyRepos+userNS(sub)).Err()
 }
 
 // errUnauthorized means GitHub answered 401 for this token.
@@ -456,9 +473,7 @@ func miss(ctx context.Context, ns, repo string, ttl time.Duration, token func() 
 	}
 	up, err := fetchRun(ctx, repo, tok)
 	if up.exhausted {
-		if wait := up.resetAt.Sub(now()); wait > 0 {
-			_ = platform.Rdb.Set(ctx, keyLimited+ns, "1", wait+time.Second).Err()
-		}
+		holdLimit(ctx, ns, up.resetAt)
 	}
 	switch {
 	case err != nil:
@@ -688,49 +703,10 @@ func HandleRuns(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-// userRuns answers with the user's token, refreshing it when it is within
-// refreshSkew of expiry or GitHub says 401. broken reports that GitHub
+// userRuns answers with the user's token. broken reports that GitHub
 // refused both the token and the refresh; the connection is marked so.
 func userRuns(ctx context.Context, conn *connection, repos []string) (runs []Run, broken bool) {
-	// One refresh per request at most. refreshErr keeps a transient failure
-	// (GitHub unreachable) from being mistaken for a refused token.
-	refreshed := false
-	var refreshErr error
-	refresh := func() error {
-		if refreshed {
-			if refreshErr != nil {
-				return refreshErr
-			}
-			return errUnauthorized // a fresh token was refused too
-		}
-		refreshed = true
-		if conn.RefreshToken == "" {
-			refreshErr = errRefreshRefused
-			return refreshErr
-		}
-		t, err := postToken(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {conn.RefreshToken}})
-		if err == nil {
-			err = saveTokens(ctx, conn.Sub, "", 0, t)
-		}
-		if err != nil {
-			refreshErr = err
-			return err
-		}
-		conn.AccessToken, conn.RefreshToken, conn.ExpiresAt = t.AccessToken, t.RefreshToken, nil
-		if t.ExpiresIn > 0 {
-			v := now().Add(time.Duration(t.ExpiresIn) * time.Second)
-			conn.ExpiresAt = &v
-		}
-		return nil
-	}
-	token := func() (string, error) {
-		if conn.ExpiresAt != nil && conn.ExpiresAt.Sub(now()) < refreshSkew {
-			if err := refresh(); err != nil {
-				return "", err
-			}
-		}
-		return conn.AccessToken, nil
-	}
+	token, refresh := userTokens(ctx, conn)
 
 	ns := userNS(conn.Sub)
 	ok := false
@@ -757,6 +733,262 @@ func userRuns(ctx context.Context, conn *connection, repos []string) (runs []Run
 		markOK(ctx, conn.Sub)
 	}
 	return runs, false
+}
+
+// userTokens hands out the connection's access token, refreshing it when it
+// is within refreshSkew of expiry, plus a refresh for a caller that saw a
+// 401. One refresh per request at most; refreshErr keeps a transient
+// failure (GitHub unreachable) from being mistaken for a refused token.
+func userTokens(ctx context.Context, conn *connection) (token func() (string, error), refresh func() error) {
+	refreshed := false
+	var refreshErr error
+	refresh = func() error {
+		if refreshed {
+			if refreshErr != nil {
+				return refreshErr
+			}
+			return errUnauthorized // a fresh token was refused too
+		}
+		refreshed = true
+		if conn.RefreshToken == "" {
+			refreshErr = errRefreshRefused
+			return refreshErr
+		}
+		t, err := postToken(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {conn.RefreshToken}})
+		if err == nil {
+			err = saveTokens(ctx, conn.Sub, "", 0, t)
+		}
+		if err != nil {
+			refreshErr = err
+			return err
+		}
+		conn.AccessToken, conn.RefreshToken, conn.ExpiresAt = t.AccessToken, t.RefreshToken, nil
+		if t.ExpiresIn > 0 {
+			v := now().Add(time.Duration(t.ExpiresIn) * time.Second)
+			conn.ExpiresAt = &v
+		}
+		return nil
+	}
+	token = func() (string, error) {
+		if conn.ExpiresAt != nil && conn.ExpiresAt.Sub(now()) < refreshSkew {
+			if err := refresh(); err != nil {
+				return "", err
+			}
+		}
+		return conn.AccessToken, nil
+	}
+	return token, refresh
+}
+
+// =============================================================================
+// Your repos (SCROLLR-307): the picker that replaces pasting URLs
+// =============================================================================
+
+const (
+	reposTTL     = 10 * time.Minute
+	activeWindow = 30 * 24 * time.Hour
+	// maxActiveChecks bounds one refresh to 31 GitHub calls: the repo list,
+	// then one runs call for each of the 30 most recently pushed repos. The
+	// rest are reported inactive without a call.
+	maxActiveChecks = 30
+	activeParallel  = 6
+
+	keyRepos = "github:repos:" // + ns; the last good list is keyLast + ns + ":repos"
+)
+
+// Repo is one of the connected user's repos, as the widget's picker shows it.
+type Repo struct {
+	FullName      string `json:"full_name"`
+	Private       bool   `json:"private"`
+	PushedAt      string `json:"pushed_at,omitempty"`
+	DefaultBranch string `json:"default_branch,omitempty"`
+	// Active: a workflow run started in the last 30 days.
+	Active    bool   `json:"active"`
+	LastRunAt string `json:"last_run_at,omitempty"`
+}
+
+// ReposResponse is GET /github/repos. 409 carries connect:true.
+type ReposResponse struct {
+	Connected bool   `json:"connected"`
+	Connect   bool   `json:"connect,omitempty"`
+	Login     string `json:"login,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+	Repos     []Repo `json:"repos"`
+	// Stale: GitHub's rate limit is spent; this is the last good list.
+	Stale bool `json:"stale,omitempty"`
+}
+
+// HandleRepos - GET /github/repos (JWT). Connected accounts only: there is
+// no "your repos" without a GitHub identity, so anyone else gets 409.
+// Nothing is stored server-side; the desktop keeps the picked repos in its
+// widget prefs as before.
+func HandleRepos(c *fiber.Ctx) error {
+	sub, ok := requireUser(c)
+	if !ok {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), requestBudget)
+	defer cancel()
+	notConnected := func(reason string) error {
+		return c.Status(fiber.StatusConflict).JSON(ReposResponse{Connect: true, Reason: reason, Repos: []Repo{}})
+	}
+	conn, err := loadConnection(ctx, sub)
+	switch {
+	case err != nil:
+		log.Printf("[GitHub] repos: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not read GitHub connection"})
+	case conn == nil:
+		return notConnected("")
+	case conn.Status != "ok":
+		return notConnected(brokenReason)
+	}
+	repos, stale, err := userRepos(ctx, conn)
+	switch {
+	case errors.Is(err, errUnauthorized) || errors.Is(err, errRefreshRefused):
+		markBroken(ctx, sub, err.Error())
+		return notConnected(brokenReason)
+	case err != nil:
+		log.Printf("[GitHub] repos: %v", err)
+		return c.Status(fiber.StatusBadGateway).JSON(platform.ErrorResponse{Status: "error", Error: "Could not reach GitHub"})
+	}
+	return c.JSON(ReposResponse{Connected: true, Login: conn.Login, Repos: repos, Stale: stale})
+}
+
+func cachedRepos(ctx context.Context, key string) ([]Repo, bool) {
+	raw, err := platform.Rdb.Get(ctx, key).Bytes()
+	if err != nil {
+		return nil, false
+	}
+	var r []Repo
+	return r, json.Unmarshal(raw, &r) == nil
+}
+
+// userRepos answers from the 10-minute cache, or lists the repos and checks
+// the recent ones for Actions activity. While the user's budget is spent it
+// serves the last good list marked stale, like /github/runs.
+func userRepos(ctx context.Context, conn *connection) (repos []Repo, stale bool, err error) {
+	ns := userNS(conn.Sub)
+	freshKey, lastKey := keyRepos+ns, keyLast+ns+":repos"
+	if r, ok := cachedRepos(ctx, freshKey); ok {
+		return r, false, nil
+	}
+	last := func() ([]Repo, bool, error) {
+		r, ok := cachedRepos(ctx, lastKey)
+		if !ok {
+			r = []Repo{}
+		}
+		return r, true, nil
+	}
+	if platform.Rdb.Exists(ctx, keyLimited+ns).Val() > 0 {
+		return last()
+	}
+
+	token, refresh := userTokens(ctx, conn)
+	tok, err := token()
+	if err != nil {
+		return nil, false, err
+	}
+	repos, up, err := listRepos(ctx, tok)
+	if err == nil && up.status == http.StatusUnauthorized {
+		if err = refresh(); err != nil {
+			return nil, false, err
+		}
+		if repos, up, err = listRepos(ctx, conn.AccessToken); err == nil && up.status == http.StatusUnauthorized {
+			return nil, false, errUnauthorized
+		}
+	}
+	if up.exhausted {
+		holdLimit(ctx, ns, up.resetAt)
+	}
+	switch {
+	case err != nil:
+		return nil, false, err
+	case up.exhausted && up.status != http.StatusOK:
+		return last()
+	case up.status != http.StatusOK:
+		return nil, false, fmt.Errorf("list repos: HTTP %d", up.status)
+	}
+
+	complete := checkActive(ctx, ns, conn.AccessToken, repos)
+	if raw, err := json.Marshal(repos); err == nil {
+		// A list cut short by the rate limit is served once but not cached,
+		// so its missing active flags do not stick for ten minutes.
+		if complete {
+			_ = platform.Rdb.Set(ctx, freshKey, raw, reposTTL).Err()
+		}
+		_ = platform.Rdb.Set(ctx, lastKey, raw, lastGoodTTL).Err()
+	}
+	markOK(ctx, conn.Sub)
+	return repos, false, nil
+}
+
+// listRepos is one call: the user's repos, most recently pushed first.
+// ponytail: one page of 100; a user with more sees the 100 freshest.
+func listRepos(ctx context.Context, token string) ([]Repo, upstream, error) {
+	resp, err := githubRequest(ctx, http.MethodGet,
+		"/user/repos?sort=pushed&per_page=100&affiliation=owner,collaborator,organization_member", token, nil)
+	if err != nil {
+		return nil, upstream{}, fmt.Errorf("list repos: %w", err)
+	}
+	defer resp.Body.Close()
+	up := upstream{status: resp.StatusCode}
+	up.exhausted, up.resetAt = rateLimit(resp)
+	if resp.StatusCode != http.StatusOK {
+		return nil, up, nil
+	}
+	var body []struct {
+		FullName      string  `json:"full_name"`
+		Private       bool    `json:"private"`
+		PushedAt      *string `json:"pushed_at"`
+		DefaultBranch string  `json:"default_branch"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 16<<20)).Decode(&body); err != nil {
+		return nil, up, fmt.Errorf("decode repos: %w", err)
+	}
+	repos := make([]Repo, 0, len(body))
+	for _, b := range body {
+		repos = append(repos, Repo{FullName: b.FullName, Private: b.Private, PushedAt: deref(b.PushedAt), DefaultBranch: b.DefaultBranch})
+	}
+	// RFC 3339 UTC sorts as text. GitHub already orders by push; this keeps
+	// the 30-check budget on the freshest repos whatever it sends.
+	sort.SliceStable(repos, func(i, j int) bool { return repos[i].PushedAt > repos[j].PushedAt })
+	return repos, up, nil
+}
+
+// checkActive asks for the latest run of the first maxActiveChecks repos
+// and sets Active and LastRunAt. complete is false when the rate limit cut
+// the checks short.
+func checkActive(ctx context.Context, ns, token string, repos []Repo) (complete bool) {
+	cutoff := now().Add(-activeWindow)
+	var exhausted atomic.Bool
+	var g errgroup.Group
+	g.SetLimit(activeParallel)
+	for i := range repos[:min(len(repos), maxActiveChecks)] {
+		g.Go(func() error {
+			if exhausted.Load() {
+				return nil
+			}
+			up, err := fetchRun(ctx, repos[i].FullName, token)
+			if up.exhausted {
+				exhausted.Store(true)
+				holdLimit(ctx, ns, up.resetAt)
+			}
+			if err != nil || !up.run.Available {
+				return nil
+			}
+			at := up.run.RunStartedAt
+			if at == "" {
+				at = up.run.UpdatedAt
+			}
+			repos[i].LastRunAt = at
+			if t, err := time.Parse(time.RFC3339, at); err == nil && t.After(cutoff) {
+				repos[i].Active = true
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+	return !exhausted.Load()
 }
 
 // =============================================================================

@@ -620,12 +620,33 @@ export interface GitHubStatus {
   reason?: string;
 }
 
+/** One of the connected user's repos, for the widget's picker (SCROLLR-307). */
+export interface GitHubRepoRow {
+  full_name: string;
+  private: boolean;
+  pushed_at?: string;
+  default_branch?: string;
+  /** A workflow run in the last 30 days (checked for the 30 freshest). */
+  active: boolean;
+  last_run_at?: string;
+}
+
+export interface GitHubReposResponse {
+  connected: boolean;
+  login?: string;
+  repos: GitHubRepoRow[];
+  /** GitHub's rate limit is spent; this is the last good list. */
+  stale?: boolean;
+}
+
 /**
  * Core brokers the Scrollr Desktop GitHub App and holds the token; the app
  * only ever sees runs. Unconnected accounts still get their public repos
  * through core's shared fallback.
  */
 export const githubApi = {
+  /** The connected user's repos. 409 when not connected. */
+  repos: () => authFetch<GitHubReposResponse>("/github/repos"),
   runs: (repos: string[]) =>
     authFetch<GitHubRunsResponse>(
       `/github/runs?repos=${encodeURIComponent(repos.join(","))}`,

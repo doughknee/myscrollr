@@ -12,7 +12,7 @@ import { LS_GITHUB_REPOS } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
 import { githubApi } from "../../api/client";
-import type { GitHubRunRow } from "../../api/client";
+import type { GitHubRepoRow, GitHubRunRow } from "../../api/client";
 
 // ── GitHub Actions API response ────────────────────────────────
 
@@ -227,6 +227,41 @@ export async function fetchRepos(
   const res = await githubApi.runs(repos.map(repoKey));
   const byKey = new Map(res.runs.map((row) => [row.repo.toLowerCase(), row]));
   return repos.map((r) => fromRunRow(r, byKey.get(repoKey(r).toLowerCase())));
+}
+
+// ── Your repos picker (SCROLLR-307) ────────────────────────────
+
+type RepoRef = { owner: string; repo: string };
+
+/** Core's GET /github/runs answers at most this many repos (maxRepos). */
+const MAX_AUTO_PICK = 20;
+
+function refOf(fullName: string): RepoRef {
+  const [owner, repo] = fullName.split("/");
+  return { owner, repo };
+}
+
+/**
+ * The configured list with one of the user's repos ticked or unticked —
+ * the same list the URL box writes. Matched case-insensitively, since a
+ * pasted URL may not match GitHub's casing.
+ */
+export function toggleRepo(config: RepoRef[], fullName: string, on: boolean): RepoRef[] {
+  const key = fullName.toLowerCase();
+  const has = config.some((r) => repoKey(r).toLowerCase() === key);
+  if (on === has) return config;
+  if (!on) return config.filter((r) => repoKey(r).toLowerCase() !== key);
+  return [...config, refOf(fullName)];
+}
+
+/**
+ * The first-load rule: with nothing configured, start from the repos with
+ * recent Actions activity. Never adds to an existing list (null = leave it).
+ */
+export function autoPick(config: RepoRef[], rows: GitHubRepoRow[]): RepoRef[] | null {
+  if (config.length > 0) return null;
+  const active = rows.filter((r) => r.active).slice(0, MAX_AUTO_PICK);
+  return active.length > 0 ? active.map((r) => refOf(r.full_name)) : null;
 }
 
 // ── Store persistence ──────────────────────────────────────────

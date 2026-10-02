@@ -13,6 +13,7 @@ import { githubWidget } from "./FeedTab";
 const api = vi.hoisted(() => ({
   status: vi.fn(),
   runs: vi.fn(),
+  repos: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
   invoke: vi.fn(async () => undefined),
@@ -31,32 +32,106 @@ vi.mock("../../api/client", async (importOriginal) => ({
   githubApi: {
     status: api.status,
     runs: api.runs,
+    repos: api.repos,
     connect: api.connect,
     disconnect: api.disconnect,
   },
 }));
 
-function mount(authenticated = true) {
+function mount(authenticated = true, repos = [{ owner: "o", repo: "r" }]) {
   const base = loadPrefs();
   const prefs = {
     ...base,
-    widgets: { ...base.widgets, github: { ...base.widgets.github, repos: [{ owner: "o", repo: "r" }] } },
+    widgets: { ...base.widgets, github: { ...base.widgets.github, repos } },
   };
   const shell = { prefs, authenticated, onPrefsChange: vi.fn() } as unknown as ShellState;
   const FeedTab = githubWidget.FeedTab;
-  return render(
+  return { shell, ...render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ShellContext.Provider value={shell}>
         <FeedTab mode="comfort" feedContext={{}} />
       </ShellContext.Provider>
     </QueryClientProvider>,
-  );
+  ) };
 }
+
+/** The repos the last prefs write configured. */
+function lastWrite(shell: ShellState) {
+  const calls = vi.mocked(shell.onPrefsChange).mock.calls;
+  return calls[calls.length - 1]?.[0].widgets.github.repos;
+}
+
+describe("GitHub widget: Your repos (SCROLLR-307)", () => {
+  const yours = {
+    connected: true,
+    login: "octo",
+    repos: [
+      { full_name: "octo/app", private: true, active: true, last_run_at: new Date(Date.now() - 2 * 86_400_000).toISOString() },
+      { full_name: "octo/site", private: false, active: true },
+      { full_name: "octo/dusty", private: false, active: false, pushed_at: "2025-01-01T00:00:00Z" },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.runs.mockResolvedValue({ connected: true, runs: [] });
+    api.repos.mockResolvedValue(yours);
+  });
+
+  it("first load with no repos: ticks the active ones", async () => {
+    api.status.mockResolvedValue({ connected: true, login: "octo" });
+    const { shell } = mount(true, []);
+    await waitFor(() =>
+      expect(lastWrite(shell)).toEqual([
+        { owner: "octo", repo: "app" },
+        { owner: "octo", repo: "site" },
+      ]),
+    );
+  });
+
+  it("existing list: adds nothing; unticking writes the list without it", async () => {
+    api.status.mockResolvedValue({ connected: true, login: "octo" });
+    const { shell } = mount(true, [{ owner: "octo", repo: "app" }, { owner: "o", repo: "r" }]);
+    const app = await screen.findByRole("checkbox", { name: /octo\/app/ });
+    expect(shell.onPrefsChange).not.toHaveBeenCalled();
+    expect(app).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /octo\/site/ })).not.toBeChecked();
+    expect(screen.getByText("last run 2d ago")).toBeTruthy();
+    expect(screen.getByLabelText("Private")).toBeTruthy();
+
+    fireEvent.click(app);
+    expect(lastWrite(shell)).toEqual([{ owner: "o", repo: "r" }]);
+    fireEvent.click(screen.getByRole("checkbox", { name: /octo\/site/ }));
+    expect(lastWrite(shell)).toEqual([
+      { owner: "octo", repo: "app" },
+      { owner: "o", repo: "r" },
+      { owner: "octo", repo: "site" },
+    ]);
+  });
+
+  it("inactive repos stay collapsed until Show all", async () => {
+    api.status.mockResolvedValue({ connected: true, login: "octo" });
+    mount(true, [{ owner: "o", repo: "r" }]);
+    await screen.findByRole("checkbox", { name: /octo\/app/ });
+    expect(screen.queryByRole("checkbox", { name: /octo\/dusty/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show all (1 more)" }));
+    expect(screen.getByRole("checkbox", { name: /octo\/dusty/ })).toBeTruthy();
+  });
+
+  it("not connected: no picker, no repos call", async () => {
+    api.status.mockResolvedValue({ connected: false });
+    mount();
+    await screen.findByRole("button", { name: "Connect GitHub" });
+    expect(api.repos).not.toHaveBeenCalled();
+    expect(screen.queryByText("Your repos")).toBeNull();
+  });
+});
 
 describe("GitHub widget: Connect GitHub", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.runs.mockResolvedValue({ connected: false, connect: true, runs: [{ repo: "o/r", available: true, status: "completed", conclusion: "success" }] });
+    api.repos.mockResolvedValue({ connected: true, repos: [] });
   });
 
   it("not connected: Connect GitHub opens core's authorize URL in the browser", async () => {
