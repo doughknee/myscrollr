@@ -192,7 +192,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Settings
 
-<!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
+<!-- source: desktop/src/components/settings/pages.ts @ fa8d32e9a379 -->
 <!-- source: desktop/src/components/settings/rows.ts @ 7785b9630a71 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 

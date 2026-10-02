@@ -14,6 +14,7 @@ import (
 	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
+	"github.com/brandon-relentnet/myscrollr/api/internal/ops"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/brandon-relentnet/myscrollr/api/internal/support"
 	"github.com/brandon-relentnet/myscrollr/api/internal/widgets"
@@ -192,6 +193,13 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/extension/token", accounts.HandleExtensionTokenExchange)
 	s.App.Options("/extension/token/refresh", accounts.HandleExtensionAuthPreflight)
 	s.App.Post("/extension/token/refresh", accounts.HandleExtensionTokenRefresh)
+
+	// The "I did it" page that finishes a stalled desktop release
+	// (SCROLLR-305). No JWT: OPS_RELEASE_KEY in the query gates all three,
+	// and a wrong key 404s like an unknown route.
+	s.App.Get("/ops/release", ops.HandleReleasePage)
+	s.App.Post("/ops/release/finish", ops.HandleReleaseFinish)
+	s.App.Get("/ops/release/status", ops.HandleReleaseStatus)
 
 	// The widget catalog — the single authority clients render from.
 	s.App.Get("/catalog", widgets.HandleGetCatalog)
