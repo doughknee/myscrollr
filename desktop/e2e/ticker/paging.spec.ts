@@ -2,8 +2,8 @@ import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import { parkMouse } from "./pages";
 
 /**
- * SCROLLR-298: manual paging. The wheel over the bar, the ‹ › arrows beside the
- * label and ←/→ step one page in reading order; the pager between the arrows
+ * SCROLLR-298: manual paging. The wheel over the bar, the ‹ › arrows at the bar's
+ * left end (before the label, SCROLLR-300) and ←/→ step one page in reading order; the pager between the arrows
  * says where the page sits in the lap (`7/23`). A step is a turn like any
  * other, so it restarts the page's dwell; a follower's step turns every window.
  *
@@ -39,13 +39,17 @@ async function wheel(page: Page, ctx: BrowserContext, dy: number, dx = 0) {
   await ctx.clock.runFor(SWIPE_MS + 100);
 }
 
-test("the pager reads the page's place in the lap, beside the label, and nothing in it moves when the count does", async ({ page, context }) => {
+test("the pager reads the page's place in the lap, at the left end before the label, and nothing in it moves when the count does", async ({ page, context }) => {
   await open(page, context);
   const total = await of(page);
   expect(total, "the pages fixture spans several pages").toBeGreaterThan(5);
   const box = await page.locator("[data-pager]").boundingBox();
-  expect(box!.x, "right after the 112px label").toBe(112);
+  expect(box!.x, "at the bar's left end, before the label (SCROLLR-300)").toBe(0);
   expect(box!.width).toBe(PAGER_W);
+  const labelBox = await page.locator("[data-label]").first().boundingBox();
+  expect(labelBox!.x, "the 112px label right after the pager").toBe(PAGER_W);
+  const pageBox = await page.locator("[data-pages] [data-page]").first().boundingBox();
+  expect(pageBox!.x, "the page after both").toBe(PAGER_W + 112);
   const label = page.locator("[data-lap-pos]");
   const first = await label.boundingBox();
   for (let i = 0; i < 9; i++) await wheel(page, context, 100); // 1/n .. 10/n: one digit to two
@@ -108,6 +112,42 @@ test("the arrows show only while the pointer is over the bar, are 44px targets, 
   await prev.click();
   await context.clock.runFor(SWIPE_MS + 100);
   expect(await at(page)).toBe(2);
+});
+
+test("a step back swipes left to right; forward and the clock's own turns swipe right to left (SCROLLR-300)", async ({ page, context }) => {
+  await open(page, context);
+  /** Mid-swipe: the x translation of the page coming in (the newest visit) and of the one going out. */
+  const midSwipe = async () => {
+    await context.clock.runFor(SWIPE_MS / 2);
+    const xs = await page.locator("[data-pages] [data-page]").evaluateAll((els) =>
+      els
+        .map((e) => ({ visit: Number(e.getAttribute("data-visit")), x: new DOMMatrix(getComputedStyle(e).transform).m41 }))
+        .sort((a, b) => a.visit - b.visit),
+    );
+    await context.clock.runFor(SWIPE_MS / 2 + 100);
+    expect(xs, "two pages on the bar mid-swipe").toHaveLength(2);
+    return { out: xs[0].x, in: xs[1].x };
+  };
+
+  await page.keyboard.press("ArrowRight");
+  const fwd = await midSwipe();
+  expect(fwd.in, "forward: comes in from the right").toBeGreaterThan(0);
+  expect(fwd.out, "and leaves to the left").toBeLessThan(0);
+
+  await page.keyboard.press("ArrowLeft");
+  const back = await midSwipe();
+  expect(back.in, "back: comes in from the left").toBeLessThan(0);
+  expect(back.out, "and leaves to the right").toBeGreaterThan(0);
+  expect(await page.locator("[data-page][data-back]").count(), "the stepped-back page is marked").toBe(1);
+
+  // The clock's own turn after a step back goes right to left again.
+  for (let s = 0; s < 80 && (await page.locator("[data-pages] [data-page]").count()) === 1; s++) await context.clock.runFor(250);
+  await context.clock.runFor(SWIPE_MS / 2 - 250);
+  const xs = await page.locator("[data-pages] [data-page]").evaluateAll((els) =>
+    els.map((e) => ({ visit: Number(e.getAttribute("data-visit")), x: new DOMMatrix(getComputedStyle(e).transform).m41 })).sort((a, b) => a.visit - b.visit),
+  );
+  expect(xs).toHaveLength(2);
+  expect(xs[1].x, "an automatic turn comes in from the right").toBeGreaterThan(0);
 });
 
 test("← and → step when the window has focus", async ({ page, context }) => {

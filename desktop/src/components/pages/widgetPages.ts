@@ -312,6 +312,8 @@ export interface Turn {
   pages: number;
   /** Seconds this page holds (before any hover). */
   dwell: number;
+  /** A manual step back: the page swipes in from the left (SCROLLR-300). Absent on every other turn. */
+  back?: true;
 }
 
 /** Each widget's next page: the leader's rotation cursors. */
@@ -383,7 +385,9 @@ export function stepTurn(
     page = dir > 0 ? 0 : plan.pages.length - 1;
   }
   nav.cursors.set(tab, (page + 1) % plan.pages.length);
-  return { seq: prev.seq + 1, tab, page, pages: plan.pages.length, dwell: dwellFor(plan.pages[page].length) };
+  const t: Turn = { seq: prev.seq + 1, tab, page, pages: plan.pages.length, dwell: dwellFor(plan.pages[page].length) };
+  if (dir < 0) t.back = true;
+  return t;
 }
 
 /** This window's page for a turn: the same index when the counts agree, else the same share of the way through. */
