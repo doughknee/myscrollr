@@ -35,6 +35,15 @@ export function inkFor(hex: string | undefined, dark: boolean): string {
   return readableInk(accentFor(hex, dark), dark);
 }
 
+/**
+ * Red and green as text on their own 12% wash: the palette's tokens moved
+ * 15% toward white (dark) or black (light), the band chip's rule, so they
+ * clear 4.5:1 on every palette (`pages-themes.spec`; a 14% wash left gruvbox-dark at 4.47).
+ */
+export function semantic(token: "down" | "up", dark: boolean): string {
+  return `color-mix(in srgb, var(--color-${token}) 85%, ${dark ? "white" : "black"})`;
+}
+
 /** `--accent` at `pct`% over whatever is behind it. Inline style, not a class. */
 export function mix(pct: number): string {
   return `color-mix(in srgb, var(--accent) ${pct}%, transparent)`;

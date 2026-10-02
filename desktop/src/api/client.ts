@@ -657,48 +657,81 @@ export interface GitHubPRRow {
   checks_state: "passing" | "failing" | "running" | "none" | "unknown";
 }
 
-/** The default branch: failing when any workflow's latest run there failed. */
-export interface GitHubDefaultCI {
-  state: "passing" | "failing" | "running" | "none";
-  workflow?: string;
-  updated_at?: string;
-  html_url?: string;
-  commit_message?: string;
+/** One of a repo's workflows, for the widget's checklist (SCROLLR-312). */
+export interface GitHubWorkflowRow {
+  name: string;
+  path: string;
+  /** Its latest run on the default branch. */
+  last: "passing" | "failing" | "running" | "none";
+  last_at?: string;
+  /** Ran on the default branch in the last 30 days: ticked by default. */
+  ran_recently: boolean;
 }
 
-export interface GitHubRepoPRs {
+export interface GitHubWorkflowsResponse {
+  connected: boolean;
+  connect?: boolean;
+  available: boolean;
+  default_branch?: string;
+  workflows: GitHubWorkflowRow[];
+  stale?: boolean;
+}
+
+/** A watched workflow's latest run on the default branch, or another CI's failing check there. */
+export interface GitHubBoardRun {
+  name: string;
+  state: "passing" | "failing" | "running" | "none";
+  at?: string;
+  url?: string;
+}
+
+export interface GitHubBoardIssue {
+  number: number;
+  title: string;
+  url: string;
+  created_at: string;
+}
+
+/** One tracked repo's cell (SCROLLR-312). `prs` / `issues` are absent when that mode is off. */
+export interface GitHubBoardRepo {
   repo: string;
   available: boolean;
   stale?: boolean;
-  prs: GitHubPRRow[];
-  default_ci?: GitHubDefaultCI;
-  /** Runs in progress on your PR branches or started by you. */
-  mine_running: number;
-  mine_since?: string;
-  mine_branch?: string;
+  workflows: GitHubBoardRun[];
+  /** Failing checks on the default branch's head from CI other than Actions. */
+  checks?: GitHubBoardRun[];
+  /** mine: the PRs that need you; all: every open PR, those first. */
+  prs?: { count: number; needs_you: number; items: GitHubPRRow[] };
+  /** `error: "permission"` until the install approves Issues: read. */
+  issues?: { count: number; items: GitHubBoardIssue[]; error?: string };
 }
 
-export interface GitHubPRsResponse {
+export interface GitHubBoardResponse {
   connected: boolean;
   connect?: boolean;
   login?: string;
   reason?: string;
-  repos: GitHubRepoPRs[];
+  repos: GitHubBoardRepo[];
 }
 
 /**
  * Core brokers the Scrollr Desktop GitHub App and holds the token; the app
- * only ever sees runs. Unconnected accounts still get their public repos
- * through core's shared fallback.
+ * only ever sees what core reads. Unconnected accounts still get their
+ * public repos' latest run through core's shared fallback (`runs`).
  */
 export const githubApi = {
   /** The connected user's repos. 409 when not connected. */
   repos: () => authFetch<GitHubReposResponse>("/github/repos"),
-  /** Open PRs, the default branch and your running branches. Connected accounts only. */
-  prs: (repos: string[]) =>
-    authFetch<GitHubPRsResponse>(
-      `/github/prs?repos=${encodeURIComponent(repos.join(","))}`,
-    ),
+  /** Every tracked repo and what it watches, in one call. Connected accounts only. */
+  board: (repos: Array<{ repo: string; workflows?: string[]; prs: string; issues: string }>) =>
+    authFetch<GitHubBoardResponse>("/github/board", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repos }),
+    }),
+  /** A repo's workflows with their last result, for the checklist. */
+  workflows: (repo: string) =>
+    authFetch<GitHubWorkflowsResponse>(`/github/workflows?repo=${encodeURIComponent(repo)}`),
   runs: (repos: string[]) =>
     authFetch<GitHubRunsResponse>(
       `/github/runs?repos=${encodeURIComponent(repos.join(","))}`,

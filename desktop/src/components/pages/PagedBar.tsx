@@ -46,7 +46,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, type LucideIcon } from "lucide-react";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { WidgetPin } from "../../preferences";
-import type { GitHubPagePR } from "../../widgets/github/types";
+import type { GitHubChipData } from "../../types";
 import { financeMarketOptions } from "../../api/queries";
 import { sourceForWidget } from "../../marketplace";
 import { isPrimaryTicker } from "../../lib/windowRole";
@@ -73,7 +73,7 @@ import GameCell from "./cells/GameCell";
 import NewsCell from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
-import PRCell from "./cells/PRCell";
+import RepoCell from "./cells/RepoCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
 import { stepBack } from "./edgeRule";
@@ -388,8 +388,8 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
       return <QuoteCell trade={t} fill={item.fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
     }
     case "github": {
-      const pr = item.data as GitHubPagePR;
-      return <PRCell pr={pr} dark={dark} onClick={() => onChipClick?.("github", item.key, pr.html_url || undefined)} />;
+      const repo = item.data as GitHubChipData;
+      return <RepoCell chip={repo} width={colW} dark={dark} onClick={() => onChipClick?.("github", item.key, repo.url)} />;
     }
     case "also": {
       const a = item.data as AlsoItem;

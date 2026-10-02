@@ -7,7 +7,7 @@ import {
   LS_TIMER_STATE,
   LS_WEATHER_CITIES,
   LS_UPTIME_MONITORS,
-  LS_GITHUB_REPOS,
+  LS_GITHUB_BOARD,
 } from "../constants";
 import { getStore, onStoreChange } from "../lib/store";
 import { formatBytes, timeAgo, truncate } from "../utils/format";
@@ -29,54 +29,35 @@ import type {
 import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
-import {
-  GITHUB_BAR_DEFAULTS,
-  barPrefs,
-  chipState,
-  inQuietHours,
-  loadRepoData,
-  needsYou,
-  nextFlash,
-  pagePRs,
-  repoKey,
-  shortAge,
-} from "../widgets/github/types";
-import type { FlashMemo, GitHubBarPrefs, GitHubRepo } from "../widgets/github/types";
+import { loadBoard, nextFlash, repoChip, sameRepo } from "../widgets/github/types";
+import type { FlashMemo } from "../widgets/github/types";
+import type { GitHubBoardRepo } from "../api/client";
+import { GITHUB_DEFAULTS, inQuietHours, migrateGitHub } from "../widgets/github/config";
+import type { GitHubWidgetConfig } from "../widgets/github/config";
 
 // Per window: each ticker flashes a repo once per worthy change.
 const githubFlash = new Map<string, FlashMemo>();
 
 /**
- * The connected fields of a GitHub chip (SCROLLR-308); none when not
- * connected. The bar prefs (SCROLLR-309) decide what counts and whether it
- * flashes; quiet hours silence the chip and empty the page.
+ * One tracked repo on the bar (SCROLLR-312): its pills worst first, the
+ * dot, the age and the most urgent link. Quiet hours empty the pills (the
+ * slot greys, the page goes) and nothing flashes; the flash fires on the
+ * worst state changing or more PRs needing you (308's rule).
  */
-export function connectedChip(
-  repo: GitHubRepo,
-  key: string,
-  bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS,
+export function githubChip(
+  r: GitHubBoardRepo,
+  cfg: GitHubWidgetConfig = GITHUB_DEFAULTS,
   quiet = false,
-): Partial<GitHubChipData> {
-  const state = chipState(repo, bar, quiet);
-  if (!state) return {};
-  const needs = needsYou(repo.prs, bar).length;
-  const broken = state === "broken";
-  // The memo follows what the chip shows: leaving quiet hours with PRs waiting flashes once.
-  const memo = nextFlash(githubFlash.get(key), broken, state === "needs" ? needs : 0);
-  githubFlash.set(key, memo);
-  const loud = bar.flash && !quiet;
-  return {
-    state,
-    needs,
-    age: shortAge(state === "running" ? repo.mineSince : repo.defaultCi?.updated_at),
-    defaultCi: repo.defaultCi,
-    mineRunning: repo.mineRunning,
-    mineBranch: repo.mineBranch,
-    prs: repo.prs,
-    page: pagePRs(repo, bar, quiet),
-    flash: loud ? memo.token : undefined,
-    flashTone: loud ? memo.tone : undefined,
-  };
+  now = Date.now(),
+): GitHubChipData {
+  const t = cfg.repos.find((x) => sameRepo(x.repo, r.repo));
+  const chip = repoChip(r, t, quiet, now);
+  const needs = chip.pills.some((p) => p.kind === "you") ? r.prs?.needs_you ?? 0 : 0;
+  // The memo follows what the bar shows: leaving quiet hours with something waiting flashes once.
+  const memo = nextFlash(githubFlash.get(chip.id), chip.worst, needs);
+  githubFlash.set(chip.id, memo);
+  const loud = cfg.flash && !quiet;
+  return { ...chip, flash: loud ? memo.token : undefined, flashTone: loud ? memo.tone : undefined };
 }
 
 const EMPTY: WidgetTickerData = {
@@ -247,9 +228,9 @@ export function useWidgetTickerData(
     () => new Set(widgetPrefs.widgetsOnTicker),
     [widgetPrefs.widgetsOnTicker],
   );
-  // The GitHub bar prefs (SCROLLR-309), stable across renders that did not change them.
-  const githubBarJson = JSON.stringify(widgetPrefs.github?.bar ?? null);
-  const githubBarRaw = useMemo(() => JSON.parse(githubBarJson) as unknown, [githubBarJson]);
+  // The GitHub config (SCROLLR-312), stable across renders that did not change it.
+  const githubJson = JSON.stringify(widgetPrefs.github ?? null);
+  const githubCfg = useMemo(() => migrateGitHub(JSON.parse(githubJson)), [githubJson]);
 
   // ── Build clock chips ─────────────────────────────────────────
   const buildClockChips = useCallback((): ClockChipData[] => {
@@ -486,51 +467,14 @@ export function useWidgetTickerData(
   // ── Build github chips ────────────────────────────────────────
   const buildGithubChips = useCallback((): GitHubChipData[] => {
     if (!enabledWidgets.has("github")) return [];
-    const repos = loadRepoData();
-    if (repos.length === 0) return [];
-    const bar = barPrefs(githubBarRaw);
-    const quiet = inQuietHours(bar);
-
-    const chips: GitHubChipData[] = [];
-
-    for (const repo of repos) {
-      const key = repoKey(repo);
-      const repoLabel = truncate(repo.repo, 20);
-      const workflow = repo.workflowName ?? "CI";
-
-      // Detail row: first line of commit message + time ago
-      const firstLine = repo.commitMessage?.split("\n")[0] ?? "";
-      const commit = truncate(firstLine, 30);
-      const checked = timeAgo(repo.updatedAt, { suffix: true });
-      const detail = [commit, checked].filter(Boolean).join(" \u00B7 ");
-
-      chips.push({
-        id: `github-${key}`,
-        label: repoLabel,
-        status: repo.status,
-        workflowName: workflow,
-        detail: detail || undefined,
-        branch: repo.branch ?? undefined,
-        // Duration for anything that ran; "queued" reads better than a
-        // zero for a run that hasn't started. `failedStep` would take
-        // this slot on failures but needs the jobs payload we don't
-        // fetch — see GitHubChipData.
-        elapsed:
-          repo.status === "unavailable"
-            ? "queued"
-            : repo.startedAt
-              ? compactDuration(
-                  (repo.updatedAt
-                    ? new Date(repo.updatedAt).getTime()
-                    : Date.now()) - new Date(repo.startedAt).getTime(),
-                )
-              : undefined,
-        ...connectedChip(repo, key, bar, quiet),
-      });
-    }
-
-    return chips;
-  }, [enabledWidgets, githubBarRaw]);
+    const quiet = inQuietHours(githubCfg.quietHours);
+    // Only repos still tracked, in config order: a removed one leaves at once.
+    const board = loadBoard();
+    return githubCfg.repos.flatMap((t) => {
+      const r = board.find((b) => sameRepo(b.repo, t.repo));
+      return r ? [githubChip(r, githubCfg, quiet)] : [];
+    });
+  }, [enabledWidgets, githubCfg]);
 
   // ── Polling intervals ─────────────────────────────────────────
 
@@ -611,7 +555,7 @@ export function useWidgetTickerData(
 
     // GitHub: listen for store changes (repo data written by FeedTab)
     const unsubGithubRepos = hasGithub
-      ? onStoreChange(LS_GITHUB_REPOS, () => {
+      ? onStoreChange(LS_GITHUB_BOARD, () => {
           setData((prev) => ({ ...prev, github: buildGithubChips() }));
         })
       : null;

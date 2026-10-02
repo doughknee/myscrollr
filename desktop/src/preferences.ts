@@ -4,7 +4,10 @@
 
 import { getStore, removeStore, setStore } from "./lib/store";
 import { LS_CLOCK_FORMAT, LS_WEATHER_UNIT } from "./constants";
-import type { GitHubBarPrefs } from "./widgets/github/types";
+import { GITHUB_DEFAULTS, migrateGitHub } from "./widgets/github/config";
+import type { GitHubWidgetConfig } from "./widgets/github/config";
+
+export type { GitHubWidgetConfig };
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -243,13 +246,6 @@ export interface SysmonWidgetConfig {
 export interface UptimeWidgetConfig {
   /** The user's Uptime Kuma public status page URL. Empty = not configured. */
   url: string;
-}
-
-export interface GitHubWidgetConfig {
-  /** Configured repos to track. */
-  repos: Array<{ owner: string; repo: string }>;
-  /** What goes on the bar (SCROLLR-309): read through `barPrefs`, which applies the defaults. */
-  bar?: Partial<GitHubBarPrefs>;
 }
 
 /**
@@ -535,9 +531,7 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   uptime: {
     url: "",
   },
-  github: {
-    repos: [],
-  },
+  github: GITHUB_DEFAULTS,
 };
 
 const DEFAULT_PREFS: AppPreferences = {
@@ -694,7 +688,6 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
   const tmr = obj(saved.timer);
   const sys = obj(saved.sysmon);
   const upt = obj(saved.uptime);
-  const ghb = obj(saved.github);
 
   const savedEnabledWidgets = Array.isArray(saved.enabledWidgets)
     ? saved.enabledWidgets
@@ -746,19 +739,8 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
     uptime: {
       url: typeof upt?.url === "string" ? upt.url : DEFAULT_WIDGETS.uptime.url,
     },
-    github: {
-      repos: Array.isArray(ghb?.repos)
-        ? (ghb.repos as unknown[]).filter(
-            (r): r is { owner: string; repo: string } =>
-              r != null &&
-              typeof r === "object" &&
-              typeof (r as Record<string, unknown>).owner === "string" &&
-              typeof (r as Record<string, unknown>).repo === "string",
-          )
-        : DEFAULT_WIDGETS.github.repos,
-      // Kept as stored; `barPrefs` type-checks each field when it is read.
-      ...(obj(ghb?.bar) ? { bar: obj(ghb?.bar) as Partial<GitHubBarPrefs> } : {}),
-    },
+    // SCROLLR-312: every release's repo list, migrated without losing one.
+    github: migrateGitHub(saved.github),
   };
 }
 

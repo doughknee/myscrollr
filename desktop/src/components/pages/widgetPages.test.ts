@@ -4,10 +4,11 @@ import { isLive } from "../../utils/gameHelpers";
 import fixture from "../../dev/__fixtures__/dashboard.pages.json";
 import busy from "../../dev/__fixtures__/dashboard.busy.json";
 import npr from "../../dev/__fixtures__/dashboard.npr.json";
-import gh from "../../dev/__fixtures__/github.prs.json";
+import gh from "../../dev/__fixtures__/github.board.json";
 import type { GitHubChipData } from "../../types";
-import { GITHUB_BAR_DEFAULTS, pagePRs, type GitHubPagePR, type GitHubRepo } from "../../widgets/github/types";
-import { PR_MIN_COL } from "./cells/PRCell";
+import type { GitHubBoardRepo } from "../../api/client";
+import { repoChip } from "../../widgets/github/types";
+import { REPO_MIN_COL } from "./cells/RepoCell";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
@@ -284,40 +285,40 @@ describe("followPage", () => {
   });
 });
 
-describe("the GitHub page (SCROLLR-309)", () => {
-  const repos = gh.repos as unknown as GitHubRepo[];
-  const chips = (bar = GITHUB_BAR_DEFAULTS, quiet = false) =>
-    repos.map((r) => ({ id: `github-${r.owner}/${r.repo}`, label: r.repo, status: "success", workflowName: "CI", page: pagePRs(r, bar, quiet) }) as GitHubChipData);
-  const page = (bar = GITHUB_BAR_DEFAULTS, quiet = false) => buildPageWidgets(null, ["clock", "github"], NOW, [], [], chips(bar, quiet));
-  const nums = (w: PageWidget) => w.items.map((i) => (i.data as GitHubPagePR).number);
+describe("the GitHub page (SCROLLR-312): one cell per repo, from three repos", () => {
+  const GH_NOW = Date.parse(gh._captured_at);
+  const chips = (n: number, quiet = false) =>
+    (gh.repos as unknown as GitHubBoardRepo[]).slice(0, n).map((r, i) => repoChip(r, gh.config[i] as never, quiet, GH_NOW));
+  const page = (n: number, quiet = false) => buildPageWidgets(null, ["clock", "github"], NOW, [], [], chips(n, quiet));
 
-  it("a column per PR that needs you across every repo: review requests, then changes requested, then failing checks", () => {
-    const [w] = page();
-    expect(w).toMatchObject({ tab: "github", kind: "github", code: "GITHUB", minCol: PR_MIN_COL });
-    expect(nums(w)).toEqual([478, 212, 479, 215]);
-    expect(chip(w)).toEqual({ kind: "needs", count: 4 });
-  });
-
-  it("'My other open PRs' adds yours after them; the band's count stays the needs-you count", () => {
-    const [w] = page({ ...GITHUB_BAR_DEFAULTS, otherPRs: true });
-    expect(nums(w)).toEqual([478, 212, 479, 215, 480, 220]);
-    expect(chip(w)).toEqual({ kind: "needs", count: 4 });
-    // The ladder keeps the order: planWidget sorts by tier, needs you before the rest.
-    const plan = planAll([w], 1920, 0).get("github")!;
-    expect(plan.pages.flat().map((i) => (i.data as GitHubPagePR).number)).toEqual([478, 212, 479, 215, 480, 220]);
-  });
-
-  it("nothing needing you, or quiet hours: no page and no Also entry", () => {
-    expect(page({ ...GITHUB_BAR_DEFAULTS, reviews: false, changes: false, failingChecks: false })).toEqual([]);
-    expect(page(GITHUB_BAR_DEFAULTS, true)).toEqual([]);
+  it("one or two repos: no page (they ride the edge slot)", () => {
+    expect(page(1)).toEqual([]);
+    expect(page(2)).toEqual([]);
     expect(buildPageWidgets(null, ["github"], NOW)).toEqual([]);
   });
 
-  it("columns of at least PR_MIN_COL at 1280 and 1920", () => {
-    const [w] = page();
+  it("three or more: a cell per repo in the user's order, the band counting the repos that need you", () => {
+    const [w] = page(4);
+    expect(w).toMatchObject({ tab: "github", kind: "github", code: "GITHUB", minCol: REPO_MIN_COL });
+    expect(w.items.map((i) => i.key)).toEqual(["github-sample/myscrollr", "github-sample/scrollr-api", "github-sample/scrollr-web", "github-sample/infra"]);
+    // All four are red or the accent.
+    expect(chip(w)).toEqual({ kind: "needs", count: 4 });
+    // The ladder never re-ranks a repo by its state: one tier, the user's order.
+    const plan = planAll([w], 1920, 0).get("github")!;
+    expect(plan.pages.flat().map((i) => i.key)).toEqual(w.items.map((i) => i.key));
+    expect(chip(page(3)[0])).toEqual({ kind: "needs", count: 3 });
+  });
+
+  it("quiet hours: no page and no Also entry", () => {
+    expect(page(4, true)).toEqual([]);
+  });
+
+  it("columns of at least REPO_MIN_COL at 1280 and 1920", () => {
+    const [w] = page(4);
     for (const width of [1280, 1920]) {
-      const plan = planAll([w], width, 300).get("github")!;
-      expect((width - 192 - 300) / plan.cols, `@${width}`).toBeGreaterThanOrEqual(PR_MIN_COL);
+      const plan = planAll([w], width, 102).get("github")!;
+      expect((width - 192 - 102) / plan.cols, `@${width}`).toBeGreaterThanOrEqual(REPO_MIN_COL);
     }
   });
 });
+

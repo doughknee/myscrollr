@@ -71,7 +71,7 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
   // SCROLLR-294: the worst case for "all shown": every page kind, with NPR's 30 headlines (8 pages at 1920) among them.
   { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true }, // all shown 295 s since SCROLLR-297 (404 s before)
-  // SCROLLR-309: the GitHub page alone (the PRs that need you from github.prs.json; the Clock and GitHub on the edge).
+  // SCROLLR-312: the GitHub page alone (github.board.json's four repos, a cell each; the Clock on the edge).
   { fixture: "github", width: 1920, laps: 3 },
   { fixture: "github", width: 1280, laps: 3 },
 ];
@@ -159,23 +159,24 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr }
   });
 }
 
-/** github.prs.json's PRs in the GitHub page's order: review requests, changes requested, failing checks; then yours that are quiet. */
-const GH_NEEDS = ["myscrollr#478", "scrollr-api#212", "myscrollr#479", "scrollr-api#215"];
-const GH_OTHER = ["myscrollr#480", "scrollr-api#220"];
+/** github.board.json's repos, in the user's order: the GitHub page's cells. */
+const GH_REPOS = ["sample/myscrollr", "sample/scrollr-api", "sample/scrollr-web", "sample/infra"];
+/** Each repo's worst pill (a failing check of another CI counts: scrollr-web's Vercel). */
+const GH_FIRST: Record<string, string> = {
+  "sample/myscrollr": "2 PRs for you",
+  "sample/scrollr-api": "✗ deploy · 12m",
+  "sample/scrollr-web": "✗ vercel · 3m",
+  "sample/infra": "◌ apply · 3m",
+};
 
-test("github: a column per PR that needs you, in order, at least PR_MIN_COL wide, the band counting them (SCROLLR-309)", async ({ page, context }) => {
+test("github: four repos are a page, a cell per repo in order, at least REPO_MIN_COL wide, the band counting the ones that need you (SCROLLR-312)", async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.clock.install();
-  for (const [width, extra, want] of [
-    [1920, "", GH_NEEDS],
-    [1280, "", GH_NEEDS],
-    [1920, "&gh=otherPRs", [...GH_NEEDS, ...GH_OTHER]],
-    [1280, "&gh=otherPRs", [...GH_NEEDS, ...GH_OTHER]],
-  ] as const) {
+  for (const width of [1920, 1280]) {
     await page.setViewportSize({ width, height: 80 });
     await recordFromStart(page);
     await parkMouse(page);
-    await page.goto(url("github", extra));
+    await page.goto(url("github"));
     await parkMouse(page);
     await page.waitForSelector("[data-page]");
     // Every page of the widget, once: a lap is one page here (one widget).
@@ -185,26 +186,59 @@ test("github: a column per PR that needs you, in order, at least PR_MIN_COL wide
     });
     const tr = await readTrace(page);
     const seen = tr.enters.slice(0, tr.enters[0].count);
-    const label = `@${width}${extra}`;
-    expect(seen.flatMap((e) => e.items.map((i) => i.id)), `${label}: a column per PR, in order`).toEqual(want);
+    const label = `@${width}`;
+    expect(seen.flatMap((e) => e.items.map((i) => i.id)), `${label}: a cell per repo, in order`).toEqual(GH_REPOS);
     const m = await page.locator("[data-page]").first().evaluate((p) => ({
       cells: [...p.querySelectorAll("[data-chip]")].map((c) => c.getBoundingClientRect().width),
+      worst: [...p.querySelectorAll("[data-chip]")].map((c) => c.getAttribute("data-worst")),
+      first: Object.fromEntries([...p.querySelectorAll("[data-chip]")].map((c) => [c.getAttribute("data-item"), c.querySelector("[data-part=pill]")?.textContent])),
       chip: document.querySelector("[data-band] [data-chip]")?.getAttribute("data-kind"),
       count: document.querySelector("[data-band] [data-chip] span:last-child")?.textContent,
+      edge: document.querySelector("[data-edge] [data-widget=github]") !== null,
     }));
-    expect(Math.min(...m.cells), `${label}: PR_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
-    expect(m, `${label}: the band's chip is the needs-you count, in the ink`).toMatchObject({ chip: "needs", count: "4" });
+    expect(Math.min(...m.cells), `${label}: REPO_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
+    for (const [item, pill] of Object.entries(m.first)) expect(pill, `${label}: ${item}'s worst pill first`).toBe(GH_FIRST[item]);
+    expect(m, `${label}: the band's chip counts the repos that need you; GitHub is not on the edge`).toMatchObject({ chip: "needs", count: "4", edge: false });
     expect(tr.moved, `${label}: nothing moves`).toEqual([]);
     expect(tr.cuts, `${label}: nothing cut`).toEqual([]);
-    console.log(`[github ${label}] ${seen.map((e) => `${e.page}: ${e.items.map((i) => i.id).join(" ")}`).join(" | ")} cols ${m.cells.map((w) => w.toFixed(0)).join("/")}`);
+    console.log(`[github ${label}] ${seen.map((e) => `${e.page}: ${e.items.map((i) => i.id).join(" ")}`).join(" | ")} cols ${m.cells.map((w) => w.toFixed(0)).join("/")} worst ${m.worst.join(",")}`);
   }
 
-  // Quiet hours all day: no GitHub page (the edge stays, its GitHub slot quiet).
+  // Quiet hours all day: no GitHub page, and GitHub nowhere on the edge.
   await page.setViewportSize({ width: 1920, height: 80 });
   await page.goto(url("github", "&gh=quiet=00:00-23:59"));
   await page.locator("[data-edge], .ticker-container").first().waitFor();
   await context.clock.runFor(4000);
   expect(await page.locator("[data-page]").count(), "quiet hours: no page").toBe(0);
+  expect(await page.locator("[data-edge] [data-widget=github]").count(), "quiet hours: not on the edge").toBe(0);
+});
+
+test("github: two repos share ONE edge slot that rotates on the turn and never changes width (SCROLLR-312)", async ({ page, context }) => {
+  test.setTimeout(120_000);
+  await context.clock.install();
+  await page.setViewportSize({ width: 1920, height: 80 });
+  await parkMouse(page);
+  // A bar with pages, so the page clock turns (the slot steps on the turn).
+  await page.goto(url("pages", "&github=two"));
+  await parkMouse(page);
+  const slot = page.locator("[data-edge] [data-widget=github] button");
+  await slot.waitFor();
+  expect(await page.locator("[data-page] [data-item^='sample/']").count(), "two repos: no GitHub page").toBe(0);
+  const seen = new Map<string, number[]>();
+  for (let i = 0; i < 40 && seen.size < 2; i++) {
+    await context.clock.runFor(2000);
+    const r = await slot.evaluate((b) => ({
+      item: b.querySelector("[data-item]:last-of-type")?.getAttribute("data-item") ?? "",
+      w: b.getBoundingClientRect().width,
+      dots: b.querySelectorAll("[data-part=dots] > span").length,
+    }));
+    expect(r.dots, "a corner dot per repo").toBe(2);
+    seen.set(r.item, [...(seen.get(r.item) ?? []), r.w]);
+  }
+  expect([...seen.keys()].sort(), "both repos come round").toEqual(["github-sample/myscrollr", "github-sample/scrollr-api"]);
+  const widths = new Set([...seen.values()].flat().map((w) => w.toFixed(1)));
+  console.log(`[github edge] widths ${[...widths].join(",")} over ${[...seen.values()].flat().length} reads`);
+  expect([...widths], "the slot's width is constant across rotations").toEqual(["176.0"]);
 });
 
 test("a truly short widget keeps a page's column width, left-aligned (SCROLLR-292)", async ({ page }) => {

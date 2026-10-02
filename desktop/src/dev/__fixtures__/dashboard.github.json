@@ -1,5 +1,5 @@
 {
-  "_note": "SCROLLR-309 github: no data widgets, so the bar is the GitHub page alone; the shim seeds the PRs from github.prs.json and puts the GitHub widget on the ticker for this fixture.",
+  "_note": "SCROLLR-312 github: no data widgets, so the bar is the GitHub page alone; the shim seeds four repos from github.board.json and puts the GitHub widget on the ticker for this fixture.",
   "_captured_at": "2026-10-02T12:00:00Z",
   "data": {},
   "preferences": {

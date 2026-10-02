@@ -17,7 +17,6 @@
  *  - `chip` is the band's "something is happening now" mark (SCROLLR-303).
  */
 import type { DashboardResponse, Game, GitHubChipData, RssItem, Trade } from "../../types";
-import type { GitHubPagePR } from "../../widgets/github/types";
 import type { TickerContext } from "../../datawidgets/ticker";
 import { dropPinned, scopedRows } from "../../datawidgets/ticker";
 import type { WidgetPin } from "../../preferences";
@@ -33,7 +32,7 @@ import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
-import { PR_MIN_COL } from "./cells/PRCell";
+import { REPO_MIN_COL } from "./cells/RepoCell";
 import {
   TIER,
   columnsFor,
@@ -60,7 +59,7 @@ export interface PageItem {
   /** Stable across refetches: game id, article id, symbol, widget id. */
   key: string;
   tier: Tier;
-  data: Game | RssItem | Trade | GitHubPagePR | AlsoItem;
+  data: Game | RssItem | Trade | GitHubChipData | AlsoItem;
   /** One of the user's favourite teams is playing (GameCell's top line). */
   mine?: boolean;
   /** `data-pin-subject` JSON for the right-click menu (utils/pinTarget). */
@@ -129,7 +128,7 @@ export function buildPageWidgets(
   pins: readonly WidgetPin[] = [],
   /** Every tracked symbol's latest quote (`/finance/public`), for a short watchlist's fills. */
   market: readonly Trade[] = [],
-  /** The GitHub edge chips (useWidgetTickerData): each repo's PRs for the GitHub page, in order (SCROLLR-309). */
+  /** The GitHub repos (useWidgetTickerData), one cell each once three or more are tracked (SCROLLR-312). */
   github: readonly GitHubChipData[] = [],
 ): PageWidget[] {
   const out: PageWidget[] = [];
@@ -253,25 +252,25 @@ export function buildPageWidgets(
   return out;
 }
 
+/** The page rule (SCROLLR-312): this many tracked repos or more get a page; fewer ride the edge in one rotating slot. */
+export const GITHUB_PAGE_MIN = 3;
+
 /**
- * The GitHub page (SCROLLR-309): a column per PR that needs you across every
- * ticked repo, review requests first, then your PRs with changes requested,
- * then yours with failing checks; then, only when the user turned it on, your
- * other open PRs (`pagePRs`, which also reads the toggles and quiet hours).
- * Nothing: no page and no Also entry. GitHub is a utility, so its edge chips
- * carry on per repo either way.
+ * The GitHub page (SCROLLR-312, canvas B3): one cell per tracked repo, in
+ * the user's order, once three or more are tracked; then GitHub leaves the
+ * edge (`buildEdge`). Fewer: no page, the edge slot rotates between them.
+ * Quiet hours: no page and no Also entry.
  */
 function githubWidget(chips: readonly GitHubChipData[]): PageWidget | null {
-  const prs = chips.flatMap((c) => (c.page ?? []).map((pr) => ({ pr, id: c.id }))).sort((a, b) => a.pr.why - b.pr.why);
-  if (prs.length === 0) return null;
+  if (chips.length < GITHUB_PAGE_MIN || chips.some((c) => c.quiet)) return null;
   return {
     tab: "github",
     kind: "github",
     code: "GITHUB",
     hex: catalogItemById("github")?.hex ?? "#f97316",
-    minCol: PR_MIN_COL,
-    // Needs you is fresh, the rest quiet: the ladder keeps this order (it sorts stably by tier).
-    items: prs.map(({ pr, id }) => ({ key: `pr:${id}#${pr.number}`, tier: pr.why < 3 ? TIER.fresh : TIER.quiet, data: pr })),
+    minCol: REPO_MIN_COL,
+    // One tier: the user's order is the order (the ladder never re-ranks a repo by its live state).
+    items: chips.map((c) => ({ key: c.id, tier: TIER.fresh, data: c })),
     fill: [],
   };
 }
@@ -304,7 +303,7 @@ export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWi
 
 /** The band's chip (SCROLLR-303): something is happening now. `live` games (counted), the stock market `open`, `fresh` stories (the last hour's, counted). */
 export interface Chip {
-  /** `needs`: PRs that need you, counted (SCROLLR-309), drawn like `fresh`, in the ink. */
+  /** `needs`: GitHub repos that need you (red or the accent), counted (SCROLLR-312), drawn like `fresh`, in the ink. */
   kind: "live" | "open" | "fresh" | "needs";
   count?: number;
 }
@@ -343,8 +342,11 @@ export function chip(widget: PageWidget, now: number = Date.now()): Chip | null 
       return count ? { kind: "fresh", count } : null;
     }
     case "github": {
-      // The edge chip's rule (needsYou), summed over the repos: your other open PRs do not count.
-      const count = widget.items.filter((i) => (i.data as GitHubPagePR).why < 3).length;
+      // Repos that need you: red or the accent (SCROLLR-312).
+      const count = widget.items.filter((i) => {
+        const w = (i.data as GitHubChipData).worst;
+        return w === "red" || w === "accent";
+      }).length;
       return count ? { kind: "needs", count } : null;
     }
     default:

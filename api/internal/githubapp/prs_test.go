@@ -62,6 +62,10 @@ func setupPRs(t *testing.T) (*prFake, *miniredis.Miniredis) {
 			return
 		}
 		w.Header().Set("X-Ratelimit-Remaining", "4000")
+		if code, ok := body.(int); ok { // a bare status, e.g. 403 for a permission not approved
+			w.WriteHeader(code)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(body)
 	}))
 	t.Cleanup(srv.Close)
@@ -244,8 +248,10 @@ func TestPRDetailCap(t *testing.T) {
 
 // TestPRBudget is the arithmetic for a heavy user: five repos with three
 // open PRs each, polled by the ticker and the app every 30 s for an hour.
-// First refresh 9 calls a repo (repo, pulls, runs, 3 reviews, 3 checks),
-// then 2 a repo a minute (pulls, runs): 45 + 59 x 10 = 635.
+// First refresh 12 calls a repo (repo, pulls, runs, 3 reviews, 3 check-runs,
+// 3 statuses; SCROLLR-312 made a PR's checks two calls, any CI, where the
+// Actions runs were one), then 2 a repo a minute (pulls, runs): 60 + 59 x 10
+// = 650.
 func TestPRBudget(t *testing.T) {
 	f, mr := setupPRs(t)
 	repos := []string{"o/a", "o/b", "o/c", "o/d", "o/e"}
@@ -257,7 +263,7 @@ func TestPRBudget(t *testing.T) {
 			sha := fmt.Sprintf("%s-%d", strings.ReplaceAll(r, "/", ""), n)
 			pulls = append(pulls, pull(n, "bob", "b", sha, nil))
 			f.set(fmt.Sprintf("/repos/%s/pulls/%d/reviews?per_page=100", r, n), []m{review("carol", "APPROVED")})
-			f.set("/repos/"+r+"/actions/runs?per_page=20&head_sha="+sha, runs(run("CI", "b", sha, "completed", "success", "bob", "2026-10-02T07:00:00Z")))
+			seedChecks(f, r, sha)
 		}
 		f.set("/repos/"+r+"/pulls?state=open&per_page=50", pulls)
 	}
@@ -265,7 +271,7 @@ func TestPRBudget(t *testing.T) {
 	for step := 0; step < 120; step++ { // 120 x 30 s = 1 h
 		for poller := 0; poller < 2; poller++ {
 			for _, r := range repos {
-				if got, err := repoPRs(ctx, source("user:sub_budget"), r); err != nil || !got.Available {
+				if got, err := repoPRs(ctx, source("user:sub_budget"), r); err != nil || !got.Available || got.PRs[0].ChecksState != "passing" {
 					t.Fatalf("repoPRs %s: %+v %v", r, got, err)
 				}
 			}
@@ -277,8 +283,57 @@ func TestPRBudget(t *testing.T) {
 	if calls > 1500 {
 		t.Fatalf("calls = %d, want <= 1500", calls)
 	}
-	if calls != 635 {
-		t.Errorf("calls = %d, want exactly 635", calls)
+	if calls != 650 {
+		t.Errorf("calls = %d, want exactly 650", calls)
+	}
+}
+
+// seedChecks: one green Actions job and one green Vercel status on a commit.
+func seedChecks(f *prFake, repo, sha string) {
+	f.set("/repos/"+repo+"/commits/"+sha+"/check-runs?per_page=100", m{"check_runs": []m{checkRun("build", "completed", "success", "github-actions")}})
+	f.set("/repos/"+repo+"/commits/"+sha+"/status", m{"statuses": []m{commitStatus("vercel", "success")}})
+}
+
+func checkRun(name, st, conclusion, app string) m {
+	c := m{"name": name, "status": st, "html_url": "https://github.com/o/r/runs/" + name, "started_at": "2026-10-02T11:50:00Z",
+		"completed_at": "2026-10-02T11:57:00Z", "app": m{"slug": app}}
+	if conclusion != "" {
+		c["conclusion"] = conclusion
+	}
+	return c
+}
+
+func commitStatus(name, state string) m {
+	return m{"context": name, "state": state, "target_url": "https://vercel.com/o/r/" + name, "updated_at": "2026-10-02T11:57:00Z"}
+}
+
+// TestPRChecksAnyCI (SCROLLR-312): a PR's checks are its commit's check runs
+// (Actions jobs and other apps) plus its statuses; the Actions runs are not
+// asked. A 403 on the check runs (Checks: read not approved yet) falls back
+// to the Actions runs; a 403 on the statuses leaves them out.
+func TestPRChecksAnyCI(t *testing.T) {
+	f, _ := setupPRs(t)
+	seedRepo(f)
+	f.set("/repos/o/r/commits/s1/check-runs?per_page=100", m{"check_runs": []m{
+		checkRun("CI / test", "completed", "failure", "github-actions"),
+		checkRun("codecov", "completed", "success", "codecov"),
+	}})
+	f.set("/repos/o/r/commits/s1/status", m{"statuses": []m{commitStatus("vercel", "success"), commitStatus("netlify", "pending")}})
+	f.set("/repos/o/r/commits/s2/check-runs?per_page=100", http.StatusForbidden)
+	f.set("/repos/o/r/commits/s2/status", http.StatusForbidden)
+	got, err := repoPRs(context.Background(), source("user:sub_anyci"), "o/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := got.PRs[0].Checks; c != (Checks{Total: 4, Passed: 2, Failed: 1, Running: 1}) || got.PRs[0].ChecksState != "failing" {
+		t.Errorf("PR #1 checks = %+v %q", c, got.PRs[0].ChecksState)
+	}
+	if n := f.count("/repos/o/r/actions/runs?per_page=20&head_sha=s1"); n != 0 {
+		t.Errorf("asked the Actions runs for a commit with check runs (%d)", n)
+	}
+	// s2: both 403 -> its Actions run (one in progress).
+	if c := got.PRs[1].Checks; c != (Checks{Total: 1, Running: 1}) || got.PRs[1].ChecksState != "running" {
+		t.Errorf("PR #2 (403) checks = %+v %q", c, got.PRs[1].ChecksState)
 	}
 }
 

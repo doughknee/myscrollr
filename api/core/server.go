@@ -294,6 +294,8 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/github/runs", platform.LogtoAuth, githubapp.HandleRuns)
 	s.App.Get("/github/repos", platform.LogtoAuth, githubapp.HandleRepos)
 	s.App.Get("/github/prs", platform.LogtoAuth, githubapp.HandlePRs)
+	s.App.Get("/github/workflows", platform.LogtoAuth, githubapp.HandleWorkflows)
+	s.App.Post("/github/board", platform.LogtoAuth, githubapp.HandleBoard)
 
 	// Support
 	s.App.Post("/support/ticket", platform.LogtoAuth, support.HandleSubmitSupportTicket)

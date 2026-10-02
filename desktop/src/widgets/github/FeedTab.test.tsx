@@ -1,19 +1,25 @@
 /**
- * The GitHub widget's Connect GitHub header (SCROLLR-304), against mocked
- * core endpoints: not connected, connected, broken, and signed out.
+ * The GitHub widget's page (SCROLLR-312, canvas board T3) against mocked
+ * core endpoints: the Connect state, the two panes, the live preview, the
+ * workflows checklist, the PR and issue modes, the picker.
  */
+import { useState } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ShellContext } from "../../shell-context";
 import type { ShellState } from "../../shell-context";
 import { loadPrefs } from "../../preferences";
+import type { AppPreferences } from "../../preferences";
+import type { GitHubTrackedRepo } from "./config";
 import { githubWidget } from "./FeedTab";
 
 const api = vi.hoisted(() => ({
   status: vi.fn(),
   runs: vi.fn(),
   repos: vi.fn(),
+  board: vi.fn(),
+  workflows: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
   invoke: vi.fn(async () => undefined),
@@ -33,210 +39,239 @@ vi.mock("../../api/client", async (importOriginal) => ({
     status: api.status,
     runs: api.runs,
     repos: api.repos,
+    board: api.board,
+    workflows: api.workflows,
     connect: api.connect,
     disconnect: api.disconnect,
   },
 }));
 
-function mount(authenticated = true, repos = [{ owner: "o", repo: "r" }]) {
-  const base = loadPrefs();
-  const prefs = {
-    ...base,
-    widgets: { ...base.widgets, github: { ...base.widgets.github, repos } },
+const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
+const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+
+/** Core's board for whatever the page asks: a red deploy, green tests, PRs and issues as the modes say. */
+function boardFor(repos: Array<{ repo: string; workflows?: string[]; prs: string; issues: string }>) {
+  return {
+    connected: true,
+    login: "octo",
+    repos: repos.map((r) => ({
+      repo: r.repo,
+      available: true,
+      workflows: (r.workflows ?? ["test", "deploy"]).map((name) => ({ name, state: name === "deploy" ? "failing" : "passing", at: ago(12) })),
+      checks: [],
+      ...(r.prs === "off" ? {} : { prs: r.prs === "all" ? { count: 5, needs_you: 2, items: [] } : { count: 2, needs_you: 2, items: [] } }),
+      ...(r.issues === "off" ? {} : { issues: r.issues === "assigned" ? { count: 0, items: [], error: "permission" } : { count: 3, items: [] } }),
+    })),
   };
-  const shell = { prefs, authenticated, onPrefsChange: vi.fn() } as unknown as ShellState;
-  const FeedTab = githubWidget.FeedTab;
-  return { shell, ...render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+}
+
+/** The page with prefs that really change (onPrefsChange is spied). */
+function mount(repos: GitHubTrackedRepo[] = [{ repo: "octo/app", prs: "mine", issues: "off" }], authenticated = true) {
+  const base = loadPrefs();
+  const spy = vi.fn();
+  let latest: AppPreferences = { ...base, widgets: { ...base.widgets, github: { ...base.widgets.github, repos } } };
+  function Harness() {
+    const [prefs, setPrefs] = useState(latest);
+    const shell = {
+      prefs,
+      authenticated,
+      onPrefsChange: (p: AppPreferences) => {
+        latest = p;
+        spy(p);
+        setPrefs(p);
+      },
+    } as unknown as ShellState;
+    const FeedTab = githubWidget.FeedTab;
+    return (
       <ShellContext.Provider value={shell}>
         <FeedTab mode="comfort" feedContext={{}} />
       </ShellContext.Provider>
+    );
+  }
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      {/* The app's shell: OverflowMenu portals its menu into it. */}
+      <div id="app-shell">
+        <Harness />
+      </div>
     </QueryClientProvider>,
-  ) };
+  );
+  return { spy, github: () => latest.widgets.github };
 }
 
-/** The repos the last prefs write configured. */
-function lastWrite(shell: ShellState) {
-  const calls = vi.mocked(shell.onPrefsChange).mock.calls;
-  return calls[calls.length - 1]?.[0].widgets.github.repos;
-}
+const preview = () => screen.getByText("On the bar it looks like").parentElement!.querySelector<HTMLElement>("[data-part=preview]")!;
+const pillTexts = () => [...preview().querySelectorAll("[data-part=pill]")].map((p) => p.textContent);
 
-describe("GitHub widget: Your repos (SCROLLR-307)", () => {
-  const yours = {
+beforeEach(() => {
+  vi.clearAllMocks();
+  api.status.mockResolvedValue({ connected: true, login: "octo" });
+  api.repos.mockResolvedValue({
     connected: true,
     login: "octo",
     repos: [
-      { full_name: "octo/app", private: true, active: true, last_run_at: new Date(Date.now() - 2 * 86_400_000).toISOString() },
+      { full_name: "octo/app", private: true, active: true, last_run_at: ago(2 * 1440) },
       { full_name: "octo/site", private: false, active: true },
       { full_name: "octo/dusty", private: false, active: false, pushed_at: "2025-01-01T00:00:00Z" },
     ],
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    api.runs.mockResolvedValue({ connected: true, runs: [] });
-    api.repos.mockResolvedValue(yours);
   });
-
-  it("first load with no repos: ticks the active ones", async () => {
-    api.status.mockResolvedValue({ connected: true, login: "octo" });
-    const { shell } = mount(true, []);
-    await waitFor(() =>
-      expect(lastWrite(shell)).toEqual([
-        { owner: "octo", repo: "app" },
-        { owner: "octo", repo: "site" },
-      ]),
-    );
-  });
-
-  it("existing list: adds nothing; unticking writes the list without it", async () => {
-    api.status.mockResolvedValue({ connected: true, login: "octo" });
-    const { shell } = mount(true, [{ owner: "octo", repo: "app" }, { owner: "o", repo: "r" }]);
-    const app = await screen.findByRole("checkbox", { name: /octo\/app/ });
-    expect(shell.onPrefsChange).not.toHaveBeenCalled();
-    expect(app).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /octo\/site/ })).not.toBeChecked();
-    expect(screen.getByText("last run 2d ago")).toBeTruthy();
-    expect(screen.getByLabelText("Private")).toBeTruthy();
-
-    fireEvent.click(app);
-    expect(lastWrite(shell)).toEqual([{ owner: "o", repo: "r" }]);
-    fireEvent.click(screen.getByRole("checkbox", { name: /octo\/site/ }));
-    expect(lastWrite(shell)).toEqual([
-      { owner: "octo", repo: "app" },
-      { owner: "o", repo: "r" },
-      { owner: "octo", repo: "site" },
-    ]);
-  });
-
-  it("inactive repos stay collapsed until Show all", async () => {
-    api.status.mockResolvedValue({ connected: true, login: "octo" });
-    mount(true, [{ owner: "o", repo: "r" }]);
-    await screen.findByRole("checkbox", { name: /octo\/app/ });
-    expect(screen.queryByRole("checkbox", { name: /octo\/dusty/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show all (1 more)" }));
-    expect(screen.getByRole("checkbox", { name: /octo\/dusty/ })).toBeTruthy();
-  });
-
-  it("not connected: no picker, no repos call", async () => {
-    api.status.mockResolvedValue({ connected: false });
-    mount();
-    await screen.findByRole("button", { name: "Connect GitHub" });
-    expect(api.repos).not.toHaveBeenCalled();
-    expect(screen.queryByText("Your repos")).toBeNull();
+  api.board.mockImplementation(async (repos) => boardFor(repos));
+  api.workflows.mockResolvedValue({
+    connected: true,
+    available: true,
+    workflows: [
+      { name: "test", path: ".github/workflows/test.yml", last: "passing", ran_recently: true },
+      { name: "deploy", path: ".github/workflows/deploy.yml", last: "failing", ran_recently: true },
+      { name: "lint", path: ".github/workflows/lint.yml", last: "passing", ran_recently: false },
+    ],
   });
 });
 
-describe("GitHub widget: Connect GitHub", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    api.runs.mockResolvedValue({ connected: false, connect: true, runs: [{ repo: "o/r", available: true, status: "completed", conclusion: "success" }] });
-    api.repos.mockResolvedValue({ connected: true, repos: [] });
-  });
-
-  it("not connected: Connect GitHub opens core's authorize URL in the browser", async () => {
+describe("not connected: the Connect state and nothing else", () => {
+  it("Connect GitHub opens core's install URL; no panes, no repos call", async () => {
     api.status.mockResolvedValue({ connected: false });
-    api.connect.mockResolvedValue({ url: "https://github.com/login/oauth/authorize?client_id=x&state=y" });
+    api.connect.mockResolvedValue({ url: "https://github.com/apps/scrollr-desktop/installations/new?state=y" });
     mount();
     fireEvent.click(await screen.findByRole("button", { name: "Connect GitHub" }));
-    await waitFor(() =>
-      expect(api.invoke).toHaveBeenCalledWith("open_external", {
-        url: "https://github.com/login/oauth/authorize?client_id=x&state=y",
-      }),
-    );
+    await waitFor(() => expect(api.invoke).toHaveBeenCalledWith("open_external", { url: "https://github.com/apps/scrollr-desktop/installations/new?state=y" }));
     expect(await screen.findByText("Finish in your browser…")).toBeTruthy();
-    // Public repos still render through core's fallback.
-    expect(await screen.findByText("Passing")).toBeTruthy();
+    expect(screen.queryByText("On your bar")).toBeNull();
+    expect(api.repos).not.toHaveBeenCalled();
+    expect(api.board).not.toHaveBeenCalled();
   });
 
-  it("connected: shows the login and disconnects", async () => {
-    api.status.mockResolvedValue({ connected: true, login: "octo", since: "2026-10-02T08:00:00Z" });
-    api.disconnect.mockResolvedValue({ connected: false });
-    mount();
-    expect(await screen.findByText("Connected as @octo")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
-    await waitFor(() => expect(api.disconnect).toHaveBeenCalled());
-  });
-
-  it("broken: offers Reconnect GitHub with the reason", async () => {
+  it("broken: Reconnect GitHub with the reason", async () => {
     api.status.mockResolvedValue({ connected: false, login: "octo", reason: "GitHub stopped accepting Scrollr's access. Reconnect GitHub." });
     mount();
     expect(await screen.findByRole("button", { name: "Reconnect GitHub" })).toBeTruthy();
     expect(screen.getByText(/stopped accepting/)).toBeTruthy();
   });
 
-  it("signed out: no Connect button, no status call", async () => {
-    mount(false);
-    await screen.findByText("o/r");
+  it("signed out: asks to sign in, no status call", () => {
+    mount(undefined, false);
+    expect(screen.getByText(/Sign in to Scrollr/)).toBeTruthy();
     expect(api.status).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /Connect GitHub/ })).toBeNull();
   });
 });
 
-describe("GitHub widget: what goes on the bar (SCROLLR-309)", () => {
-  const lastBar = (shell: ShellState) => {
-    const calls = vi.mocked(shell.onPrefsChange).mock.calls;
-    return calls[calls.length - 1]?.[0].widgets.github.bar;
-  };
+describe("connected: two panes", () => {
+  it("left: the account, the repos on your bar, the rule; right: the first repo and its live cell", async () => {
+    mount([
+      { repo: "octo/app", prs: "mine", issues: "off" },
+      { repo: "relentnet/infra", prs: "off", issues: "off" },
+    ]);
+    expect(await screen.findByText("@octo")).toBeTruthy();
+    const list = screen.getByRole("list", { name: "On your bar" });
+    await waitFor(() => expect(within(list).getAllByRole("listitem").map((b) => b.textContent)).toEqual(["app3", "infra2"]));
+    expect(screen.getByText(/1–2 repos ride the edge in one rotating slot/)).toBeTruthy();
+    expect(screen.getByText("octo", { selector: "span.font-mono" })).toBeTruthy();
+    await waitFor(() => expect(pillTexts()).toEqual(["✗ deploy · 12m", "2 PRs for you", "✓ test"]));
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    api.runs.mockResolvedValue({ connected: true, runs: [] });
-    api.repos.mockResolvedValue({ connected: true, login: "octo", repos: [{ full_name: "o/r", private: false, active: true }] });
-    api.status.mockResolvedValue({ connected: true, login: "octo" });
+    fireEvent.click(within(list).getAllByRole("listitem")[1]);
+    expect(await screen.findByText("relentnet")).toBeTruthy();
+    await waitFor(() => expect(pillTexts()).toEqual(["✗ deploy · 12m", "✓ test"]));
   });
 
-  it("the switches start at their defaults and write the widget's prefs", async () => {
-    const { shell } = mount();
-    const on = ["Failing CI on main", "Review requests to me", "Changes requested on my PRs", "My PRs with failing checks", "Flash when something changes"];
-    const off = ["Runs on my branches (the pulse)", "My other open PRs on the page", "Quiet hours"];
-    for (const name of on) expect(await screen.findByRole("checkbox", { name })).toBeChecked();
-    for (const name of off) expect(screen.getByRole("checkbox", { name })).not.toBeChecked();
+  it("the PR and issue modes write the repo's config, and the preview follows", async () => {
+    const { github } = mount();
+    await waitFor(() => expect(pillTexts()).toContain("2 PRs for you"));
+    fireEvent.click(screen.getByRole("radio", { name: "All open" }));
+    expect(github().repos[0]).toMatchObject({ repo: "octo/app", prs: "all", issues: "off" });
+    await waitFor(() => expect(pillTexts()).toContain("5 open PRs"));
+    expect(api.board).toHaveBeenLastCalledWith([{ repo: "octo/app", workflows: undefined, prs: "all", issues: "off" }]);
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "My other open PRs on the page" }));
-    expect(lastBar(shell)).toMatchObject({ otherPRs: true, reviews: true, pulse: false });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Review requests to me" }));
-    expect(lastBar(shell)).toMatchObject({ reviews: false });
+    fireEvent.click(screen.getByRole("radio", { name: "Every new issue" }));
+    await waitFor(() => expect(pillTexts()).toContain("3 new issues"));
   });
 
-  it("quiet hours: turning it on keeps the default times", async () => {
-    const { shell } = mount();
-    expect(screen.queryByLabelText("Quiet from")).toBeNull();
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Quiet hours" }));
-    expect(lastBar(shell)).toMatchObject({ quiet: true, quietFrom: "22:00", quietTo: "08:00" });
+  it("Issues assigned before the permission is approved: Approve on GitHub opens the install page", async () => {
+    mount([{ repo: "octo/app", prs: "mine", issues: "assigned" }]);
+    fireEvent.click(await screen.findByRole("button", { name: "Approve on GitHub ↗" }));
+    expect(api.invoke).toHaveBeenCalledWith("open_external", { url: INSTALL_URL });
   });
 
-  it("quiet hours stored: two time fields show the times and edit them", async () => {
-    const base = loadPrefs();
-    const prefs = { ...base, widgets: { ...base.widgets, github: { repos: [{ owner: "o", repo: "r" }], bar: { quiet: true, quietFrom: "23:00", quietTo: "07:00" } } } };
-    const shell = { prefs, authenticated: true, onPrefsChange: vi.fn() } as unknown as ShellState;
-    const FeedTab = githubWidget.FeedTab;
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <ShellContext.Provider value={shell}>
-          <FeedTab mode="comfort" feedContext={{}} />
-        </ShellContext.Provider>
-      </QueryClientProvider>,
+  it("workflows: the recent ones start ticked; a tick writes the list, in the repo's order", async () => {
+    const { github } = mount();
+    const lint = await screen.findByRole("checkbox", { name: /lint/ });
+    expect(screen.getByRole("checkbox", { name: /test/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /deploy/ })).toBeChecked();
+    expect(lint).not.toBeChecked();
+    expect(github().repos[0]).not.toHaveProperty("workflows");
+    fireEvent.click(lint);
+    expect(github().repos[0].workflows).toEqual(["test", "deploy", "lint"]);
+    fireEvent.click(screen.getByRole("checkbox", { name: /deploy/ }));
+    expect(github().repos[0].workflows).toEqual(["test", "lint"]);
+    await waitFor(() => expect(pillTexts()).toEqual(["2 PRs for you", "✓ test", "✓ lint"]));
+  });
+
+  it("Remove from bar takes the repo off the list", async () => {
+    const { github } = mount([
+      { repo: "octo/app", prs: "mine", issues: "off" },
+      { repo: "octo/site", prs: "mine", issues: "off" },
+    ]);
+    fireEvent.click(await screen.findByRole("button", { name: /Remove from bar/ }));
+    expect(github().repos.map((r) => r.repo)).toEqual(["octo/site"]);
+  });
+});
+
+describe("+ Add a repo", () => {
+  it("first load with nothing tracked: the active repos, with the defaults", async () => {
+    const { github } = mount([]);
+    await waitFor(() =>
+      expect(github().repos).toEqual([
+        { repo: "octo/app", prs: "mine", issues: "off" },
+        { repo: "octo/site", prs: "mine", issues: "off" },
+      ]),
     );
-    const from = (await screen.findByLabelText("Quiet from")) as HTMLInputElement;
-    expect(from.value).toBe("23:00");
-    expect((screen.getByLabelText("Quiet until") as HTMLInputElement).value).toBe("07:00");
-    fireEvent.change(from, { target: { value: "21:30" } });
-    expect(lastBar(shell)).toMatchObject({ quiet: true, quietFrom: "21:30", quietTo: "07:00" });
   });
 
-  it("Choose repos on GitHub opens the app's install page; the list re-reads when the window regains focus", async () => {
-    mount();
-    fireEvent.click(await screen.findByRole("button", { name: "Choose repos on GitHub" }));
-    expect(api.invoke).toHaveBeenCalledWith("open_external", { url: "https://github.com/apps/scrollr-desktop/installations/new" });
-    const calls = api.repos.mock.calls.length;
-    window.dispatchEvent(new Event("focus"));
-    await waitFor(() => expect(api.repos.mock.calls.length).toBeGreaterThan(calls));
+  it("the picker: tick to add with the defaults, untick to remove; inactive ones behind Show all", async () => {
+    const { github, spy } = mount([{ repo: "octo/app", prs: "all", issues: "new" }]);
+    fireEvent.click(await screen.findByRole("button", { name: /Add a repo/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Your repos" });
+    expect(spy).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("checkbox", { name: /octo\/app/ })).toBeChecked();
+    expect(within(dialog).getByLabelText("Private")).toBeTruthy();
+    expect(within(dialog).queryByRole("checkbox", { name: /octo\/dusty/ })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /octo\/site/ }));
+    expect(github().repos).toEqual([
+      { repo: "octo/app", prs: "all", issues: "new" },
+      { repo: "octo/site", prs: "mine", issues: "off" },
+    ]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Show all (1 more)" }));
+    expect(within(dialog).getByRole("checkbox", { name: /octo\/dusty/ })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /octo\/app/ }));
+    expect(github().repos.map((r) => r.repo)).toEqual(["octo/site"]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Choose repos on GitHub" }));
+    expect(api.invoke).toHaveBeenCalledWith("open_external", { url: INSTALL_URL });
   });
 
-  it("a connected account whose install sees no repos still gets the link", async () => {
-    api.repos.mockResolvedValue({ connected: true, login: "octo", repos: [] });
-    mount(true, []);
-    expect(await screen.findByRole("button", { name: "Choose repos on GitHub" })).toBeTruthy();
+  it("a public repo by URL", async () => {
+    const { github } = mount();
+    fireEvent.click(await screen.findByRole("button", { name: /Add a repo/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Track a public repo…" }));
+    const field = screen.getByLabelText("Public repo URL");
+    fireEvent.change(field, { target: { value: "https://github.com/octo/app" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText("That repo is already on your bar.")).toBeTruthy();
+    fireEvent.change(field, { target: { value: "https://github.com/vercel/next.js" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(github().repos.map((r) => r.repo)).toEqual(["octo/app", "vercel/next.js"]);
+  });
+});
+
+describe("the ⋯ menu", () => {
+  it("Flash on change and Quiet hours write the app-wide settings", async () => {
+    const { github } = mount();
+    const trigger = await screen.findByRole("button", { name: "GitHub options" });
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Flash on change/ }));
+    expect(github().flash).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "GitHub options" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Quiet hours/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Quiet hours" }));
+    expect(github().quietHours).toEqual({ on: true, from: "22:00", to: "08:00" });
+    fireEvent.change(screen.getByLabelText("Quiet from"), { target: { value: "21:30" } });
+    expect(github().quietHours).toEqual({ on: true, from: "21:30", to: "08:00" });
   });
 });

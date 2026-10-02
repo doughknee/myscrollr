@@ -15,5 +15,6 @@ export const LS_WEATHER_CITIES = "scrollr:widget:weather:cities";
 /** Legacy — read once by `loadPrefs` to seed `appearance.units`, then deleted. */
 export const LS_WEATHER_UNIT = "scrollr:widget:weather:unit";
 export const LS_UPTIME_MONITORS = "scrollr:widget:uptime:monitors";
-export const LS_GITHUB_REPOS = "scrollr:widget:github:repos";
+/** The GitHub board, one entry per tracked repo (SCROLLR-312; 1.7.0's `…:github:repos` held another shape). */
+export const LS_GITHUB_BOARD = "scrollr:widget:github:board";
 export const LS_SYSMON_DATA = "scrollr:widget:sysmon:data";

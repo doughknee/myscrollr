@@ -52,7 +52,7 @@ import { getAllDataWidgets } from "../datawidgets/registry";
 import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
 import { API_BASE, DEMO } from "../config";
 import { getAllWidgets } from "../widgets/registry";
-import { fetchRepos, repoKey, saveRepoData } from "../widgets/github/types";
+import { githubBoardQuery } from "../widgets/github/types";
 import { canonicalOrder } from "../marketplace";
 
 // Data
@@ -475,22 +475,13 @@ function RootLayout() {
     enabled: enabledWidgets.includes("weather"),
   });
 
-  // Shell-level GitHub polling (SCROLLR-308): the edge chip has to move
-  // within a minute of a review request whichever page is open. Same key
-  // as the GitHub FeedTab's observer, so the two never double-fetch;
-  // saveRepoData writes only on a change.
-  const githubRepos = prefs.widgets.github.repos;
+  // Shell-level GitHub polling (SCROLLR-308, SCROLLR-312): the bar has to
+  // move within a minute of a review request whichever page is open. Same
+  // key as the GitHub FeedTab's observer, so the two never double-fetch;
+  // saveBoard writes only on a change.
   useQuery({
-    queryKey: ["github-actions", auth.authenticated, githubRepos.map(repoKey)],
-    queryFn: async () => {
-      const data = await fetchRepos(githubRepos);
-      saveRepoData(data);
-      return data;
-    },
-    enabled: enabledWidgets.includes("github") && githubRepos.length > 0,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
-    retry: 1,
+    ...githubBoardQuery(prefs.widgets.github.repos, auth.authenticated),
+    enabled: enabledWidgets.includes("github") && prefs.widgets.github.repos.length > 0,
   });
 
   // ── Subscription info — fetched for billing UI in Account tab + banner ──
