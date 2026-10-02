@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { THEME_FAMILIES } from "../../src/preferences";
+import { parkMouse } from "./pages";
 
 /**
  * SCROLLR-275 (Home addition): the widget pages stay legible in every
@@ -146,7 +147,10 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
 }
 
 async function readings(page: Page, url: string, root: string, ready: string): Promise<Reading[]> {
+  // The pointer off the bar: a hovered band shows its keypad and the chip steps aside (SCROLLR-303).
+  await parkMouse(page);
   await page.goto(url);
+  await parkMouse(page);
   await page.locator(ready).first().waitFor();
   await page.evaluate(() => document.fonts.ready);
   // Colours are measured at rest: a theme applied after first paint transitions, and a mid-fade reading is not the palette's.
