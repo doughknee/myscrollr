@@ -151,6 +151,8 @@ export interface TickerPrefs {
   tickerSpeed: number;
   onHover: HoverBehavior;
   scrollMode: ScrollMode;
+  /** Pages only: the pager (`‹ 7/23 ›`) at the bar's left end. Off gives its width to the columns; the wheel and keys still page (SCROLLR-301). */
+  pageControls: boolean;
 }
 
 // The Ticker page offers presets, never raw numbers (SETTINGS_AUDIT §3).
@@ -466,6 +468,7 @@ const DEFAULT_TICKER: TickerPrefs = {
   tickerSpeed: TICKER_SPEEDS.normal,
   onHover: "slow",
   scrollMode: "pages",
+  pageControls: true,
 };
 
 const DEFAULT_PRIVACY: PrivacyPrefs = {
@@ -1090,6 +1093,7 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     ...rest,
     onHover: migratedHover,
     scrollMode: scrollMode === "continuous" ? "continuous" : "pages",
+    pageControls: rest.pageControls !== false,
     tickerSpeed: snapToPreset(
       rest.tickerSpeed,
       Object.values(TICKER_SPEEDS),

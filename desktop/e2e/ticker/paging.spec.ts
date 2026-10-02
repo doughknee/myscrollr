@@ -208,3 +208,103 @@ test("a step on a follower window turns the leader and every window with it", as
   expect(await at(page)).toBe(1);
   expect(await at(second)).toBe(1);
 });
+
+// ── SCROLLR-301: page controls can be hidden; ↓/↑ and Shift+wheel jump a whole widget ──
+
+const tabUp = async (page: Page) => (await pageUp(page)).split(":")[0];
+const visit = (page: Page) => page.locator("[data-pages] [data-page]").last().getAttribute("data-visit").then(Number);
+
+test("Page controls off: no pager, the label at the left end, the pager's 88px go to the columns, and the wheel and keys still page", async ({ page, context }) => {
+  await open(page, context);
+  const on = (await page.locator("[data-pages] [data-page]").boundingBox())!;
+
+  const off = await context.newPage();
+  await parkMouse(off);
+  await off.goto("/ticker-shim.html?pages=1&fixture=pages&controls=0");
+  await parkMouse(off);
+  await off.waitForSelector("[data-pages] [data-page]");
+  await off.evaluate(() => document.fonts.ready);
+  await context.clock.runFor(1000);
+  expect(await off.locator("[data-pager]").count(), "the cluster is gone").toBe(0);
+  expect((await off.locator("[data-label]").first().boundingBox())!.x, "the label at the bar's left end").toBe(0);
+  const wide = (await off.locator("[data-pages] [data-page]").boundingBox())!;
+  expect(wide.x).toBe(112);
+  expect(wide.width, "the columns get the pager's width").toBe(on.width + PAGER_W);
+
+  const before = await visit(off);
+  await off.mouse.move(900, 30);
+  await off.mouse.wheel(0, 100);
+  await context.clock.runFor(SWIPE_MS + 100);
+  expect(await visit(off), "the wheel still turns the page").toBe(before + 1);
+  await off.keyboard.press("ArrowRight");
+  await context.clock.runFor(SWIPE_MS + 100);
+  expect(await visit(off), "and so does the right arrow").toBe(before + 2);
+});
+
+test("down jumps to the next widget, up back to the page you were reading; a jump back swipes left to right", async ({ page, context }) => {
+  await open(page, context);
+  const first = await pageUp(page);
+  await page.keyboard.press("ArrowDown");
+  await context.clock.runFor(SWIPE_MS + 100);
+  const second = await pageUp(page);
+  expect(second.split(":")[0], "a different widget").not.toBe(first.split(":")[0]);
+  expect(second.split(":")[1], "on its first page").toMatch(/^1\//);
+  expect(await page.locator("[data-page][data-back]").count()).toBe(0);
+  await page.keyboard.press("ArrowUp");
+  await context.clock.runFor(SWIPE_MS + 100);
+  expect(await pageUp(page), "back on the page you were reading").toBe(first);
+  expect(await page.locator("[data-page][data-back]").count(), "a jump back swipes left to right").toBe(1);
+  // Up from the first widget wraps to the last widget's last page.
+  await page.keyboard.press("ArrowUp");
+  await context.clock.runFor(SWIPE_MS + 100);
+  expect(await at(page)).toBe(await of(page));
+});
+
+test("Shift+wheel jumps whole widgets, forward and back", async ({ page, context }) => {
+  await open(page, context);
+  const first = await tabUp(page);
+  await page.mouse.move(900, 30);
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, 100);
+  await context.clock.runFor(SWIPE_MS + 100);
+  const second = await tabUp(page);
+  expect(second).not.toBe(first);
+  await page.mouse.wheel(0, 100);
+  await context.clock.runFor(SWIPE_MS + 100);
+  const third = await tabUp(page);
+  expect(third).not.toBe(second);
+  expect(third).not.toBe(first);
+  await page.mouse.wheel(0, -100);
+  await context.clock.runFor(SWIPE_MS + 100);
+  expect(await tabUp(page)).toBe(second);
+  await page.keyboard.up("Shift");
+});
+
+test("a widget jump on a follower turns the leader and every window with it", async ({ page, context }) => {
+  await open(page, context);
+  const second = await context.newPage();
+  await parkMouse(second);
+  await second.goto("/ticker-shim.html?pages=1&fixture=pages&label=ticker-2");
+  await parkMouse(second);
+  await second.waitForSelector("[data-lap-pos]");
+  await page.waitForTimeout(400);
+  const first = await tabUp(page);
+
+  await second.keyboard.press("ArrowDown");
+  await page.waitForTimeout(300);
+  await context.clock.runFor(SWIPE_MS + 100);
+  await page.waitForTimeout(100);
+  const jumped = await tabUp(page);
+  expect(jumped, "the leader took the follower's jump").not.toBe(first);
+  expect(await tabUp(second)).toBe(jumped);
+
+  await second.mouse.move(900, 30);
+  await second.keyboard.down("Shift");
+  await second.mouse.wheel(0, -100);
+  await second.keyboard.up("Shift");
+  await page.waitForTimeout(300);
+  await context.clock.runFor(SWIPE_MS + 100);
+  await page.waitForTimeout(100);
+  expect(await tabUp(page)).toBe(first);
+  expect(await tabUp(second)).toBe(first);
+});

@@ -619,6 +619,16 @@ export default function App() {
     invoke("pin_window", { pinned: next }).catch(() => {});
   }, []);
 
+  // The pager at the bar's left end (SCROLLR-301): one click from the bar, as in Settings › Ticker.
+  const handleTogglePageControls = useCallback(() => {
+    const updated = {
+      ...prefsRef.current,
+      ticker: { ...prefsRef.current.ticker, pageControls: !prefsRef.current.ticker.pageControls },
+    };
+    setPrefs(updated);
+    savePrefs(updated);
+  }, []);
+
   // ── Right-click → native context menu ──────────────────────────
 
   useEffect(() => {
@@ -749,6 +759,17 @@ export default function App() {
         }),
       );
 
+      // Pages only, like the Settings row: the ‹ 7/23 › at the bar's left end (SCROLLR-301).
+      if (prefsRef.current.ticker.scrollMode === "pages") {
+        items.push(
+          await CheckMenuItem.new({
+            text: "Page controls",
+            checked: prefsRef.current.ticker.pageControls,
+            action: handleTogglePageControls,
+          }),
+        );
+      }
+
       // Customize Ticker — the Ticker page of Settings, not the default
       // (Appearance) page it used to land on.
       items.push(
@@ -809,7 +830,7 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow, handleTogglePin]);
+  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow, handleTogglePin, handleTogglePageControls]);
 
   // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
@@ -885,6 +906,7 @@ export default function App() {
                   pins={prefs.widgets.pins}
                   onChipClick={handleChipClick}
                   onDisplayedWidgetsChange={reportDisplayedWidgets}
+                  pageControls={prefs.ticker.pageControls}
                 />
               );
             }

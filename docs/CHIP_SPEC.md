@@ -137,7 +137,7 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 |‹ 7/23 ›| label   | col 1 | col 2 | col 3 | ... all equal | edge     |
 ```
 
-- **Content width** = `bar width - LABEL_W - PAGER_W - edge width` (`contentWidth`). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
+- **Content width** = `bar width - LABEL_W - PAGER_W - edge width` (`contentWidth`); `PAGER_W` only while the pager shows (Page controls, §P.7a), so with it off the columns get its 88px back. The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
 - The page block is a grid, `repeat(n, minmax(0, 1fr))` where `n` is the number of items **on that page**. Every page is full (§P.4a), so `n` is the column count except in two cases:
   - **A widget on several pages** whose pool is not a multiple of the columns splits evenly (§P.4): 9 headlines at 8 columns are 5 + 4, each page's columns widened to fill the bar.
   - **A truly short widget** (one page, fewer items than columns even after the fill: one NFL game all week, a feed holding two headlines) keeps **a full page's column width**, `content width / columns`, **left-aligned** from the label: `repeat(n, colW px)`, `data-short` on the page. Never one item stretched across the bar, and never centred: a centred cell floats away from the label that names it and reads as one item lost on a page (both drawn on SCROLLR-292; left picked).
@@ -303,7 +303,16 @@ choice).
 
 SCROLLR-298 (Brandon, 1 Oct 2026: "little buttons or something somewhere that make it easy
 to cycle through them"; then, "arrow keys on the far left and far right might be annoying; I
-have an ultrawide"). No setting.
+have an ultrawide"); then (SCROLLR-301), "hide the controls if you don't want them" and "up
+and down arrows as well for swapping between entire widgets".
+
+- **Page controls** (`ticker.pageControls`, default on; SCROLLR-301): a toggle in Settings ›
+  Ticker › Motion, shown under Pages only (as Speed and On hover show under Continuous
+  only), and the same checkable item in the bar's right-click menu (also Pages only). Off
+  removes the pager (`data-pager` absent): the label starts at x = 0 and `contentWidth`
+  no longer takes `PAGER_W` (`planAll(…, pager)`), so columns are re-planned on the next
+  page. The wheel and the keys keep working. The pager's width is the only thing it
+  changes; every window reads the same pref.
 
 - **The pager** sits at the bar's left end, before the label (SCROLLR-300; it sat after
   the label until then): it counts the whole lap, a bar-level control, so it sits outside
@@ -335,6 +344,14 @@ have an ultrawide"). No setting.
   the hold (§P.7, Hover) stays while you page.
 - **Keys:** `←` and `→` (no modifier) step when the ticker window has focus (it does after
   a click on it; it normally has none, being always on top at a screen edge).
+- **A widget jump** (SCROLLR-301): `↓` and `↑` (no modifier), or the wheel with **Shift**
+  held (Chromium hands it over as `deltaX`; the sign rule above still applies), jump a
+  whole widget: `stepTurn(…, whole)`. Forward lands on the next widget at the page its
+  cursor would show next (what the clock's own turn would bring); back on the previous
+  widget at the page it showed last (its last page if it has not been up yet), so `↓`
+  then `↑` returns to what you were reading. Otherwise it is a step like any other below:
+  a back jump swipes left to right, the cursor ends after the page shown, and a follower
+  relays it as `pages:step` `{dir, whole}`. No on-bar button; the ‹ › stay page steps.
 - **A step** is `stepTurn` (`widgetPages.ts`) on the leader's page clock: the next or
   previous page in the same reading order the pager counts; past a widget's last page is
   the next widget's first, before its first page is the previous widget's last, and the lap

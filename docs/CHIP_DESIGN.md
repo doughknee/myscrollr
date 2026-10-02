@@ -47,7 +47,9 @@ once, at the release, with a one-time notice that Continuous is one click away i
 
 - **The pager** at the far left says where this page is in the whole trip round the bar:
   7/23 means the seventh of 23 pages across every widget. While your mouse is on the bar,
-  a ‹ and a › appear either side of it to go back or forward a page.
+  a ‹ and a › appear either side of it to go back or forward a page. Don't want it? Turn
+  off **Page controls** in Settings › Ticker, or right-click the bar and untick it: the
+  columns get its space, and the wheel and arrow keys still page.
 - **The label** right after it is 112 pixels: the widget's name in its own colour (NFL, BBC,
   Stocks), one fact beneath it (6 LIVE, SUN 4, how many stocks are up and down), and
   where you are in the widget when it has more than one page: 2/8 means page 2 of 8, so
@@ -117,7 +119,8 @@ your place under your cursor.
   page, up for the one before (one page per notch; a trackpad swipe sideways works too).
   Or click the ‹ › at the far left of the bar, or press ← → once you've clicked the bar.
   Going back slides the bar the other way, and from a widget's first page takes you to
-  the previous widget's last. Each page you step
+  the previous widget's last. To skip a whole widget, press ↓ (or hold Shift while you
+  scroll); ↑ goes back to the widget before, on the page you were reading. Each page you step
   to gets its full time, and when the bar moves on by itself it carries on from there, so
   it won't show you again what you just paged through. With a bar on several monitors,
   they all turn together.

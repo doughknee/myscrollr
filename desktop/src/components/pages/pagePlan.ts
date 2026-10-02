@@ -62,9 +62,9 @@ export const LABEL_W = 112;
  */
 export const PAGER_W = 88;
 
-/** Width left for columns once the label, the pager and the edge zone are taken. */
-export function contentWidth(barWidth: number, edgeWidth = 0): number {
-  return Math.max(0, barWidth - LABEL_W - PAGER_W - edgeWidth);
+/** Width left for columns once the label, the pager (unless hidden, SCROLLR-301) and the edge zone are taken. */
+export function contentWidth(barWidth: number, edgeWidth = 0, pager = true): number {
+  return Math.max(0, barWidth - LABEL_W - (pager ? PAGER_W : 0) - edgeWidth);
 }
 
 /**

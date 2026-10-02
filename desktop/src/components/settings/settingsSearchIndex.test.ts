@@ -153,6 +153,7 @@ describe("searchSettings", () => {
       "screenEdge",
       "tickerScale",
       "scrollMode",
+      "pageControls",
       "speed",
       "onHover",
       "alwaysOnTop",
