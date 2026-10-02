@@ -1,5 +1,21 @@
 # Build context: monorepo root (Coolify deploys from repo root)
 
+# ── Stage 0: The live bar (SCROLLR-310) ─────────────────────────
+# The desktop app's own ticker, built for the web (desktop/embed.html,
+# `vite build --mode embed`), served at /bar/ and framed by the site.
+# Only what that build reads is copied; it reads no .env.
+FROM node:22-alpine AS bar
+
+WORKDIR /app/desktop
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+COPY desktop/package.json desktop/package-lock.json ./
+RUN npm ci
+COPY desktop/embed.html desktop/vite.config.ts desktop/tsconfig.json ./
+COPY desktop/public ./public
+COPY desktop/scripts ./scripts
+COPY desktop/src ./src
+RUN npx vite build --mode embed
+
 # ── Stage 1: Build ──────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
@@ -79,6 +95,7 @@ FROM nginx:alpine
 
 # Copy built assets to nginx
 COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
+COPY --from=bar /app/desktop/dist-embed /usr/share/nginx/html/bar
 
 # SPA fallback: route dynamic paths to _shell.html for client-side routing
 # Includes security headers, gzip compression, and proper caching
@@ -228,6 +245,18 @@ server {\n\
         try_files $uri $uri/index.html =404;\n\
     }\n\
 \n\
+    # ── The live bar (SCROLLR-310): its own CSP, framed by the site only ─\n\
+    location /bar/ {\n\
+        include /etc/nginx/bar-headers.conf;\n\
+        add_header Cache-Control "no-cache";\n\
+        try_files $uri /bar/embed.html;\n\
+    }\n\
+    location /bar/assets/ {\n\
+        include /etc/nginx/bar-headers.conf;\n\
+        expires 1y;\n\
+        add_header Cache-Control "public, max-age=31536000, immutable";\n\
+    }\n\
+\n\
     # ── Hashed static assets: cache forever ─────────────────────\n\
     location /assets/ {\n\
         include /etc/nginx/security-headers.conf;\n\
@@ -246,8 +275,14 @@ server {\n\
 printf 'add_header X-Content-Type-Options "nosniff" always;\n\
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;\n\
-add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"' https://relentnet.com; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://js.stripe.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com https://auth.myscrollr.com https://api.stripe.com https://api.github.com https://us.i.posthog.com; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"';" always;\n\
-' > /etc/nginx/security-headers.conf
+add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"' https://relentnet.com; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://js.stripe.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com https://auth.myscrollr.com https://api.stripe.com https://api.github.com https://us.i.posthog.com; frame-src '"'"'self'"'"' https://js.stripe.com https://hooks.stripe.com; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"';" always;\n\
+' > /etc/nginx/security-headers.conf && \
+printf 'add_header X-Content-Type-Options "nosniff" always;\n\
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;\n\
+add_header X-Robots-Tag "noindex" always;\n\
+add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"'; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com; base-uri '"'"'self'"'"'; form-action '"'"'none'"'"';" always;\n\
+' > /etc/nginx/bar-headers.conf
 
 EXPOSE 3000
 

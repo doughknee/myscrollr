@@ -1,18 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { motion, useInView } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Building2 } from 'lucide-react'
 import type { FormEvent } from 'react'
 
 import type { BusinessUseCase } from '@/api/client'
-import type { DemoTickerBarOverride } from '@/components/DemoTickerBar'
-import type { DemoChip } from '@/hooks/useDemoTicker'
 import type {
   BackdropBeam,
   BackdropParticle,
 } from '@/components/landing/_ConvergenceBackdrop'
 import { businessApi } from '@/api/client'
-import DemoTickerBar from '@/components/DemoTickerBar'
 import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
 import {
   DeparturesRow,
@@ -63,84 +60,17 @@ type BrandId = 'scrollr' | 'acme' | 'dugout' | 'novax'
 interface BrandDef {
   label: string
   accent: string
-  bar: { bg: string; border: string; text: string; muted: string }
 }
 
 // prettier-ignore
 const BRAND_DEFS: Record<BrandId, BrandDef> = {
-  scrollr: { label: 'SCROLLR', accent: '#34d399', bar: { bg: 'rgba(16,16,24,.9)', border: '#2e2e42', text: '#c8c8d8', muted: '#5a5a72' } },
-  acme: { label: 'ACME CAPITAL', accent: '#00d4ff', bar: { bg: 'rgba(8,16,28,.93)', border: '#1c3450', text: '#c9dcf0', muted: '#4a6a8a' } },
-  dugout: { label: 'THE DUGOUT', accent: '#fbbf24', bar: { bg: 'rgba(22,14,8,.93)', border: '#4a3418', text: '#f0e2c9', muted: '#8a7a5a' } },
-  novax: { label: 'NOVAX', accent: '#a855f7', bar: { bg: 'rgba(16,10,26,.93)', border: '#362050', text: '#ddc9f0', muted: '#6f5a8a' } },
+  scrollr: { label: 'SCROLLR', accent: '#34d399' },
+  acme: { label: 'ACME CAPITAL', accent: '#00d4ff' },
+  dugout: { label: 'THE DUGOUT', accent: '#fbbf24' },
+  novax: { label: 'NOVAX', accent: '#a855f7' },
 }
 
 const BRAND_IDS = Object.keys(BRAND_DEFS) as Array<BrandId>
-
-function jitter(tick: number, base: number, seed: number, spread: number) {
-  return base + Math.sin(tick * 0.9 + seed) * spread
-}
-
-/** Audience-specific chips per white-label brand (mockup `brandChips`),
- *  in the app-faithful structured chip shape rendered by DemoTickerBar. */
-function brandChips(brand: BrandId, tick: number): Array<DemoChip> {
-  const t = tick
-  if (brand === 'acme') {
-    const cyan = '#00d4ff'
-    return [
-      // prettier-ignore
-      { kind: 'text', accent: cyan, label: 'ACME MODEL PORTFOLIO', value: '▲+0.8% TODAY' },
-      // prettier-ignore
-      { kind: 'trade', accent: cyan, symbol: 'SPY', price: '$' + jitter(t, 612.4, 1, 0.8).toFixed(2), delta: '▲+0.4%', up: true },
-      // prettier-ignore
-      { kind: 'trade', accent: cyan, symbol: 'QQQ', price: '$' + jitter(t, 482.1, 3, 1.2).toFixed(2), delta: '▲+0.9%', up: true },
-      // prettier-ignore
-      { kind: 'trade', accent: cyan, symbol: '10Y YIELD', price: '3.84%', delta: '▼-2BP', up: false },
-      // prettier-ignore
-      { kind: 'text', accent: cyan, label: 'YOUR ADVISOR', value: 'QUARTERLY REVIEW THU 2PM' },
-    ]
-  }
-  if (brand === 'dugout') {
-    const amber = '#fbbf24'
-    return [
-      // prettier-ignore
-      { kind: 'game', accent: amber, away: 'NYY', awayScore: '5', home: 'BOS', homeScore: '3', status: '▲7', live: true, winner: 'away' },
-      // prettier-ignore
-      { kind: 'game', accent: amber, away: 'MIA', awayScore: '2', home: 'LA', homeScore: '1', status: '63′', live: true, winner: 'away' },
-      // prettier-ignore
-      { kind: 'text', accent: amber, label: 'TONIGHT', value: 'TRIVIA 8PM', sub: 'WINGS ½ OFF DURING ANY OT' },
-      {
-        kind: 'game',
-        accent: amber,
-        away: 'KC',
-        awayScore: '24',
-        home: 'BUF',
-        homeScore: '21',
-        status:
-          'Q4 ' +
-          (2 - (t % 3)) +
-          ':' +
-          String(59 - ((t * 7) % 60)).padStart(2, '0'),
-        live: true,
-        winner: 'away',
-      },
-    ]
-  }
-  if (brand === 'novax') {
-    const purple = '#a855f7'
-    return [
-      // prettier-ignore
-      { kind: 'trade', accent: purple, symbol: 'BTC/USDT', price: '$' + Math.round(jitter(t, 118240, 4, 180)).toLocaleString(), delta: '▲+2.4%', up: true },
-      // prettier-ignore
-      { kind: 'trade', accent: purple, symbol: 'ETH/USDT', price: '$' + Math.round(jitter(t, 4120, 5, 14)).toLocaleString(), delta: '▼-0.8%', up: false },
-      // prettier-ignore
-      { kind: 'trade', accent: purple, symbol: 'SOL/USDT', price: '$' + jitter(t, 212.5, 6, 2.4).toFixed(2), delta: '▲+5.1%', up: true },
-      // prettier-ignore
-      { kind: 'text', accent: purple, label: 'NOVAX', value: 'MAKER FEES 0% THROUGH SEPTEMBER' },
-    ]
-  }
-  // 'scrollr' renders <DemoTickerBar /> with no override instead.
-  return []
-}
 
 // ── Section content (copy verbatim from the mockup) ─────────────
 
@@ -867,30 +797,10 @@ function FormField({
 
 function BusinessPage() {
   const [brand, setBrand] = useState<BrandId>('scrollr')
-  const [tick, setTick] = useState(0)
-
-  // 3s jitter tick for the branded chip text (mirrors useDemoChips).
-  useEffect(() => {
-    const iv = setInterval(() => setTick((v) => v + 1), 3000)
-    return () => clearInterval(iv)
-  }, [])
-
-  // The white-label demo never writes the scrollr-marketing-demo key —
-  // the override path in DemoTickerBar already guarantees this.
-  const override: DemoTickerBarOverride | undefined =
-    brand === 'scrollr'
-      ? undefined
-      : {
-          label: BRAND_DEFS[brand].label,
-          accent: BRAND_DEFS[brand].accent,
-          palette: BRAND_DEFS[brand].bar,
-          chips: brandChips(brand, tick),
-        }
 
   return (
-    // Bar clearance (top and bottom, density-aware) is handled by
-    // __root — it treats /business like every bar-having route; only
-    // the bar INSTANCE is page-local (for the white-label override).
+    // The bar is the site's live one (__root); the brand switcher
+    // rebrands the four screens below, not the bar.
     <div>
       <PageHeader
         eyebrowLeft="BUSINESS ／ BRANDED DEPLOYMENTS"
@@ -941,7 +851,7 @@ function BusinessPage() {
         <TerminalContainer>
           <SectionRow
             tag="SEC 00 ／ ONE PLATFORM, MANY DEPLOYMENTS"
-            stat="CLICK A SCREEN · THE BAR BELOW REBRANDS"
+            stat="CLICK A SCREEN TO REBRAND IT"
           />
           <div className="flex justify-center py-12">
             <DeploymentFanout brand={brand} onSelect={setBrand} />
@@ -955,10 +865,6 @@ function BusinessPage() {
       <FaqSection />
       <CtaSection />
       <ContactSection />
-
-      {/* Page exception: /business renders its own bar as the
-          white-label demo (see DEMO_BAR_EXCLUDED in __root.tsx). */}
-      <DemoTickerBar override={override} />
     </div>
   )
 }

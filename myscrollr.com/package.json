@@ -26,7 +26,7 @@
     "lint": "eslint",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",
-    "og-images": "node scripts/generate-og-images.mjs"
+    "og-images": "node ../scripts/marketing/shoot.mjs --only=og"
   },
   "dependencies": {
     "@logto/react": "^4.0.12",

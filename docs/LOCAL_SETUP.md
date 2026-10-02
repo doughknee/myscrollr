@@ -242,6 +242,16 @@ powershell -File scripts/dev/capture-window.ps1 -Title "Scrollr Ticker" -Out tic
 website (theme × density × channel) from the running app, then runs the site's
 optimizer. It puts your prefs and bar back afterwards. Windows only.
 
+`make marketing` needs no running app, on any OS. It shoots the ticker's web
+build (`desktop/embed.html`, the same `/bar/` the website frames; built into
+`desktop/dist-embed` if missing, so delete that folder after changing the
+ticker) with Playwright's Chromium: five scenarios at 1280, 1920 and 3440 px in
+Scrollr dark and light into `marketing/out/` (ignored), plus the files the site
+ships — the OG cards in `myscrollr.com/public/og/`, the homepage proof and the
+bar placeholder in `myscrollr.com/public/marketing/` — which you commit. Every
+shot uses a fixture, so they repeat; `make marketing args=--prod` shoots
+`myscrollr.com/bar/` instead. About a minute and a half.
+
 ## The Windows "run this .exe?" prompt
 
 The Tauri dev binary is unsigned, so Windows SmartScreen and the firewall

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { useDemoTicker } from '@/hooks/useDemoTicker'
+import { useBar } from '@/hooks/useBar'
 import ScrollrSVG from '@/components/ScrollrSVG'
 
 /**
@@ -32,19 +32,17 @@ export default function Header({
   hasBar = false,
 }: {
   /**
-   * Whether the current route shows a demo ticker bar (the shared one,
-   * or /business's white-label instance — both follow the shared
-   * store's pin/density).
+   * Whether the current route shows the live bar.
    */
   hasBar?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
   // Sticky offset: when the demo bar is pinned top, the header slots
   // in directly beneath it — the bar stays "on top of everything".
-  // Bar height tracks density (h-12 compact / h-16 detailed).
-  const { pos, density } = useDemoTicker()
-  const barTopInset = density === 'detailed' ? 'top-16' : 'top-12'
-  const barBottomInset = density === 'detailed' ? 'bottom-16' : 'bottom-12'
+  // The bar is one height, 64px (h-16), like the app's.
+  const { pos } = useBar()
+  const barTopInset = 'top-16'
+  const barBottomInset = 'bottom-16'
   const stickyTop = hasBar && pos === 'top' ? barTopInset : 'top-0'
   // The mobile drawer and the bar are both z-50 with the bar later in
   // the DOM, so the bar paints on top — inset the drawer on the bar's

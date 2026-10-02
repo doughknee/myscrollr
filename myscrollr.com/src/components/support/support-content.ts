@@ -16,7 +16,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes. The free tier lets three widgets run at once, and Clock and Weather are free on top of that. No account is required to download or look around; sign in to add live data widgets and sync settings. Uplink plans add more concurrent widgets from $6.67/mo.',
+      'Yes. Your bar has room for three pages on the free tier (each widget is one page), and Clock and Weather sit on its edge for free. No account is required to download or look around; sign in to add live data widgets and sync settings. Uplink plans fit more pages, from $6.67/mo.',
   },
   {
     question: "Does it affect my computer's performance?",
@@ -41,7 +41,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Can I customize the bar?',
     answer:
-      'Twenty palettes, top or bottom of any monitor, speed and density controls, and per-widget settings.',
+      'Ten themes, each light or dark; top or bottom of any monitor, one monitor or all of them, pages or a continuous scroll, and per-widget settings.',
   },
   {
     question: 'How do I update the app?',
@@ -116,7 +116,7 @@ export const GETTING_STARTED_STEPS: Array<GettingStartedStep> = [
   {
     title: 'Customize the Ticker',
     description:
-      'The ticker bar runs across your screen showing live data. Open Settings > Ticker to change its size, chip colors and speed. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.',
+      'The ticker shows one widget at a time as a page, then swipes to the next; Clock and Weather sit on its edge. Open Settings > Ticker to change its size, the screen edge and monitors it sits on, or switch to a continuous scroll. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.',
   },
 ]
 

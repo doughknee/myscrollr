@@ -187,8 +187,8 @@ export default function SubscriptionStatus({
           </span>
         </div>
         <p className="text-sm text-base-content/30">
-          Upgrade to Uplink for more widget slots, or Uplink Ultimate for
-          unlimited widgets.
+          Upgrade to Uplink for more pages on your bar, or Uplink Ultimate for
+          unlimited.
         </p>
       </div>
     )
@@ -460,8 +460,8 @@ export default function SubscriptionStatus({
                 <>
                   <p>
                     If you cancel now, you&apos;ll lose access to all premium
-                    features immediately &mdash; including your extra widget
-                    slots and Uplink Ultimate access.
+                    features immediately &mdash; including the extra pages on
+                    your bar and Uplink Ultimate access.
                   </p>
                   <p className="font-semibold text-base-content/70">
                     This is the only free trial offered per account. Once

@@ -1,13 +1,16 @@
-import { chromium } from 'playwright'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+// The OpenGraph card template (1200x630). `make marketing`
+// (scripts/marketing/shoot.mjs) renders it per page with a real shot of
+// the bar across the top and writes public/og/<file>; `npm run og-images`
+// runs that step alone.
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
-const outDir = join(root, 'public', 'og')
+export const OG_DIR = join(root, 'public', 'og')
 
-const PAGES = [
+export const PAGES = [
   {
     file: 'home.png',
     eyebrow: 'Scrollr',
@@ -59,7 +62,8 @@ const fontPath = join(root, 'public', 'fonts', 'plus-jakarta-sans-latin.woff2')
 const fontBuffer = await readFile(fontPath)
 const fontDataUrl = `data:font/woff2;base64,${fontBuffer.toString('base64')}`
 
-const template = ({ eyebrow, title, subtitle, accent }) => `
+/** `bar`: a data URL of the bar shot, laid across the top edge. */
+export const template = ({ eyebrow, title, subtitle, accent, bar }) => `
 <!doctype html>
 <html>
 <head>
@@ -124,6 +128,11 @@ const template = ({ eyebrow, title, subtitle, accent }) => `
     background: ${accent};
     border-radius: 12px;
   }
+  .bar {
+    position: absolute; top: 0; left: 0;
+    width: 1200px; height: 64px;
+    z-index: 2;
+  }
   .domain {
     font-size: 20px;
     color: #8a8a98;
@@ -131,7 +140,8 @@ const template = ({ eyebrow, title, subtitle, accent }) => `
   }
 </style>
 </head>
-<body>
+<body${bar ? ' style="padding-top: 128px"' : ''}>
+  ${bar ? `<img class="bar" src="${bar}" alt="">` : ''}
   <div class="eyebrow">${eyebrow}</div>
   <div>
     <div class="title">${title}</div>
@@ -144,31 +154,3 @@ const template = ({ eyebrow, title, subtitle, accent }) => `
 </body>
 </html>
 `
-
-async function main() {
-  await mkdir(outDir, { recursive: true })
-
-  const browser = await chromium.launch()
-  const context = await browser.newContext({
-    viewport: { width: 1200, height: 630 },
-    deviceScaleFactor: 1, // 1200x630 final dimensions per OG spec
-  })
-  const page = await context.newPage()
-
-  for (const pg of PAGES) {
-    await page.setContent(template(pg), { waitUntil: 'networkidle' })
-    // Force a paint so the embedded font is fully shaped before screenshot
-    await page.evaluate(() => document.fonts.ready)
-    const buf = await page.screenshot({ type: 'png' })
-    const outPath = join(outDir, pg.file)
-    await writeFile(outPath, buf)
-    console.log(`✓ ${pg.file}`)
-  }
-
-  await browser.close()
-}
-
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})

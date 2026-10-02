@@ -1,0 +1,10 @@
+# Only the website image builds from the repo root (myscrollr.com/Dockerfile,
+# which also builds desktop/'s ticker for /bar/). Keep local installs, build
+# output and secrets out of its context.
+.git
+**/node_modules
+**/dist
+**/dist-embed
+**/.env
+**/.env.*
+desktop/src-tauri

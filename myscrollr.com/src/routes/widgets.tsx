@@ -3,11 +3,11 @@
  * (design_handoff_marketing_site/Widgets - Redesign.dc.html).
  *
  * Everything renders from the real catalog (`useCatalog`); counts are
- * always computed, never literals. ADD TO BAR writes the shared demo
- * ticker state so the persistent bar updates immediately.
+ * always computed, never literals. ADD TO BAR writes the shared bar
+ * state, so the live bar at the edge of the page reloads with it.
  */
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import type { CatalogWidget } from '@/lib/catalog'
@@ -21,7 +21,7 @@ import {
   widgetAbbr,
   widgetAccent,
 } from '@/lib/catalog'
-import { chipText, chipsFor, useDemoTicker } from '@/hooks/useDemoTicker'
+import { useBar } from '@/hooks/useBar'
 import {
   DeparturesRow,
   PageHeader,
@@ -52,24 +52,10 @@ function ChannelsPage() {
   const widgets = useCatalog()
   const counts = categoryCounts(widgets)
   const n = widgets.length
-  const { active, toggle } = useDemoTicker()
+  const { active, toggle } = useBar()
 
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
-
-  // Local 3s tick driving the jittering sample-chip column (same
-  // cadence as useDemoChips; `now` stays null through SSR/first paint
-  // to avoid a timezone hydration mismatch on the Clock row).
-  const [tick, setTick] = useState(0)
-  const [now, setNow] = useState<Date | null>(null)
-  useEffect(() => {
-    setNow(new Date())
-    const iv = setInterval(() => {
-      setTick((v) => v + 1)
-      setNow(new Date())
-    }, 3000)
-    return () => clearInterval(iv)
-  }, [])
 
   const q = query.trim().toLowerCase()
   const matches = (w: CatalogWidget) =>
@@ -195,8 +181,6 @@ function ChannelsPage() {
                       key={w.id}
                       widget={w}
                       inBar={active.includes(w.id)}
-                      tick={tick}
-                      now={now}
                       onToggle={() => toggle(w.id)}
                     />
                   ))}
@@ -251,19 +235,13 @@ function ChannelsPage() {
 function CatalogRow({
   widget,
   inBar,
-  tick,
-  now,
   onToggle,
 }: {
   widget: CatalogWidget
   inBar: boolean
-  tick: number
-  now: Date | null
   onToggle: () => void
 }) {
   const accent = widgetAccent(widget)
-  const chip = chipsFor(widget.id, tick, now).at(0)
-  const sample = chip ? `⋯ ${chipText(chip)} ⋯` : ''
 
   return (
     // Whole-row click target — on a 35-row catalog the small button is
@@ -272,7 +250,7 @@ function CatalogRow({
     // propagation so a button click doesn't fire twice.
     <div
       onClick={onToggle}
-      className={`grid cursor-pointer grid-cols-[74px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-hairline-minor px-2 py-[15px] transition-colors duration-150 hover:bg-primary/[0.03] lg:grid-cols-[90px_190px_1.1fr_1.3fr_130px] lg:gap-[18px] ${
+      className={`grid cursor-pointer grid-cols-[74px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-hairline-minor px-2 py-[15px] transition-colors duration-150 hover:bg-primary/[0.03] lg:grid-cols-[90px_190px_1fr_130px] lg:gap-[18px] ${
         inBar ? 'bg-primary/5 hover:bg-primary/5' : ''
       }`}
     >
@@ -297,11 +275,6 @@ function CatalogRow({
 
       <span className="col-span-2 col-start-2 row-start-3 text-[13.5px] text-base-content/50 lg:col-span-1 lg:col-start-auto lg:row-start-auto">
         {widget.description}
-      </span>
-
-      {/* Jittering sample chip — desktop only */}
-      <span className="hidden overflow-hidden overflow-ellipsis whitespace-nowrap font-mono text-xs text-base-content/40 lg:block">
-        {sample}
       </span>
 
       {/* min-w reserves the wider label's width on mobile so toggling

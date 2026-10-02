@@ -1,18 +1,14 @@
 /**
- * SEC 04 ／ MAKE IT YOURS — theme family swatches + mode/pin/density/
- * direction controls, all driving the persistent demo bar (and, for
- * theme + mode, the whole site) through useDemoTicker + useTheme.
+ * SEC 04 ／ MAKE IT YOURS — theme family swatches + mode/pin/scroll
+ * controls, all driving the live bar (and, for theme + mode, the whole
+ * site) through useBar + useTheme.
  * Mirrors the app's Appearance settings: theme FAMILY and color MODE
  * are separate controls, exactly like the desktop app.
  */
 
 import { AnimatePresence, motion } from 'motion/react'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
-import {
-  APP_FAMILY_COUNT,
-  DEMO_THEMES,
-  useDemoTicker,
-} from '@/hooks/useDemoTicker'
+import { APP_FAMILY_COUNT, BAR_THEMES, useBar } from '@/hooks/useBar'
 import { useTheme } from '@/hooks/useTheme'
 
 function ControlRow<T extends string>({
@@ -64,16 +60,7 @@ function ControlRow<T extends string>({
 }
 
 export function MakeItYours() {
-  const {
-    theme,
-    pos,
-    density,
-    direction,
-    setTheme,
-    setPos,
-    setDensity,
-    setDirection,
-  } = useDemoTicker()
+  const { theme, pos, scroll, setTheme, setPos, setScroll } = useBar()
   const { theme: mode, setTheme: setMode } = useTheme()
 
   return (
@@ -88,8 +75,9 @@ export function MakeItYours() {
               <span className="text-primary">Dress it, park it.</span>
             </h2>
             <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
-              Twenty palettes. Top or bottom of any monitor. Speed, density, all
-              of it tunable. Try it right here. The bar takes orders.
+              Ten themes, each light or dark. Top or bottom of any monitor.
+              Pages, or a continuous scroll if you prefer. Try it right here.
+              The bar takes orders.
             </p>
             <div className="flex flex-col gap-3">
               <ControlRow
@@ -111,31 +99,22 @@ export function MakeItYours() {
                 onChange={setPos}
               />
               <ControlRow
-                label="DENSITY"
-                value={density}
+                label="SCROLL"
+                value={scroll}
                 options={[
-                  { id: 'compact' as const, label: 'COMPACT' },
-                  { id: 'detailed' as const, label: 'DETAILED' },
+                  { id: 'pages' as const, label: 'PAGES' },
+                  { id: 'continuous' as const, label: 'CONTINUOUS' },
                 ]}
-                onChange={setDensity}
-              />
-              <ControlRow
-                label="DIRECTION"
-                value={direction}
-                options={[
-                  { id: 'left' as const, label: '← LEFT' },
-                  { id: 'right' as const, label: 'RIGHT →' },
-                ]}
-                onChange={setDirection}
+                onChange={setScroll}
               />
             </div>
           </div>
           <div>
             <div className="pb-3.5 font-mono text-[11px] tracking-[0.14em] text-base-content/45">
-              THEMES — {DEMO_THEMES.length} OF {APP_FAMILY_COUNT} FAMILIES
+              THEMES — {BAR_THEMES.length} OF {APP_FAMILY_COUNT} FAMILIES
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {DEMO_THEMES.map((fam) => {
+              {BAR_THEMES.map((fam) => {
                 const pal = fam[mode]
                 return (
                   <motion.button
@@ -166,14 +145,9 @@ export function MakeItYours() {
                         className="min-w-0 truncate font-mono text-[11px]"
                         style={{ color: pal.text }}
                       >
-                        <span style={{ color: pal.chips.fin }}>
-                          AAPL 232.14
-                        </span>
+                        AAPL 253.69
                         <span style={{ color: pal.up }}> ▲</span>
-                        {' · '}
-                        <span style={{ color: pal.chips.spt }}>
-                          KC 24—BUF 21
-                        </span>
+                        {' · NYJ 24—CHI 20'}
                       </span>
                     </span>
                     <span className="flex justify-between px-0.5 font-mono text-[10px] tracking-[0.1em] text-base-content/45">
@@ -197,7 +171,7 @@ export function MakeItYours() {
               })}
             </div>
             <div className="pt-3 font-mono text-[11px] text-base-content/30">
-              + {APP_FAMILY_COUNT - DEMO_THEMES.length} MORE IN THE APP · EVERY
+              + {APP_FAMILY_COUNT - BAR_THEMES.length} MORE IN THE APP · EVERY
               THEME IN LIGHT & DARK
             </div>
           </div>

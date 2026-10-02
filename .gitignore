@@ -21,6 +21,8 @@ node_modules
 .DS_Store
 dist
 dist-ssr
+dist-embed
+marketing/out/
 *.local
 count.txt
 .nitro
