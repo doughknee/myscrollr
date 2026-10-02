@@ -862,7 +862,7 @@ function getWidgetValue(id: string, units: UnitsPrefs): string {
       return `${up} up`;
     }
     case "github": {
-      const repos = loadBoard();
+      const { repos } = loadBoard();
       if (repos.length === 0) return "No repos";
       const worst = repos.map((r) => worstOf(pillsFor(r)));
       const failing = worst.filter((w) => w === "red").length;

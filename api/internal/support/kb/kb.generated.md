@@ -251,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 50023e1b544e -->
+<!-- source: docs/CHIP_DESIGN.md @ 9c31e9abea69 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -419,10 +419,19 @@ that needs you: `Review` and the pull request's title and who opened it, `Change
 Nothing to name says `Nothing needs you`. Clicking the cell opens its most urgent thing
 on GitHub.
 
-One or two repos share one slot on the edge that never changes width: it shows one repo
-at a time (`GITHUB · MYSCROLLR`, its most urgent pill) and rolls to the next as the page
-turns, with a dot per repo in its corner. Three or more get a page, one cell each, in your
-order, and leave the edge; the band counts the repos that need you.
+GitHub gets its own page from the first repo, one cell per repo in your order, and never
+sits on the edge (the edge is for clocks, weather and timers). When your repos leave
+columns spare, the page fills itself with the next things that need you, one per cell:
+a review someone asked of you (from any repo the app can see, not only the ones you track),
+changes asked on one of yours, your failing checks, a failing run, a new or assigned
+issue. Each says what kind on top (`REVIEW`, `CHANGES ASKED`, `NEW ISSUE`), where and who
+(`myscrollr #479 · yours`) and the checks (`✗ 1 of 5`), with the title beneath. Nothing it
+shows repeats what a repo cell already says. Out of things that need you, it shows what was
+merged in the last day, drawn quieter (`MERGED`). Repos that fill the page get no extras.
+The band counts the repos that need you.
+
+Connect GitHub and do nothing else, and the page is already there: the repos with recent
+Actions runs go on the bar by themselves, without opening the widget.
 
 GitHub is the one widget where you choose what reaches the bar, because a developer's day
 has more events than anyone wants to see. In the widget, pick a repo on the left and choose

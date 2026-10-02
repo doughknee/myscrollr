@@ -1,5 +1,5 @@
 {
-  "_note": "SCROLLR-312 github: four tracked repos as the GitHub store holds them (core's POST /github/board answer) with the widget config that asked for them, after canvas board B3. Representative sample data, not production rows (CHIP_SPEC §10.2: GitHub is per-user, not in the seed). myscrollr: 2 PRs for you, two green workflows, 1 new issue. scrollr-api: deploy failing 12m ago, test green, 3 open PRs (All open). scrollr-web: two green workflows and Vercel failing on main (a commit status: any CI turns the cell red). infra: apply running 3m, 2 new issues. The shim seeds it for ?fixture=github or ?github=one|two|many (the first 1, 2 or all 4).",
+  "_note": "SCROLLR-312 github: four tracked repos as the GitHub store holds them (core's POST /github/board answer) with the widget config that asked for them, after canvas board B3. Representative sample data, not production rows (CHIP_SPEC §10.2: GitHub is per-user, not in the seed). myscrollr: 2 PRs for you, two green workflows, 1 new issue. scrollr-api: deploy failing 12m ago, test green, 3 open PRs (All open). scrollr-web: two green workflows and Vercel failing on main (a commit status: any CI turns the cell red). infra: apply running 3m, 2 new issues. queue (core's search across every repo the app can see): a review asked of you in sample-org/docs (not tracked), and myscrollr #479 again (changes requested; the page keeps it once). shipped: two PRs merged today, in myscrollr and scrollr-api. The GitHub page is a cell per repo, then thing cells in the spare columns (canvas F1): with myscrollr alone at 1920, REVIEW docs #61, CHANGES ASKED #479, NEW ISSUE #312, MERGED #476. The shim seeds it for ?fixture=github or ?github=one|two|many (the first 1, 2 or all 4 repos; shipped only from those).",
   "_captured_at": "2026-10-02T12:00:00Z",
   "config": [
     { "repo": "sample/myscrollr", "prs": "mine", "issues": "new" },
@@ -95,5 +95,13 @@
         ]
       }
     }
+  ],
+  "queue": [
+    { "repo": "sample-org/docs", "number": 61, "title": "Sample: fix the install steps for Windows", "url": "https://github.com/sample-org/docs/pull/61", "author": "kim", "kind": "review", "at": "2026-10-02T11:20:00Z" },
+    { "repo": "sample/myscrollr", "number": 479, "title": "Connect GitHub: core brokers the Scrollr Desktop app", "url": "https://github.com/sample/myscrollr/pull/479", "author": "you", "mine": true, "kind": "changes", "at": "2026-10-02T09:40:00Z" }
+  ],
+  "shipped": [
+    { "repo": "sample/myscrollr", "number": 476, "title": "Sample: settings, startup and shortcuts move under App", "url": "https://github.com/sample/myscrollr/pull/476", "author": "you", "mine": true, "kind": "merged", "at": "2026-10-02T10:00:00Z" },
+    { "repo": "sample/scrollr-api", "number": 210, "title": "Sample: cache the workflow list for ten minutes", "url": "https://github.com/sample/scrollr-api/pull/210", "author": "sample-dev", "kind": "merged", "at": "2026-10-01T20:00:00Z" }
   ]
 }

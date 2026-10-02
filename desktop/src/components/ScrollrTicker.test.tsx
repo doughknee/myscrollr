@@ -48,6 +48,7 @@ const widgetData: WidgetTickerData = {
   sysmon: [],
   uptime: [],
   github: [],
+  githubThings: [],
 };
 
 describe("ScrollrTicker", () => {

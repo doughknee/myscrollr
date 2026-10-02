@@ -1131,31 +1131,6 @@
   }
 }
 
-/* GitHub, "running on yours" (SCROLLR-308, canvas board 1): a ring in the
-   widget's accent breathing out around its dot. The app shell stills it
-   like every other animation; the ticker runs it. Reduced motion keeps
-   the ring, still. */
-@keyframes ghRing {
-  0%,
-  100% {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 8%, transparent);
-  }
-}
-
-.gh-ring {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
-  animation: ghRing 1.6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gh-ring {
-    animation: none;
-  }
-}
-
 /* Live spine glow — the 2px bar under a chip whose game is in progress.
    Opacity only, so it reads as a pulse rather than a movement, and the
    chip's layout never shifts.

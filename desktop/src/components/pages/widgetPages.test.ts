@@ -7,7 +7,8 @@ import npr from "../../dev/__fixtures__/dashboard.npr.json";
 import gh from "../../dev/__fixtures__/github.board.json";
 import type { GitHubChipData } from "../../types";
 import type { GitHubBoardRepo } from "../../api/client";
-import { repoChip } from "../../widgets/github/types";
+import { repoChip, thingsFor } from "../../widgets/github/types";
+import type { GitHubBoard } from "../../widgets/github/types";
 import { REPO_MIN_COL } from "./cells/RepoCell";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
@@ -285,27 +286,47 @@ describe("followPage", () => {
   });
 });
 
-describe("the GitHub page (SCROLLR-312): one cell per repo, from three repos", () => {
+describe("the GitHub page (SCROLLR-312, canvas F1): a cell per repo from one up, then things", () => {
   const GH_NOW = Date.parse(gh._captured_at);
   const chips = (n: number, quiet = false) =>
     (gh.repos as unknown as GitHubBoardRepo[]).slice(0, n).map((r, i) => repoChip(r, gh.config[i] as never, quiet, GH_NOW));
-  const page = (n: number, quiet = false) => buildPageWidgets(null, ["clock", "github"], NOW, [], [], chips(n, quiet));
+  const things = (n: number) => thingsFor(gh as unknown as GitHubBoard, gh.config.slice(0, n) as never, GH_NOW);
+  const page = (n: number, quiet = false) => buildPageWidgets(null, ["clock", "github"], NOW, [], [], chips(n, quiet), things(n));
+  const keys = (w: { items: { key: string }[] }, width: number, edge = 0) =>
+    planAll([w as never], width, edge).get("github")!.pages.map((p) => p.map((i) => i.key.replace(/^t:https:\/\/github\.com\//, "t:")));
 
-  it("one or two repos: no page (they ride the edge slot)", () => {
-    expect(page(1)).toEqual([]);
-    expect(page(2)).toEqual([]);
+  it("no repos: no page", () => {
     expect(buildPageWidgets(null, ["github"], NOW)).toEqual([]);
   });
 
-  it("three or more: a cell per repo in the user's order, the band counting the repos that need you", () => {
+  it("one repo: its cell, then the next things that need you, then what shipped; one page, every column full", () => {
+    const [w] = page(1);
+    expect(w).toMatchObject({ tab: "github", kind: "github", minCol: REPO_MIN_COL });
+    // 1920 with no edge: 1728px, five columns.
+    expect(keys(w, 1920)).toEqual([["github-sample/myscrollr", "t:sample-org/docs/pull/61", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312", "t:sample/myscrollr/pull/476"]]);
+    // The band counts repos, never things.
+    expect(chip(w)).toEqual({ kind: "needs", count: 1 });
+  });
+
+  it("two repos: both cells first, then the things", () => {
+    const [w] = page(2);
+    expect(keys(w, 1920)).toEqual([["github-sample/myscrollr", "github-sample/scrollr-api", "t:sample-org/docs/pull/61", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312"]]);
+  });
+
+  it("repos that fill a page: repo cells only, never a thing pushing a repo off", () => {
+    const [w] = page(4);
+    // 1280 with the Clock: three columns, four repos: 2 + 2, no things.
+    expect(keys(w, 1280, 102)).toEqual([["github-sample/myscrollr", "github-sample/scrollr-api"], ["github-sample/scrollr-web", "github-sample/infra"]]);
+  });
+
+  it("four repos at 1920: a cell per repo in the user's order, then one thing; the band counting the repos that need you", () => {
     const [w] = page(4);
     expect(w).toMatchObject({ tab: "github", kind: "github", code: "GITHUB", minCol: REPO_MIN_COL });
     expect(w.items.map((i) => i.key)).toEqual(["github-sample/myscrollr", "github-sample/scrollr-api", "github-sample/scrollr-web", "github-sample/infra"]);
     // All four are red or the accent.
     expect(chip(w)).toEqual({ kind: "needs", count: 4 });
     // The ladder never re-ranks a repo by its state: one tier, the user's order.
-    const plan = planAll([w], 1920, 0).get("github")!;
-    expect(plan.pages.flat().map((i) => i.key)).toEqual(w.items.map((i) => i.key));
+    expect(keys(w, 1920)).toEqual([[...w.items.map((i) => i.key), "t:sample-org/docs/pull/61"]]);
     expect(chip(page(3)[0])).toEqual({ kind: "needs", count: 3 });
   });
 

@@ -212,7 +212,7 @@ const GITHUB_CAP: Record<
 /**
  * One tracked repo on the rail: its worst state on the cap, the name and
  * its most urgent pill, the rest of its pills beneath, the age in the fixed
- * cell (the same pills as the page cell and the edge slot).
+ * cell (the same pills that colour the page cell's dot and the band count).
  */
 export function GitHubCappedChip({
   item,

@@ -716,6 +716,26 @@ export interface GitHubBoardResponse {
   login?: string;
   reason?: string;
   repos: GitHubBoardRepo[];
+  /** Open PRs that need you in every repo the app can see (SCROLLR-312's page fill). Absent from an older core. */
+  queue?: GitHubBoardItem[];
+  /** PRs merged in the tracked repos in the last 24 h. Absent from an older core. */
+  shipped?: GitHubBoardItem[];
+}
+
+/** One PR from core's GitHub search: a review queue entry or one that shipped. */
+export interface GitHubBoardItem {
+  /** "owner/name". */
+  repo: string;
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  /** You wrote it. */
+  mine?: boolean;
+  /** review (asked of you), changes (yours, changes requested), checks (yours, failing), merged. */
+  kind: "review" | "changes" | "checks" | "merged";
+  /** Last updated (queue) or merged (shipped). */
+  at?: string;
 }
 
 /**

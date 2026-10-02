@@ -47,6 +47,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, type LucideIcon } fr
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { WidgetPin } from "../../preferences";
 import type { GitHubChipData } from "../../types";
+import type { GitHubThing } from "../../widgets/github/types";
 import { financeMarketOptions } from "../../api/queries";
 import { sourceForWidget } from "../../marketplace";
 import { isPrimaryTicker } from "../../lib/windowRole";
@@ -74,6 +75,7 @@ import NewsCell from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
 import RepoCell from "./cells/RepoCell";
+import ThingCell from "./cells/ThingCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
 import { stepBack } from "./edgeRule";
@@ -390,6 +392,10 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
       return <QuoteCell trade={t} fill={item.fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
     }
     case "github": {
+      if (item.fill) {
+        const t = item.data as GitHubThing;
+        return <ThingCell thing={t} dark={dark} onClick={() => onChipClick?.("github", item.key, t.url)} />;
+      }
       const repo = item.data as GitHubChipData;
       return <RepoCell chip={repo} dark={dark} onClick={() => onChipClick?.("github", item.key, repo.url)} />;
     }
@@ -441,8 +447,8 @@ export default function PagedBar({
   const awaitingMarket = shortWatchlist && !!dashboard && marketPending;
 
   const widgets = useMemo(
-    () => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge, shortWatchlist ? market : undefined, widgetData?.github),
-    [dashboard, activeTabs, onEdge, market, shortWatchlist, widgetData?.github],
+    () => buildPageWidgets(dashboard, activeTabs, Date.now(), onEdge, shortWatchlist ? market : undefined, widgetData?.github, widgetData?.githubThings),
+    [dashboard, activeTabs, onEdge, market, shortWatchlist, widgetData?.github, widgetData?.githubThings],
   );
   const edge = useMemo(() => buildEdge(widgetData, onEdge, dashboard, activeTabs), [widgetData, onEdge, dashboard, activeTabs]);
   const widgetsRef = useRef(widgets);
@@ -474,7 +480,7 @@ export default function PagedBar({
   const [planEdge, setPlanEdge] = useState(0);
   const [held, setHeld] = useState(false);
   const heldRef = useRef(false);
-  // No page to turn (the edge alone: GitHub with 1–2 repos and nothing else on the bar):
+  // No page to turn (the edge alone: several clocks or cities and nothing else on the bar):
   // the edge's slots still step, on the wall clock so every window steps together
   // without a message, and not while the bar is held.
   const [wallTick, setWallTick] = useState(0);

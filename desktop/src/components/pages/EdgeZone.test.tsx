@@ -23,6 +23,7 @@ const data = {
   sysmon: [],
   uptime: [],
   github: [],
+  githubThings: [],
 } as WidgetTickerData;
 const pin = (widget: string, subject: string): WidgetPin => ({ widget, subject, side: "right" });
 

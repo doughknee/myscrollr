@@ -5,7 +5,7 @@
  * The edge sits on the RIGHT of the bar (the canvas default; every pin is
  * stored with side "right" since REL-239) and holds, in this order:
  *  - one slot per utility on the ticker (clock, timer, weather, sysmon,
- *    uptime, GitHub). A slot shows ONE zone, city or metric at a time and
+ *    uptime). A slot shows ONE zone, city or metric at a time and
  *    steps to the next on each page turn (`tick` = the turn's seq, which
  *    every ticker window shares), so it changes only while the page swipes.
  *  - one cell per pinned subject (CHIP_SPEC §8.5), drawn with the page
@@ -18,6 +18,9 @@
  * widest item from the first frame, whichever item is up and whatever the
  * clock reads. With no utility and no pin the zone renders nothing and
  * takes no width.
+ *
+ * GitHub is never here: it is a page from one repo up (SCROLLR-312, canvas
+ * F1). The edge is for clocks, weather, timers, system and uptime, and pins.
  */
 import { memo, useLayoutEffect, useRef, type Ref } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -26,7 +29,6 @@ import type {
   ClockChipData,
   DashboardResponse,
   Game,
-  GitHubChipData,
   RssItem,
   SysmonChipData,
   Trade,
@@ -42,18 +44,15 @@ import { leagueCode } from "../../utils/gameHelpers";
 import { formatTempRange } from "../../utils/format";
 import { teamShortName } from "../../utils/teamShortName";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { GITHUB_PAGE_MIN } from "./widgetPages";
-import { OnceFlash } from "../chips/ChipFlash";
 import GameCell, { gameMinCol } from "./cells/GameCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { Rule, accentFor, accentStyle, inkFor } from "./cells/parts";
 
-const UTILITIES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
+const UTILITIES = ["clock", "timer", "weather", "sysmon", "uptime"] as const;
 type Utility = (typeof UTILITIES)[number];
 
-/** `ink`: the widget's own readable colour (`--accent-ink`). */
-type Tone = "live" | "down" | "error" | "warning" | "ink" | undefined;
+type Tone = "live" | "down" | "error" | "warning" | undefined;
 
 /** One thing a utility slot can show. */
 export interface SlotItem {
@@ -66,16 +65,6 @@ export interface SlotItem {
   detail?: string;
   tone?: Tone;
   dim?: boolean;
-  /**
-   * A mark before the value (GitHub): a dot (`up`, `down`, the accent for `you`,
-   * grey for `idle`), or a ring breathing in the accent (`run`).
-   */
-  mark?: "up" | "down" | "run" | "you" | "idle";
-  /** Where a click goes (GitHub: the repo's most urgent link). */
-  url?: string;
-  /** Counts worthy changes; the slot flashes once per new token. */
-  flash?: number;
-  flashTone?: "up" | "down";
 }
 
 export interface EdgeUtility {
@@ -109,30 +98,6 @@ export function reserveOf(value: string, digits: number): string {
   return value.replace(/\d+/, (m) => m.padStart(digits, "0")).replace(/\d/g, "0");
 }
 
-/**
- * One tracked repo in GitHub's edge slot (SCROLLR-312, canvas B3): the
- * label `GITHUB · REPO`, the dot in its worst state and its most urgent pill;
- * the next pill beneath. Quiet hours: a grey dot and the age. The slot is
- * a fixed width (`GH_SLOT_W`), so the value truncates rather than widen it.
- */
-function githubSlot(g: GitHubChipData): SlotItem {
-  const [top, next] = g.pills;
-  const base = { id: g.id, label: `GITHUB · ${g.label}`, reserve: "", url: g.url, flash: g.flash, flashTone: g.flashTone, detail: next?.text };
-  switch (g.worst) {
-    case "red":
-      return { ...base, mark: "down", value: top.text, tone: "down" };
-    case "accent":
-      return { ...base, mark: top.kind === "run" ? "run" : "you", value: top.text, tone: "ink" };
-    case "ok":
-      return { ...base, mark: "up", value: top.text, dim: true };
-    default:
-      return { ...base, mark: "idle", value: g.quiet ? g.age : g.available ? "nothing to watch" : "not available", dim: true };
-  }
-}
-
-/** GitHub's slot is this wide whatever it shows (B3: it never widens). */
-export const GH_SLOT_W = 176;
-
 function slotOf(tab: Utility, raw: unknown): SlotItem {
   switch (tab) {
     case "clock": {
@@ -160,8 +125,6 @@ function slotOf(tab: Utility, raw: unknown): SlotItem {
       // A down monitor shows how long, not its percentage (the chip's rule).
       return { id: u.id, label: u.label, value: down ? u.outageFor ?? "DOWN" : u.uptime, reserve: "000.00%", detail: u.responseAvg ?? u.detail, tone: down ? "down" : undefined };
     }
-    case "github":
-      return githubSlot(raw as GitHubChipData);
   }
 }
 
@@ -175,8 +138,6 @@ export function buildEdge(
   const utilities: EdgeUtility[] = [];
   for (const tab of UTILITIES) {
     const items = widgetData?.[tab] ?? [];
-    // Three or more repos are a page and leave the edge (SCROLLR-312); in quiet hours they are nowhere.
-    if (tab === "github" && items.length >= GITHUB_PAGE_MIN) continue;
     if (activeTabs.includes(tab) && items.length) {
       utilities.push({ tab, hex: catalogItemById(tab)?.hex, items: items.map((i) => slotOf(tab, i)) });
     }
@@ -214,24 +175,6 @@ export function edgeTabs(edge: Edge): string[] {
 
 const EASE = [0.32, 0.72, 0, 1] as const;
 
-/** The mark before a value. A sizer holds a dot's room: the widest state is a dot's. */
-function Mark({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
-  if (!it.mark) return null;
-  return (
-    <span
-      data-mark={sizer ? undefined : it.mark}
-      className={clsx(
-        "size-[8px] shrink-0 rounded-full",
-        !sizer && it.mark === "up" && "bg-up",
-        !sizer && it.mark === "down" && "bg-down",
-        !sizer && it.mark === "idle" && "bg-fg-3",
-        !sizer && it.mark === "run" && "gh-ring",
-      )}
-      style={!sizer && (it.mark === "run" || it.mark === "you") ? { background: "var(--accent)" } : undefined}
-    />
-  );
-}
-
 function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
   return (
     <span
@@ -241,19 +184,17 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
         sizer ? "invisible col-start-1 row-start-1 h-0 overflow-hidden" : "h-full",
       )}
     >
-      <span className={clsx("truncate whitespace-nowrap text-[9.5px] font-bold uppercase leading-none tracking-[0.08em] text-fg-3", it.id.startsWith("github-") && "pr-4")}>
+      <span className="truncate whitespace-nowrap text-[9.5px] font-bold uppercase leading-none tracking-[0.08em] text-fg-3">
         {it.label}
         {!sizer && it.dim && it.id.startsWith("clock") ? " ☾" : ""}
       </span>
-      <span className={clsx("inline-flex max-w-full whitespace-nowrap", it.mark ? "items-center gap-[6px]" : "items-baseline gap-1")}>
+      <span className="inline-flex max-w-full items-baseline gap-1 whitespace-nowrap">
         {it.icon && <span className="text-[12px] leading-none">{it.icon}</span>}
-        <Mark it={it} sizer={sizer} />
         <span
           className={clsx(
             "min-w-0 truncate text-[16px] font-bold leading-none tabular-nums",
-            it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : it.tone === "ink" ? "" : it.dim ? "text-fg-2" : "text-fg",
+            it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : it.dim ? "text-fg-2" : "text-fg",
           )}
-          style={it.tone === "ink" && !sizer ? { color: "var(--accent-ink)" } : undefined}
         >
           {sizer ? it.reserve : it.value}
         </span>
@@ -268,36 +209,20 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
 }
 
 /** One utility: every item sized in, the one for this turn shown, rolled in with the swipe. */
-const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string, url?: string) => void }) {
+const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string) => void }) {
   const at = ((tick % u.items.length) + u.items.length) % u.items.length;
   const it = u.items[at];
   const roll = reduced
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.4, ease: "linear" as const } }
     : { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: 0.45, ease: EASE } };
-  // GitHub's slot is a fixed width (B3), with a corner dot per repo when it rotates; the rest size to their widest item.
-  const github = u.tab === "github";
   return (
-    <button
-      type="button"
-      onClick={() => onClick?.(it.id, it.url)}
-      data-chip=""
-      className={clsx("relative grid h-full shrink-0 overflow-hidden", github ? "w-[176px]" : "max-w-[180px]")}
-    >
-      {!github &&
-        u.items.map((x) => (
-          <SlotFace key={x.id} it={x} sizer />
-        ))}
-      {github && u.items.length > 1 && (
-        <span data-part="dots" className="absolute right-2 top-[9px] z-10 flex gap-[3px]">
-          {u.items.map((x, i) => (
-            <span key={x.id} data-on={i === at || undefined} className={clsx("size-1 rounded-full", i === at ? "bg-fg" : "bg-fg-3")} />
-          ))}
-        </span>
-      )}
+    <button type="button" onClick={() => onClick?.(it.id)} data-chip="" className="relative grid h-full max-w-[180px] shrink-0 overflow-hidden">
+      {u.items.map((x) => (
+        <SlotFace key={x.id} it={x} sizer />
+      ))}
       <AnimatePresence initial={false}>
         <motion.span key={it.id} data-item={it.id} className="absolute inset-0" {...roll}>
           <SlotFace it={it} />
-          {it.flash !== undefined && <OnceFlash id={it.id} token={it.flash} tone={it.flashTone} />}
         </motion.span>
       </AnimatePresence>
     </button>
@@ -350,7 +275,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
         {edge.utilities.map((u, i) => (
           <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark))}>
             {i > 0 && <Rule />}
-            <Slot u={u} tick={tick} reduced={reduced} onClick={(id, url) => onChipClick?.(u.tab, id, url)} />
+            <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>
         ))}
       </div>

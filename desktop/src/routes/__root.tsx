@@ -53,6 +53,7 @@ import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace"
 import { API_BASE, DEMO } from "../config";
 import { getAllWidgets } from "../widgets/registry";
 import { githubBoardQuery } from "../widgets/github/types";
+import { useGitHubAutoPick } from "../widgets/github/useAutoPick";
 import { canonicalOrder } from "../marketplace";
 
 // Data
@@ -483,6 +484,9 @@ function RootLayout() {
     ...githubBoardQuery(prefs.widgets.github.repos, auth.authenticated),
     enabled: enabledWidgets.includes("github") && prefs.widgets.github.repos.length > 0,
   });
+
+  // Zero setup (SCROLLR-312): nothing tracked, your active repos go on the bar.
+  useGitHubAutoPick(prefs, enabledWidgets.includes("github"), auth.authenticated, persistPrefs);
 
   // ── Subscription info — fetched for billing UI in Account tab + banner ──
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);

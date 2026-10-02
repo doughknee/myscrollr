@@ -24,6 +24,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +40,8 @@ const (
 	newIssueWindow = 24 * time.Hour
 	issuesLen      = 30
 	maxWorkflows   = 50
+	searchLen      = 20
+	shippedWindow  = 24 * time.Hour
 )
 
 // ── Wire shapes ──────────────────────────────────────────────────
@@ -121,6 +125,22 @@ type BoardRepo struct {
 	Issues *BoardIssues    `json:"issues,omitempty"`
 }
 
+// BoardItem is one pull request from GitHub search: a queue entry or one
+// that shipped.
+type BoardItem struct {
+	Repo   string `json:"repo"`
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Author string `json:"author"`
+	Mine   bool   `json:"mine,omitempty"`
+	// review (asked of you or your team) | changes (yours, changes
+	// requested) | checks (yours, failing) | merged
+	Kind string `json:"kind"`
+	// Last updated (queue) or merged (shipped).
+	At string `json:"at,omitempty"`
+}
+
 // BoardResponse is POST /github/board.
 type BoardResponse struct {
 	Connected bool        `json:"connected"`
@@ -128,6 +148,10 @@ type BoardResponse struct {
 	Login     string      `json:"login,omitempty"`
 	Reason    string      `json:"reason,omitempty"`
 	Repos     []BoardRepo `json:"repos"`
+	// Open PRs that need you in every repo the app can see (the page's fill).
+	Queue []BoardItem `json:"queue"`
+	// PRs merged in the tracked repos in the last 24 h.
+	Shipped []BoardItem `json:"shipped"`
 }
 
 // ── Cache ────────────────────────────────────────────────────────
@@ -268,6 +292,103 @@ func headChecks(ctx context.Context, src prSource, repo, branch string) ([]Board
 			}
 		}
 		return out, nil
+	})
+}
+
+// ── Search: the review queue and what shipped (SCROLLR-312, F1/F3) ─
+
+// searchPath is one search for pull requests, most recently updated first.
+func searchPath(q string) string {
+	return "/search/issues?" + url.Values{"q": {q}, "sort": {"updated"}, "order": {"desc"}, "per_page": {strconv.Itoa(searchLen)}}.Encode()
+}
+
+// repoOf: "https://api.github.com/repos/o/r" → "o/r".
+func repoOf(apiURL string) string {
+	parts := strings.Split(strings.TrimRight(apiURL, "/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[len(parts)-2] + "/" + parts[len(parts)-1]
+}
+
+// searchPRs is one search call. Anything but 200 (a 422 for a query GitHub
+// will not run) answers nothing rather than failing the board.
+func searchPRs(ctx context.Context, src prSource, q, kind string) ([]BoardItem, error) {
+	var body struct {
+		Items []struct {
+			Number        int     `json:"number"`
+			Title         string  `json:"title"`
+			HTMLURL       string  `json:"html_url"`
+			RepositoryURL string  `json:"repository_url"`
+			UpdatedAt     string  `json:"updated_at"`
+			User          ghLogin `json:"user"`
+			PullRequest   *struct {
+				MergedAt *string `json:"merged_at"`
+			} `json:"pull_request"`
+		} `json:"items"`
+	}
+	status, err := getJSON(ctx, src.ns, searchPath(q), src.token, &body)
+	if err != nil {
+		return nil, err
+	}
+	out := []BoardItem{}
+	if status != http.StatusOK {
+		return out, nil
+	}
+	for _, i := range body.Items {
+		at := i.UpdatedAt
+		if kind == "merged" && i.PullRequest != nil && deref(i.PullRequest.MergedAt) != "" {
+			at = deref(i.PullRequest.MergedAt)
+		}
+		out = append(out, BoardItem{
+			Repo: repoOf(i.RepositoryURL), Number: i.Number, Title: i.Title, URL: i.HTMLURL,
+			Author: i.User.Login, Mine: src.login != "" && strings.EqualFold(i.User.Login, src.login),
+			Kind: kind, At: at,
+		})
+	}
+	return out, nil
+}
+
+// reviewQueue is three searches across every repo the app can see (60 s):
+// reviews asked of you, then yours with changes requested, then yours with
+// failing checks. A PR in two lists is kept once, in the first.
+func reviewQueue(ctx context.Context, src prSource) ([]BoardItem, bool, error) {
+	return cached(ctx, src.ns, "queue", "@me", boardTTL, func() ([]BoardItem, error) {
+		out := []BoardItem{}
+		seen := map[string]bool{}
+		for _, s := range [...]struct{ q, kind string }{
+			{"is:pr is:open archived:false review-requested:@me", "review"},
+			{"is:pr is:open archived:false author:@me review:changes_requested", "changes"},
+			{"is:pr is:open archived:false author:@me status:failure", "checks"},
+		} {
+			items, err := searchPRs(ctx, src, s.q, s.kind)
+			if err != nil {
+				return nil, err
+			}
+			for _, it := range items {
+				if !seen[it.URL] {
+					seen[it.URL] = true
+					out = append(out, it)
+				}
+			}
+		}
+		return out, nil
+	})
+}
+
+// shippedPRs is one search (60 s): the PRs merged in the tracked repos in
+// the last 24 h.
+func shippedPRs(ctx context.Context, src prSource, repos []string) ([]BoardItem, bool, error) {
+	if len(repos) == 0 {
+		return []BoardItem{}, false, nil
+	}
+	sorted := slices.Sorted(slices.Values(repos))
+	return cached(ctx, src.ns, "shipped", strings.Join(sorted, ","), boardTTL, func() ([]BoardItem, error) {
+		q := "is:pr is:merged merged:>=" + now().Add(-shippedWindow).UTC().Format(time.RFC3339)
+		for _, r := range sorted {
+			q += " repo:" + r
+		}
+		return searchPRs(ctx, src, q, "merged")
 	})
 }
 
@@ -620,7 +741,7 @@ func HandleBoard(c *fiber.Ctx) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), requestBudget)
 	defer cancel()
-	out := BoardResponse{Repos: []BoardRepo{}}
+	out := BoardResponse{Repos: []BoardRepo{}, Queue: []BoardItem{}, Shipped: []BoardItem{}}
 	conn, reason := connectedSource(ctx, sub)
 	if conn == nil {
 		out.Connect, out.Reason = true, reason
@@ -634,6 +755,31 @@ func HandleBoard(c *fiber.Ctx) error {
 	if broken {
 		out.Connect, out.Reason = true, brokenReason
 		return c.JSON(out)
+	}
+	// The page's fill (SCROLLR-312): the review queue everywhere, and what
+	// shipped in the tracked repos. A failure answers none, never the board.
+	names := make([]string, len(reqs))
+	for i, r := range reqs {
+		names[i] = r.Repo
+	}
+	type fill struct{ queue, shipped []BoardItem }
+	extra, broken := eachRepo(ctx, conn, 1, func(_ int, src prSource) (fill, error) {
+		q, _, err := reviewQueue(ctx, src)
+		if err != nil {
+			return fill{}, err
+		}
+		s, _, err := shippedPRs(ctx, src, names)
+		return fill{q, s}, err
+	}, func(int) fill { return fill{} })
+	if broken {
+		out.Connect, out.Reason = true, brokenReason
+		return c.JSON(out)
+	}
+	if extra[0].queue != nil {
+		out.Queue = extra[0].queue
+	}
+	if extra[0].shipped != nil {
+		out.Shipped = extra[0].shipped
 	}
 	markAnyOK(ctx, conn, res, func(r BoardRepo) bool { return r.Available })
 	out.Connected, out.Login, out.Repos = true, conn.Login, res

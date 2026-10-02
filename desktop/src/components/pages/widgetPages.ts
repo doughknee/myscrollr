@@ -20,6 +20,7 @@ import type { DashboardResponse, Game, GitHubChipData, RssItem, Trade } from "..
 import type { TickerContext } from "../../datawidgets/ticker";
 import { dropPinned, scopedRows } from "../../datawidgets/ticker";
 import type { WidgetPin } from "../../preferences";
+import type { GitHubThing } from "../../widgets/github/types";
 import { TICKER_SOURCES } from "../../datawidgets/tickerRegistry";
 import { TICKER_FINAL_HOURS, selectSportsForPages } from "../../datawidgets/sports/view";
 import { selectRssForPages } from "../../datawidgets/rss/view";
@@ -59,12 +60,12 @@ export interface PageItem {
   /** Stable across refetches: game id, article id, symbol, widget id. */
   key: string;
   tier: Tier;
-  data: Game | RssItem | Trade | GitHubChipData | AlsoItem;
+  data: Game | RssItem | Trade | GitHubChipData | GitHubThing | AlsoItem;
   /** One of the user's favourite teams is playing (GameCell's top line). */
   mine?: boolean;
   /** `data-pin-subject` JSON for the right-click menu (utils/pinTarget). */
   pin?: string;
-  /** Not the user's own: a popular symbol filling a short watchlist's page (SCROLLR-292). */
+  /** Not the user's own: a popular symbol filling a short watchlist's page (SCROLLR-292), or a GitHub thing cell (SCROLLR-312). */
   fill?: boolean;
 }
 
@@ -128,15 +129,17 @@ export function buildPageWidgets(
   pins: readonly WidgetPin[] = [],
   /** Every tracked symbol's latest quote (`/finance/public`), for a short watchlist's fills. */
   market: readonly Trade[] = [],
-  /** The GitHub repos (useWidgetTickerData), one cell each once three or more are tracked (SCROLLR-312). */
+  /** The GitHub repos (useWidgetTickerData), one cell each (SCROLLR-312). */
   github: readonly GitHubChipData[] = [],
+  /** What fills the GitHub page's empty columns (`thingsFor`). */
+  githubThings: readonly GitHubThing[] = [],
 ): PageWidget[] {
   const out: PageWidget[] = [];
   const also: PageItem[] = [];
 
   for (const tab of activeTabs) {
     if (tab === "github") {
-      const w = githubWidget(github);
+      const w = githubWidget(github, githubThings);
       if (w) out.push(w);
       continue;
     }
@@ -252,17 +255,15 @@ export function buildPageWidgets(
   return out;
 }
 
-/** The page rule (SCROLLR-312): this many tracked repos or more get a page; fewer ride the edge in one rotating slot. */
-export const GITHUB_PAGE_MIN = 3;
-
 /**
- * The GitHub page (SCROLLR-312, canvas B3): one cell per tracked repo, in
- * the user's order, once three or more are tracked; then GitHub leaves the
- * edge (`buildEdge`). Fewer: no page, the edge slot rotates between them.
- * Quiet hours: no page and no Also entry.
+ * The GitHub page (SCROLLR-312, canvas F1): one cell per tracked repo, in
+ * the user's order, from one repo up (GitHub is never on the edge). A page
+ * the repos leave short fills with thing cells (`thingsFor`): the next
+ * things that need you, then what shipped. Quiet hours: no page and no Also
+ * entry.
  */
-function githubWidget(chips: readonly GitHubChipData[]): PageWidget | null {
-  if (chips.length < GITHUB_PAGE_MIN || chips.some((c) => c.quiet)) return null;
+function githubWidget(chips: readonly GitHubChipData[], things: readonly GitHubThing[]): PageWidget | null {
+  if (chips.length === 0 || chips.some((c) => c.quiet)) return null;
   return {
     tab: "github",
     kind: "github",
@@ -271,7 +272,7 @@ function githubWidget(chips: readonly GitHubChipData[]): PageWidget | null {
     minCol: REPO_MIN_COL,
     // One tier: the user's order is the order (the ladder never re-ranks a repo by its live state).
     items: chips.map((c) => ({ key: c.id, tier: TIER.fresh, data: c })),
-    fill: [],
+    fill: things.map((t) => ({ key: `t:${t.url}`, tier: TIER.quiet, data: t, fill: true })),
   };
 }
 
@@ -294,8 +295,9 @@ export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWi
     widgets.map((w) => {
       const cols = columnsFor(content, w.minCol);
       // Popular symbols fill a watchlist SHORTER than a page, never the tail of a long one
-      // (10 symbols at 9 columns are two pages of 5, not 9 of yours and 1 of yours + 8 of theirs).
-      const fill = w.kind === "finance" && w.items.length >= cols ? [] : w.fill;
+      // (10 symbols at 9 columns are two pages of 5, not 9 of yours and 1 of yours + 8 of theirs);
+      // GitHub's things fill only a page the repos leave short (SCROLLR-312).
+      const fill = (w.kind === "finance" || w.kind === "github") && w.items.length >= cols ? [] : w.fill;
       return [w.tab, { ...planWidget(topUp(w.items, fill, cols), (i) => i.tier, cols), cols, avail: w.items.length + fill.length }];
     }),
   );

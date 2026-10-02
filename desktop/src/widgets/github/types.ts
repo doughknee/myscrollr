@@ -14,7 +14,7 @@ import { LS_GITHUB_BOARD } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
 import { githubApi } from "../../api/client";
-import type { GitHubBoardRepo, GitHubBoardRun, GitHubPRRow, GitHubRepoRow, GitHubRunRow } from "../../api/client";
+import type { GitHubBoardItem, GitHubBoardRepo, GitHubBoardRun, GitHubPRRow, GitHubRepoRow, GitHubRunRow } from "../../api/client";
 import { newRepo } from "./config";
 import type { GitHubTrackedRepo } from "./config";
 import type { GitHubChipData } from "../../types";
@@ -95,21 +95,39 @@ async function fetchDirect(repo: string): Promise<GitHubBoardRepo> {
 }
 
 /**
- * The widget's fetch, one entry per tracked repo in config order. Connected:
- * the board. Not connected (or an older core without /github/board): each
- * repo's latest run through core. Signed out: GitHub directly.
+ * What the widget knows: one entry per tracked repo in config order, and
+ * the page's fill (SCROLLR-312): the review queue across every repo the app
+ * can see, and what shipped in the tracked repos today. Both are empty
+ * unless connected.
  */
-export async function fetchBoard(tracked: GitHubTrackedRepo[]): Promise<GitHubBoardRepo[]> {
-  if (tracked.length === 0) return [];
-  if (isSignedOut()) return Promise.all(tracked.map((t) => fetchDirect(t.repo)));
+export interface GitHubBoard {
+  repos: GitHubBoardRepo[];
+  queue: GitHubBoardItem[];
+  shipped: GitHubBoardItem[];
+}
+
+const noFill = (repos: GitHubBoardRepo[]): GitHubBoard => ({ repos, queue: [], shipped: [] });
+
+/**
+ * The widget's fetch. Connected: the board. Not connected (or an older core
+ * without /github/board): each repo's latest run through core. Signed out:
+ * GitHub directly.
+ */
+export async function fetchBoard(tracked: GitHubTrackedRepo[]): Promise<GitHubBoard> {
+  if (tracked.length === 0) return noFill([]);
+  if (isSignedOut()) return noFill(await Promise.all(tracked.map((t) => fetchDirect(t.repo))));
   const board = await githubApi
     .board(tracked.map(({ repo, workflows, prs, issues }) => ({ repo, workflows, prs, issues })))
     .catch(() => null);
   if (board?.connected) {
-    return tracked.map((t) => board.repos.find((r) => sameRepo(r.repo, t.repo)) ?? { repo: t.repo, available: false, workflows: [] });
+    return {
+      repos: tracked.map((t) => board.repos.find((r) => sameRepo(r.repo, t.repo)) ?? { repo: t.repo, available: false, workflows: [] }),
+      queue: board.queue ?? [],
+      shipped: board.shipped ?? [],
+    };
   }
   const res = await githubApi.runs(tracked.map((t) => t.repo));
-  return tracked.map((t) => fromRun(t.repo, res.runs.find((r) => sameRepo(r.repo, t.repo))));
+  return noFill(tracked.map((t) => fromRun(t.repo, res.runs.find((r) => sameRepo(r.repo, t.repo)))));
 }
 
 /**
@@ -277,6 +295,130 @@ export function needFor(r: GitHubBoardRepo): GitHubNeed | null {
   return null;
 }
 
+// ── The page's fill: one thing cell per next item (canvas F1) ──
+
+export type ThingTone = "accent" | "red" | "dim" | "up" | "faint";
+
+/** One thing that needs you (or just shipped), as a fill cell on the GitHub page draws it. */
+export interface GitHubThing {
+  /** Its link: the key on the page and where a click goes. */
+  url: string;
+  /** The kicker: `REVIEW`, `CHANGES ASKED`, `DEPLOY FAILED`, `NEW ISSUE`, `MERGED`. */
+  tag: string;
+  tone: ThingTone;
+  /** `myscrollr #479 · yours`: the repo (owner/name when it is not tracked), the number, who. */
+  where: string;
+  /** Right-aligned: the PR's checks (`✓ 5/5`, `✗ 1 of 5`, `◌ 2 running`) or an age. */
+  right: string;
+  rightTone: ThingTone;
+  title: string;
+  /** Merged today: drawn quieter, like a final on a sports page. */
+  shipped?: boolean;
+}
+
+const PR_RANK = { review: 0, changes: 1, checks: 2 } as const;
+type PRKind = keyof typeof PR_RANK;
+const PR_TAG: Record<PRKind, [string, ThingTone]> = {
+  review: ["REVIEW", "accent"],
+  changes: ["CHANGES ASKED", "red"],
+  checks: ["CHECKS FAILED", "red"],
+};
+
+/** A PR's checks, as its thing cell's right side; else its age. */
+function checksText(p: GitHubPRRow, now: number): [string, ThingTone] {
+  const c = p.checks;
+  if (c?.failed) return [`✗ ${c.failed} of ${c.total}`, "red"];
+  if (c?.running) return [`◌ ${c.running} running`, "accent"];
+  if (c?.total && c.passed === c.total) return [`✓ ${c.passed}/${c.total}`, "up"];
+  return [shortAge(p.updated_at, now), "faint"];
+}
+
+/**
+ * The GitHub page's fill (SCROLLR-312, canvas F1), most urgent first: PRs
+ * that need you (reviews, then changes asked on yours, then your red checks;
+ * the tracked repos' own first, then the queue from everywhere), failing
+ * runs, new or assigned issues, then what shipped today. Never a thing a
+ * repo cell already names (its line 2, or the failing run its line 1 reads),
+ * and one cell per link.
+ */
+export function thingsFor(
+  board: GitHubBoard,
+  tracked: readonly Pick<GitHubTrackedRepo, "repo" | "issues">[],
+  now = Date.now(),
+): GitHubThing[] {
+  const repos = tracked.flatMap((t) => {
+    const r = board.repos.find((b) => sameRepo(b.repo, t.repo));
+    return r ? [{ r, t }] : [];
+  });
+  const label = (repo: string) => (tracked.some((t) => sameRepo(t.repo, repo)) ? repoName(repo) : repo);
+  const seen = new Set<string>();
+  for (const { r } of repos) {
+    const need = needFor(r);
+    if (need) seen.add(need.url);
+    const broke = [...(r.checks ?? []), ...r.workflows].find((w) => w.state === "failing");
+    if (broke?.url) seen.add(broke.url);
+  }
+
+  const prs: Array<GitHubThing & { rank: number }> = [];
+  for (const { r } of repos) {
+    for (const p of (r.prs?.items ?? []).filter(needsYou)) {
+      const kind: PRKind = p.review_requested ? "review" : p.review_state === "changes_requested" ? "changes" : "checks";
+      const [tag, tone] = PR_TAG[kind];
+      const [right, rightTone] = checksText(p, now);
+      prs.push({ rank: PR_RANK[kind], url: p.html_url, tag, tone, where: `${label(r.repo)} #${p.number} · ${p.is_mine ? "yours" : p.author}`, right, rightTone, title: p.title });
+    }
+  }
+  for (const q of board.queue) {
+    if (q.kind === "merged") continue;
+    const [tag, tone] = PR_TAG[q.kind];
+    prs.push({ rank: PR_RANK[q.kind], url: q.url, tag, tone, where: `${label(q.repo)} #${q.number} · ${q.mine ? "yours" : q.author}`, right: shortAge(q.at, now), rightTone: "faint", title: q.title });
+  }
+  prs.sort((a, b) => a.rank - b.rank); // stable: the tracked repos' own first, in your order
+
+  const runs = repos.flatMap(({ r }) =>
+    [...(r.checks ?? []), ...r.workflows]
+      .filter((w) => w.state === "failing" && w.url)
+      .map((w): GitHubThing => ({
+        url: w.url!,
+        tag: `${w.name.toUpperCase()} FAILED`,
+        tone: "red",
+        where: [label(r.repo), w.by_you ? "you" : w.actor].filter(Boolean).join(" · "),
+        right: shortAge(w.at, now),
+        rightTone: "red",
+        title: w.commit || w.name,
+      })),
+  );
+  const issues = repos.flatMap(({ r, t }) =>
+    (r.issues && !r.issues.error ? r.issues.items : []).map((i): GitHubThing => ({
+      url: i.url,
+      tag: t.issues === "new" ? "NEW ISSUE" : "ISSUE",
+      tone: "dim",
+      where: `${label(r.repo)} #${i.number}`,
+      right: shortAge(i.created_at, now),
+      rightTone: "faint",
+      title: i.title,
+    })),
+  );
+  const shipped = board.shipped.map((s): GitHubThing => ({
+    url: s.url,
+    tag: "MERGED",
+    tone: "up",
+    where: `${label(s.repo)} #${s.number} · ${s.mine ? "you" : s.author}`,
+    right: shortAge(s.at, now),
+    rightTone: "faint",
+    title: s.title,
+    shipped: true,
+  }));
+
+  const out: GitHubThing[] = [];
+  for (const t of [...prs.map(({ rank: _, ...t }) => t), ...runs, ...issues, ...shipped]) {
+    if (!t.url || seen.has(t.url)) continue;
+    seen.add(t.url);
+    out.push(t);
+  }
+  return out;
+}
+
 /** A repo's worst state, its dot: red, the accent (running or needs you), green, or nothing to say. */
 export type GitHubWorst = "red" | "accent" | "ok" | "none";
 
@@ -398,13 +540,22 @@ export function autoPick(tracked: GitHubTrackedRepo[], rows: GitHubRepoRow[]): G
 
 // ── Store persistence (the ticker windows read it) ─────────────
 
-export function loadBoard(): GitHubBoardRepo[] {
+const listOf = <T>(v: unknown, ok: (x: T) => boolean): T[] => (Array.isArray(v) ? (v as T[]).filter((x) => !!x && ok(x)) : []);
+
+/** The stored board. Before SCROLLR-312's fill it was the repos alone, an array. */
+export function loadBoard(): GitHubBoard {
   const v = getStore<unknown>(LS_GITHUB_BOARD, []);
-  return Array.isArray(v) ? v.filter((r): r is GitHubBoardRepo => !!r && typeof r.repo === "string" && Array.isArray(r.workflows)) : [];
+  const o = (Array.isArray(v) ? { repos: v } : (v ?? {})) as Record<string, unknown>;
+  const item = (i: GitHubBoardItem) => typeof i.url === "string" && typeof i.repo === "string";
+  return {
+    repos: listOf<GitHubBoardRepo>(o.repos, (r) => typeof r.repo === "string" && Array.isArray(r.workflows)),
+    queue: listOf(o.queue, item),
+    shipped: listOf(o.shipped, item),
+  };
 }
 
 /** Writes only when something changed, so followers do not re-render. */
-export function saveBoard(repos: GitHubBoardRepo[]): void {
-  if (JSON.stringify(repos) === JSON.stringify(loadBoard())) return;
-  setStore(LS_GITHUB_BOARD, repos);
+export function saveBoard(board: GitHubBoard): void {
+  if (JSON.stringify(board) === JSON.stringify(loadBoard())) return;
+  setStore(LS_GITHUB_BOARD, board);
 }

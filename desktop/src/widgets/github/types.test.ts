@@ -12,7 +12,8 @@ vi.mock("../../auth", () => ({ isSignedOut: () => signedOut() }));
 vi.mock("../../api/client", () => ({ githubApi: { board: (r: unknown) => board(r), runs: (r: string[]) => runs(r) } }));
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: (...a: unknown[]) => directFetch(...a) }));
 
-const { autoPick, fetchBoard, fitPills, needFor, nextFlash, parseRepoUrl, pillWidth, pillsFor, repoChip, worstOf } = await import("./types");
+const { autoPick, fetchBoard, fitPills, needFor, nextFlash, parseRepoUrl, pillWidth, pillsFor, repoChip, thingsFor, worstOf } = await import("./types");
+type Board = import("./types").GitHubBoard;
 
 const NOW = Date.parse("2026-10-02T12:00:00Z");
 const repos = fixture.repos as unknown as GitHubBoardRepo[];
@@ -123,8 +124,13 @@ describe("fetchBoard", () => {
       { repo: "o/a", workflows: undefined, prs: "mine", issues: "off" },
       { repo: "o/b", workflows: ["test"], prs: "off", issues: "new" },
     ]);
-    expect(got.map((r) => r.repo)).toEqual(["o/a", "O/B"]);
+    expect(got.repos.map((r) => r.repo)).toEqual(["o/a", "O/B"]);
+    // An older core sends no fill: none, not undefined.
+    expect(got).toMatchObject({ queue: [], shipped: [] });
     expect(runs).not.toHaveBeenCalled();
+    const q = { repo: "x/y", number: 1, title: "t", url: "https://github.com/x/y/pull/1", author: "kim", kind: "review" };
+    board.mockResolvedValue({ connected: true, repos: [], queue: [q], shipped: [] });
+    expect((await fetchBoard(tracked)).queue).toEqual([q]);
   });
 
   it("not connected (or a core without /github/board): each repo's latest run as one workflow", async () => {
@@ -136,17 +142,18 @@ describe("fetchBoard", () => {
         { repo: "o/b", available: false },
       ],
     });
-    const got = await fetchBoard(tracked);
+    const { repos: got, queue } = await fetchBoard(tracked);
     expect(got[0].workflows).toEqual([{ name: "CI", state: "failing", at: "2026-10-02T11:00:00Z", url: "u" }]);
     expect(got[1]).toMatchObject({ repo: "o/b", available: false, workflows: [] });
+    expect(queue).toEqual([]);
     board.mockRejectedValue(new Error("404"));
-    expect((await fetchBoard(tracked))[0].workflows[0].state).toBe("failing");
+    expect((await fetchBoard(tracked)).repos[0].workflows[0].state).toBe("failing");
   });
 
   it("signed out: GitHub directly, one call a repo", async () => {
     signedOut.mockReturnValue(true);
     directFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_runs: [{ name: "CI", status: "in_progress", conclusion: null, run_started_at: "2026-10-02T11:58:00Z" }] }) });
-    const got = await fetchBoard(tracked);
+    const { repos: got } = await fetchBoard(tracked);
     expect(directFetch).toHaveBeenCalledTimes(2);
     expect(got[0].workflows[0]).toMatchObject({ name: "CI", state: "running", at: "2026-10-02T11:58:00Z" });
     expect(board).not.toHaveBeenCalled();
@@ -183,5 +190,40 @@ describe("needFor: line 2 names what needs you (canvas C4 · D)", () => {
   });
   it("an approved PR of yours with green checks asks nothing: the issue speaks instead", () => {
     expect(needFor(withPRs([{ ...mine, review_state: "approved", checks_state: "passing" }]))).toMatchObject({ tag: "Issue", text: "Sample: the widget page is overwhelming" });
+  });
+});
+
+describe("thingsFor: the GitHub page's fill (canvas F1)", () => {
+  const all = fixture as unknown as Board;
+  const things = (n: number, board: Board = all) => thingsFor(board, cfg.slice(0, n), NOW);
+  const rows = (n: number, board?: Board) => things(n, board).map((t) => `${t.tag} | ${t.where} | ${t.right} | ${t.title}`);
+
+  it("most urgent first, never what a repo cell names, one cell per link", () => {
+    expect(rows(4)).toEqual([
+      // A review anywhere the app can see, before changes asked on yours; an untracked repo by its full name.
+      "REVIEW | sample-org/docs #61 · kim | 40m | Sample: fix the install steps for Windows",
+      // The repo's own copy (with its checks) wins over the queue's.
+      "CHANGES ASKED | myscrollr #479 · yours | ✗ 1 of 5 | Connect GitHub: core brokers the Scrollr Desktop app",
+      // #478 is myscrollr's line 2; scrollr-api's deploy and scrollr-web's vercel are their line 1; infra #41 its line 2.
+      "NEW ISSUE | myscrollr #312 | 3h | Sample: the widget page is overwhelming",
+      "NEW ISSUE | infra #40 | 3h | Sample: bump node pool",
+      "MERGED | myscrollr #476 · you | 2h | Sample: settings, startup and shortcuts move under App",
+      "MERGED | scrollr-api #210 · sample-dev | 16h | Sample: cache the workflow list for ten minutes",
+    ]);
+    expect(things(4).filter((t) => t.shipped).map((t) => t.tag)).toEqual(["MERGED", "MERGED"]);
+  });
+
+  it("a second failing run is a thing; the first is the repo's line 1", () => {
+    const red = { ...repos[1], workflows: [...repos[1].workflows, { name: "release", state: "failing" as const, at: "2026-10-02T11:00:00Z", url: "u-release", commit: "v1.7.1", actor: "kim" }] };
+    const board: Board = { repos: [repos[0], red], queue: [], shipped: [] };
+    expect(rows(2, board)).toContain("RELEASE FAILED | scrollr-api · kim | 1h | v1.7.1");
+    expect(rows(2, board).some((r) => r.startsWith("DEPLOY FAILED"))).toBe(false);
+  });
+
+  it("a PR's checks on the right: all green, some running", () => {
+    const pr = repos[0].prs!.items[0];
+    const board = (checks: typeof pr.checks): Board => ({ repos: [{ ...repos[0], prs: { count: 2, needs_you: 2, items: [{ ...pr, number: 1, html_url: "x1" }, { ...pr, checks }] } }], queue: [], shipped: [] });
+    expect(things(1, board({ total: 5, passed: 5, failed: 0, running: 0 }))[0]).toMatchObject({ tag: "REVIEW", right: "✓ 5/5", rightTone: "up" });
+    expect(things(1, board({ total: 5, passed: 3, failed: 0, running: 2 }))[0]).toMatchObject({ right: "◌ 2 running", rightTone: "accent" });
   });
 });
