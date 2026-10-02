@@ -23,8 +23,9 @@ const configs = Object.fromEntries(
 )
 const production = configs['/etc/nginx/conf.d/default.conf']
 const headers = configs['/etc/nginx/security-headers.conf']
+const barHeaders = configs['/etc/nginx/bar-headers.conf']
 assert.ok(
-  production && headers,
+  production && headers && barHeaders,
   'Production nginx configuration must be extracted',
 )
 const received = []
@@ -76,10 +77,12 @@ try {
     `MOCKED=${Buffer.from(mocked).toString('base64')}`,
     '-e',
     `HEADERS=${Buffer.from(headers).toString('base64')}`,
+    '-e',
+    `BAR=${Buffer.from(barHeaders).toString('base64')}`,
     'nginx:alpine',
     'sh',
     '-c',
-    'echo "$HEADERS" | base64 -d > /etc/nginx/security-headers.conf && echo "$PRODUCTION" | base64 -d > /etc/nginx/conf.d/default.conf && nginx -t && echo "$MOCKED" | base64 -d > /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"',
+    'echo "$HEADERS" | base64 -d > /etc/nginx/security-headers.conf && echo "$BAR" | base64 -d > /etc/nginx/bar-headers.conf && echo "$PRODUCTION" | base64 -d > /etc/nginx/conf.d/default.conf && nginx -t && echo "$MOCKED" | base64 -d > /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"',
   )
   const address = docker('port', name, '3000/tcp')
   const base = `http://${address}`
