@@ -198,6 +198,11 @@ data:
   #                        team's backlog instead
   LINEAR_TEAM_KEY: "REL"
 
+  # The release the ops page's "I did it" button finishes (SCROLLR-305,
+  # /ops/release). Change it for the next stalled release. GITHUB_OPS_TOKEN
+  # and OPS_RELEASE_KEY are secrets (see k8s/secrets.yaml.template).
+  OPS_RELEASE_TAG: "desktop-v1.7.0"
+
   # Discord integration. The following secrets MUST be added manually
   # to k8s/secrets.yaml (none are configmap-safe):
   #   - DISCORD_BOT_TOKEN          (from Discord developer portal → Bot)

@@ -15,6 +15,7 @@ import (
 func TestScrubSentryEventRemovesPII(t *testing.T) {
 	event := &sentry.Event{
 		Request: &sentry.Request{
+			URL:         "https://api.myscrollr.com/ops/release?key=ops-release-key",
 			Cookies:     "session=abc; AUTH_TOKEN=very-secret",
 			QueryString: "code=logto-auth-code&state=csrf123",
 			Data:        `{"access_token":"REPLACE_ME"}`,
@@ -45,6 +46,9 @@ func TestScrubSentryEventRemovesPII(t *testing.T) {
 	}
 	if event.Request.QueryString != "" {
 		t.Errorf("QueryString not scrubbed (Logto code/state leak risk): %q", event.Request.QueryString)
+	}
+	if event.Request.URL != "https://api.myscrollr.com/ops/release" {
+		t.Errorf("URL query not scrubbed (ops key leak risk): %q", event.Request.URL)
 	}
 	if event.Request.Data != "" {
 		t.Errorf("Data not scrubbed: %q", event.Request.Data)

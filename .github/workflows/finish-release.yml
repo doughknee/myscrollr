@@ -14,6 +14,9 @@
 #      hang off that event are dispatched by name instead.
 # If any step fails, nothing is published and the draft is left as it was.
 name: Finish Desktop Release
+# The ops page (api/internal/ops, SCROLLR-305) finds this release's run by
+# this title. Change it there too.
+run-name: Finish ${{ inputs.tag }}
 
 on:
   workflow_dispatch:

@@ -44,6 +44,8 @@ func ScrubSentryEvent(event *sentry.Event) {
 		event.Request.Cookies = ""
 		event.Request.Data = ""
 		event.Request.QueryString = ""
+		// A URL that carries its query (e.g. /ops/release?key=…) loses it too.
+		event.Request.URL, _, _ = strings.Cut(event.Request.URL, "?")
 		// Keep only an explicit allow-list of safe headers. Anything else
 		// (Authorization, Cookie, custom auth headers) could leak secrets.
 		safe := map[string]string{}
