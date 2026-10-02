@@ -119,8 +119,10 @@ export const SETTINGS_PAGE_META: Record<SettingsPage, SettingsPageMeta> = {
 };
 
 /** Rail grouping, in display order. */
+// Startup and Shortcuts are the app's, not the look's (Brandon, 2 Oct 2026):
+// Customize is what you see, App is how Scrollr runs on this computer.
 export const SETTINGS_RAIL_GROUPS: { label: string; pages: SettingsPage[] }[] = [
-  { label: "Customize", pages: ["appearance", "startup", "shortcuts", "ticker"] },
+  { label: "Customize", pages: ["appearance", "ticker"] },
   { label: "Account", pages: ["profile", "data"] },
-  { label: "App", pages: ["updates"] },
+  { label: "App", pages: ["startup", "shortcuts", "updates"] },
 ];
