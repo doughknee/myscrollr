@@ -92,6 +92,14 @@ func frontendURL() string {
 
 func configured() bool { return clientID() != "" && clientSecret() != "" }
 
+// appSlug names the app in its install URL (github.com/apps/<slug>).
+func appSlug() string {
+	if v := os.Getenv("GITHUB_APP_SLUG"); v != "" {
+		return v
+	}
+	return "scrollr-desktop"
+}
+
 func userNS(sub string) string { return "user:" + sub }
 
 // =============================================================================
@@ -505,8 +513,8 @@ func requireUser(c *fiber.Ctx) (string, bool) {
 	return sub, true
 }
 
-// HandleConnect - GET /github/connect (JWT). Returns the GitHub authorize URL
-// for the desktop to open in the system browser.
+// HandleConnect - GET /github/connect (JWT). Returns the app's install URL for
+// the desktop to open in the system browser.
 func HandleConnect(c *fiber.Ctx) error {
 	sub, ok := requireUser(c)
 	if !ok {
@@ -524,25 +532,55 @@ func HandleConnect(c *fiber.Ctx) error {
 		log.Printf("[GitHub] store state: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not start GitHub connection"})
 	}
-	q := url.Values{"client_id": {clientID()}, "redirect_uri": {callbackURL()}, "state": {state}}
-	return c.JSON(fiber.Map{"url": WebBase + "/login/oauth/authorize?" + q.Encode()})
+	// The install page, not the bare authorize page (SCROLLR-309): a GitHub
+	// App's user token sees only repos where the app is installed. The app
+	// requests OAuth on install, so GitHub installs and then sends the
+	// browser to the callback with a code, as the authorize page would.
+	q := url.Values{"state": {state}}
+	return c.JSON(fiber.Map{"url": WebBase + "/apps/" + url.PathEscape(appSlug()) + "/installations/new?" + q.Encode()})
 }
 
 // HandleCallback - GET /github/callback (public). GitHub sends the browser
-// here after the user approves; the browser ends on the website's account
-// page either way.
+// here after the user installs (or approves) the app; the browser ends on the
+// website's account page either way.
+//
+// An install arrives with code, state, installation_id and
+// setup_action=install: the code is exchanged as before and the installation
+// recorded. A change to an existing install (other repos picked) arrives with
+// setup_action=update and no code: the tokens stay, and the account's cached
+// answers are dropped so the change shows on the next fetch. That account is
+// found by the state, else by the installation id an install recorded (a
+// configure link opened without /github/connect carries no state). Anything
+// else is today's error redirect.
 func HandleCallback(c *fiber.Ctx) error {
 	// Cloned: c.Query aliases fasthttp's pooled buffer.
 	code, state := strings.Clone(c.Query("code")), strings.Clone(c.Query("state"))
+	installation, _ := strconv.ParseInt(c.Query("installation_id"), 10, 64)
 	fail := func(why string) error {
 		log.Printf("[GitHub] callback: %s", why)
 		return c.Redirect(frontendURL()+"/account?github=error", fiber.StatusFound)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), requestBudget)
+	defer cancel()
+	if code == "" && c.Query("setup_action") == "update" {
+		sub := ""
+		if state != "" {
+			sub, _ = platform.Rdb.GetDel(ctx, keyState+state).Result()
+		}
+		if sub == "" && installation > 0 && platform.DBPool != nil {
+			_ = platform.DBPool.QueryRow(ctx,
+				`SELECT logto_sub FROM github_connections WHERE installation_id = $1`, installation).Scan(&sub)
+		}
+		if sub == "" {
+			return fail("update with no known state or installation")
+		}
+		saveInstallation(ctx, sub, installation)
+		forgetUser(ctx, sub)
+		return c.Redirect(frontendURL()+"/account?github=connected", fiber.StatusFound)
+	}
 	if code == "" || state == "" {
 		return fail("missing code or state")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), requestBudget)
-	defer cancel()
 	sub, err := platform.Rdb.GetDel(ctx, keyState+state).Result()
 	if err != nil || sub == "" {
 		return fail("unknown or expired state")
@@ -558,8 +596,22 @@ func HandleCallback(c *fiber.Ctx) error {
 	if err := saveTokens(ctx, sub, login, id, tok); err != nil {
 		return fail(err.Error())
 	}
+	saveInstallation(ctx, sub, installation)
 	forgetUser(ctx, sub)
 	return c.Redirect(frontendURL()+"/account?github=connected", fiber.StatusFound)
+}
+
+// saveInstallation records which app installation an account's repos come
+// from. Best effort: nothing on the request path reads it.
+func saveInstallation(ctx context.Context, sub string, installation int64) {
+	if installation <= 0 || platform.DBPool == nil {
+		return
+	}
+	if _, err := platform.DBPool.Exec(ctx, `
+		UPDATE github_connections SET installation_id = $2, updated_at = now()
+		 WHERE logto_sub = $1`, sub, installation); err != nil {
+		log.Printf("[GitHub] save installation: %v", err)
+	}
 }
 
 // StatusResponse is GET /github/status.

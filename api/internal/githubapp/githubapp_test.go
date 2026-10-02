@@ -233,8 +233,12 @@ func connectState(t *testing.T, app *fiber.App, sub string) string {
 
 // ── Unit: no database ─────────────────────────────────────────────
 
-func TestConnectBuildsAuthorizeURLAndSingleUseState(t *testing.T) {
+// TestConnectBuildsInstallURLAndSingleUseState: Connect opens the app's
+// install page (SCROLLR-309), since a user token sees only the repos the app
+// is installed on; the slug comes from GITHUB_APP_SLUG.
+func TestConnectBuildsInstallURLAndSingleUseState(t *testing.T) {
 	_, mr, app := setup(t)
+	t.Setenv("GITHUB_APP_SLUG", "scrollr-test")
 	resp := do(t, app, "GET", "/github/connect", "sub_connect")
 	body := decode[struct{ URL string }](t, resp)
 	u, err := url.Parse(body.URL)
@@ -242,12 +246,12 @@ func TestConnectBuildsAuthorizeURLAndSingleUseState(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := u.Query()
-	if u.Path != "/login/oauth/authorize" || q.Get("client_id") != "Iv-test" ||
-		q.Get("redirect_uri") != "http://localhost:18080/github/callback" || len(q.Get("state")) != 64 {
-		t.Fatalf("authorize URL = %s", body.URL)
+	if u.Path != "/apps/scrollr-test/installations/new" || len(q.Get("state")) != 64 || len(q) != 1 {
+		t.Fatalf("install URL = %s", body.URL)
 	}
-	if q.Has("scope") {
-		t.Errorf("a GitHub App's permissions are fixed; no scope expected")
+	t.Setenv("GITHUB_APP_SLUG", "")
+	if u, _ := url.Parse(decode[struct{ URL string }](t, do(t, app, "GET", "/github/connect", "sub_connect")).URL); u.Path != "/apps/scrollr-desktop/installations/new" {
+		t.Errorf("default slug path = %s", u.Path)
 	}
 	key := keyState + q.Get("state")
 	if got, _ := mr.Get(key); got != "sub_connect" {
@@ -266,6 +270,41 @@ func TestCallbackRejectsUnknownState(t *testing.T) {
 	}
 	if len(f.tokenGrants) != 0 {
 		t.Errorf("a forged state reached GitHub's token endpoint")
+	}
+}
+
+// TestCallbackUpdateKeepsTokensAndBustsCache: picking other repos on an
+// existing install comes back with setup_action=update and no code. The
+// state names the account; nothing reaches the token endpoint and the
+// account's cached answers (the repo list first) are dropped.
+func TestCallbackUpdateKeepsTokensAndBustsCache(t *testing.T) {
+	f, mr, app := setup(t)
+	state := connectState(t, app, "sub_upd")
+	_ = mr.Set(keyRepos+userNS("sub_upd"), `[]`)
+	_ = mr.Set(keyRuns+userNS("sub_upd")+":o/r", `{}`)
+	_ = mr.Set(keyRepos+userNS("sub_other"), `[]`)
+
+	resp := do(t, app, "GET", "/github/callback?installation_id=77&setup_action=update&state="+state, "")
+	if loc := resp.Header.Get("Location"); loc != "https://web.test/account?github=connected" {
+		t.Fatalf("redirect = %q", loc)
+	}
+	if len(f.tokenGrants) != 0 {
+		t.Errorf("an update exchanged a code: %v", f.tokenGrants)
+	}
+	if mr.Exists(keyRepos+userNS("sub_upd")) || mr.Exists(keyRuns+userNS("sub_upd")+":o/r") {
+		t.Errorf("the account's cache survived the update")
+	}
+	if !mr.Exists(keyRepos + userNS("sub_other")) {
+		t.Errorf("another account's cache was dropped")
+	}
+	if mr.Exists(keyState + state) {
+		t.Errorf("state survived its use")
+	}
+	// Neither a code nor a known state (nor a known installation): the error redirect.
+	for _, q := range []string{"installation_id=77&setup_action=update", "setup_action=update&state=forged", "installation_id=77&setup_action=install"} {
+		if loc := do(t, app, "GET", "/github/callback?"+q, "").Header.Get("Location"); loc != "https://web.test/account?github=error" {
+			t.Errorf("%s redirect = %q", q, loc)
+		}
 	}
 }
 
@@ -461,6 +500,41 @@ func TestRunsUnconnectedUsesPublicFallback(t *testing.T) {
 		if tok != "" {
 			t.Errorf("fallback sent a token: %q", tok)
 		}
+	}
+}
+
+// TestInstallCallbackStoresInstallation: the install page's callback
+// carries the code (the exchange is unchanged) and installation_id, which is
+// stored; a later update with only that installation id (the desktop's
+// "Choose repos on GitHub" link has no state) finds the account and drops
+// its cached repo list, keeping the tokens.
+func TestInstallCallbackStoresInstallation(t *testing.T) {
+	f, mr, app := setupDB(t)
+	state := connectState(t, app, "sub_inst")
+	resp := do(t, app, "GET", "/github/callback?code=good-code&installation_id=4242&setup_action=install&state="+state, "")
+	if loc := resp.Header.Get("Location"); loc != "https://web.test/account?github=connected" {
+		t.Fatalf("redirect = %q", loc)
+	}
+	var inst *int64
+	if err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT installation_id FROM github_connections WHERE logto_sub = 'sub_inst'`).Scan(&inst); err != nil || inst == nil || *inst != 4242 {
+		t.Fatalf("installation_id = %v, %v", inst, err)
+	}
+	_, before := rowStatus(t, "sub_inst")
+
+	_ = mr.Set(keyRepos+userNS("sub_inst"), `[]`)
+	resp = do(t, app, "GET", "/github/callback?installation_id=4242&setup_action=update", "")
+	if loc := resp.Header.Get("Location"); loc != "https://web.test/account?github=connected" {
+		t.Fatalf("update redirect = %q", loc)
+	}
+	if mr.Exists(keyRepos + userNS("sub_inst")) {
+		t.Errorf("repo list cache survived the update")
+	}
+	if status, after := rowStatus(t, "sub_inst"); status != "ok" || after != before {
+		t.Errorf("update touched the tokens: status=%q changed=%v", status, after != before)
+	}
+	if len(f.tokenGrants) != 1 {
+		t.Errorf("token calls = %v, want the one install exchange", f.tokenGrants)
 	}
 }
 

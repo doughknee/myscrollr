@@ -1,5 +1,5 @@
 {
-    "version": "a22929a8d89e5073",
+    "version": "e68a9d9c2d49514b",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -1510,7 +1510,7 @@
         {
             "id": "github",
             "name": "GitHub",
-            "description": "CI status for your repos — connect GitHub for private ones",
+            "description": "CI and pull requests that need you, from your GitHub",
             "category": "utility",
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
@@ -1520,7 +1520,9 @@
             "keywords": [
                 "actions",
                 "ci",
-                "pull requests"
+                "pull requests",
+                "reviews",
+                "checks"
             ],
             "added_at": "2026-07-02"
         }

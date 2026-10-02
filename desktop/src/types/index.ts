@@ -7,6 +7,7 @@
  */
 import type { DataWidgetRow, GitHubDefaultCI, GitHubPRRow } from "../api/client";
 import type { SportsMeta } from "../api/queries";
+import type { GitHubPagePR } from "../widgets/github/types";
 
 // ── Finance ──────────────────────────────────────────────────────
 
@@ -379,7 +380,7 @@ export interface GitHubChipData {
   failedStep?: string;
   // ── Connected GitHub (SCROLLR-308); all absent when not connected ──
   /** Needs you › broken › running on yours › passing (`chipState`). */
-  state?: "needs" | "broken" | "running" | "passing";
+  state?: "needs" | "broken" | "running" | "passing" | "quiet";
   /** PRs that need you, each once (`needsYou`). */
   needs?: number;
   /** The age the state shows ("12m"): since the default-branch run, or your run started. */
@@ -387,8 +388,10 @@ export interface GitHubChipData {
   defaultCi?: GitHubDefaultCI;
   mineRunning?: number;
   mineBranch?: string;
-  /** Open PRs, for the GitHub page (SCROLLR-309). */
+  /** Open PRs. */
   prs?: GitHubPRRow[];
+  /** This repo's PRs on the GitHub page, in its order, as the bar prefs and quiet hours allow (`pagePRs`, SCROLLR-309). */
+  page?: GitHubPagePR[];
   /** Counts worthy changes (`nextFlash`); 0 until the first. */
   flash?: number;
   flashTone?: "up" | "down";

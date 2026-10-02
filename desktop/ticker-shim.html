@@ -43,6 +43,11 @@
                       (e.g. America/New_York,Europe/London,Asia/Tokyo).
     ?weather=demo     three sample cities (Chicago carries a "Storm watch" alert),
                       and puts weather on the ticker.
+    ?github=<m>       SCROLLR-308: demo|needs|broken|running|passing sample repos;
+                      page (SCROLLR-309): github.prs.json, the GitHub page's
+                      fixture (also seeded by ?fixture=github).
+    ?gh=<a,-b>        the GitHub widget's "What goes on the bar" switches
+                      (otherPRs, -reviews, quiet=HH:MM-HH:MM, ...).
     ?weather=alert    only the alerted city, so the edge slot never rotates away
                       from the alert (the contrast spec reads it at rest).
 
@@ -197,6 +202,26 @@
           needs: ghRepo("infra", { prs: [ghPr(1, { review_requested: true, title: "Sample: review requested" }), ghPr(2, { is_mine: true, review_state: "changes_requested" })] }),
         };
         var ghRepos = ghQ === "demo" ? [ghDemo.passing, ghDemo.broken, ghDemo.running, ghDemo.needs] : ghDemo[ghQ] ? [ghDemo[ghQ]] : [];
+        // ?github=page, or ?fixture=github (SCROLLR-309): the GitHub page's
+        // fixture, src/dev/__fixtures__/github.prs.json, rebased like a
+        // dashboard. Read synchronously: the store must hold it before boot.
+        if (ghQ === "page" || (fixtureName === "github" && !ghQ)) {
+          if (utils.indexOf("github") < 0) utils.push("github");
+          var ghx = new XMLHttpRequest();
+          ghx.open("GET", "/src/dev/__fixtures__/github.prs.json", false);
+          ghx.send();
+          var ghj = JSON.parse(ghx.responseText);
+          ghRepos = rebase(ghj.repos, Date.now() - Date.parse(ghj._captured_at));
+        }
+        // ?gh=otherPRs,-reviews,quiet=22:00-08:00 (SCROLLR-309): the widget's
+        // "What goes on the bar" switches; a name turns one on, -name off.
+        var ghBar = {};
+        (params.get("gh") || "").split(",").filter(Boolean).forEach(function (t) {
+          var q = /^quiet=([0-9][0-9]:[0-9][0-9])-([0-9][0-9]:[0-9][0-9])$/.exec(t);
+          if (q) { ghBar.quiet = true; ghBar.quietFrom = q[1]; ghBar.quietTo = q[2]; }
+          else if (t.charAt(0) === "-") ghBar[t.slice(1)] = false;
+          else ghBar[t] = true;
+        });
 
         var themeQ = /^([a-z-]+)-(light|dark)$/.exec(params.get("theme") || "");
         var store = new Map([
@@ -222,6 +247,7 @@
               widgetsOnTicker: utils,
               // SCROLLR-9: the fixed zone, so a pinned subject the
               // horizon would otherwise hide can be looked at here.
+              github: { repos: [], bar: ghBar },
               pins: params.getAll("pin").map(function (raw) {
                 var at = raw.indexOf(":");
                 return {

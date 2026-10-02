@@ -119,7 +119,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ a22929a8d89e5073 -->
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ e68a9d9c2d49514b -->
 56 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
@@ -188,7 +188,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 - **Weather** (Desk) — Current conditions for your locations
 - **System Monitor** (Dev) — Live CPU, memory, and GPU stats
 - **Uptime** (Dev) — Monitor status from Uptime Kuma
-- **GitHub** (Dev) — CI status for your repos — connect GitHub for private ones
+- **GitHub** (Dev) — CI and pull requests that need you, from your GitHub
 
 ## Settings
 
@@ -251,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 30a14b716ba8 -->
+<!-- source: docs/CHIP_DESIGN.md @ 626c5a12111b -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -406,6 +406,27 @@ A fixed block at the right end of the bar that doesn't swipe away.
 A widget you added that has nothing to show right now doesn't vanish and doesn't get its
 own empty page. All of them share one page at the very end: "EPL · next match Sat 10 Oct",
 "NBA · off-season", "PBS · no headlines in the last 2 days". Never a made-up date.
+
+#### GitHub
+
+GitHub is a utility, so each repo you tick has a spot on the edge: a count of the pull
+requests that need you, a red dot when the main branch is failing, or a green dot and how
+long ago it last ran. When pull requests need you, GitHub also gets a page, a column per pull
+request, the way NFL is a column per game: reviews asked of you first, then your pull
+requests with changes requested, then yours with failing checks. Each column is the title,
+then the repo, number, author and age, with a tag (Review requested, Changes requested,
+Approved) and the checks (`✓ 5/5`, `✗ 1 failing`, `◌ 2 running`). Clicking one opens it
+on GitHub. Nothing needs you: no page, just the edge.
+
+GitHub is the one widget where you choose what reaches the bar, because a developer's day
+has more events than anyone wants to see. In the widget, under Your repos, **What goes on
+the bar** has a switch each for failing CI on main, review requests, changes requested on
+your pull requests, your pull requests with failing checks, runs on your branches (off by
+default), your other open pull requests on the page (off by default) and the flash when
+something changes; and quiet hours, two times between which the bar goes silent while the
+widget page still shows everything. They choose which kinds of event are yours to hear
+about, never how many or in what order. Green pull requests waiting on others stay off the
+bar.
 
 #### Colour and a new account
 
@@ -626,10 +647,6 @@ popular symbols to your watchlist for you. A time window on pages that hides par
 the widget page shows. Starting a widget from its first page on every visit. A page counter
 for the whole lap (7/23), and a line of text counting a widget's games and pages: the band's
 pills say how much there is without anything to read.
-
-### Still to do
-
-GitHub chips haven't been rebuilt on these rules yet.
 
 ## The settings model
 

@@ -71,6 +71,9 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
   // SCROLLR-294: the worst case for "all shown": every page kind, with NPR's 30 headlines (8 pages at 1920) among them.
   { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true }, // all shown 295 s since SCROLLR-297 (404 s before)
+  // SCROLLR-309: the GitHub page alone (the PRs that need you from github.prs.json; the Clock and GitHub on the edge).
+  { fixture: "github", width: 1920, laps: 3 },
+  { fixture: "github", width: 1280, laps: 3 },
 ];
 
 /** dashboard.npr.json's 30 headlines, rebased onto now as the shim rebases a fixture. */
@@ -155,6 +158,54 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr }
     expect.soft(must.filter((id) => !marked.has(id)), "every live game and your team shown, marked live or yours").toEqual([]);
   });
 }
+
+/** github.prs.json's PRs in the GitHub page's order: review requests, changes requested, failing checks; then yours that are quiet. */
+const GH_NEEDS = ["myscrollr#478", "scrollr-api#212", "myscrollr#479", "scrollr-api#215"];
+const GH_OTHER = ["myscrollr#480", "scrollr-api#220"];
+
+test("github: a column per PR that needs you, in order, at least PR_MIN_COL wide, the band counting them (SCROLLR-309)", async ({ page, context }) => {
+  test.setTimeout(120_000);
+  await context.clock.install();
+  for (const [width, extra, want] of [
+    [1920, "", GH_NEEDS],
+    [1280, "", GH_NEEDS],
+    [1920, "&gh=otherPRs", [...GH_NEEDS, ...GH_OTHER]],
+    [1280, "&gh=otherPRs", [...GH_NEEDS, ...GH_OTHER]],
+  ] as const) {
+    await page.setViewportSize({ width, height: 80 });
+    await recordFromStart(page);
+    await parkMouse(page);
+    await page.goto(url("github", extra));
+    await parkMouse(page);
+    await page.waitForSelector("[data-page]");
+    // Every page of the widget, once: a lap is one page here (one widget).
+    await runUntil(context.clock, async () => {
+      const e = (await readTrace(page)).enters;
+      return e.length > 0 && e.length >= e[0].count;
+    });
+    const tr = await readTrace(page);
+    const seen = tr.enters.slice(0, tr.enters[0].count);
+    const label = `@${width}${extra}`;
+    expect(seen.flatMap((e) => e.items.map((i) => i.id)), `${label}: a column per PR, in order`).toEqual(want);
+    const m = await page.locator("[data-page]").first().evaluate((p) => ({
+      cells: [...p.querySelectorAll("[data-chip]")].map((c) => c.getBoundingClientRect().width),
+      chip: document.querySelector("[data-band] [data-chip]")?.getAttribute("data-kind"),
+      count: document.querySelector("[data-band] [data-chip] span:last-child")?.textContent,
+    }));
+    expect(Math.min(...m.cells), `${label}: PR_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
+    expect(m, `${label}: the band's chip is the needs-you count, in the ink`).toMatchObject({ chip: "needs", count: "4" });
+    expect(tr.moved, `${label}: nothing moves`).toEqual([]);
+    expect(tr.cuts, `${label}: nothing cut`).toEqual([]);
+    console.log(`[github ${label}] ${seen.map((e) => `${e.page}: ${e.items.map((i) => i.id).join(" ")}`).join(" | ")} cols ${m.cells.map((w) => w.toFixed(0)).join("/")}`);
+  }
+
+  // Quiet hours all day: no GitHub page (the edge stays, its GitHub slot quiet).
+  await page.setViewportSize({ width: 1920, height: 80 });
+  await page.goto(url("github", "&gh=quiet=00:00-23:59"));
+  await page.locator("[data-edge], .ticker-container").first().waitFor();
+  await context.clock.runFor(4000);
+  expect(await page.locator("[data-page]").count(), "quiet hours: no page").toBe(0);
+});
 
 test("a truly short widget keeps a page's column width, left-aligned (SCROLLR-292)", async ({ page }) => {
   // One NFL game in the whole week: nothing can fill the page. The game is

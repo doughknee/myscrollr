@@ -1,0 +1,72 @@
+{
+  "_note": "SCROLLR-309 github: two connected repos as the GitHub store holds them (GitHubRepo[] with core's /github/prs merged in). Representative sample data, not production rows (CHIP_SPEC §10.2: GitHub is per-user, not in the seed). Six open PRs: 2 review requests to you, 1 of yours with changes requested, 1 of yours with failing checks, 2 of yours that are quiet (approved, green). The shim seeds it for ?fixture=github or ?github=page.",
+  "_captured_at": "2026-10-02T12:00:00Z",
+  "repos": [
+    {
+      "owner": "sample",
+      "repo": "myscrollr",
+      "status": "success",
+      "workflowName": "CI",
+      "runUrl": null,
+      "commitMessage": "feat: the band replaces the pager",
+      "updatedAt": "2026-10-02T10:00:00Z",
+      "branch": "main",
+      "startedAt": "2026-10-02T09:55:00Z",
+      "defaultCi": { "state": "passing", "workflow": "CI", "updated_at": "2026-10-02T10:00:00Z", "commit_message": "feat: the band replaces the pager" },
+      "mineRunning": 0,
+      "prs": [
+        {
+          "number": 478, "title": "The band: edge bar, name and page pills replace the pager", "html_url": "https://github.com/sample/myscrollr/pull/478",
+          "author": "sample-dev", "is_mine": false, "review_requested": true, "review_state": "none", "draft": false,
+          "head_branch": "band", "head_sha": "a478", "updated_at": "2026-10-02T10:00:00Z",
+          "checks": { "total": 5, "passed": 5, "failed": 0, "running": 0 }, "checks_state": "passing"
+        },
+        {
+          "number": 479, "title": "Connect GitHub: core brokers the Scrollr Desktop app and serves the widget, private repos included", "html_url": "https://github.com/sample/myscrollr/pull/479",
+          "author": "you", "is_mine": true, "review_requested": false, "review_state": "changes_requested", "draft": false,
+          "head_branch": "connect", "head_sha": "a479", "updated_at": "2026-10-02T11:20:00Z",
+          "checks": { "total": 5, "passed": 4, "failed": 1, "running": 0 }, "checks_state": "failing"
+        },
+        {
+          "number": 480, "title": "Ops page: the \"I did it\" button for a stalled release", "html_url": "https://github.com/sample/myscrollr/pull/480",
+          "author": "you", "is_mine": true, "review_requested": false, "review_state": "approved", "draft": false,
+          "head_branch": "ops", "head_sha": "a480", "updated_at": "2026-10-02T11:00:00Z",
+          "checks": { "total": 5, "passed": 3, "failed": 0, "running": 2 }, "checks_state": "running"
+        }
+      ]
+    },
+    {
+      "owner": "sample",
+      "repo": "scrollr-api",
+      "status": "success",
+      "workflowName": "deploy",
+      "runUrl": null,
+      "commitMessage": "fix: retry the token refresh once",
+      "updatedAt": "2026-10-02T09:00:00Z",
+      "branch": "main",
+      "startedAt": "2026-10-02T08:52:00Z",
+      "defaultCi": { "state": "passing", "workflow": "deploy", "updated_at": "2026-10-02T09:00:00Z", "commit_message": "fix: retry the token refresh once" },
+      "mineRunning": 0,
+      "prs": [
+        {
+          "number": 212, "title": "Rate limit: hold the budget until GitHub's reset", "html_url": "https://github.com/sample/scrollr-api/pull/212",
+          "author": "teammate", "is_mine": false, "review_requested": true, "review_state": "none", "draft": false,
+          "head_branch": "limit", "head_sha": "b212", "updated_at": "2026-10-01T16:00:00Z",
+          "checks": { "total": 3, "passed": 1, "failed": 0, "running": 2 }, "checks_state": "running"
+        },
+        {
+          "number": 215, "title": "Migrations: add installation_id to github_connections", "html_url": "https://github.com/sample/scrollr-api/pull/215",
+          "author": "you", "is_mine": true, "review_requested": false, "review_state": "none", "draft": false,
+          "head_branch": "install", "head_sha": "b215", "updated_at": "2026-10-02T11:45:00Z",
+          "checks": { "total": 3, "passed": 2, "failed": 1, "running": 0 }, "checks_state": "failing"
+        },
+        {
+          "number": 220, "title": "Docs: the GitHub paragraph in CHIP_DESIGN", "html_url": "https://github.com/sample/scrollr-api/pull/220",
+          "author": "you", "is_mine": true, "review_requested": false, "review_state": "none", "draft": true,
+          "head_branch": "docs", "head_sha": "b220", "updated_at": "2026-09-30T12:00:00Z",
+          "checks": { "total": 3, "passed": 3, "failed": 0, "running": 0 }, "checks_state": "passing"
+        }
+      ]
+    }
+  ]
+}

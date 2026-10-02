@@ -30,25 +30,41 @@ import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
 import {
+  GITHUB_BAR_DEFAULTS,
+  barPrefs,
   chipState,
+  inQuietHours,
   loadRepoData,
   needsYou,
   nextFlash,
+  pagePRs,
   repoKey,
   shortAge,
 } from "../widgets/github/types";
-import type { FlashMemo, GitHubRepo } from "../widgets/github/types";
+import type { FlashMemo, GitHubBarPrefs, GitHubRepo } from "../widgets/github/types";
 
 // Per window: each ticker flashes a repo once per worthy change.
 const githubFlash = new Map<string, FlashMemo>();
 
-/** The connected fields of a GitHub chip (SCROLLR-308); none when not connected. */
-export function connectedChip(repo: GitHubRepo, key: string): Partial<GitHubChipData> {
-  const state = chipState(repo);
+/**
+ * The connected fields of a GitHub chip (SCROLLR-308); none when not
+ * connected. The bar prefs (SCROLLR-309) decide what counts and whether it
+ * flashes; quiet hours silence the chip and empty the page.
+ */
+export function connectedChip(
+  repo: GitHubRepo,
+  key: string,
+  bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS,
+  quiet = false,
+): Partial<GitHubChipData> {
+  const state = chipState(repo, bar, quiet);
   if (!state) return {};
-  const needs = needsYou(repo.prs).length;
-  const memo = nextFlash(githubFlash.get(key), repo.defaultCi?.state === "failing", needs);
+  const needs = needsYou(repo.prs, bar).length;
+  const broken = state === "broken";
+  // The memo follows what the chip shows: leaving quiet hours with PRs waiting flashes once.
+  const memo = nextFlash(githubFlash.get(key), broken, state === "needs" ? needs : 0);
   githubFlash.set(key, memo);
+  const loud = bar.flash && !quiet;
   return {
     state,
     needs,
@@ -57,8 +73,9 @@ export function connectedChip(repo: GitHubRepo, key: string): Partial<GitHubChip
     mineRunning: repo.mineRunning,
     mineBranch: repo.mineBranch,
     prs: repo.prs,
-    flash: memo.token,
-    flashTone: memo.tone,
+    page: pagePRs(repo, bar, quiet),
+    flash: loud ? memo.token : undefined,
+    flashTone: loud ? memo.tone : undefined,
   };
 }
 
@@ -230,6 +247,9 @@ export function useWidgetTickerData(
     () => new Set(widgetPrefs.widgetsOnTicker),
     [widgetPrefs.widgetsOnTicker],
   );
+  // The GitHub bar prefs (SCROLLR-309), stable across renders that did not change them.
+  const githubBarJson = JSON.stringify(widgetPrefs.github?.bar ?? null);
+  const githubBarRaw = useMemo(() => JSON.parse(githubBarJson) as unknown, [githubBarJson]);
 
   // ── Build clock chips ─────────────────────────────────────────
   const buildClockChips = useCallback((): ClockChipData[] => {
@@ -468,6 +488,8 @@ export function useWidgetTickerData(
     if (!enabledWidgets.has("github")) return [];
     const repos = loadRepoData();
     if (repos.length === 0) return [];
+    const bar = barPrefs(githubBarRaw);
+    const quiet = inQuietHours(bar);
 
     const chips: GitHubChipData[] = [];
 
@@ -503,12 +525,12 @@ export function useWidgetTickerData(
                     : Date.now()) - new Date(repo.startedAt).getTime(),
                 )
               : undefined,
-        ...connectedChip(repo, key),
+        ...connectedChip(repo, key, bar, quiet),
       });
     }
 
     return chips;
-  }, [enabledWidgets]);
+  }, [enabledWidgets, githubBarRaw]);
 
   // ── Polling intervals ─────────────────────────────────────────
 

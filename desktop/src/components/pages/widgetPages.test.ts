@@ -4,6 +4,10 @@ import { isLive } from "../../utils/gameHelpers";
 import fixture from "../../dev/__fixtures__/dashboard.pages.json";
 import busy from "../../dev/__fixtures__/dashboard.busy.json";
 import npr from "../../dev/__fixtures__/dashboard.npr.json";
+import gh from "../../dev/__fixtures__/github.prs.json";
+import type { GitHubChipData } from "../../types";
+import { GITHUB_BAR_DEFAULTS, pagePRs, type GitHubPagePR, type GitHubRepo } from "../../widgets/github/types";
+import { PR_MIN_COL } from "./cells/PRCell";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
@@ -277,5 +281,43 @@ describe("followPage", () => {
     expect(followPage({ page: 1, pages: 2 }, 6)).toBe(3);
     expect(followPage({ page: 3, pages: 4 }, 1)).toBe(0);
     expect(followPage({ page: 0, pages: 3 }, 0)).toBe(0);
+  });
+});
+
+describe("the GitHub page (SCROLLR-309)", () => {
+  const repos = gh.repos as unknown as GitHubRepo[];
+  const chips = (bar = GITHUB_BAR_DEFAULTS, quiet = false) =>
+    repos.map((r) => ({ id: `github-${r.owner}/${r.repo}`, label: r.repo, status: "success", workflowName: "CI", page: pagePRs(r, bar, quiet) }) as GitHubChipData);
+  const page = (bar = GITHUB_BAR_DEFAULTS, quiet = false) => buildPageWidgets(null, ["clock", "github"], NOW, [], [], chips(bar, quiet));
+  const nums = (w: PageWidget) => w.items.map((i) => (i.data as GitHubPagePR).number);
+
+  it("a column per PR that needs you across every repo: review requests, then changes requested, then failing checks", () => {
+    const [w] = page();
+    expect(w).toMatchObject({ tab: "github", kind: "github", code: "GITHUB", minCol: PR_MIN_COL });
+    expect(nums(w)).toEqual([478, 212, 479, 215]);
+    expect(chip(w)).toEqual({ kind: "needs", count: 4 });
+  });
+
+  it("'My other open PRs' adds yours after them; the band's count stays the needs-you count", () => {
+    const [w] = page({ ...GITHUB_BAR_DEFAULTS, otherPRs: true });
+    expect(nums(w)).toEqual([478, 212, 479, 215, 480, 220]);
+    expect(chip(w)).toEqual({ kind: "needs", count: 4 });
+    // The ladder keeps the order: planWidget sorts by tier, needs you before the rest.
+    const plan = planAll([w], 1920, 0).get("github")!;
+    expect(plan.pages.flat().map((i) => (i.data as GitHubPagePR).number)).toEqual([478, 212, 479, 215, 480, 220]);
+  });
+
+  it("nothing needing you, or quiet hours: no page and no Also entry", () => {
+    expect(page({ ...GITHUB_BAR_DEFAULTS, reviews: false, changes: false, failingChecks: false })).toEqual([]);
+    expect(page(GITHUB_BAR_DEFAULTS, true)).toEqual([]);
+    expect(buildPageWidgets(null, ["github"], NOW)).toEqual([]);
+  });
+
+  it("columns of at least PR_MIN_COL at 1280 and 1920", () => {
+    const [w] = page();
+    for (const width of [1280, 1920]) {
+      const plan = planAll([w], width, 300).get("github")!;
+      expect((width - 192 - 300) / plan.cols, `@${width}`).toBeGreaterThanOrEqual(PR_MIN_COL);
+    }
   });
 });
