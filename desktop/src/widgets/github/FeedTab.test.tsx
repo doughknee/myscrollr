@@ -49,6 +49,12 @@ vi.mock("../../api/client", async (importOriginal) => ({
 const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 
+const pr = (number: number, title: string, needs: boolean) => ({
+  number, title, html_url: `https://github.com/octo/app/pull/${number}`, author: "sam", is_mine: false, review_requested: needs,
+  review_state: "none", draft: false, head_branch: "b", head_sha: "s", updated_at: ago(30),
+  checks: { total: 0, passed: 0, failed: 0, running: 0 }, checks_state: "none",
+});
+
 /** Core's board for whatever the page asks: a red deploy, green tests, PRs and issues as the modes say. */
 function boardFor(repos: Array<{ repo: string; workflows?: string[]; prs: string; issues: string }>) {
   return {
@@ -59,8 +65,8 @@ function boardFor(repos: Array<{ repo: string; workflows?: string[]; prs: string
       available: true,
       workflows: (r.workflows ?? ["test", "deploy"]).map((name) => ({ name, state: name === "deploy" ? "failing" : "passing", at: ago(12) })),
       checks: [],
-      ...(r.prs === "off" ? {} : { prs: r.prs === "all" ? { count: 5, needs_you: 2, items: [] } : { count: 2, needs_you: 2, items: [] } }),
-      ...(r.issues === "off" ? {} : { issues: r.issues === "assigned" ? { count: 0, items: [], error: "permission" } : { count: 3, items: [] } }),
+      ...(r.prs === "off" ? {} : { prs: r.prs === "all" ? { count: 5, needs_you: 0, items: [1, 2, 3, 4, 5].map((n) => pr(n, `Open PR ${n}`, false)) } : { count: 2, needs_you: 2, items: [pr(7, "Fix the login loop", true), pr(8, "Bump deps", true)] } }),
+      ...(r.issues === "off" ? {} : { issues: r.issues === "assigned" ? { count: 0, items: [], error: "permission" } : { count: 3, items: [{ number: 9, title: "Crash on start", url: "https://github.com/octo/app/issues/9", created_at: ago(60) }] } }),
     })),
   };
 }
@@ -100,7 +106,11 @@ function mount(repos: GitHubTrackedRepo[] = [{ repo: "octo/app", prs: "mine", is
 }
 
 const preview = () => screen.getByText("On the bar it looks like").parentElement!.querySelector<HTMLElement>("[data-part=preview]")!;
-const pillTexts = () => [...preview().querySelectorAll("[data-part=pill]")].map((p) => p.textContent);
+/** The preview cell's two lines, as text: line 1's status, then line 2. */
+const cellLines = () => {
+  const t = (p: string) => preview().querySelector(`[data-part=${p}]`)?.textContent ?? "";
+  return [t("status"), [t("tag"), t("what"), t("who")].filter(Boolean).join(" · ") || t("empty")];
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -164,23 +174,23 @@ describe("connected: two panes", () => {
     await waitFor(() => expect(within(list).getAllByRole("listitem").map((b) => b.textContent)).toEqual(["app3", "infra2"]));
     expect(screen.getByText(/1–2 repos ride the edge in one rotating slot/)).toBeTruthy();
     expect(screen.getByText("octo", { selector: "span.font-mono" })).toBeTruthy();
-    await waitFor(() => expect(pillTexts()).toEqual(["✗ deploy · 12m", "2 PRs for you", "✓ test"]));
+    await waitFor(() => expect(cellLines()).toEqual(["deploy failed · 12m", "Review · Fix the login loop · sam +1"]));
 
     fireEvent.click(within(list).getAllByRole("listitem")[1]);
     expect(await screen.findByText("relentnet")).toBeTruthy();
-    await waitFor(() => expect(pillTexts()).toEqual(["✗ deploy · 12m", "✓ test"]));
+    await waitFor(() => expect(cellLines()).toEqual(["deploy failed · 12m", "Nothing else needs you"]));
   });
 
   it("the PR and issue modes write the repo's config, and the preview follows", async () => {
     const { github } = mount();
-    await waitFor(() => expect(pillTexts()).toContain("2 PRs for you"));
+    await waitFor(() => expect(cellLines()[1]).toBe("Review · Fix the login loop · sam +1"));
     fireEvent.click(screen.getByRole("radio", { name: "All open" }));
     expect(github().repos[0]).toMatchObject({ repo: "octo/app", prs: "all", issues: "off" });
-    await waitFor(() => expect(pillTexts()).toContain("5 open PRs"));
+    await waitFor(() => expect(cellLines()[1]).toBe("PR · Open PR 1 · sam +4"));
     expect(api.board).toHaveBeenLastCalledWith([{ repo: "octo/app", workflows: undefined, prs: "all", issues: "off" }]);
 
     fireEvent.click(screen.getByRole("radio", { name: "Every new issue" }));
-    await waitFor(() => expect(pillTexts()).toContain("3 new issues"));
+    await waitFor(() => expect(cellLines()[1]).toBe("Issue · Crash on start · +2"));
   });
 
   it("Issues assigned before the permission is approved: Approve on GitHub opens the install page", async () => {
@@ -200,7 +210,7 @@ describe("connected: two panes", () => {
     expect(github().repos[0].workflows).toEqual(["test", "deploy", "lint"]);
     fireEvent.click(screen.getByRole("checkbox", { name: /deploy/ }));
     expect(github().repos[0].workflows).toEqual(["test", "lint"]);
-    await waitFor(() => expect(pillTexts()).toEqual(["2 PRs for you", "✓ test", "✓ lint"]));
+    await waitFor(() => expect(cellLines()[0]).toBe("all green · 12m"));
   });
 
   it("Remove from bar takes the repo off the list", async () => {

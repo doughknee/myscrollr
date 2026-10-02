@@ -157,13 +157,15 @@ own empty page. All of them share one page at the very end: "EPL · next match S
 
 ### GitHub
 
-Each repo you track is one cell. The cell has a dot in the repo's worst state, its name,
-how long ago something last happened, and a row of pills, the worst first: a failing
-workflow (`✗ deploy · 12m`, red), one running (`◌ apply · 3m`), pull requests that need
-you (`2 PRs for you`), the green workflows (`✓ test`), then quieter counts (`3 open PRs`,
-`1 new issue`, `2 assigned`). What doesn't fit becomes `+2`. A failing check from any CI
-on main counts too, under its own name (`✗ vercel · 3m`). Clicking the cell opens its most
-urgent thing on GitHub.
+Each repo you track is one cell, and the cell answers two questions by name. The top line
+is the repo and whether it is broken: `deploy failed · 12m` in red, `apply running · 3m`,
+or `all green · 1h`, with a dot in the same colour. A failing check from any CI on main
+counts too, under its own name (`vercel failed · 3m`). The second line is the one thing
+that needs you: `Review` and the pull request's title and who opened it, `Changes` or
+`Checks failed` on one of yours, `Broke on` and the commit that broke the build (and
+`you` if you pushed it), or the newest issue. `+1` means there is one more of the same.
+Nothing to name says `Nothing needs you`. Clicking the cell opens its most urgent thing
+on GitHub.
 
 One or two repos share one slot on the edge that never changes width: it shows one repo
 at a time (`GITHUB · MYSCROLLR`, its most urgent pill) and rolls to the next as the page

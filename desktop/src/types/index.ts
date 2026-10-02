@@ -7,7 +7,7 @@
  */
 import type { DataWidgetRow } from "../api/client";
 import type { SportsMeta } from "../api/queries";
-import type { GitHubPill, GitHubWorst } from "../widgets/github/types";
+import type { GitHubNeed, GitHubPill, GitHubStatus, GitHubWorst } from "../widgets/github/types";
 
 // ── Finance ──────────────────────────────────────────────────────
 
@@ -371,6 +371,10 @@ export interface GitHubChipData {
   pills: GitHubPill[];
   /** The dot: the first pill's kind (`worstOf`); `none` in quiet hours. */
   worst: GitHubWorst;
+  /** The page cell's line 1, right side: is it broken (`statusFor`); null in quiet hours. */
+  status: GitHubStatus | null;
+  /** The page cell's line 2: what needs you, named (`needFor`); null when nothing does. */
+  need: GitHubNeed | null;
   /** Age of the newest event the cell knows of ("12m"). */
   age: string;
   /** The most urgent pill's link, else the repo. */

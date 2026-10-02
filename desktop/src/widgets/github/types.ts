@@ -14,7 +14,7 @@ import { LS_GITHUB_BOARD } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
 import { githubApi } from "../../api/client";
-import type { GitHubBoardRepo, GitHubBoardRun, GitHubRepoRow, GitHubRunRow } from "../../api/client";
+import type { GitHubBoardRepo, GitHubBoardRun, GitHubPRRow, GitHubRepoRow, GitHubRunRow } from "../../api/client";
 import { newRepo } from "./config";
 import type { GitHubTrackedRepo } from "./config";
 import type { GitHubChipData } from "../../types";
@@ -198,6 +198,85 @@ export function pillsFor(r: GitHubBoardRepo, t?: Pick<GitHubTrackedRepo, "prs" |
   return out.sort((a, b) => RANK[a.kind] - RANK[b.kind]);
 }
 
+// ── The cell's two lines (canvas board C4 · D) ─────────────────
+
+export type LineTone = "red" | "accent" | "dim" | "faint";
+
+/** Line 1's right side: is it broken? `deploy failed · 12m`, `apply running · 3m`, `all green · 1h`. */
+export interface GitHubStatus {
+  text: string;
+  tone: LineTone;
+}
+
+/** Line 2: what needs you, named. `Review` · the PR's title · `sample-dev +1`. */
+export interface GitHubNeed {
+  tag: string;
+  tone: LineTone;
+  text: string;
+  /** Who, and `+N` more of the same kind. */
+  who: string;
+  url: string;
+}
+
+/** 308's rule, client side: a review asked of you, or yours with changes requested or red checks. */
+const needsYou = (p: GitHubPRRow) =>
+  p.review_requested || (p.is_mine && (p.review_state === "changes_requested" || p.checks_state === "failing"));
+
+const more = (n: number) => (n > 0 ? `+${n}` : "");
+const joinWho = (...parts: string[]) => parts.filter(Boolean).join(" ");
+
+/** The newest of these runs' times, or "". */
+const newest = (runs: GitHubBoardRun[]) =>
+  runs.reduce<string>((a, r) => (r.at && (!a || Date.parse(r.at) > Date.parse(a)) ? r.at : a), "");
+
+/** Line 1: the first failing run or check, else the first running, else all green with its age. */
+export function statusFor(r: GitHubBoardRepo, now = Date.now()): GitHubStatus | null {
+  const all = [...(r.checks ?? []), ...r.workflows];
+  const age = (at?: string) => (shortAge(at, now) ? ` · ${shortAge(at, now)}` : "");
+  const bad = all.find((w) => w.state === "failing");
+  if (bad) return { text: `${bad.name} failed${age(bad.at)}`, tone: "red" };
+  const run = all.find((w) => w.state === "running");
+  if (run) return { text: `${run.name} running${age(run.at)}`, tone: "accent" };
+  const ok = all.filter((w) => w.state === "passing");
+  return ok.length ? { text: `all green${age(newest(ok))}`, tone: "dim" } : null;
+}
+
+/**
+ * Line 2: the one thing that needs you, by name. A PR that needs you (a
+ * review, changes asked of yours, your red checks); else the commit that
+ * broke a run; else a new or assigned issue; else the newest open PR (All
+ * open); else the commit a run is building. Null: nothing to name.
+ */
+export function needFor(r: GitHubBoardRepo): GitHubNeed | null {
+  const home = `https://github.com/${r.repo}`;
+  const prs = r.prs?.items ?? [];
+  const mine = prs.filter(needsYou);
+  if (mine.length) {
+    const p = mine[0];
+    const [tag, tone]: [string, LineTone] = p.review_requested
+      ? ["Review", "accent"]
+      : p.review_state === "changes_requested"
+        ? ["Changes", "red"]
+        : ["Checks failed", "red"];
+    return { tag, tone, text: p.title, who: joinWho(p.review_requested ? p.author : `#${p.number}`, more(mine.length - 1)), url: p.html_url || `${home}/pulls` };
+  }
+  const runs = [...(r.checks ?? []), ...r.workflows];
+  const broke = runs.find((w) => w.state === "failing" && w.commit);
+  if (broke) return { tag: "Broke on", tone: "faint", text: broke.commit!, who: broke.by_you ? "you" : broke.actor ?? "", url: broke.url || `${home}/actions` };
+  const is = r.issues;
+  if (is && !is.error && is.items.length) {
+    const i = is.items[0];
+    return { tag: "Issue", tone: "dim", text: i.title, who: more(is.count - 1), url: i.url || `${home}/issues` };
+  }
+  if (prs.length) {
+    const p = prs[0];
+    return { tag: p.draft ? "Draft" : "PR", tone: "dim", text: p.title, who: joinWho(p.author, more(prs.length - 1)), url: p.html_url || `${home}/pulls` };
+  }
+  const building = runs.find((w) => w.state === "running" && w.commit);
+  if (building) return { tag: "Building", tone: "faint", text: building.commit!, who: building.by_you ? "you" : building.actor ?? "", url: building.url || `${home}/actions` };
+  return null;
+}
+
 /** A repo's worst state, its dot: red, the accent (running or needs you), green, or nothing to say. */
 export type GitHubWorst = "red" | "accent" | "ok" | "none";
 
@@ -269,6 +348,8 @@ export function repoChip(
     label: repoName(r.repo),
     pills,
     worst: worstOf(pills),
+    status: quiet ? null : statusFor(r, now),
+    need: quiet ? null : needFor(r),
     age: shortAge(latestAt(r), now),
     url: pills[0]?.url ?? `https://github.com/${r.repo}`,
     quiet,

@@ -683,6 +683,10 @@ export interface GitHubBoardRun {
   state: "passing" | "failing" | "running" | "none";
   at?: string;
   url?: string;
+  /** The run's commit (first line) and who pushed it; absent for other CI's checks. */
+  commit?: string;
+  actor?: string;
+  by_you?: boolean;
 }
 
 export interface GitHubBoardIssue {

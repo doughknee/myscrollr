@@ -80,6 +80,11 @@ type BoardWorkflow struct {
 	State string `json:"state"` // passing | failing | running | none
 	At    string `json:"at,omitempty"`
 	URL   string `json:"url,omitempty"`
+	// The run's commit (first line) and who pushed it; ByYou when that is the
+	// connected login. Empty for checks from other CI.
+	Commit string `json:"commit,omitempty"`
+	Actor  string `json:"actor,omitempty"`
+	ByYou  bool   `json:"by_you,omitempty"`
 }
 
 // BoardPRs: mine lists the PRs that need you; all lists every open PR.
@@ -337,7 +342,7 @@ func listWorkflows(list []ghWorkflow, runs []ghRun) []Workflow {
 // boardWorkflows: the chosen workflows' latest runs, in the chosen order;
 // nil chosen = the ones that ran in the last 30 days, in the list's order.
 // A chosen workflow with no run in the window says "none".
-func boardWorkflows(chosen []string, list []ghWorkflow, runs []ghRun) []BoardWorkflow {
+func boardWorkflows(chosen []string, list []ghWorkflow, runs []ghRun, login string) []BoardWorkflow {
 	latest := latestByWorkflow(runs, list)
 	if chosen == nil {
 		chosen = []string{}
@@ -352,6 +357,10 @@ func boardWorkflows(chosen []string, list []ghWorkflow, runs []ghRun) []BoardWor
 		bw := BoardWorkflow{Name: name, State: "none"}
 		if r, ok := latest[name]; ok {
 			bw.State, bw.At, bw.URL = runState(r), runAt(r), r.HTMLURL
+			bw.Actor, bw.ByYou = r.Actor.Login, login != "" && strings.EqualFold(r.Actor.Login, login)
+			if r.HeadCommit != nil {
+				bw.Commit, _, _ = strings.Cut(r.HeadCommit.Message, "\n")
+			}
 		}
 		out = append(out, bw)
 	}
@@ -426,7 +435,7 @@ func boardRepo(ctx context.Context, src prSource, req BoardRequestRepo) (BoardRe
 		return out, err
 	}
 	out.Stale = s1 || s2 || s3
-	out.Workflows = boardWorkflows(req.Workflows, list, runs)
+	out.Workflows = boardWorkflows(req.Workflows, list, runs, src.login)
 	out.Checks = checks
 
 	if req.PRs != "off" {

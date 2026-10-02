@@ -29,6 +29,11 @@ func wfRun(id int64, name, status, conclusion, created string) m {
 	return r
 }
 
+func withCommit(r m, actor, msg string) m {
+	r["actor"], r["head_commit"] = m{"login": actor}, m{"message": msg}
+	return r
+}
+
 func issue(n int, title, created string, isPR bool) m {
 	i := m{"number": n, "title": title, "html_url": fmt.Sprintf("https://github.com/o/r/issues/%d", n), "created_at": created}
 	if isPR {
@@ -57,7 +62,7 @@ func seedBoard(f *prFake) {
 		{"id": 5, "name": "Release", "path": ".github/workflows/release.yml", "state": "active"},
 	}})
 	f.set(druns, runs(
-		wfRun(2, "deploy", "completed", "failure", "2026-10-02T11:48:00Z"),
+		withCommit(wfRun(2, "deploy", "completed", "failure", "2026-10-02T11:48:00Z"), "octo", "fix: hold the budget\n\nlong body"),
 		wfRun(1, "test", "in_progress", "", "2026-10-02T11:57:00Z"),
 		wfRun(1, "test", "completed", "success", "2026-10-02T10:00:00Z"),
 		wfRun(5, "v1.2", "completed", "success", "2026-09-30T10:00:00Z"),
@@ -114,6 +119,13 @@ func TestBoardGroupsRunsByWorkflowFromOneCall(t *testing.T) {
 	}
 	if d := got.Workflows[1]; d.At != "2026-10-02T11:48:00Z" || d.URL != "https://github.com/o/r/actions/runs/2" {
 		t.Errorf("deploy = %+v", d)
+	}
+	// The cell names what broke it: the commit's first line, and you when you pushed it.
+	if d := got.Workflows[1]; d.Commit != "fix: hold the budget" || d.Actor != "octo" || !d.ByYou {
+		t.Errorf("deploy commit = %+v", d)
+	}
+	if w := got.Workflows[0]; w.Actor != "bob" || w.ByYou {
+		t.Errorf("test actor = %+v", w)
 	}
 	if got.PRs != nil || got.Issues != nil {
 		t.Errorf("off modes answered: %+v %+v", got.PRs, got.Issues)

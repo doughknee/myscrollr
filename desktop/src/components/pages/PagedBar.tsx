@@ -391,7 +391,7 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
     }
     case "github": {
       const repo = item.data as GitHubChipData;
-      return <RepoCell chip={repo} width={colW} dark={dark} onClick={() => onChipClick?.("github", item.key, repo.url)} />;
+      return <RepoCell chip={repo} dark={dark} onClick={() => onChipClick?.("github", item.key, repo.url)} />;
     }
     case "also": {
       const a = item.data as AlsoItem;

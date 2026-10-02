@@ -12,7 +12,7 @@ vi.mock("../../auth", () => ({ isSignedOut: () => signedOut() }));
 vi.mock("../../api/client", () => ({ githubApi: { board: (r: unknown) => board(r), runs: (r: string[]) => runs(r) } }));
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: (...a: unknown[]) => directFetch(...a) }));
 
-const { autoPick, fetchBoard, fitPills, nextFlash, parseRepoUrl, pillWidth, pillsFor, repoChip, worstOf } = await import("./types");
+const { autoPick, fetchBoard, fitPills, needFor, nextFlash, parseRepoUrl, pillWidth, pillsFor, repoChip, worstOf } = await import("./types");
 
 const NOW = Date.parse("2026-10-02T12:00:00Z");
 const repos = fixture.repos as unknown as GitHubBoardRepo[];
@@ -168,5 +168,20 @@ describe("the picker's first load and URLs", () => {
     expect(parseRepoUrl("github.com/o/r.git")).toBe("o/r");
     expect(parseRepoUrl("o/r")).toBe("o/r");
     expect(parseRepoUrl("not a repo")).toBeNull();
+  });
+});
+
+describe("needFor: line 2 names what needs you (canvas C4 · D)", () => {
+  const mine = repos[0].prs!.items[1]; // yours, changes requested, red checks
+  const withPRs = (items: typeof mine[]) => ({ ...repos[0], prs: { count: items.length, needs_you: items.length, items } });
+  it("a review asked of you leads, by title and author, +N for the rest", () => {
+    expect(needFor(repos[0])).toMatchObject({ tag: "Review", tone: "accent", who: "sample-dev +1", url: "https://github.com/sample/myscrollr/pull/478" });
+  });
+  it("yours: changes requested, else red checks; who is the PR's number", () => {
+    expect(needFor(withPRs([mine]))).toMatchObject({ tag: "Changes", tone: "red", text: mine.title, who: "#479" });
+    expect(needFor(withPRs([{ ...mine, review_state: "approved" }]))).toMatchObject({ tag: "Checks failed", tone: "red" });
+  });
+  it("an approved PR of yours with green checks asks nothing: the issue speaks instead", () => {
+    expect(needFor(withPRs([{ ...mine, review_state: "approved", checks_state: "passing" }]))).toMatchObject({ tag: "Issue", text: "Sample: the widget page is overwhelming" });
   });
 });

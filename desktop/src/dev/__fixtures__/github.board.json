@@ -43,7 +43,7 @@
       "repo": "sample/scrollr-api",
       "available": true,
       "workflows": [
-        { "name": "deploy", "state": "failing", "at": "2026-10-02T11:48:00Z", "url": "https://github.com/sample/scrollr-api/actions/runs/3" },
+        { "name": "deploy", "state": "failing", "at": "2026-10-02T11:48:00Z", "url": "https://github.com/sample/scrollr-api/actions/runs/3", "commit": "fix: hold the budget until GitHub resets it", "actor": "you", "by_you": true },
         { "name": "test", "state": "passing", "at": "2026-10-02T11:40:00Z", "url": "https://github.com/sample/scrollr-api/actions/runs/4" }
       ],
       "checks": [],
@@ -84,7 +84,7 @@
     {
       "repo": "sample/infra",
       "available": true,
-      "workflows": [{ "name": "apply", "state": "running", "at": "2026-10-02T11:57:00Z", "url": "https://github.com/sample/infra/actions/runs/7" }],
+      "workflows": [{ "name": "apply", "state": "running", "at": "2026-10-02T11:57:00Z", "url": "https://github.com/sample/infra/actions/runs/7", "commit": "Raise the ingress idle timeout", "actor": "sample-dev" }],
       "checks": [],
       "prs": { "count": 0, "needs_you": 0, "items": [] },
       "issues": {

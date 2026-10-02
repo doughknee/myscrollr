@@ -416,7 +416,7 @@ function RepoPane({
           style={accentStyle(accentFor(HEX, dark), inkFor(HEX, dark))}
         >
           {chip ? (
-            <RepoCell chip={chip} width={420} dark={dark} onClick={() => openExternal(chip.url)} />
+            <RepoCell chip={chip} dark={dark} onClick={() => openExternal(chip.url)} />
           ) : (
             <span className="flex h-full items-center gap-2 px-4 text-[12px] text-fg-3">
               <LoadingGlyph size={10} /> Reading GitHub…

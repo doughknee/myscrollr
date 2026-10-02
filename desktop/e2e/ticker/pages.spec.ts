@@ -161,12 +161,12 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr }
 
 /** github.board.json's repos, in the user's order: the GitHub page's cells. */
 const GH_REPOS = ["sample/myscrollr", "sample/scrollr-api", "sample/scrollr-web", "sample/infra"];
-/** Each repo's worst pill (a failing check of another CI counts: scrollr-web's Vercel). */
+/** Each repo's line 1 status (a failing check of another CI counts: scrollr-web's Vercel). */
 const GH_FIRST: Record<string, string> = {
-  "sample/myscrollr": "2 PRs for you",
-  "sample/scrollr-api": "✗ deploy · 12m",
-  "sample/scrollr-web": "✗ vercel · 3m",
-  "sample/infra": "◌ apply · 3m",
+  "sample/myscrollr": "all green · 1h",
+  "sample/scrollr-api": "deploy failed · 12m",
+  "sample/scrollr-web": "vercel failed · 3m",
+  "sample/infra": "apply running · 3m",
 };
 
 test("github: four repos are a page, a cell per repo in order, at least REPO_MIN_COL wide, the band counting the ones that need you (SCROLLR-312)", async ({ page, context }) => {
@@ -191,13 +191,13 @@ test("github: four repos are a page, a cell per repo in order, at least REPO_MIN
     const m = await page.locator("[data-page]").first().evaluate((p) => ({
       cells: [...p.querySelectorAll("[data-chip]")].map((c) => c.getBoundingClientRect().width),
       worst: [...p.querySelectorAll("[data-chip]")].map((c) => c.getAttribute("data-worst")),
-      first: Object.fromEntries([...p.querySelectorAll("[data-chip]")].map((c) => [c.getAttribute("data-item"), c.querySelector("[data-part=pill]")?.textContent])),
+      first: Object.fromEntries([...p.querySelectorAll("[data-chip]")].map((c) => [c.getAttribute("data-item"), c.querySelector("[data-part=status]")?.textContent])),
       chip: document.querySelector("[data-band] [data-chip]")?.getAttribute("data-kind"),
       count: document.querySelector("[data-band] [data-chip] span:last-child")?.textContent,
       edge: document.querySelector("[data-edge] [data-widget=github]") !== null,
     }));
     expect(Math.min(...m.cells), `${label}: REPO_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
-    for (const [item, pill] of Object.entries(m.first)) expect(pill, `${label}: ${item}'s worst pill first`).toBe(GH_FIRST[item]);
+    for (const [item, pill] of Object.entries(m.first)) expect(pill, `${label}: ${item}'s status`).toBe(GH_FIRST[item]);
     expect(m, `${label}: the band's chip counts the repos that need you; GitHub is not on the edge`).toMatchObject({ chip: "needs", count: "4", edge: false });
     expect(tr.moved, `${label}: nothing moves`).toEqual([]);
     expect(tr.cuts, `${label}: nothing cut`).toEqual([]);
