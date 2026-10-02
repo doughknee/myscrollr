@@ -101,7 +101,7 @@ const STATIC_FAQ = [
   {
     question: 'What are widgets, and how many do I get?',
     answer:
-      'Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
+      'Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, and more. Each widget is a page on your bar, and your plan sets how many pages your bar has room for: 3 on Free, 6 on Uplink, 12 on Pro, and unlimited on Ultimate. Clock and Weather sit on the edge of the bar and are free. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it is still one page.',
   },
   {
     question: 'How fast are live updates?',
@@ -215,11 +215,11 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
   const ult = limits.tiers.uplink_ultimate
 
   const widgets = (n: number | null): string =>
-    n === null ? 'Unlimited' : `${n} widgets`
+    n === null ? 'Unlimited' : `${n} pages`
 
   return [
     {
-      label: 'Widgets at once',
+      label: 'Pages on your bar',
       free: widgets(free.max_widgets),
       uplink: widgets(uplink.max_widgets),
       pro: widgets(pro.max_widgets),
@@ -366,7 +366,7 @@ function buildUplinkFAQ(
   return [
     {
       question: 'What are widgets, and how many do I get?',
-      answer: `Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
+      answer: `Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, and more. Each widget is a page on your bar, and your plan sets how many pages your bar has room for: ${free.max_widgets} on Free, ${uplink.max_widgets} on Uplink, ${pro.max_widgets} on Pro, and unlimited on Ultimate. Clock and Weather sit on the edge of the bar and are free. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it is still one page.`,
     },
     ...STATIC_FAQ.slice(1),
   ]
@@ -800,8 +800,8 @@ function UplinkPage() {
             <div className="space-y-3 text-xs leading-relaxed text-base-content/50">
               <p>
                 If you cancel now, you&apos;ll lose access to all premium
-                features immediately &mdash; including your extra widget slots
-                and Uplink Ultimate access.
+                features immediately &mdash; including the extra pages on your
+                bar and Uplink Ultimate access.
               </p>
               <p className="font-semibold text-base-content/70">
                 This is the only free trial offered per account. Once canceled,
@@ -1030,7 +1030,7 @@ function UplinkPage() {
                         </span>
                       </h2>
                       <p className="m-0 max-w-[440px] text-[15.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
-                        Permanent Uplink Ultimate: unlimited slots, priority
+                        Permanent Uplink Ultimate: unlimited pages, priority
                         support, and early access, plus a founding-member badge.
                         Pays for itself against Ultimate Annual in 2.5 years.
                       </p>
@@ -1218,8 +1218,8 @@ function UplinkPage() {
                       </div>
                       <div className="mb-[26px] font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
                         {p.slots === null
-                          ? 'UNLIMITED WIDGETS AT ONCE'
-                          : `${p.slots} WIDGETS AT ONCE`}
+                          ? 'UNLIMITED PAGES ON YOUR BAR'
+                          : `${p.slots} PAGES ON YOUR BAR`}
                       </div>
 
                       {/* CTA */}
@@ -1448,7 +1448,7 @@ function UplinkPage() {
           <DeparturesRow
             index="00"
             label="Not ready? The free tier isn't a trial."
-            meta="Three slots, forever. No card, no clock."
+            meta="Three pages on your bar, forever. No card, no clock."
             action="DOWNLOAD FREE ↓"
             to="/download"
           />

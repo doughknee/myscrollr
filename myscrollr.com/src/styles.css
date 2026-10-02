@@ -429,8 +429,8 @@
 /* ==========================================================================
    TERMINAL EDITORIAL — marketing redesign utilities
    4px scanlines, condensed display type, outlined headlines with a solid
-   color fallback where -webkit-text-stroke is unsupported, ghost numerals,
-   and the persistent demo ticker bar's marquee.
+   color fallback where -webkit-text-stroke is unsupported, and ghost
+   numerals.
    ========================================================================== */
 
 .scanlines {
@@ -488,10 +488,6 @@
     -webkit-text-stroke-color: var(--color-primary);
   }
 }
-
-/* Demo ticker bar scrolling is the Motion+ Ticker component now
-   (DemoTickerBar.tsx) — velocity-driven, stops on hover, respects
-   reduced motion on its own. */
 
 @keyframes pulse-dot {
   0%,

@@ -1,0 +1,54 @@
+<!--
+  embed.html — the TICKER for the website (SCROLLR-310).
+
+  The real ticker bundle (src/main.tsx → App) in a plain page, built by
+  `npm run build:embed` into dist-embed/ and served by the website at
+  /bar/. src/embed/boot.ts stands in for Tauri and feeds it
+  api.myscrollr.com/public/feed; read it for the query params. The
+  production sibling of ticker-shim.html (dev-only, fixtures only).
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Scrollr ticker</title>
+    <script>
+      // Pre-paint theme: ?theme=<family>-<light|dark>, else the visitor's
+      // colour scheme with the Scrollr family. boot.ts seeds the same pair.
+      (function () {
+        var q = /^([a-z-]+)-(light|dark)$/.exec(
+          new URLSearchParams(location.search).get("theme") || "",
+        );
+        var mode = q
+          ? q[2]
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        document.documentElement.setAttribute("data-theme", (q ? q[1] : "scrollr") + "-" + mode);
+        document.documentElement.setAttribute("data-mode", mode);
+      })();
+    </script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        background: #141420;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+      html[data-mode="dark"], html[data-mode="dark"] body { background: #141420; }
+      html[data-mode="light"], html[data-mode="light"] body { background: #ffffff; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/embed/boot.ts"></script>
+  </body>
+</html>

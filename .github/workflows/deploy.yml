@@ -7,6 +7,13 @@ on:
       - "api/**"
       - "channels/**"
       - "myscrollr.com/**"
+      # The website serves the desktop's ticker at /bar/ (SCROLLR-310).
+      - "desktop/src/**"
+      - "desktop/public/**"
+      - "desktop/embed.html"
+      - "desktop/vite.config.ts"
+      - "desktop/package-lock.json"
+      - ".dockerignore"
       - "k8s/**"
       - ".github/workflows/deploy.yml"
   # When a desktop release is published (drafts -> published), rebuild the
@@ -121,6 +128,12 @@ jobs:
               - 'api/**'
             website:
               - 'myscrollr.com/**'
+              - 'desktop/src/**'
+              - 'desktop/public/**'
+              - 'desktop/embed.html'
+              - 'desktop/vite.config.ts'
+              - 'desktop/package-lock.json'
+              - '.dockerignore'
             finance-service:
               - 'channels/finance/service/**'
             sports-service:

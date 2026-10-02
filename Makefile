@@ -41,7 +41,7 @@ COMPOSE      := docker compose -f docker/compose.yml $(if $(COMPOSE_OVERRIDE),-f
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor up down restart rebuild reset logs ps shell \
-        web desktop dev screenshots check kb
+        web desktop dev screenshots marketing check kb
 
 # ── Help ─────────────────────────────────────────────────────────────
 # Targets are documented with `##<group>: description` and grouped below.
@@ -110,6 +110,10 @@ desktop: ##run: Desktop app only, natively (Tauri)
 
 screenshots: ##run: Re-shoot the site's ticker screenshots from the running dev app (Windows)
 	@cd myscrollr.com && node scripts/capture-ticker.mjs $(args)
+
+marketing: ##run: Shoot marketing PNGs from the real ticker (web build); args=--prod for myscrollr.com/bar/
+	@test -f desktop/dist-embed/embed.html || (cd desktop && npx vite build --mode embed)
+	@node scripts/marketing/shoot.mjs $(args)
 
 # ── Iterate ──────────────────────────────────────────────────────────
 # Editing Go/Rust source needs NO command here — the containers watch and

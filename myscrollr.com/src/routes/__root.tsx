@@ -12,9 +12,10 @@ import { MotionConfig } from 'motion/react'
 import type { ReactNode } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import DemoTickerBar from '@/components/DemoTickerBar'
+import { LiveBar } from '@/components/LiveBar'
 import AnalyticsConsent from '@/components/AnalyticsConsent'
-import { useDemoTicker } from '@/hooks/useDemoTicker'
+import { useBar } from '@/hooks/useBar'
+import { useTheme } from '@/hooks/useTheme'
 import { captureWebsitePageview } from '@/lib/posthog'
 import { usesSiteChrome } from '@/lib/siteChrome'
 import appCss from '@/styles.css?url'
@@ -145,9 +146,8 @@ function RootErrorDocument(props: { error: Error }) {
   )
 }
 
-// Routes that don't get the shared demo ticker bar: app-like surfaces
-// (account, invite, auth callback, public profiles) and /business,
-// which renders its own white-label variant of the bar.
+// Routes that don't get the live bar: app-like surfaces (account, invite,
+// auth callback, public profiles).
 const DEMO_BAR_EXCLUDED = [
   // The fallback shell must match the private routes that consume it.
   '/tss-spa-shell',
@@ -155,7 +155,6 @@ const DEMO_BAR_EXCLUDED = [
   '/invite',
   '/callback',
   '/u/',
-  '/business',
   // The staff console is a tool, not a shop window. A demo ticker scrolling
   // fake prices over it is noise at every width, and at phone widths it is
   // worse than noise: it is fixed to the bottom of the viewport, exactly
@@ -198,14 +197,10 @@ function RootLayout() {
     })
   }, [pathname])
 
-  const hasDemoBar = showsDemoBar(pathname)
-  // /business renders its OWN DemoTickerBar instance (white-label
-  // override) but it follows the shared store's pin/density, so for
-  // layout purposes (padding, header offset, drawer insets) it counts
-  // as a bar-having route like any other.
-  const hasAnyBar = hasDemoBar || pathname.startsWith('/business')
+  const hasBar = showsDemoBar(pathname)
   const isConsole = hydrated && !usesSiteChrome(pathname)
-  const { theme: demoFamily, density, pos } = useDemoTicker()
+  const { theme: demoFamily, pos, active, customized, scroll } = useBar()
+  const { theme: mode } = useTheme()
 
   // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
   // the whole site (the [data-theme-family] token blocks in styles.css).
@@ -225,19 +220,11 @@ function RootLayout() {
       <MotionConfig reducedMotion="user">
         <div
           className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
-            hasAnyBar
-              ? density === 'detailed'
-                ? 'pb-[88px]'
-                : 'pb-[72px]'
-              : ''
+            hasBar ? 'pb-[88px]' : ''
           } ${
             // Top-pinned bar is fixed; pad the page so it doesn't sit
             // on top of the (sticky) header at scroll 0.
-            hasAnyBar && pos === 'top'
-              ? density === 'detailed'
-                ? 'pt-16'
-                : 'pt-12'
-              : ''
+            hasBar && pos === 'top' ? 'pt-16' : ''
           }`}
         >
           {/* Skip to main content — first focusable element */}
@@ -249,7 +236,7 @@ function RootLayout() {
           </a>
 
           {/* Navigation */}
-          {!isConsole && <Header hasBar={hasAnyBar} />}
+          {!isConsole && <Header hasBar={hasBar} />}
 
           {/* Reserve the viewport below the 60px header, even while Outlet is
               empty. The console reserves nothing — AdminChrome's own 48px bar
@@ -273,9 +260,22 @@ function RootLayout() {
             </ClientOnly>
           )}
 
-          {/* Persistent demo ticker bar — the brand's connective tissue.
-              /business mounts its own white-label variant instead. */}
-          {hasDemoBar && <DemoTickerBar />}
+          {/* The app's own ticker, live, pinned like the app pins it: one
+              height (64px), the visitor's edge, theme, widgets and mode. */}
+          {hasBar && (
+            <div
+              data-demo-ticker-bar={pos}
+              className={`fixed left-0 right-0 z-50 h-16 ${
+                pos === 'bottom' ? 'bottom-0' : 'top-0'
+              }`}
+            >
+              <LiveBar
+                theme={`${demoFamily}-${mode}`}
+                widgets={customized ? active : undefined}
+                mode={scroll}
+              />
+            </div>
+          )}
         </div>
       </MotionConfig>
     </RootDocument>

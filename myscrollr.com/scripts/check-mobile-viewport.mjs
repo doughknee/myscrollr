@@ -1,8 +1,7 @@
 // Mobile viewport regression check.
 //
 // Spawns a small HTTP server over `dist/client/`, then headless
-// Chromium via Playwright (already a devDep — used by
-// generate-og-images.mjs) visits every prerendered route at several
+// Chromium via Playwright (already a devDep) visits every prerendered route at several
 // mobile viewport widths. For each visit:
 //
 //  - Asserts `document.documentElement.scrollWidth <= clientWidth`
@@ -121,6 +120,9 @@ function resolveStaticFile(urlPath) {
   // Reject anything containing `..` after normalization. join()
   // would resolve `..` and could escape `clientDir`.
   if (pathname.includes('..')) return null
+  // /bar/ is the desktop's ticker build (the Dockerfile adds it); nginx
+  // serves it from its own location, never the SPA shell.
+  if (pathname.startsWith('/bar/')) return null
 
   const direct = join(clientDir, pathname)
   if (existsSync(direct)) {
@@ -350,9 +352,9 @@ try {
       if (route.path === '/' && viewport.width < 768) {
         // New-layout mobile invariants (terminal-editorial redesign):
         //  - hero heading + approved sub copy actually render
-        //  - the persistent demo ticker bar is pinned full-width at the
-        //    viewport edge with its duplicated marquee intact (the 2x
-        //    chip duplication is what makes the -50% loop seamless)
+        //  - the live bar (LiveBar) is pinned full-width at the viewport
+        //    edge at the app's one height, 64px, with its placeholder
+        //    image and the /bar/ frame in it
         const layout = await page.evaluate(() => {
           const heading = document.querySelector('h1')
           const heroCopy = Array.from(document.querySelectorAll('p')).find(
@@ -369,7 +371,8 @@ try {
             barLeft: Math.round(barRect.left),
             barRight: Math.round(barRect.right),
             barHeight: Math.round(barRect.height),
-            chipCount: bar.querySelectorAll('.demo-chip').length,
+            hasPlaceholder: !!bar.querySelector('img[src^="/marketing/bar-"]'),
+            hasFrame: !!bar.querySelector('iframe[src^="/bar/"]'),
             clientWidth: document.documentElement.clientWidth,
             clientHeight: document.documentElement.clientHeight,
           }
@@ -385,10 +388,10 @@ try {
             layout.pos === 'top'
               ? Math.abs(layout.barTop) <= 1
               : Math.abs(layout.barBottom - layout.clientHeight) <= 1
-          if (!pinnedEdgeOk || layout.barHeight !== 48) {
+          if (!pinnedEdgeOk || layout.barHeight !== 64) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
-                `demo bar not pinned to the ${layout.pos} viewport edge at 48px — ` +
+                `live bar not pinned to the ${layout.pos} viewport edge at 64px — ` +
                 `top=${layout.barTop}, bottom=${layout.barBottom}, ` +
                 `height=${layout.barHeight}, clientHeight=${layout.clientHeight}`,
             )
@@ -398,20 +401,20 @@ try {
           if (layout.barLeft > 1 || layout.barRight < layout.clientWidth - 1) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
-                `demo bar should span the full viewport width — ` +
+                `live bar should span the full viewport width — ` +
                 `left=${layout.barLeft}, right=${layout.barRight}, clientWidth=${layout.clientWidth}`,
             )
             failures += 1
           }
 
-          // Motion+ Ticker clones however many chips it needs to fill
-          // the viewport (no fixed 2x duplication anymore) — assert
-          // the bar holds a non-empty chip run.
-          if (layout.chipCount === 0) {
+          // The frame's content is /bar/, built from desktop/ by the
+          // Dockerfile, so it is absent here: assert the frame and the
+          // placeholder the prerender ships, not what the frame draws.
+          if (!layout.hasPlaceholder || !layout.hasFrame) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
-                `demo bar should hold a non-empty chip run — ` +
-                `chips=${layout.chipCount}`,
+                `live bar should hold its placeholder and the /bar/ frame — ` +
+                `placeholder=${layout.hasPlaceholder}, frame=${layout.hasFrame}`,
             )
             failures += 1
           }

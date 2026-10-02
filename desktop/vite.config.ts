@@ -51,7 +51,7 @@ function webMode(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     tanstackRouter({
       target: "react",
@@ -91,21 +91,33 @@ export default defineConfig({
     watch: { ignored: ["**/src-tauri/target/**"] },
   },
 
+  // The website's ticker (SCROLLR-310): `npm run build:embed` builds
+  // embed.html alone into dist-embed/, served by the site at /bar/. No
+  // desktop .env is read (no DSN, no API URL baked in); the Tauri build is
+  // untouched.
+  ...(mode === "embed" && {
+    base: "/bar/",
+    envDir: resolve(projectRoot, "src/embed"),
+  }),
+
   // Multi-page build: ticker (index.html) + app window (app.html) +
   // the Identify tile (identify.html, no JS of its own)
   build: {
-    outDir: "dist",
+    outDir: mode === "embed" ? "dist-embed" : "dist",
     emptyOutDir: true,
     target: "esnext",
     // Generate source maps but don't expose them via comment. The Sentry
     // plugin uploads them and deletes locally when SENTRY_AUTH_TOKEN is set.
-    sourcemap: "hidden",
+    sourcemap: mode === "embed" ? false : "hidden",
     rollupOptions: {
-      input: {
-        main: resolve(projectRoot, "index.html"),
-        app: resolve(projectRoot, "app.html"),
-        identify: resolve(projectRoot, "identify.html"),
-      },
+      input:
+        mode === "embed"
+          ? { embed: resolve(projectRoot, "embed.html") }
+          : {
+              main: resolve(projectRoot, "index.html"),
+              app: resolve(projectRoot, "app.html"),
+              identify: resolve(projectRoot, "identify.html"),
+            },
     },
   },
-});
+}));
