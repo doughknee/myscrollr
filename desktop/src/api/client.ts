@@ -639,6 +639,53 @@ export interface GitHubReposResponse {
   stale?: boolean;
 }
 
+/** One open pull request, as core serves it (SCROLLR-308). */
+export interface GitHubPRRow {
+  number: number;
+  title: string;
+  html_url: string;
+  author: string;
+  is_mine: boolean;
+  review_requested: boolean;
+  /** "" past core's 20-PR detail cap. */
+  review_state: "approved" | "changes_requested" | "none" | "";
+  draft: boolean;
+  head_branch: string;
+  head_sha: string;
+  updated_at: string;
+  checks: { total: number; passed: number; failed: number; running: number };
+  checks_state: "passing" | "failing" | "running" | "none" | "unknown";
+}
+
+/** The default branch: failing when any workflow's latest run there failed. */
+export interface GitHubDefaultCI {
+  state: "passing" | "failing" | "running" | "none";
+  workflow?: string;
+  updated_at?: string;
+  html_url?: string;
+  commit_message?: string;
+}
+
+export interface GitHubRepoPRs {
+  repo: string;
+  available: boolean;
+  stale?: boolean;
+  prs: GitHubPRRow[];
+  default_ci?: GitHubDefaultCI;
+  /** Runs in progress on your PR branches or started by you. */
+  mine_running: number;
+  mine_since?: string;
+  mine_branch?: string;
+}
+
+export interface GitHubPRsResponse {
+  connected: boolean;
+  connect?: boolean;
+  login?: string;
+  reason?: string;
+  repos: GitHubRepoPRs[];
+}
+
 /**
  * Core brokers the Scrollr Desktop GitHub App and holds the token; the app
  * only ever sees runs. Unconnected accounts still get their public repos
@@ -647,6 +694,11 @@ export interface GitHubReposResponse {
 export const githubApi = {
   /** The connected user's repos. 409 when not connected. */
   repos: () => authFetch<GitHubReposResponse>("/github/repos"),
+  /** Open PRs, the default branch and your running branches. Connected accounts only. */
+  prs: (repos: string[]) =>
+    authFetch<GitHubPRsResponse>(
+      `/github/prs?repos=${encodeURIComponent(repos.join(","))}`,
+    ),
   runs: (repos: string[]) =>
     authFetch<GitHubRunsResponse>(
       `/github/runs?repos=${encodeURIComponent(repos.join(","))}`,

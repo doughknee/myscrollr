@@ -515,6 +515,20 @@ slots, not five.
   `text-warning` bold caps, sysmon hot `text-error`, uptime or GitHub down `text-down`; a
   night zone or paused timer draws its value in `text-fg-2` (no opacity, SCROLLR-287), a
   night clock carries `☾`. Label and detail are `text-fg-3`.
+- **GitHub, connected** (SCROLLR-308, canvas board 1): one item per repo in one of four
+  states, in this priority (`chipState`): **needs you** (a count pill in `--accent` and
+  `for you` in `--accent-ink`; the count is review requests to you or your team plus your
+  PRs with changes requested or failing checks, each PR once, `needsYou`), **broken** (the
+  default branch's latest run of any workflow failed: a red dot, `deploy · 12m` in
+  `text-down`, the commit beneath), **running on yours** (a run in progress on one of your
+  PR branches or started by you: a dot with the `gh-ring` breathing in the accent,
+  `yours · 3m` in `--accent-ink`, the branch beneath), **passing** (a green dot and the age
+  of the default branch's last run in `text-fg-2`; never the word). Every state reserves
+  the widest, `GH_RESERVE` = `00000000 · 00m` behind a dot (workflow names cut to 8), so a
+  state change never moves the slot (measured 173.4px in all four). It flashes once
+  (`OnceFlash`, the chips' `chip-flash`) when the default branch breaks or recovers or the
+  needs-you count goes up (`nextFlash`), never on a poll that changed nothing, never on a
+  roll-in. Not connected, or no settled default-branch run: the latest-run form above.
 - Clicking a slot opens that widget (`onChipClick(tab, id)`).
 
 Clock and Weather are free of widget slots, so they cost the user none of their plan's

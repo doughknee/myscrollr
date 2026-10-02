@@ -29,7 +29,38 @@ import type {
 import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
-import { loadRepoData, repoKey } from "../widgets/github/types";
+import {
+  chipState,
+  loadRepoData,
+  needsYou,
+  nextFlash,
+  repoKey,
+  shortAge,
+} from "../widgets/github/types";
+import type { FlashMemo, GitHubRepo } from "../widgets/github/types";
+
+// Per window: each ticker flashes a repo once per worthy change.
+const githubFlash = new Map<string, FlashMemo>();
+
+/** The connected fields of a GitHub chip (SCROLLR-308); none when not connected. */
+export function connectedChip(repo: GitHubRepo, key: string): Partial<GitHubChipData> {
+  const state = chipState(repo);
+  if (!state) return {};
+  const needs = needsYou(repo.prs).length;
+  const memo = nextFlash(githubFlash.get(key), repo.defaultCi?.state === "failing", needs);
+  githubFlash.set(key, memo);
+  return {
+    state,
+    needs,
+    age: shortAge(state === "running" ? repo.mineSince : repo.defaultCi?.updated_at),
+    defaultCi: repo.defaultCi,
+    mineRunning: repo.mineRunning,
+    mineBranch: repo.mineBranch,
+    prs: repo.prs,
+    flash: memo.token,
+    flashTone: memo.tone,
+  };
+}
 
 const EMPTY: WidgetTickerData = {
   clock: [],
@@ -472,6 +503,7 @@ export function useWidgetTickerData(
                     : Date.now()) - new Date(repo.startedAt).getTime(),
                 )
               : undefined,
+        ...connectedChip(repo, key),
       });
     }
 
@@ -585,8 +617,9 @@ export function useWidgetTickerData(
         }, uptimeMs)
       : null;
 
-    // GitHub: same, at the GitHub FeedTab's fixed cadence
-    const githubMs = 120_000;
+    // GitHub: same, every minute (the store is written only on a change,
+    // so this is what moves the chip's age)
+    const githubMs = 60_000;
     const githubInterval = hasGithub
       ? setInterval(() => {
           setData((prev) => ({ ...prev, github: buildGithubChips() }));

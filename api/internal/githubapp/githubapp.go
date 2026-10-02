@@ -417,7 +417,7 @@ func forgetUser(ctx context.Context, sub string) {
 	if platform.Rdb == nil {
 		return
 	}
-	for _, prefix := range []string{keyRuns, keyLast} {
+	for _, prefix := range []string{keyRuns, keyLast, keyPR} {
 		iter := platform.Rdb.Scan(ctx, 0, prefix+userNS(sub)+":*", 100).Iterator()
 		for iter.Next(ctx) {
 			_ = platform.Rdb.Del(ctx, iter.Val()).Err()
@@ -650,6 +650,26 @@ type RunsResponse struct {
 
 var repoRE = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
+// parseRepos reads ?repos=owner/a,owner/b (at most maxRepos). On a malformed
+// name it answers 400 itself and returns ok=false.
+func parseRepos(c *fiber.Ctx) (repos []string, ok bool) {
+	for _, r := range strings.Split(strings.Clone(c.Query("repos")), ",") {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		if !repoRE.MatchString(r) || strings.Contains(r, "..") {
+			_ = c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: "repos must be owner/repo"})
+			return nil, false
+		}
+		repos = append(repos, r)
+	}
+	if len(repos) > maxRepos {
+		repos = repos[:maxRepos]
+	}
+	return repos, true
+}
+
 // HandleRuns - GET /github/runs?repos=owner/a,owner/b (JWT).
 //
 // Always 200: an unconnected account still gets its public repos through
@@ -659,19 +679,9 @@ func HandleRuns(c *fiber.Ctx) error {
 	if !ok {
 		return nil
 	}
-	var repos []string
-	for _, r := range strings.Split(strings.Clone(c.Query("repos")), ",") {
-		r = strings.TrimSpace(r)
-		if r == "" {
-			continue
-		}
-		if !repoRE.MatchString(r) || strings.Contains(r, "..") {
-			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: "repos must be owner/repo"})
-		}
-		repos = append(repos, r)
-	}
-	if len(repos) > maxRepos {
-		repos = repos[:maxRepos]
+	repos, ok := parseRepos(c)
+	if !ok {
+		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), requestBudget)

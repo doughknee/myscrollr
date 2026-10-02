@@ -16,6 +16,8 @@ import { clsx } from "clsx";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 import { ChipCap, cappedChipClasses } from "./ChipCap";
 import type { CapTone } from "./ChipCap";
+import { OnceFlash } from "./ChipFlash";
+import { needsYou } from "../../widgets/github/types";
 import type { GitHubChipData, UptimeChipData } from "../../types";
 
 // ── Status → cap ────────────────────────────────────────────────
@@ -47,6 +49,18 @@ const GITHUB_CAP: Record<
   unavailable: { tone: "neutral", text: "○", label: "Queued" },
 };
 
+// Connected GitHub (SCROLLR-308): the same four states as the edge slot.
+// Needs you leads with the count; nothing ever says "passing".
+const GITHUB_STATE_CAP: Record<
+  NonNullable<GitHubChipData["state"]>,
+  { tone: CapTone; text: string; label: string; pulse?: boolean }
+> = {
+  needs: { tone: "info", text: "", label: "Needs you" },
+  broken: { tone: "down", text: "✗", label: "Default branch failing" },
+  running: { tone: "warning", text: "●", label: "Running on yours", pulse: true },
+  passing: { tone: "up", text: "✓", label: "Default branch green" },
+};
+
 // ── Shared shell ────────────────────────────────────────────────
 
 interface ShellProps {
@@ -58,6 +72,8 @@ interface ShellProps {
   /** Right-hand fixed cell: the one value that changes while on screen. */
   end?: React.ReactNode;
   children: React.ReactNode;
+  /** A flash overlay (`OnceFlash`), drawn over the whole chip. */
+  flash?: React.ReactNode;
 }
 
 function CapShell({
@@ -68,6 +84,7 @@ function CapShell({
   onClick,
   end,
   children,
+  flash,
 }: ShellProps) {
   const c = getChipColors(type);
   return (
@@ -107,6 +124,7 @@ function CapShell({
           {end}
         </span>
       )}
+      {flash}
     </button>
   );
 }
@@ -215,10 +233,11 @@ export function GitHubCappedChip({
   item: GitHubChipData;
   onClick?: () => void;
 }) {
+  const c = getChipColors("github");
+  if (item.state) return <GitHubStateChip item={item} onClick={onClick} />;
   const cap = GITHUB_CAP[item.status] ?? GITHUB_CAP.unavailable;
   const failed = item.status === "failure";
   const queued = item.status === "unavailable";
-  const c = getChipColors("github");
 
   // A failure's most useful value is WHERE it broke — that's the thing
   // you'd otherwise open GitHub to find. Falls back to duration when
@@ -258,6 +277,67 @@ export function GitHubCappedChip({
       {item.detail && (
         <span className={clsx("truncate text-ui-chip", c.textFaint)}>
           {item.detail}
+        </span>
+      )}
+    </CapShell>
+  );
+}
+
+/** A connected repo: the state on the cap, its age in the fixed cell. */
+function GitHubStateChip({
+  item,
+  onClick,
+}: {
+  item: GitHubChipData;
+  onClick?: () => void;
+}) {
+  const state = item.state!;
+  const c = getChipColors("github");
+  const base = GITHUB_STATE_CAP[state];
+  const cap =
+    state === "needs"
+      ? { ...base, text: (item.needs ?? 0) > 99 ? "99+" : String(item.needs ?? 0) }
+      : base;
+  const broken = state === "broken";
+  const ci = item.defaultCi;
+  const top =
+    state === "needs"
+      ? "for you"
+      : state === "running"
+        ? "yours"
+        : (ci?.workflow ?? item.workflowName);
+  const detail =
+    state === "needs"
+      ? needsYou(item.prs)[0]?.title
+      : state === "running"
+        ? item.mineBranch
+        : ci?.commit_message?.split("\n")[0];
+  return (
+    <CapShell
+      cap={cap}
+      type="github"
+      alert={broken}
+      onClick={onClick}
+      end={
+        state === "needs" ? undefined : (
+          <span className={broken ? "text-down" : c.textDim}>{item.age}</span>
+        )
+      }
+      flash={
+        item.flash !== undefined ? (
+          <OnceFlash id={item.id} token={item.flash} tone={item.flashTone} />
+        ) : undefined
+      }
+    >
+      <span className="flex items-baseline gap-1.5">
+        <span className={clsx("font-semibold", c.text)}>{item.label}</span>
+        <span className={broken ? "font-semibold text-down" : c.textDim}>
+          {top}
+        </span>
+      </span>
+      {detail && (
+        <span className={clsx("truncate text-ui-chip", c.textFaint)}>
+          {detail}
         </span>
       )}
     </CapShell>

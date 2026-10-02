@@ -52,6 +52,7 @@ import { getAllDataWidgets } from "../datawidgets/registry";
 import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
 import { API_BASE, DEMO } from "../config";
 import { getAllWidgets } from "../widgets/registry";
+import { fetchRepos, repoKey, saveRepoData } from "../widgets/github/types";
 import { canonicalOrder } from "../marketplace";
 
 // Data
@@ -472,6 +473,24 @@ function RootLayout() {
   useQuery({
     ...weatherQueryOptions(),
     enabled: enabledWidgets.includes("weather"),
+  });
+
+  // Shell-level GitHub polling (SCROLLR-308): the edge chip has to move
+  // within a minute of a review request whichever page is open. Same key
+  // as the GitHub FeedTab's observer, so the two never double-fetch;
+  // saveRepoData writes only on a change.
+  const githubRepos = prefs.widgets.github.repos;
+  useQuery({
+    queryKey: ["github-actions", auth.authenticated, githubRepos.map(repoKey)],
+    queryFn: async () => {
+      const data = await fetchRepos(githubRepos);
+      saveRepoData(data);
+      return data;
+    },
+    enabled: enabledWidgets.includes("github") && githubRepos.length > 0,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: 1,
   });
 
   // ── Subscription info — fetched for billing UI in Account tab + banner ──

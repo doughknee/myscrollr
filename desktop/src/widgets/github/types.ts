@@ -12,7 +12,13 @@ import { LS_GITHUB_REPOS } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
 import { githubApi } from "../../api/client";
-import type { GitHubRepoRow, GitHubRunRow } from "../../api/client";
+import type {
+  GitHubDefaultCI,
+  GitHubPRRow,
+  GitHubRepoPRs,
+  GitHubRepoRow,
+  GitHubRunRow,
+} from "../../api/client";
 
 // ── GitHub Actions API response ────────────────────────────────
 
@@ -71,6 +77,13 @@ export interface GitHubRepo {
   branch: string | null;
   /** When the run started — used for the chip's elapsed value. */
   startedAt: string | null;
+  // From core's /github/prs when GitHub is connected (SCROLLR-308);
+  // absent otherwise, and the chip keeps its latest-run form.
+  prs?: GitHubPRRow[];
+  defaultCi?: GitHubDefaultCI;
+  mineRunning?: number;
+  mineSince?: string;
+  mineBranch?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -224,9 +237,106 @@ export async function fetchRepos(
   repos: Array<{ owner: string; repo: string }>,
 ): Promise<GitHubRepo[]> {
   if (isSignedOut()) return fetchAllRepos(repos);
-  const res = await githubApi.runs(repos.map(repoKey));
+  const keys = repos.map(repoKey);
+  // PRs are an extra: an older core (404) or a hiccup leaves the runs.
+  const [res, prs] = await Promise.all([
+    githubApi.runs(keys),
+    (async () => githubApi.prs(keys))().catch(() => null),
+  ]);
   const byKey = new Map(res.runs.map((row) => [row.repo.toLowerCase(), row]));
-  return repos.map((r) => fromRunRow(r, byKey.get(repoKey(r).toLowerCase())));
+  const prsByKey = new Map(
+    (prs?.connected ? prs.repos : []).map((p) => [p.repo.toLowerCase(), p]),
+  );
+  return repos.map((r) => {
+    const k = repoKey(r).toLowerCase();
+    return withPRs(fromRunRow(r, byKey.get(k)), prsByKey.get(k));
+  });
+}
+
+/** Merge one repo's PR answer into its record. */
+export function withPRs(r: GitHubRepo, p: GitHubRepoPRs | undefined): GitHubRepo {
+  if (!p?.available) return r;
+  return {
+    ...r,
+    prs: p.prs,
+    defaultCi: p.default_ci,
+    mineRunning: p.mine_running,
+    mineSince: p.mine_since,
+    mineBranch: p.mine_branch,
+  };
+}
+
+// ── The edge chip's state (SCROLLR-308) ────────────────────────
+
+/**
+ * The PRs that need you, each once: a review asked of you (or your team),
+ * or yours with changes requested or failing checks.
+ */
+export function needsYou(prs: GitHubPRRow[] = []): GitHubPRRow[] {
+  return prs.filter(
+    (p) =>
+      p.review_requested ||
+      (p.is_mine &&
+        (p.review_state === "changes_requested" ||
+          p.checks_state === "failing")),
+  );
+}
+
+export type GitHubChipState = "needs" | "broken" | "running" | "passing";
+
+/**
+ * Needs you › broken › running on yours › passing. Undefined without PR
+ * data (not connected) or with no settled default-branch run: the chip
+ * keeps its latest-run form.
+ */
+export function chipState(r: GitHubRepo): GitHubChipState | undefined {
+  if (!r.prs) return undefined;
+  if (needsYou(r.prs).length > 0) return "needs";
+  if (r.defaultCi?.state === "failing") return "broken";
+  if ((r.mineRunning ?? 0) > 0) return "running";
+  if (r.defaultCi?.state === "passing") return "passing";
+  return undefined;
+}
+
+/** "now", "12m", "5h", "3d", "6w", "2y": at most three characters. */
+export function shortAge(iso: string | null | undefined, now = Date.now()): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (Number.isNaN(t)) return "";
+  const m = Math.max(0, Math.floor((now - t) / 60_000));
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  if (d < 700) return `${Math.floor(d / 7)}w`;
+  return `${Math.floor(d / 365)}y`;
+}
+
+/** What a repo's flash remembers: the last verdict and the token. */
+export interface FlashMemo {
+  broken: boolean;
+  needs: number;
+  /** Counts worthy changes; 0 until the first. */
+  token: number;
+  tone: "up" | "down";
+}
+
+/**
+ * One flash per worthy change: the default branch broke or recovered, or
+ * more PRs need you. A poll that changed nothing (or only lowered the
+ * count) keeps the token. The first sighting never flashes.
+ */
+export function nextFlash(
+  prev: FlashMemo | undefined,
+  broken: boolean,
+  needs: number,
+): FlashMemo {
+  if (!prev) return { broken, needs, token: 0, tone: "up" };
+  if (broken !== prev.broken || needs > prev.needs) {
+    return { broken, needs, token: prev.token + 1, tone: broken ? "down" : "up" };
+  }
+  return { ...prev, broken, needs };
 }
 
 // ── Your repos picker (SCROLLR-307) ────────────────────────────
@@ -270,6 +380,8 @@ export function loadRepoData(): GitHubRepo[] {
   return getStore<GitHubRepo[]>(LS_GITHUB_REPOS, []);
 }
 
+/** Writes only when something changed, so followers do not re-render. */
 export function saveRepoData(repos: GitHubRepo[]): void {
+  if (JSON.stringify(repos) === JSON.stringify(loadRepoData())) return;
   setStore(LS_GITHUB_REPOS, repos);
 }
