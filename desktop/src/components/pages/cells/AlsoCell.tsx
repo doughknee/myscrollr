@@ -38,12 +38,12 @@ const AlsoCell = memo(function AlsoCell({ code, text, hex, dark, onClick }: Also
     >
       <span
         data-part="code"
-        className="shrink-0 rounded-[3px] px-1.5 py-[3px] text-[11px] font-bold leading-4 tracking-[0.08em]"
+        className="shrink-0 rounded-[3px] px-1.5 py-[3px] text-[12px] font-bold leading-4 tracking-[0.08em]"
         style={{ background: mix(dark ? 16 : 12), color: "var(--accent-ink)" }}
       >
         {code}
       </span>
-      <span data-part="text" className="min-w-0 truncate text-[12.5px] font-medium leading-none text-fg-2">
+      <span data-part="text" className="min-w-0 truncate text-[13px] font-medium leading-none text-fg-2">
         {text}
       </span>
     </button>

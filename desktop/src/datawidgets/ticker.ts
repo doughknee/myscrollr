@@ -132,15 +132,30 @@ export function widest(texts: readonly string[]): string {
   return texts.reduce((a, b) => (b.length > a.length ? b : a), "");
 }
 
-const STATUS_DAY: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
-const STATUS_DAY_TIME: Intl.DateTimeFormatOptions = { ...STATUS_DAY, hour: "numeric", minute: "2-digit" };
+/**
+ * The bar's one time format (SCROLLR-296): "6:30P", "11:05A"; a 24-hour
+ * locale keeps its own "18:30". Game cells, the Also page and the status
+ * chip all print times through this.
+ */
+export function barTime(ms: number): string {
+  return new Date(ms)
+    .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    .replace(/\s?([AaPp])\.?\s?[Mm]\.?$/, (_, ap: string) => ap.toUpperCase());
+}
 
 /**
- * A date on a status chip, in the user's locale ("Sat 10 Oct, 12:30" /
- * "Sat, Oct 10, 12:30 PM"). `withTime` adds the kick-off time.
+ * A date on a status chip or the Also page, in the bar's one format: the
+ * weekday, month and day in capitals as the game cells and the label print
+ * them ("SAT OCT 10"), then `barTime` when `withTime` ("SAT OCT 10 6:30P").
  */
 export function statusDate(ms: number, withTime: boolean): string {
-  return new Date(ms).toLocaleString(undefined, withTime ? STATUS_DAY_TIME : STATUS_DAY);
+  const d = new Date(ms);
+  const day = [
+    d.toLocaleDateString(undefined, { weekday: "short" }),
+    d.toLocaleDateString(undefined, { month: "short" }),
+    d.getDate(),
+  ].join(" ").replace(/\./g, "").toUpperCase();
+  return withTime ? `${day} ${barTime(ms)}` : day;
 }
 
 /**

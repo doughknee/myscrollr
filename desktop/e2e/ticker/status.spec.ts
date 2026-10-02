@@ -43,12 +43,16 @@ test("[idle] one status chip per empty widget, the right words, no layout shift"
   await expect(page.locator('.ticker-item [data-widget^="sports_"]:not([data-status])')).toHaveCount(0);
   await expect(page.locator('.ticker-item [data-widget="news_pbs"]:not([data-status])')).toHaveCount(0);
 
-  // The date is whatever the shim rebased next_game to, in this locale.
+  // The date is whatever the shim rebased next_game to, in this locale, in
+  // the bar's one format (SCROLLR-296): "SUN OCT 11 2:38P".
   const expected = await bus<string>(
     page,
     `const m = qc.getQueryData(["dashboard"]).data.sports_meta.leagues.find((l) => l.name === "Premier League");
-     return "next match " + new Date(m.next_game).toLocaleString(undefined,
-       { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });`,
+     const d = new Date(m.next_game);
+     const day = [d.toLocaleDateString(undefined, { weekday: "short" }), d.toLocaleDateString(undefined, { month: "short" }), d.getDate()]
+       .join(" ").replace(/\\./g, "").toUpperCase();
+     const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\\s?([AaPp])\\.?\\s?[Mm]\\.?$/, (_, ap) => ap.toUpperCase());
+     return "next match " + day + " " + time;`,
   );
   // The visible line only: the width sizer holds a sample date by design.
   const said = (w: string) => status(page, w).getByTestId("status-text");

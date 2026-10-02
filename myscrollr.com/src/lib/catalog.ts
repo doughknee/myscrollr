@@ -20,7 +20,7 @@ export type { CatalogWidget }
 export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
   // prettier-ignore
   ...([
-    ['finance_stocks', 'Stocks', 'finance', '#16a34a', 'Live stock & ETF prices with a watchlist you control.'],
+    ['finance_stocks', 'Stocks', 'finance', '#7c3aed', 'Live stock & ETF prices with a watchlist you control.'],
     ['finance_crypto', 'Crypto', 'finance', '#f7931a', 'Live crypto prices with a watchlist you control.'],
     ['sports_nfl', 'NFL', 'sports', '#013369', 'Live NFL scores and game states.'],
     ['sports_nba', 'NBA', 'sports', '#c9082a', 'Live NBA scores and game states.'],

@@ -49,14 +49,16 @@ const ALL_CAP_MS = 600_000;
 const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; full?: boolean; npr30?: boolean; over5?: boolean }[] = [
   { fixture: "pages", width: 1920, laps: 2, live: true }, // every page kind: NFL (yours + live), stocks, crypto, news, the Also page
   { fixture: "mixed", width: 1920, laps: 2, live: true, over5: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 330 s)
-  { fixture: "busy", width: 1280, live: true }, // the overflow case: 14 pages of 4 games
+  // SCROLLR-296 round 2: college cells at 276px give 3 columns at 1280 with the Clock (was 4), 19 pages: all shown 306.6 s. Flagged to Home (their call; 264 would keep 4 columns and ~217 s).
+  { fixture: "busy", width: 1280, live: true, over5: true }, // the overflow case: 19 pages of 3 games (all shown 307 s)
   { fixture: "longnames", width: 1280 }, // the longest names, in the narrowest columns
   { fixture: "quiet", width: 1920 }, // nothing live: the floor
   { fixture: "default", width: 1920, live: true },
   // SCROLLR-292, every page is full. One widget, one page, so a lap is one page: three laps measure three dwells.
   // `full`: the fixture has enough to fill, so every page must have a column per item.
-  { fixture: "nflthursday", width: 1920, laps: 3, live: true, full: true }, // TNF + Sunday (your Bears lead the fill, on every lap)
-  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 5 columns: four pages of 4 (the whole week, SCROLLR-293)
+  // 16 games at 6 columns (SCROLLR-296 round 2: fewer, roomier game cells) split evenly 6/5/5: `unfilled` holds, "a column per item" cannot.
+  { fixture: "nflthursday", width: 1920, laps: 3, live: true }, // TNF + Sunday (your Bears lead, on every lap)
+  { fixture: "nflthursday", width: 1280, laps: 3, live: true }, // 16 games at 4 columns: four pages of 4 (the whole week, SCROLLR-293)
   { fixture: "googl", width: 1920, laps: 3, full: true }, // GOOGL + popular fills
   { fixture: "sparsenews", width: 1280, laps: 3 }, // 9 headlines over 3 days: all of them now (SCROLLR-293), 5 pages at 2 columns
   // SCROLLR-293: a 30-headline feed, the whole of it. One widget, so a lap is one visit (one page, SCROLLR-294).

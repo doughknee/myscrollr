@@ -63,7 +63,7 @@ describe("the 40% rule", () => {
   });
 
   it("the edge's border and the utilities count against the budget", () => {
-    // 512 - 1 (border) - 194 = 317 left at 1280: a 212 game fits, a 317+ pin set does not.
+    // 512 - 1 (border) - 194 = 317 left at 1280: a 264 game fits, a 317+ pin set does not.
     expect(fitsEdge([nfl(1)], room(1280))).toBe(true);
     expect(fitsEdge([], room(1280, 600))).toBe(false);
   });
@@ -97,7 +97,7 @@ describe("pinRefusal", () => {
     expect(msg).not.toContain("\n");
   });
   it("names the newest pin whose removal makes room", () => {
-    // 1920 (768), util 100: [nfl 212, news 260] = 573 fits; adding a game (212) = 785 does not.
+    // 1920 (768), util 100: [nfl 264, news 260] = 625 fits; adding a game (264) = 889 does not.
     // The newest pin whose removal makes room is the news pin.
     const msg = pinRefusal([nfl(1), news(1)], { widget: "sports_nfl", subject: "Team 9", label: "Team 9" }, room(1920, 100));
     expect(msg).toBe("No room on the edge at this screen size — unpin BBC News first");

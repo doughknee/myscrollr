@@ -15,7 +15,7 @@
  * bottom hold one item in every state it passes through, in equal fixed
  * columns, for e2e/ticker/cells.spec.ts to measure.
  */
-import { StrictMode, type ReactNode } from "react";
+import { StrictMode, useEffect, useState, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import "../style.css";
 import type { Game, RssItem, Trade } from "../types";
@@ -126,14 +126,42 @@ const GAME_STATES: [string, Game][] = [
 ];
 const aapl = stocks[0];
 const QUOTE_STATES: [string, Trade][] = [
-  ["small", { ...aapl, price: 9.99, percentage_change: 0.89, day_low: 9.5, day_high: 10.2 }],
-  ["large", { ...aapl, price: 1253.69, percentage_change: -12.4, day_low: 1201.1, day_high: 61260.55 }],
-  ["no-range", { ...aapl, price: 253.69, percentage_change: 0, day_low: 0, day_high: 0 }],
+  // One stock through a day (SCROLLR-296 round 5: the price zone is the price's own width, so a
+  // state changes digits, not how many): a one- and a two-digit move, a new low and high, no range.
+  ["up", { ...aapl, price: 253.69, percentage_change: 0.89, day_low: 251.5, day_high: 254.2 }],
+  ["down", { ...aapl, price: 249.1, percentage_change: -12.4, day_low: 201.1, day_high: 289.55 }],
+  ["no-range", { ...aapl, price: 250.01, percentage_change: 0, day_low: 0, day_high: 0 }],
 ];
 const NEWS_STATES: [string, RssItem][] = [
   ["fresh", { ...bbc[0], published_at: new Date(NOW - 9 * 60_000).toISOString() }],
   ["old", { ...bbc[0], published_at: new Date(NOW - 12 * 3_600_000).toISOString() }],
 ];
+
+/**
+ * A price crossing a digit boundary while its page is up (SCROLLR-296 round 6):
+ * each cell mounts at its first price and, 600ms later, ticks to the second.
+ * cells.spec measures every cell before and after; nothing may move.
+ */
+const CROSSINGS: [string, number, number][] = [
+  ["up 99.99 to 100.01", 99.99, 100.01],
+  ["down 100.01 to 99.99", 100.01, 99.99],
+  ["up 999.99 to 1,000.01", 999.99, 1000.01],
+  ["down 1.00 to 0.99", 1.0, 0.99],
+];
+function CrossingStrip() {
+  const [ticked, setTicked] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setTicked(true), 600);
+    return () => window.clearTimeout(id);
+  }, []);
+  return (
+    <div data-ticked={ticked ? "" : undefined}>
+      <Strip name="quote-cross" width={QUOTE_MIN_COL}>
+        {CROSSINGS.map(([s, a, b]) => [s, <QuoteCell trade={{ ...aapl, price: ticked ? b : a }} />])}
+      </Strip>
+    </div>
+  );
+}
 
 function Strip({ name, width, children }: { name: string; width: number; children: [string, ReactNode][] }) {
   return (
@@ -161,7 +189,7 @@ const GAME_BOARD: [string, Game, boolean][] = [
   ["pre · today", byName("Minnesota Vikings"), false],
   ["pre · later day", byName("New Orleans Saints"), false],
   ["live", notClose!, false],
-  ["live · close (tint)", close!, false],
+  ["live · close (marked)", close!, false],
   ["live · yours", data.sports.find(isMine)!, true],
   ["final · longest nickname", byName("Washington Commanders"), false],
   ["postponed", { ...byName("Las Vegas Raiders"), state: "postponed", status_short: "PST" }, false],
@@ -215,7 +243,10 @@ const col = (viewport: number, minCol: number) => contentWidth(viewport) / colum
 function States() {
   const games = (w: number): [string, ReactNode][] => GAME_BOARD.map(([s, g, m]) => [s, <GameCell key={s} game={g} width={w} mine={m} now={NOW} />]);
   const news = (w: number, line?: boolean): [string, ReactNode][] => NEWS_BOARD.map(([s, r]) => [s, <NewsCell key={s} item={r} width={w} line={line} now={NOW} />]);
-  const quotes = QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} />]);
+  const quotes = [
+    ...QUOTE_BOARD.map(([s, t]): [string, ReactNode] => [s, <QuoteCell key={s} trade={t} />]),
+    ["popular fill", <QuoteCell key="fill" trade={fin("NVDA")} fill />] as [string, ReactNode],
+  ];
   return (
     <>
       <div className="px-4 pt-6 font-mono text-[10px] tracking-[0.06em] text-fg-4">EVERY STATE AT THE BAR&apos;S REAL COLUMN WIDTHS (SCROLLR-295)</div>
@@ -262,9 +293,10 @@ function Gallery() {
       </Bar>
 
       <div className="px-1 pt-3 font-mono text-[10px] tracking-[0.06em] text-fg-4">ONE ITEM IN EVERY STATE · SAME COLUMN WIDTH · NOTHING MAY MOVE</div>
-      <Strip name="game-stacked" width={240}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={240} mine now={NOW} />])}</Strip>
+      <Strip name="game-stacked" width={gameMinCol("NFL")}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
-      <Strip name="quote" width={200}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <CrossingStrip />
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
       <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}

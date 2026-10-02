@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import NewsCell, { age, BIG_HEADLINE_PX } from "./NewsCell";
+import NewsCell, { age, AGE_CH } from "./NewsCell";
 import type { RssItem } from "../../../types";
 
 const NOW = Date.parse("2026-10-04T18:40:00Z");
@@ -41,18 +41,30 @@ describe("NewsCell", () => {
     expect(container.querySelector('[data-part="summary"]')!.textContent).toBe("BBC News");
   });
 
-  it("a wide column sets the headline larger", () => {
-    const size = (w: number) =>
-      render(<NewsCell item={item()} width={w} now={NOW} />).container.querySelector('[data-part="headline"]')!.classList.contains("text-[15px]");
-    expect(size(BIG_HEADLINE_PX)).toBe(true);
-    expect(size(BIG_HEADLINE_PX - 1)).toBe(false);
+  it("two sizes, none under 12px: the headline at 15px at every width, the meta line at 12px", () => {
+    for (const w of [400, 426, 584, 900]) {
+      const { container } = render(<NewsCell item={item()} width={w} now={NOW} />);
+      expect(container.querySelector('[data-part="headline"]')!.classList.contains("text-[15px]")).toBe(true);
+      expect(container.querySelector('[data-part="age"]')!.parentElement!.classList.contains("text-[12px]")).toBe(true);
+    }
   });
 
-  it("width-stable: the age sits in a fixed column, whatever it says", () => {
-    const grid = (published: number) =>
-      render(<NewsCell item={item({ published_at: new Date(published).toISOString() })} width={420} now={NOW} />)
-        .container.querySelector("button")!.className;
-    expect(grid(NOW - 9 * 60_000)).toBe(grid(NOW - 12 * 3_600_000));
-    expect(grid(NOW).includes("grid-cols-[26px_minmax(0,1fr)]")).toBe(true);
+  it("width-stable: the age leads the meta line in a fixed box, whatever it says", () => {
+    const ageBox = (published: number) =>
+      (render(<NewsCell item={item({ published_at: new Date(published).toISOString() })} width={420} now={NOW} />)
+        .container.querySelector('[data-part="age"]') as HTMLElement).style.width;
+    expect(ageBox(NOW - 9 * 60_000)).toBe(ageBox(NOW - 12 * 3_600_000));
+    expect(ageBox(NOW)).toBe(`${AGE_CH}ch`);
+    expect(age(item({ published_at: new Date(NOW - 6.9 * 86_400_000).toISOString() }), NOW).length).toBeLessThanOrEqual(AGE_CH);
+  });
+
+  it("a one-line and a two-line headline sit on the same grid: fixed rows, title on top, meta beneath", () => {
+    const cell = (title: string) => render(<NewsCell item={item({ title })} width={420} now={NOW} />).container.querySelector("button")!;
+    const short = cell("Rates hold");
+    const long = cell("Central bank holds rates as inflation cools for a third month while markets wait on the next jobs report");
+    expect(short.className).toBe(long.className);
+    expect(short.className.includes("grid-rows-[38px_15px]")).toBe(true);
+    // The age is in the meta line, not a column of its own beside the headline.
+    expect(short.querySelector('[data-part="age"]')!.parentElement!.contains(short.querySelector('[data-part="summary"]'))).toBe(true);
   });
 });

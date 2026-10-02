@@ -141,7 +141,7 @@ var catalog = []WidgetDef{
 		ID: "finance_stocks", Name: "Stocks", Category: "finance", Source: "finance",
 		Group: "Markets", AddedAt: addedV110,
 		Keywords:      []string{"shares", "etf", "s&p", "nasdaq", "dow", "tickers"},
-		Color:         "#16a34a",
+		Color:         "#7c3aed",
 		Description:   "Live stock & ETF prices with a watchlist you control.",
 		DefaultConfig: map[string]any{"symbols": []string{"AAPL", "MSFT", "NVDA", "AMZN", "TSLA"}, "asset_class": "stock"},
 		About:         "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",

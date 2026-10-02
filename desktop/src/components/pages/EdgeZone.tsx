@@ -233,14 +233,15 @@ const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility;
   );
 });
 
-function PinCell({ p, onChipClick }: { p: EdgePin; onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void }) {
+function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void }) {
   if (p.kind === "sports") {
     const g = p.data as Game;
     return <GameCell game={g} width={p.width} onClick={() => onChipClick?.("sports", g.id, chipUrlForSports(g))} />;
   }
   if (p.kind === "finance") {
     const t = p.data as Trade;
-    return <QuoteCell trade={t} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
+    // Keyed on the turn: its price reservation is taken at each swipe, as a page's is (SCROLLR-296).
+    return <QuoteCell key={tick} trade={t} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
   }
   const r = p.data as RssItem;
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
@@ -291,9 +292,15 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
           style={{ ...accentStyle(accentFor(p.hex, dark), inkFor(p.hex, dark)), width: p.width }}
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
-          <PinCell p={p} onChipClick={onChipClick} />
-          {/* The line on top marks it as yours (canvas "Pins"). */}
-          <span aria-hidden data-part="pinned" className="pointer-events-none absolute left-0 right-0 top-0 h-[2px]" style={{ background: "var(--accent)" }} />
+          <PinCell p={p} tick={tick} onChipClick={onChipClick} />
+          {/* The dashed line on top marks it as pinned (canvas "Pins"); dashed, so it is not
+              read as the solid line a page draws over your team's game (SCROLLR-296). */}
+          <span
+            aria-hidden
+            data-part="pinned"
+            className="pointer-events-none absolute left-0 right-0 top-0 h-[2px]"
+            style={{ backgroundImage: "repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 10px)" }}
+          />
         </div>
       ))}
     </div>
