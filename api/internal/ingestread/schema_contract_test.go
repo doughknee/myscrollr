@@ -65,7 +65,7 @@ func TestReadQueriesMatchTheSchema(t *testing.T) {
 		}
 		getUserRSSFeedURLs(ctx, noSuchUser)
 		queryRSSItems(ctx, []string{"https://example.com/feed.xml"})
-		if _, err := PublicRSS(ctx); err != nil {
+		if _, err := PublicRSS(ctx, curatedFeedURLs()); err != nil {
 			t.Errorf("PublicRSS: %v", err)
 		}
 	})

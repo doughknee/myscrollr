@@ -16,8 +16,9 @@
  *   ?fixture=<name>                 src/dev/__fixtures__/dashboard.<name>.json,
  *                                   rebased to now, instead of the feed
  *
- * Data: GET api.myscrollr.com/public/feed, refreshed every 30 s, timestamps
- * as served; see feed.ts for what it lacks. If it fails or is empty, the
+ * Data: GET api.myscrollr.com/public/feed?widgets=<the bar's data widgets>
+ * (SCROLLR-315; the default's first request is the whole feed, to see which
+ * league plays tonight), refreshed every 30 s, timestamps as served; see feed.ts for what it lacks. If it fails or is empty, the
  * `default` fixture rebased to now. Clicks open the item in a new tab;
  * nothing is persisted, nothing is sent anywhere but the feed request.
  *
@@ -26,6 +27,7 @@
  */
 import {
   STARTER,
+  feedUrl,
   fromPublicFeed,
   isUtility,
   rebase,
@@ -73,16 +75,21 @@ async function newsRows(): Promise<Row[]> {
   return (rss ?? []).map((r) => ({ ...r, link: "" }));
 }
 
+/**
+ * The bar's widgets: the page's, or the default's, chosen from the first
+ * full feed and then kept, so the bar never swaps a widget under the
+ * visitor and every refresh asks for just these (SCROLLR-315).
+ */
+let ids: string[] | null = asked;
+
 async function live(): Promise<EmbedDashboard | null> {
   try {
-    const res = await nativeFetch(FEED_URL);
+    const res = await nativeFetch(feedUrl(FEED_URL, ids));
     if (!res.ok) return null;
     const body = await res.json();
-    const ids =
-      asked ??
-      [sportsTonight(body?.data?.sports?.sports ?? [], Date.now()), ...STARTER].filter(
-        (id): id is string => id !== null,
-      );
+    ids ??= [sportsTonight(body?.data?.sports?.sports ?? [], Date.now()), ...STARTER].filter(
+      (id): id is string => id !== null,
+    );
     return fromPublicFeed(body, ids, await newsRows());
   } catch {
     return null;
@@ -264,7 +271,7 @@ window.addEventListener("contextmenu", (e) => e.stopImmediatePropagation(), true
 
 if (!forced) {
   setInterval(() => {
-    // The feed is ~400 KB uncompressed; a background tab doesn't need it.
+    // A background tab doesn't need the feed.
     if (document.hidden) return;
     void live().then((d) => {
       if (!d) return; // keep what is on the bar

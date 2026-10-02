@@ -5,6 +5,8 @@
  * What `/public/feed` lacks, and what stands in for it here:
  *   - no `widgets` / `preferences`: rows are built from the catalog
  *     snapshot's default configs for the widgets the page asked for;
+ *     `?widgets=` (feedUrl) narrows the feed to those widgets' data
+ *     (SCROLLR-315);
  *   - `rss` holds the curated news feeds only (SCROLLR-313); when it is
  *     missing or empty, news rows come from the bundled fixture (the caller
  *     passes them in);
@@ -43,6 +45,12 @@ export function resolveWidget(name: string): string | null {
 
 export function isUtility(id: string): boolean {
   return CATALOG.find((w) => w.id === id)?.category === "utility";
+}
+
+/** The feed URL for `ids`: only their data (SCROLLR-315); utilities need none, so none means the full feed. */
+export function feedUrl(base: string, ids: string[] | null): string {
+  const data = ids?.filter((id) => !isUtility(id)) ?? [];
+  return data.length ? `${base}?widgets=${data.join(",")}` : base;
 }
 
 /** Dashboard widget rows for the data widgets among `ids`, as the server writes them. */
@@ -100,7 +108,7 @@ export function fromPublicFeed(body: unknown, ids: string[], fallbackRss: Row[])
   const data = (body as { data?: { finance?: Row[]; sports?: { sports?: Row[]; meta?: Row }; rss?: Row[] } })?.data;
   const finance = data?.finance ?? [];
   const sports = data?.sports?.sports ?? [];
-  if (finance.length === 0 && sports.length === 0) return null;
+  if (finance.length === 0 && sports.length === 0 && !data?.rss?.length) return null;
   return {
     data: {
       finance,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromPublicFeed, isUtility, rebase, resolveWidget, sportsTonight, widgetRows } from "./feed";
+import { feedUrl, fromPublicFeed, isUtility, rebase, resolveWidget, sportsTonight, widgetRows } from "./feed";
 
 const NOW = Date.parse("2026-10-02T17:00:00Z");
 
@@ -15,6 +15,15 @@ describe("embed feed", () => {
     ]);
     expect(isUtility("github")).toBe(true);
     expect(isUtility("news_npr")).toBe(false);
+  });
+
+  it("asks the feed for the data widgets only, the full feed when there are none", () => {
+    const base = "https://api.myscrollr.com/public/feed";
+    expect(feedUrl(base, ["sports_nfl", "clock", "news_npr", "finance_stocks"])).toBe(
+      `${base}?widgets=sports_nfl,news_npr,finance_stocks`,
+    );
+    expect(feedUrl(base, ["clock", "github"])).toBe(base);
+    expect(feedUrl(base, null)).toBe(base);
   });
 
   it("builds rows for data widgets only, with the catalog's default config", () => {
@@ -46,6 +55,8 @@ describe("embed feed", () => {
     expect(d.widgets.map((w) => w.widget_type)).toEqual(["sports_nhl"]);
     const live = { data: { ...feed.data, rss: [{ title: "real" }] } };
     expect(fromPublicFeed(live, [], [{ title: "x" }])!.data.rss).toEqual([{ title: "real" }]);
+    // A news-only bar's feed has no finance or sports: still live.
+    expect(fromPublicFeed({ data: { finance: [], rss: [{ title: "real" }] } }, ["news_npr"], [])).not.toBeNull();
     expect(fromPublicFeed({ data: {} }, [], [])).toBeNull();
     expect(fromPublicFeed(null, [], [])).toBeNull();
   });
