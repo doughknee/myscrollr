@@ -9,7 +9,7 @@ import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
 import { dwellFor } from "./pagePlan";
-import { ALSO_TAB, buildPageWidgets, followPage, newNav, nextTurn, planAll, type PageWidget, type Turn } from "./widgetPages";
+import { ALSO_TAB, buildPageWidgets, followPage, newNav, nextTurn, planAll, stepTurn, type PageWidget, type Turn } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;
 const NOW = Date.parse(fixture._captured_at);
@@ -123,6 +123,53 @@ describe("nextTurn", () => {
 
   it("nothing to show, no turn", () => {
     expect(nextTurn(null, [], new Map(), newNav())).toBeNull();
+  });
+});
+
+describe("stepTurn (SCROLLR-298)", () => {
+  const widgets = buildPageWidgets(dash, TABS, NOW);
+  const plans = planAll(widgets, 1280);
+  // Reading order: every page of every widget, in ticker order.
+  const flat = widgets.flatMap((w) => plans.get(w.tab)!.pages.map((_, p) => `${w.tab}:${p}`));
+  const key = (t: Turn) => `${t.tab}:${t.page}`;
+
+  it("forward walks every page of every widget in reading order and wraps; back walks it in reverse", () => {
+    const nav = newNav();
+    let t = nextTurn(null, widgets, plans, nav)!;
+    const fwd = [key(t)];
+    for (let i = 0; i < flat.length; i++) fwd.push(key((t = stepTurn(t, 1, widgets, plans, nav)!)));
+    expect(fwd).toEqual([...flat, flat[0]]);
+    const back = [key(t)];
+    for (let i = 0; i < flat.length; i++) back.push(key((t = stepTurn(t, -1, widgets, plans, nav)!)));
+    expect(back).toEqual([flat[0], ...[...flat].reverse()]);
+  });
+
+  it("back from a widget's first page is the previous widget's last page", () => {
+    const tab = widgets[1].tab;
+    const onSecond: Turn = { seq: 5, tab, page: 0, pages: plans.get(tab)!.pages.length, dwell: 6 };
+    const back = stepTurn(onSecond, -1, widgets, plans, newNav())!;
+    expect(back.tab).toBe(widgets[0].tab);
+    expect(back.page).toBe(plans.get(widgets[0].tab)!.pages.length - 1);
+  });
+
+  it("a step is a new turn with its page's dwell; the clock then moves on to the next widget and the widget's next turn continues after it", () => {
+    const ws = buildPageWidgets(npr as unknown as DashboardResponse, ["news_npr", ...TABS], Date.parse(npr._captured_at));
+    const ps = planAll(ws, 1920);
+    const nav = newNav();
+    let t = nextTurn(null, ws, ps, nav)!; // NPR 1
+    t = stepTurn(t, 1, ws, ps, nav)!; // NPR 2
+    t = stepTurn(t, 1, ws, ps, nav)!; // NPR 3, read by hand
+    expect([t.tab, t.page, t.seq]).toEqual(["news_npr", 2, 3]);
+    expect(t.dwell).toBe(dwellFor(ps.get("news_npr")!.pages[2].length));
+    t = nextTurn(t, ws, ps, nav)!;
+    expect(t.tab).not.toBe("news_npr");
+    while (t.tab !== "news_npr") t = nextTurn(t, ws, ps, nav)!;
+    expect(t.page, "NPR's next turn continues after the page read by hand").toBe(3);
+  });
+
+  it("nothing up yet: the first turn; nothing to show: no turn", () => {
+    expect(key(stepTurn(null, 1, widgets, plans, newNav())!)).toBe(flat[0]);
+    expect(stepTurn(null, -1, [], new Map(), newNav())).toBeNull();
   });
 });
 

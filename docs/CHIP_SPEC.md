@@ -116,7 +116,7 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 ### P.1 The bar
 
 - Height `h-16`, 64px, `ticker-container relative flex w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150`. One height: no density branch (invariant 1).
-- Left to right: **label** (112px, `shrink-0`), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
+- Left to right: **label** (112px, `shrink-0`), **pager** (`PAGER_W` = 88px, `shrink-0`, §P.7a), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
 - The edge sits outside the page block, so it shows with no page at all.
 - `data-pages` on the bar; `data-motion-style` is `"swipe"` or `"fade"` (reduced motion, §P.7).
 - Nothing to draw (no widget page, no utility, no pin): `EmptyBar` in its Pages look (a label block in the theme accent, then the same one-row message). Two states, decided in `App.tsx`: **sourceless** (signed in, no widgets installed: browse the catalog) and **installedOff** (installed, none showing: open one to turn it on). A clock or a pin on the edge counts as something to show: the bar stays.
@@ -133,11 +133,11 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 ### P.3 Geometry of a page
 
 ```
-|<- 112 ->|<------------- content width ------------->|<- edge ->|
-| label   | col 1 | col 2 | col 3 | ... all equal      | edge     |
+|<- 112 ->|<- 88 ->|<---------- content width ---------->|<- edge ->|
+| label   | ‹ 7/23 ›| col 1 | col 2 | col 3 | ... all equal | edge     |
 ```
 
-- **Content width** = `bar width - LABEL_W - edge width` (`contentWidth`). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
+- **Content width** = `bar width - LABEL_W - PAGER_W - edge width` (`contentWidth`). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
 - The page block is a grid, `repeat(n, minmax(0, 1fr))` where `n` is the number of items **on that page**. Every page is full (§P.4a), so `n` is the column count except in two cases:
   - **A widget on several pages** whose pool is not a multiple of the columns splits evenly (§P.4): 9 headlines at 8 columns are 5 + 4, each page's columns widened to fill the bar.
   - **A truly short widget** (one page, fewer items than columns even after the fill: one NFL game all week, a feed holding two headlines) keeps **a full page's column width**, `content width / columns`, **left-aligned** from the label: `repeat(n, colW px)`, `data-short` on the page. Never one item stretched across the bar, and never centred: a centred cell floats away from the label that names it and reads as one item lost on a page (both drawn on SCROLLR-292; left picked).
@@ -158,9 +158,12 @@ cell family's own export**, never a default in `pagePlan.ts`:
 | Headline | 400px | `NEWS_MIN_COL` |
 | Also entry | 300px | `ALSO_MIN_COL` |
 
-Worked columns, no edge: at 1280 the content is 1168px: 4 NFL, 4 college, 4 quotes, 2
-headlines. At 1920 it is 1808px: 6, 6, 6, 4. With the Clock on the edge (102px): 4, 3, 4, 2
-and 6, 6, 6, 4. An edge of 400px takes 400px off the content. SCROLLR-296 widened the game
+Worked columns, no edge: at 1280 the content is 1080px: 4 NFL, 3 college, 4 quotes, 2
+headlines. At 1920 it is 1720px: 6, 6, 6, 4. With the Clock on the edge (102px): 3, 3, 3, 2
+and 6, 5, 6, 4. An edge of 400px takes 400px off the content. The pager (§P.7a, SCROLLR-298)
+costs 88px: before it, 1280 had 1168px (4, 4, 4, 2; with the Clock 4, 3, 4, 2) and 1920 had
+1808px (6, 6, 6, 4 either way), so it costs a column for NFL and quotes at 1280 with the
+Clock and for college at 1920 with it. SCROLLR-296 widened the game
 and quote columns on purpose (Brandon, 1 Oct 2026: "we don't need that many per page. I'd
 rather fit more of the names"; the price "should be the biggest, most important thing"):
 fewer, roomier cells are the feature. Before it they were 212 / 244 / 172 (5, 4, 6, 2 and
@@ -293,7 +296,52 @@ published as `data-visit` on the page for the browser checks (a visit is one pag
 | Hover | A page held by an **active** pointer holds, and so does the dwell line; the clock stands still and resumes when the hold ends. Active = over the bar and entering or moving within the last **5 s** (`HOVER_IDLE_MS`, `activeHover.ts`). A pointer that rests 5 s releases the hold and the bar turns again (worst case a further dwell of up to 12 s); moving it grabs the page back; leaving the bar releases at once. Under Pages there is **no hover setting**, whatever `onHover` was left at by Continuous |
 
 The page clock restarts only on a new turn, never on a data update. Dwell is a floor of 6 s
-by design: nothing on the bar turns faster.
+by design: nothing on the bar turns faster on its own (a manual step, §P.7a, is the reader's
+choice).
+
+### P.7a Manual paging and the pager
+
+SCROLLR-298 (Brandon, 1 Oct 2026: "little buttons or something somewhere that make it easy
+to cycle through them"; then, "arrow keys on the far left and far right might be annoying; I
+have an ultrawide"). No setting.
+
+- **The pager** sits right after the label, `PAGER_W` = 88px, `shrink-0`, `data-pager`:
+  `‹ 7/23 ›`. The middle is always shown: this page's place in the lap and the lap's total,
+  `font-mono text-[12px] font-semibold tabular-nums text-fg-3`, centred in a 44px box
+  reserved for `99/99` (`data-lap-pos`). The lap is every page of every widget in ticker
+  order, the Also page last: `at` = the pages of the widgets before this one + this page's
+  index + 1, `of` = the sum of every widget's page count, each from **this window's** plans.
+  Both are frozen with the page (§P.8): a re-plan reaches the count on the next page.
+  `contentWidth` takes `PAGER_W` off, so columns stay exact (§P.4 for the cost).
+- **The arrows** either side of the count are `<button>`s (`data-step="prev"|"next"`,
+  `aria-label` "Previous page" / "Next page"), a lucide chevron drawn 18px in a 22px box, in
+  the label's ink (`--accent-ink`), hit area 44px wide by the bar's 64px (an `after:` box
+  11px either side). `opacity-0`, shown while the pointer is over the bar
+  (`group-hover/bar`) or when one has keyboard focus. Together beside the label so neither
+  the eye nor the mouse crosses an ultrawide bar; nothing at the far ends.
+- **The wheel** over the bar is the primary control (the bar lives at a screen edge where
+  the wheel is the natural gesture): down or a sideways swipe left (`deltaY` or `deltaX` >
+  0, whichever is larger) is the next page, up or right is the previous. One step per
+  gesture: a wheel event steps only after `WHEEL_QUIET_MS` = 200 ms without one, so a flick
+  or a trackpad's glide is one page and notches turned one at a time are a page each. The
+  listener is native and not passive, and calls `preventDefault`, so a sideways swipe never
+  becomes the webview's back gesture; nothing in the ticker scrolls anyway (`overflow:
+  hidden` throughout). WebView2 delivers the wheel to the window under the pointer without
+  focus; the Rust side does nothing with it. A wheel event counts as pointer activity, so
+  the hold (§P.7, Hover) stays while you page.
+- **Keys:** `←` and `→` (no modifier) step when the ticker window has focus (it does after
+  a click on it; it normally has none, being always on top at a screen edge).
+- **A step** is `stepTurn` (`widgetPages.ts`) on the leader's page clock: the next or
+  previous page in the same reading order the pager counts; past a widget's last page is
+  the next widget's first, before its first page is the previous widget's last, and the lap
+  wraps both ways. It is a turn like any other: a new `seq`, the same swipe (always right to
+  left, back included) or crossfade, frozen at swipe-in, the edge slots step, and **the
+  page's dwell starts again**. A held page stays held. The step is an immediate turn plus
+  a move of that widget's cursor (§P.6) to the page after the one stepped to, so the
+  clock's next turn moves on to the next widget as after any turn, and the widget's next
+  turn does not show that page again.
+- **Monitors:** a follower's step is sent to the leader as `pages:step` (`{dir}`); the
+  leader applies it and broadcasts the turn, so every window turns together (§P.14).
 
 ### P.8 The freeze
 
@@ -492,7 +540,8 @@ state and one window owns it.
   the same place. Followers show it. Each window times its own pointer (§P.7) and reports only the
   transitions, as `pages:hover` (`{label, on}`); the leader holds while any window's pointer is
   active, so a hold ends when the last active window's pointer has rested 5 s or left. A starting follower asks `pages:hello` and the leader
-  rebroadcasts.
+  rebroadcasts. A follower's manual step (§P.7a) goes to the leader as `pages:step`
+  (`{dir}`) and comes back as the leader's turn.
 - Each window plans at **its own** width and edge. A window whose width gives the widget a
   different page count maps the leader's page onto its own: same index when the counts
   agree, else the same share of the way through (`followPage`). Every monitor shows the same
@@ -561,6 +610,12 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
   text in the widget's colour at 4.5:1, the label name at 3:1, every hairline at 1.5:1.
 - `e2e/ticker/hover.spec.ts`: under the fake clock, a still pointer holds 5 s and then the bar turns, a moving pointer holds the page and the dwell line for 40 s, and moving again after a release grabs the page back.
+- `e2e/ticker/paging.spec.ts` (SCROLLR-298), fake clock: the pager sits at x = 112 and
+  `PAGER_W` wide and its count's box stays put from `1/n` to `10/n`; wheel down and up, a
+  flick of eight events is one step, a sideways swipe counts the same, back from the
+  first page wraps to the last, nothing scrolls; the arrows are hidden off the bar, shown on
+  it, 44px targets, and step; `←`/`→` step; a step restarts the dwell and the clock then
+  carries on past it; a follower's wheel and arrow turn the leader and both windows.
 - vitest: `activeHover.test.ts`, `pagePlan.test.ts`, `widgetPages.test.ts`, `pageFill.test.ts` (the pool and the fill per family), `EdgeZone.test.tsx`, one test per cell. `widgetPages.test.ts` rebuilds the widgets from fresh data before every turn and asserts the cursor carries on.
 
 ---
@@ -1450,7 +1505,8 @@ needs both until Continuous is retired.
 - [ ] An active pointer (moved within 5 s) holds the page and the dwell line, a resting one does not (`hover.spec.ts`); reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
 - [ ] Colour only through `--accent` and `mix()`, text in the widget's colour only through `--accent-ink`; red only live or urgent.
 - [ ] Contrast (§P.13): no opacity on text, no `fg-4` text, `pages-themes.spec.ts` green in all 20 palettes.
-- [ ] Process-wide work (page clock, hover) runs in the primary window only; followers follow.
+- [ ] Process-wide work (page clock, hover, manual steps) runs in the primary window only; followers follow.
+- [ ] The pager (§P.7a) keeps its 88px and the count its reserved box; `contentWidth` still takes `PAGER_W` off; a manual step is a turn (fresh dwell, cursor past it) and reaches every window (`paging.spec.ts`).
 - [ ] No template-literal classes; served CSS checked.
 - [ ] Verified in the shim at 1280 and 1920 with `?pages=1&live=1`; `npm run test:browser` green.
 - [ ] Any rule from §P that this change relies on and that is not on `main` is marked *(lands with SCROLLR-xxx)*, and any mark whose issue just merged is removed.

@@ -26,12 +26,20 @@
  *    weather and the other utilities, then pins. Its slots step on the
  *    turn's seq, so they change only while a page swipes. Its measured
  *    width is frozen into each page with the bar's.
+ *  - Manual paging (SCROLLR-298): the wheel over the bar, the ‹ › arrows that
+ *    show while the pointer is over it, and ←/→ when the window has focus step
+ *    one page in reading order (`stepTurn`). A step is a turn like any other:
+ *    the same swipe, frozen at swipe-in, a fresh dwell, and the hold stays. A
+ *    follower sends its step to the leader (`pages:step`), which turns every
+ *    window.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import clsx from "clsx";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { DashboardResponse, Game, RssItem, Trade, WidgetTickerData } from "../../types";
 import type { WidgetPin } from "../../preferences";
 import { financeMarketOptions } from "../../api/queries";
@@ -40,7 +48,7 @@ import { isPrimaryTicker } from "../../lib/windowRole";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { LABEL_W, columnsFor, contentWidth, freezePage, pageItems, refreshPage, type FrozenPage } from "./pagePlan";
+import { LABEL_W, PAGER_W, columnsFor, contentWidth, freezePage, pageItems, refreshPage, type FrozenPage } from "./pagePlan";
 import {
   ALSO_TAB,
   buildPageWidgets,
@@ -49,6 +57,7 @@ import {
   newNav,
   nextTurn,
   planAll,
+  stepTurn,
   type AlsoItem,
   type PageItem,
   type PageWidget,
@@ -77,6 +86,14 @@ const TURN_EVENT = "pages:turn";
 const HOVER_EVENT = "pages:hover";
 /** Follower → leader: I just started; tell me the page now up. */
 const HELLO_EVENT = "pages:hello";
+/** Follower → leader: step one page, `dir` 1 forward or -1 back (SCROLLR-298). */
+const STEP_EVENT = "pages:step";
+/**
+ * A wheel gesture is one step: a wheel event steps only after this long without
+ * one, so a flick or a trackpad's glide is one page and notches turned one at a
+ * time are a page each.
+ */
+const WHEEL_QUIET_MS = 200;
 
 type TurnMsg = Turn & { held: boolean };
 
@@ -108,6 +125,9 @@ interface Shown {
   avail: number;
   /** Fewer items than columns even after filling: cells keep a full page's column width, left-aligned, instead of stretching (SCROLLR-292). */
   short: boolean;
+  /** This page's place among every page of every widget, in reading order, and their total: the pager's `7/23` (SCROLLR-298). */
+  lapAt: number;
+  lapOf: number;
 }
 
 const NO_PINS: WidgetPin[] = [];
@@ -151,6 +171,45 @@ function DwellLine({ seq, dwell, held, accent }: { seq: number; dwell: number; h
       className="absolute bottom-0 left-0 z-10 h-[2px] w-full origin-left"
       style={{ ...accentStyle(accent), background: "var(--accent)", transform: "scaleX(0)" }}
     />
+  );
+}
+
+/**
+ * The pager beside the label, `‹ 7/23 ›` (SCROLLR-298): where this page sits among
+ * every page of the lap, always shown, and the two arrows around it, shown while
+ * the pointer is over the bar (or one has keyboard focus). Together beside the
+ * label so neither the eye nor the mouse crosses an ultrawide bar. PAGER_W wide,
+ * reserved for `99/99`, so a count changing moves nothing. Each arrow is drawn
+ * 22px and hits 44px (its `after:` box reaches 11px either side).
+ */
+function Pager({ at, of, onStep, style }: { at: number; of: number; onStep: (dir: 1 | -1) => void; style: CSSProperties }) {
+  const arrow = (dir: 1 | -1) => {
+    const Icon = dir > 0 ? ChevronRight : ChevronLeft;
+    return (
+      <button
+        type="button"
+        data-step={dir > 0 ? "next" : "prev"}
+        aria-label={dir > 0 ? "Next page" : "Previous page"}
+        onClick={() => onStep(dir)}
+        className="relative z-10 flex h-full w-[22px] shrink-0 cursor-pointer items-center justify-center opacity-0 transition-opacity duration-150 after:absolute after:inset-y-0 after:-inset-x-[11px] focus-visible:opacity-100 group-hover/bar:opacity-100"
+        style={{ color: "var(--accent-ink)" }}
+      >
+        <Icon size={18} strokeWidth={2.25} aria-hidden />
+      </button>
+    );
+  };
+  return (
+    <div data-pager="" className="flex h-full shrink-0 items-stretch" style={{ ...style, width: PAGER_W }}>
+      {arrow(-1)}
+      <span
+        data-lap-pos={`${at}/${of}`}
+        aria-label={`page ${at} of ${of} in the lap`}
+        className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums text-fg-3"
+      >
+        {at}/{of}
+      </span>
+      {arrow(1)}
+    </div>
   );
 }
 
@@ -289,6 +348,15 @@ export default function PagedBar({
     broadcast();
   }, [show, broadcast]);
 
+  /** A manual step on the leader: a new turn, so the clock below restarts the page's dwell. */
+  const stepHere = useCallback((dir: 1 | -1) => {
+    const ws = widgetsRef.current;
+    const t = stepTurn(turnRef.current, dir, ws, planAll(ws, widthRef.current, edgeW()), nav.current);
+    if (!t) return;
+    show(t);
+    broadcast();
+  }, [show, broadcast]);
+
   useEffect(() => {
     // The ref, not the state: StrictMode runs this twice before the first
     // turn renders, and the second run must not skip page one.
@@ -329,6 +397,9 @@ export default function PagedBar({
   useTauriListener(HELLO_EVENT, () => {
     if (leader) broadcast();
   });
+  useTauriListener<{ dir: 1 | -1 }>(STEP_EVENT, (e) => {
+    if (leader) stepHere(e.payload.dir);
+  });
 
   // ── Followers: take the leader's turns ─────────────────────────
   useTauriListener<TurnMsg>(TURN_EVENT, (e) => {
@@ -356,6 +427,40 @@ export default function PagedBar({
     }
   });
 
+  // ── Manual paging (SCROLLR-298) ─────────────────────────────────
+  const step = useCallback((dir: 1 | -1) => {
+    if (leader) stepHere(dir);
+    else emit(STEP_EVENT, { dir }).catch(() => {});
+  }, [leader, stepHere]);
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const lastWheel = useRef(-Infinity);
+  useEffect(() => {
+    if (!bar) return;
+    // Native and not passive (React's onWheel is): preventDefault keeps a
+    // horizontal trackpad swipe from turning into the webview's back gesture.
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      hover.move(); // paging is activity: the hold stays while you page
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const now = performance.now();
+      const fresh = now - lastWheel.current >= WHEEL_QUIET_MS;
+      lastWheel.current = now;
+      if (fresh && d !== 0) stepRef.current(d > 0 ? 1 : -1);
+    };
+    bar.addEventListener("wheel", onWheel, { passive: false });
+    return () => bar.removeEventListener("wheel", onWheel);
+  }, [bar, hover]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key === "ArrowRight") stepRef.current(1);
+      else if (e.key === "ArrowLeft") stepRef.current(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // ── Presence: widgets that have pages ───────────────────────────
   const displayedKey = [...new Set([...widgets.filter((w) => w.tab !== ALSO_TAB).map((w) => w.tab), ...edgeTabs(edge)])].sort().join("\0");
   useEffect(() => {
@@ -374,7 +479,12 @@ export default function PagedBar({
       // Truly short (one page, fewer items than columns, nothing left to
       // fill with): a full page's column width, not one item across the bar.
       const short = plan.pages.length === 1 && items.length < plan.cols;
+      // Frozen with the page: a plan that changes reaches the count on the next page.
+      const counts = widgets.map((x) => plans.get(x.tab)?.pages.length ?? 0);
+      const before = counts.slice(0, widgets.indexOf(w)).reduce((a, b) => a + b, 0);
       shown.current = {
+        lapAt: before + index + 1,
+        lapOf: counts.reduce((a, b) => a + b, 0),
         seq: turn.seq,
         widget: w,
         page: freezePage(items, keyOf),
@@ -410,7 +520,7 @@ export default function PagedBar({
       ref={setBar}
       data-pages=""
       data-motion-style={reduced ? "fade" : "swipe"}
-      className="ticker-container relative flex h-16 w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150"
+      className="ticker-container group/bar relative flex h-16 w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150"
       onMouseEnter={hover.move}
       onMouseMove={hover.move}
       onMouseLeave={hover.leave}
@@ -452,6 +562,8 @@ export default function PagedBar({
             </AnimatePresence>
             {turn && <DwellLine seq={turn.seq} dwell={turn.dwell} held={held} accent={accent} />}
           </div>
+
+          <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={accentStyle(accent, ink)} />
 
           {/* The page: equal columns, full width, swiped in whole. */}
           <div className="relative min-w-0 flex-1 overflow-hidden">
