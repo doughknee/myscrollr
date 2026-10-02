@@ -51,9 +51,14 @@ jobs:
         run: |
           RUN_ID='${{ inputs.run_id }}'
           if [ -z "$RUN_ID" ]; then
-            RUN_ID=$(gh run list --workflow desktop-release.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
+            # The run that built the draft: the one on the draft's commit. Not
+            # "the latest run on main" — every later push to desktop/ leaves a
+            # skipped run behind (dry run, 2 Oct: that picked a September run).
+            SHA=$(gh release view "$TAG" --json targetCommitish --jq .targetCommitish)
+            [ -n "$SHA" ] || { echo "::error::No release $TAG"; exit 1; }
+            RUN_ID=$(gh run list --workflow "Desktop Release" --commit "$SHA" --json databaseId,conclusion --jq '[.[] | select(.conclusion != "skipped")][0].databaseId')
           fi
-          [ -n "$RUN_ID" ] || { echo "::error::No Desktop Release run found"; exit 1; }
+          [ -n "$RUN_ID" ] || { echo "::error::No Desktop Release run found for $TAG"; exit 1; }
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           gh run view "$RUN_ID" --json status,conclusion,url --jq '"Build run: \(.url) (\(.status) \(.conclusion // ""))"'
 
