@@ -24,7 +24,9 @@ import { allShown, bandMismatch, dwells, hoverReport, laps, lapStarts, mustSeeId
  */
 
 /** The design's floor (pagePlan's dwellFor: 6..12 s); 20 ms under it for the clock's frame step. */
-const MIN_DWELL_S = 5.98;
+// 6 s is the shortest dwell; CI measured 5.972 once (e98614fd: enter timestamps jitter ~30 ms under
+// the fake clock), so the floor allows 100 ms, which still fails a dwell that is actually short.
+const MIN_DWELL_S = 5.9;
 const MAX_DWELL_S = 12.1;
 /**
  * One trip round the bar: the scorecard (SCROLLR-266) says a lap is <= 60 s. Measured 14.6-57.8 s. The SCROLLR-268 prototype measured 23-60 s at

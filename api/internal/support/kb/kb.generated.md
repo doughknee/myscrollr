@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.6.10**.
+Current desktop version: **1.7.0**.
 
-<!-- source: desktop/package.json @ 62d221ccb614 -->
+<!-- source: desktop/package.json @ a938779a63cb -->
 
 ## Policies
 
@@ -255,7 +255,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
-Widget pages are new and arrive with the desktop release after 1.6.10. Until then the app
+Widget pages are new and arrive with the desktop release after 1.7.0. Until then the app
 you have is the second way of showing the bar, Continuous chips. Anything marked *(lands
 with SCROLLR-xxx)* is decided but not in the app yet.
 
@@ -747,10 +747,10 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.10 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.7.0 -->
 The last 8 published releases, newest first, as users read them.
 
-### Scrollr 1.6.10 — Something on your bar from the first second (`desktop-v1.6.10`, 2026-09-30)
+### Scrollr 1.7.0 — Something on your bar from the first second (`desktop-v1.7.0`, 2026-09-30)
 
 #### New
 
