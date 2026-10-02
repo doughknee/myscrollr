@@ -109,13 +109,15 @@ jobs:
 
           n_finance="$(echo "$body" | jq '.data.finance | length')"
           n_sports="$(echo "$body" | jq '.data.sports.sports | length')"
-          echo "finance rows: $n_finance   sports rows: $n_sports"
+          # The website's bar reads its news from here (SCROLLR-313).
+          n_rss="$(echo "$body" | jq '.data.rss | length')"
+          echo "finance rows: $n_finance   sports rows: $n_sports   rss items: $n_rss"
 
-          case "$n_finance$n_sports" in
+          case "$n_finance$n_sports$n_rss" in
             ''|*[!0-9]*) echo "::error::could not read row counts from /public/feed"; exit 1 ;;
           esac
 
-          if [ "$n_finance" -lt 1 ] || [ "$n_sports" -lt 1 ]; then
+          if [ "$n_finance" -lt 1 ] || [ "$n_sports" -lt 1 ] || [ "$n_rss" -lt 1 ]; then
             echo "::error::/public/feed served no data after 'make seed' — the seed load, the read path, or the Redis cache is broken."
             exit 1
           fi

@@ -25,12 +25,16 @@ const (
 )
 
 // PublicFeedResponse is the response shape for GET /public/feed.
-// It mirrors the DashboardResponse data map but without preferences/channels.
+// It mirrors the DashboardResponse data map but without preferences/channels:
+// "finance" and "rss" are the dashboard's shapes, "sports" is the
+// /sports/public {sports, meta} object.
 type PublicFeedResponse struct {
 	Data map[string]interface{} `json:"data"`
 }
 
-// HandlePublicFeed returns an aggregated feed of finance + sports data.
+// HandlePublicFeed returns an aggregated feed of finance, sports and rss
+// (the curated news feeds, SCROLLR-313) for the website's bar and the
+// signed-out desktop.
 // No authentication required. Results are cached in Redis for 30s.
 //
 // This used to resolve both sources through platform.GetChannel and fetch
@@ -63,10 +67,12 @@ func HandlePublicFeed(c *fiber.Ctx) error {
 			wg      sync.WaitGroup
 			trades  []Trade
 			sports  SportsResponse
+			rss     []RssItem
 			okTrade bool
 			okSport bool
+			okRSS   bool
 		)
-		wg.Add(2)
+		wg.Add(3)
 		go func() {
 			defer wg.Done()
 			t, _, err := PublicFinance(ctx)
@@ -85,6 +91,15 @@ func HandlePublicFeed(c *fiber.Ctx) error {
 			}
 			sports, okSport = s, true
 		}()
+		go func() {
+			defer wg.Done()
+			r, err := PublicRSS(ctx)
+			if err != nil {
+				log.Printf("[PublicFeed] rss: %v", err)
+				return
+			}
+			rss, okRSS = r, true
+		}()
 		wg.Wait()
 
 		// A source that errored is omitted rather than emitted empty, so a
@@ -96,6 +111,9 @@ func HandlePublicFeed(c *fiber.Ctx) error {
 		if okSport {
 			res.Data["sports"] = sports
 		}
+		if okRSS {
+			res.Data["rss"] = rss
+		}
 
 		cacheData, err := json.Marshal(res)
 		if err != nil {
@@ -103,7 +121,7 @@ func HandlePublicFeed(c *fiber.Ctx) error {
 		}
 		// Only cache a complete feed. Caching a half-built one would pin the
 		// degraded shape for the full TTL.
-		if okTrade && okSport {
+		if okTrade && okSport && okRSS {
 			platform.Rdb.Set(ctx, PublicFeedCacheKey, cacheData, PublicFeedCacheTTL)
 		}
 		return cacheData, nil

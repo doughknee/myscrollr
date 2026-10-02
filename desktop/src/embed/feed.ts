@@ -5,12 +5,13 @@
  * What `/public/feed` lacks, and what stands in for it here:
  *   - no `widgets` / `preferences`: rows are built from the catalog
  *     snapshot's default configs for the widgets the page asked for;
- *   - no `rss` at all: news rows come from the bundled fixture (the caller
+ *   - `rss` holds the curated news feeds only (SCROLLR-313); when it is
+ *     missing or empty, news rows come from the bundled fixture (the caller
  *     passes them in);
  *   - `sports` is `{ sports, meta }` where the dashboard has `sports` and
- *     `sports_meta`, and holds the first 200 games across every league, so
- *     a league whose next game is days out is absent (its page shows the
- *     league status line instead).
+ *     `sports_meta`, and holds up to 40 games per league (SCROLLR-313), so
+ *     a league whose next game is days out may still be absent (its page
+ *     shows the league status line instead).
  */
 import snapshot from "../catalog.snapshot.json";
 
@@ -94,14 +95,19 @@ export const PREFERENCES: Row = {
   updated_at: "2026-01-01T00:00:00Z",
 };
 
-/** The public feed as a dashboard for `ids`; null when it carries nothing. */
-export function fromPublicFeed(body: unknown, ids: string[], rss: Row[]): EmbedDashboard | null {
-  const data = (body as { data?: { finance?: Row[]; sports?: { sports?: Row[]; meta?: Row } } })?.data;
+/** The public feed as a dashboard for `ids`, `fallbackRss` when it has no news; null when it carries nothing. */
+export function fromPublicFeed(body: unknown, ids: string[], fallbackRss: Row[]): EmbedDashboard | null {
+  const data = (body as { data?: { finance?: Row[]; sports?: { sports?: Row[]; meta?: Row }; rss?: Row[] } })?.data;
   const finance = data?.finance ?? [];
   const sports = data?.sports?.sports ?? [];
   if (finance.length === 0 && sports.length === 0) return null;
   return {
-    data: { finance, sports, sports_meta: data?.sports?.meta ?? { leagues: [] }, rss },
+    data: {
+      finance,
+      sports,
+      sports_meta: data?.sports?.meta ?? { leagues: [] },
+      rss: data?.rss?.length ? data.rss : fallbackRss,
+    },
     widgets: widgetRows(ids),
     preferences: PREFERENCES,
   };

@@ -67,7 +67,7 @@ async function fixture(name: string): Promise<Row | null> {
   return Number.isNaN(captured) ? j : rebase(j, Date.now() - captured);
 }
 
-/** News rows: the public feed has none, so the default fixture's, unlinked. */
+/** News rows for when the public feed has none: the default fixture's, unlinked. */
 async function newsRows(): Promise<Row[]> {
   const rss = ((await fixture("dashboard.default"))?.data as Row | undefined)?.rss as Row[] | undefined;
   return (rss ?? []).map((r) => ({ ...r, link: "" }));
