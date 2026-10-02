@@ -128,6 +128,8 @@ interface Shown {
   /** This page's place among every page of every widget, in reading order, and their total: the pager's `7/23` (SCROLLR-298). */
   lapAt: number;
   lapOf: number;
+  /** Arrived by a manual step back: swiped in left to right (SCROLLR-300). */
+  back: boolean;
 }
 
 const NO_PINS: WidgetPin[] = [];
@@ -175,10 +177,11 @@ function DwellLine({ seq, dwell, held, accent }: { seq: number; dwell: number; h
 }
 
 /**
- * The pager beside the label, `‹ 7/23 ›` (SCROLLR-298): where this page sits among
- * every page of the lap, always shown, and the two arrows around it, shown while
- * the pointer is over the bar (or one has keyboard focus). Together beside the
- * label so neither the eye nor the mouse crosses an ultrawide bar. PAGER_W wide,
+ * The pager at the bar's left end, before the label, `‹ 7/23 ›` (SCROLLR-298,
+ * SCROLLR-300): where this page sits among every page of the lap, always shown, and
+ * the two arrows around it, shown while the pointer is over the bar (or one has
+ * keyboard focus). A bar-level control, so it sits outside the widget's label; next
+ * to it, so neither the eye nor the mouse crosses an ultrawide bar. PAGER_W wide,
  * reserved for `99/99`, so a count changing moves nothing. Each arrow is drawn
  * 22px and hits 44px (its `after:` box reaches 11px either side).
  */
@@ -495,6 +498,7 @@ export default function PagedBar({
         cols: plan.cols,
         total: plan.pages.reduce((n, p) => n + p.length, 0),
         avail: plan.avail,
+        back: turn.back === true,
       };
     }
   }
@@ -509,7 +513,19 @@ export default function PagedBar({
   const ink = inkFor(cur?.widget.hex, dark);
   const items = cur ? pageItems(cur.page) : [];
   const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: FADE_S, ease: "linear" as const } };
-  const swipe = { initial: { x: "100%" }, animate: { x: "0%" }, exit: { x: "-100%" }, transition: { duration: SWIPE_S, ease: EASE } };
+  // Right to left, except a manual step back, which slides the other way (SCROLLR-300).
+  // `custom` on AnimatePresence reaches the page that is leaving, so it exits the same way.
+  const swipe = {
+    variants: {
+      in: (back: boolean) => ({ x: back ? "-100%" : "100%" }),
+      up: { x: "0%" },
+      out: (back: boolean) => ({ x: back ? "100%" : "-100%" }),
+    },
+    initial: "in",
+    animate: "up",
+    exit: "out",
+    transition: { duration: SWIPE_S, ease: EASE },
+  };
   const wipe = { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: LABEL_S, ease: EASE } };
 
   // A clock or a pin on the edge is something to show: the bar stays.
@@ -527,7 +543,10 @@ export default function PagedBar({
     >
       {cur && (
         <>
-          {/* The label: the widget's name in its colour. Pages of the same
+          {/* The pager first: the whole lap is the bar's, not the widget's (SCROLLR-300). */}
+          <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={accentStyle(accent, ink)} />
+
+          {/* The label:the widget's name in its colour. Pages of the same
               widget keep it; a new widget wipes it upward. */}
           <div className="relative shrink-0 overflow-hidden" style={{ width: LABEL_W }}>
             <AnimatePresence initial={false}>
@@ -563,13 +582,13 @@ export default function PagedBar({
             {turn && <DwellLine seq={turn.seq} dwell={turn.dwell} held={held} accent={accent} />}
           </div>
 
-          <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={accentStyle(accent, ink)} />
-
           {/* The page: equal columns, full width, swiped in whole. */}
           <div className="relative min-w-0 flex-1 overflow-hidden">
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} custom={cur.back}>
               <motion.div
                 key={cur.seq}
+                custom={cur.back}
+                data-back={cur.back ? "" : undefined}
                 data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`}
                 data-visit={cur.seq}
                 data-short={cur.short ? "" : undefined}

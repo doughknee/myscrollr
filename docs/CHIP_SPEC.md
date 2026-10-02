@@ -116,7 +116,7 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 ### P.1 The bar
 
 - Height `h-16`, 64px, `ticker-container relative flex w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150`. One height: no density branch (invariant 1).
-- Left to right: **label** (112px, `shrink-0`), **pager** (`PAGER_W` = 88px, `shrink-0`, §P.7a), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
+- Left to right: **pager** (`PAGER_W` = 88px, `shrink-0`, §P.7a), **label** (112px, `shrink-0`), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
 - The edge sits outside the page block, so it shows with no page at all.
 - `data-pages` on the bar; `data-motion-style` is `"swipe"` or `"fade"` (reduced motion, §P.7).
 - Nothing to draw (no widget page, no utility, no pin): `EmptyBar` in its Pages look (a label block in the theme accent, then the same one-row message). Two states, decided in `App.tsx`: **sourceless** (signed in, no widgets installed: browse the catalog) and **installedOff** (installed, none showing: open one to turn it on). A clock or a pin on the edge counts as something to show: the bar stays.
@@ -133,8 +133,8 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 ### P.3 Geometry of a page
 
 ```
-|<- 112 ->|<- 88 ->|<---------- content width ---------->|<- edge ->|
-| label   | ‹ 7/23 ›| col 1 | col 2 | col 3 | ... all equal | edge     |
+|<- 88 ->|<- 112 ->|<---------- content width ---------->|<- edge ->|
+|‹ 7/23 ›| label   | col 1 | col 2 | col 3 | ... all equal | edge     |
 ```
 
 - **Content width** = `bar width - LABEL_W - PAGER_W - edge width` (`contentWidth`). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
@@ -289,7 +289,7 @@ published as `data-visit` on the page for the browser checks (a visit is one pag
 | What | Value |
 |---|---|
 | Dwell | `dwellFor(items on page) = clamp(3 + 0.75 x items, 6, 12)` seconds: 6 s for a page of four or fewer, 12 s from twelve |
-| Swipe | 0.6 s (`SWIPE_S`), ease `(0.32, 0.72, 0, 1)`; the new page enters from `x: 100%`, the old leaves to `x: -100%` |
+| Swipe | 0.6 s (`SWIPE_S`), ease `(0.32, 0.72, 0, 1)`; the new page enters from `x: 100%`, the old leaves to `x: -100%`; a manual step back is mirrored (§P.7a) |
 | Label wipe | 0.45 s, same ease, upward, only when the widget changes |
 | Edge slot roll | 0.45 s, same ease, upward |
 | Reduced motion | The **OS** setting, read directly (`prefers-reduced-motion`); every swipe, wipe and roll becomes a 0.4 s linear crossfade, and `data-motion-style="fade"` |
@@ -305,7 +305,11 @@ SCROLLR-298 (Brandon, 1 Oct 2026: "little buttons or something somewhere that ma
 to cycle through them"; then, "arrow keys on the far left and far right might be annoying; I
 have an ultrawide"). No setting.
 
-- **The pager** sits right after the label, `PAGER_W` = 88px, `shrink-0`, `data-pager`:
+- **The pager** sits at the bar's left end, before the label (SCROLLR-300; it sat after
+  the label until then): it counts the whole lap, a bar-level control, so it sits outside
+  the widget's label, a quiet control at the left end against the edge zone's utilities
+  and pins at the right. It has no dwell line; that and the wipe stay on the label.
+  `PAGER_W` = 88px, `shrink-0`, `data-pager`:
   `‹ 7/23 ›`. The middle is always shown: this page's place in the lap and the lap's total,
   `font-mono text-[12px] font-semibold tabular-nums text-fg-3`, centred in a 44px box
   reserved for `99/99` (`data-lap-pos`). The lap is every page of every widget in ticker
@@ -317,7 +321,7 @@ have an ultrawide"). No setting.
   `aria-label` "Previous page" / "Next page"), a lucide chevron drawn 18px in a 22px box, in
   the label's ink (`--accent-ink`), hit area 44px wide by the bar's 64px (an `after:` box
   11px either side). `opacity-0`, shown while the pointer is over the bar
-  (`group-hover/bar`) or when one has keyboard focus. Together beside the label so neither
+  (`group-hover/bar`) or when one has keyboard focus. Together, next to the label, so neither
   the eye nor the mouse crosses an ultrawide bar; nothing at the far ends.
 - **The wheel** over the bar is the primary control (the bar lives at a screen edge where
   the wheel is the natural gesture): down or a sideways swipe left (`deltaY` or `deltaX` >
@@ -334,9 +338,14 @@ have an ultrawide"). No setting.
 - **A step** is `stepTurn` (`widgetPages.ts`) on the leader's page clock: the next or
   previous page in the same reading order the pager counts; past a widget's last page is
   the next widget's first, before its first page is the previous widget's last, and the lap
-  wraps both ways. It is a turn like any other: a new `seq`, the same swipe (always right to
-  left, back included) or crossfade, frozen at swipe-in, the edge slots step, and **the
-  page's dwell starts again**. A held page stays held. The step is an immediate turn plus
+  wraps both ways. It is a turn like any other: a new `seq`, the same 0.6 s swipe or
+  crossfade, frozen at swipe-in, the edge slots step, and **the page's dwell starts
+  again**. **A step back swipes the other way** (SCROLLR-300, Brandon: the bar slides the
+  way you asked): the page comes in from `x: -100%` and the old one leaves to `x: 100%`.
+  Forward steps and every automatic turn stay right to left. The turn carries `back: true`
+  (`stepTurn` with dir -1, relayed to followers with the rest of the turn), the page
+  `data-back`, and AnimatePresence's `custom` hands the direction to the page leaving.
+  Reduced motion stays a crossfade. A held page stays held. The step is an immediate turn plus
   a move of that widget's cursor (§P.6) to the page after the one stepped to, so the
   clock's next turn moves on to the next widget as after any turn, and the widget's next
   turn does not show that page again.
@@ -610,8 +619,11 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
   text in the widget's colour at 4.5:1, the label name at 3:1, every hairline at 1.5:1.
 - `e2e/ticker/hover.spec.ts`: under the fake clock, a still pointer holds 5 s and then the bar turns, a moving pointer holds the page and the dwell line for 40 s, and moving again after a release grabs the page back.
-- `e2e/ticker/paging.spec.ts` (SCROLLR-298), fake clock: the pager sits at x = 112 and
-  `PAGER_W` wide and its count's box stays put from `1/n` to `10/n`; wheel down and up, a
+- `e2e/ticker/paging.spec.ts` (SCROLLR-298), fake clock: the pager sits at x = 0 and
+  `PAGER_W` wide, the label at x = `PAGER_W`, the page after both (SCROLLR-300), and its
+  count's box stays put from `1/n` to `10/n`; a step back swipes in from the left and out
+  to the right while a forward step and the clock's next turn go right to left (the sign
+  of each page's x mid-swipe); wheel down and up, a
   flick of eight events is one step, a sideways swipe counts the same, back from the
   first page wraps to the last, nothing scrolls; the arrows are hidden off the bar, shown on
   it, 44px targets, and step; `←`/`→` step; a step restarts the dwell and the clock then

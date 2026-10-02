@@ -56,7 +56,8 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 export const LABEL_W = 112;
 
 /**
- * Width of the pager beside the label, `‹ 7/23 ›` (SCROLLR-298): two 22px arrows
+ * Width of the pager at the bar's left end, before the label, `‹ 7/23 ›`
+ * (SCROLLR-298, SCROLLR-300): two 22px arrows
  * around a counter reserved for `99/99` at 12px mono.
  */
 export const PAGER_W = 88;
