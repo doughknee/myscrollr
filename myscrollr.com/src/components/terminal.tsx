@@ -76,7 +76,7 @@ export function PageHeader({
   // overflow-wrap:break-word splits words mid-glyph on small phones.
   const headline =
     size === 'lg'
-      ? 'text-[clamp(56px,8.5vw,118px)] max-sm:text-[clamp(40px,13.5vw,56px)]'
+      ? 'text-[clamp(56px,8.5vw,118px)] max-sm:text-[clamp(34px,11vw,56px)]'
       : 'text-[clamp(44px,6.5vw,96px)] max-sm:text-[clamp(34px,10.5vw,44px)]'
   return (
     <section className="relative overflow-hidden border-b border-hairline px-5 pb-14 pt-16 sm:px-8">
