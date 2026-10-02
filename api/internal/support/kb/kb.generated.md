@@ -764,8 +764,33 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.10 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.7.0 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.7.0 — Pages (`desktop-v1.7.0`, 2026-10-02)
+
+#### Scrollr 1.7.0 — Pages
+
+The bar has a new default. Instead of chips scrolling by, each widget gets **a whole page of the bar**: NFL is a row of games, NPR a row of headlines, Stocks a row of quotes, in equal columns that fill your screen. Nothing moves while a page is up; after a few seconds it swipes out and the next widget swipes in. Continuous scrolling is still there in Settings › Ticker if you prefer it.
+
+**The band.** The left end of the bar now tells you where you are without a word to read: a colour-coded strip for your widgets, the widget's name, a dot when something is happening (red = games live, green = market open, the widget's colour = fresh stories), and a row of pills for its pages — the current one fills as the page's time runs out, the ones you've seen are lit. Hover the bar for ‹ ˄ ˅ › : ‹ › walk every page, ˄ ˅ skip a widget. Arrow keys and the wheel do the same.
+
+**Every page is full.** A short watchlist tops up with popular symbols (marked with a +) until you add your own. Live games and your teams lead. A page shows exactly one page per lap, so a long feed doesn't hold the bar.
+
+**GitHub, connected.** Press **Connect GitHub** in the widget, pick the repos Scrollr can see, and they show up on their own — private ones included. Each repo's chip says one thing: a green dot when main is passing, red with the workflow when it breaks, a pulse while your branch is running, and a count when something is waiting on you. Pull requests that need you — review requested, changes requested, failing checks — get their own page on the bar. Choose what counts in the widget, and set quiet hours so the bar stays silent when you want it to.
+
+**Fewer settings.** Colors, item order, font weight and the compact density are gone — one bar, one look, ten themes. Startup and Shortcuts now live under App.
+
+**Also**
+- Clock and Weather are free and never use a widget slot.
+- A new account starts with NPR + Stocks and the Clock on the edge.
+- The catalog finds stocks and crypto by symbol.
+- The edge zone (clocks, weather, pins) never takes more than 40% of the bar.
+- Weather ranges print in your unit; alert amber reads on every theme.
+- All ten themes pass 4.5:1 on the bar.
+- Scrollr starts with your computer by default on new installs (one-time notice; turn it off under App › Startup).
+
+Existing users are moved to Pages once, with a notice; switch back any time.
 
 ### Scrollr 1.6.10 — Something on your bar from the first second (`desktop-v1.6.10`, 2026-09-30)
 
@@ -869,18 +894,3 @@ Two trust improvements: Windows can verify who made Scrollr, and product activit
 If you turn it on, Scrollr records one daily fact after the native ticker has been visible with an enabled widget for 30 continuous seconds. That fact can include only broad categories such as sports, markets, news, fantasy, predictions, and utilities. It does not include symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint.
 
 Activity facts are retained for 90 days. Turning the switch off stops collection and deletes the stored activity facts and cohort metadata for your account. Crash reporting remains a separate setting.
-
-### Scrollr 1.6.3 — The whole matchday (`desktop-v1.6.3`, 2026-09-08)
-
-A small release with one fix, for something that made the bar look broken when it was not.
-
-#### ⚽ The whole matchday, not one game
-
-**If a league's next games are more than a day away, the bar now shows that whole matchday.** Before, it showed exactly one fixture. So if your league had fourteen games kicking off tomorrow evening, you saw a single one of them tonight and reasonably concluded the ticker was broken. Now all fourteen go on the bar and take turns, the same way they would once they are live.
-
-Two things stayed deliberately the same:
-
-- **A league whose next fixture really is a lone event still shows one chip.** A Formula 1 race weeks out, a single Thursday night football game: those are genuinely one thing, and one chip is the honest answer.
-- **Nothing changed about live games or recent results.** Live is always on the bar, finished games stay for eighteen hours, and anything kicking off within a day is on as before.
-
-There is no new setting for this. What appears on the bar is not something you configure, and this is a better rule rather than another dial.
