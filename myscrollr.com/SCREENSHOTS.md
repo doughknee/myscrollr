@@ -3,8 +3,8 @@
 This document covers how product screenshots are captured, optimized, and
 consumed by the marketing site.
 
-The site uses a **single pipeline** for every screenshot — hero, customization,
-channels, support, themes — driven by `scripts/optimize-screenshots.mjs` and
+The site uses a **single pipeline** for every screenshot — channels and
+support — driven by `scripts/optimize-screenshots.mjs` and
 rendered through the shared `<ProductScreenshot>` component.
 
 ---
@@ -18,19 +18,13 @@ context (which only copies `myscrollr.com/`) can access them:
 myscrollr.com/screenshot-sources/
   darkmode/       dark-<slug>.png            ← every dark-mode capture
   lightmode/      light-<slug>.png           ← every light-mode capture
-  themes/dark/    theme-<name>-dark-settings.png
-  themes/light/   theme-<name>-light-settings.png
-
-myscrollr.com/screenshot-sources-ticker/
-  compact/<theme>/<channel>-<theme>-compact.png
-  detailed/<theme>/<channel>-<theme>-detailed.png
 ```
 
 All sources are **2478×1478** (aspect ≈ `1600 / 954`, i.e. 1.677). Keep this
 size locked when adding new captures so the optimize script and the
 `<ProductScreenshot>` aspect-ratio defaults stay aligned.
 
-`screenshot-sources/` and `screenshot-sources-ticker/` are committed so the
+`screenshot-sources/` is committed so the
 optimize script can regenerate WebPs deterministically on any machine.
 
 ---
@@ -39,9 +33,7 @@ optimize script can regenerate WebPs deterministically on any machine.
 
 ### Conventions
 
-- One screenshot per slug × theme (dark + light). Theme-named accent palettes
-  (Catppuccin, Dracula, etc.) are captured only for the **settings panel**
-  since that's the canonical "theme preview" surface.
+- One screenshot per slug × theme (dark + light).
 - Resolution: capture at the same display zoom level every time. macOS
   `Cmd+Shift+4` → Space → click the Scrollr window works well.
 - Don't full-screen — the window's rounded corners and title bar are part of
@@ -74,9 +66,6 @@ optimize script can regenerate WebPs deterministically on any machine.
 
 For single-theme captures (only dark or only light), use the
 `SINGLE_THEME_MAP` table instead.
-
-For new accent themes, add the slug to the `THEME_NAMES` array; the optimize
-script handles the `themes/dark/` and `themes/light/` source folders.
 
 ---
 
@@ -117,9 +106,6 @@ The shared `<ProductScreenshot>` component (`src/components/ProductScreenshot.ts
 is the only consumer. It handles:
 
 - **Theme resolution**: reads `useTheme()` and serves the matching variant.
-  `themeOverride` forces a specific theme; `variantSuffix` forces an
-  arbitrary suffix for cases like the theme switcher rendering Dracula
-  regardless of the site theme.
 - **`<picture>` + `srcset`**: serves 1× or 2× WebP based on
   `devicePixelRatio`.
 - **Decoding hints**: `priority` flips `loading=eager` + `fetchpriority=high`
@@ -160,14 +146,11 @@ the radius class up one step.
 
 ## Where each screenshot is used
 
-| Category     | Used in                                                 |
-| ------------ | ------------------------------------------------------- |
-| `channels/`  | `HeroProductShowcase` (home hero rotation, 4 channels)  |
-| `configure/` | `CustomizationShowcase` (style card)                    |
-| `overview/`  | `CustomizationShowcase` (catalog card)                  |
-| `themes/`    | `MakeItYoursSection` (switcher + decorative deck)       |
-| `widgets/`   | Reserved for `/channels` page (planned)                 |
-| `display/`   | Reserved for `/channels` configure mosaic (planned)     |
-| `support/`   | Reserved for `/support` section illustrations (planned) |
+| Category    | Used in                                                    |
+| ----------- | ---------------------------------------------------------- |
+| `channels/` | `/sports`, `/markets`, `/news` heroes; SoftwareApp JSON-LD |
+| `support/`  | `/support` sections                                        |
+| `widgets/`  | Reserved for `/channels` page (planned)                    |
+| `display/`  | Reserved for `/channels` configure mosaic (planned)        |
 
 Refresh the placements as new pages adopt the asset set.

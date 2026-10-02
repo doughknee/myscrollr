@@ -22,7 +22,7 @@ export function TerminalHero() {
       line1="Your live desktop ticker"
       line2="for everything you follow"
       sub={
-        "The moment it happens, you already know. Live sports scores, markets, crypto, news, RSS, weather, and more stay visible in a quiet bar above whatever you're working on."
+        "The moment it happens, you already know. Scores, markets, headlines, your GitHub and the weather, one page at a time, in a quiet bar above whatever you're working on."
       }
       actions={<HeroActions />}
     />

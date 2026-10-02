@@ -19,7 +19,7 @@ function LifetimePrerender() {
     <div>
       <PageHeader
         eyebrowLeft="UPLINK ／ LIFETIME"
-        eyebrowRight="128 FOUNDING MEMBER SLOTS · ONE PAYMENT"
+        eyebrowRight="128 FOUNDING MEMBER SPOTS · ONE PAYMENT"
         line1="Ultimate."
         line2="One payment."
         sub="One payment. Permanent access. Lifetime members get Uplink Ultimate with unlimited widgets at once, priority support, and early access for $999."
@@ -51,7 +51,7 @@ export const Route = createFileRoute('/uplink_/lifetime')({
     seo({
       title: 'Scrollr Lifetime Ultimate: Founding Members',
       description:
-        'One payment, permanent Uplink Ultimate access: unlimited widgets, priority support, and early access, forever. Only 128 founding member slots available.',
+        'One payment, permanent Uplink Ultimate access: unlimited widgets, priority support, and early access, forever. Only 128 founding member spots available.',
       path: '/uplink/lifetime',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -197,7 +197,7 @@ function LifetimePage() {
             className="mb-10 flex flex-wrap justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45"
           >
             <span>UPLINK ／ LIFETIME</span>
-            <span>128 FOUNDING MEMBER SLOTS · ONE PAYMENT</span>
+            <span>128 FOUNDING MEMBER SPOTS · ONE PAYMENT</span>
           </motion.div>
 
           <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
@@ -223,7 +223,7 @@ function LifetimePage() {
                 Lifetime members get permanent Uplink Ultimate access with a
                 single payment: unlimited widgets at once, priority support, and
                 early access, forever. No renewals, no tiers to think about.
-                Only 128 founding member slots will ever exist.
+                Only 128 founding member spots will ever exist.
               </motion.p>
 
               {/* Feature list */}
@@ -283,7 +283,7 @@ function LifetimePage() {
                       LIFETIME ULTIMATE
                     </span>
                     <span className="font-mono text-[10px] tracking-[0.12em] text-base-content/45">
-                      128 SLOTS TOTAL
+                      128 SPOTS TOTAL
                     </span>
                   </div>
 
@@ -317,7 +317,7 @@ function LifetimePage() {
                   <div className="mb-8 rounded-[4px] border border-hairline-minor bg-panel p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-base-content/40">
-                        Available Slots
+                        Available Spots
                       </span>
                       <span className="font-mono text-xs font-bold text-warning/70">
                         128 / 128

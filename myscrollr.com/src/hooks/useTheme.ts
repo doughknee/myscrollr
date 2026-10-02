@@ -17,8 +17,7 @@ function getResolvedTheme(): Theme {
 // hydrates, so a naive `getResolvedTheme()` on the first client render
 // would disagree with the SSR markup and trigger a hydration mismatch
 // (React error #418) — visible as a Sun/Moon swap in `ThemeToggle`,
-// different image URLs in `ProductScreenshot`, and the caption text in
-// `MakeItYoursSection`.
+// and different image URLs in `ProductScreenshot`.
 //
 // We force the first client render to mirror SSR (`'dark'`), then flip
 // to the real DOM-resolved theme inside `useEffect` on the next commit.

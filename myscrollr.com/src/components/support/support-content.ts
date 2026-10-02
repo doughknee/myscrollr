@@ -41,7 +41,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Can I customize the bar?',
     answer:
-      'Ten themes, each light or dark; top or bottom of any monitor, one monitor or all of them, pages or a continuous scroll, and per-widget settings.',
+      'Twenty palettes, top or bottom of any monitor, pages or a continuous scroll, and per-widget settings.',
   },
   {
     question: 'How do I update the app?',
@@ -116,7 +116,7 @@ export const GETTING_STARTED_STEPS: Array<GettingStartedStep> = [
   {
     title: 'Customize the Ticker',
     description:
-      'The ticker shows one widget at a time as a page, then swipes to the next; Clock and Weather sit on its edge. Open Settings > Ticker to change its size, the screen edge and monitors it sits on, or switch to a continuous scroll. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.',
+      'The bar sits at the edge of your screen and shows one widget per page. Open Settings › Ticker to switch between Pages and Continuous, or set the scroll speed in Continuous. To move it to the top or bottom, right-click it.',
   },
 ]
 

@@ -11,7 +11,7 @@ Privacy: no advertising trackers or data brokers. Operational diagnostics and au
 - [Download](https://myscrollr.com/download): Current packages and platform requirements.
 - [Widgets](https://myscrollr.com/widgets): The current widget catalog, including individual sports leagues, stocks, crypto, curated news, and local utilities.
 - [Architecture](https://myscrollr.com/architecture): How source data reaches the desktop ticker.
-- [Uplink](https://myscrollr.com/uplink): Current plan prices and widget-slot limits.
+- [Uplink](https://myscrollr.com/uplink): Current plan prices and how many pages each plan puts on your bar.
 - [Business](https://myscrollr.com/business): Discuss a custom deployment; capabilities, price, timing, support, and terms require a written scope.
 
 You can download and browse without an account. Sign-in is required to add live data widgets and sync settings. Live updates appear automatically when Scrollr receives them; upstream timing, corrections, outages, and the user's connection can affect arrival time.

@@ -26,7 +26,7 @@ const SPORTS_FAQ = [
   {
     question: 'Can I focus on one team?',
     answer:
-      'Yes. Each league has its own widget, and the sports controls let you set a favorite team and choose the time window shown.',
+      'Yes. Each league has its own widget. Set a favorite team and it leads page 1: live games first, then yours, then the rest of the slate.',
   },
   {
     question: 'Are scores guaranteed to be instant?',
@@ -95,8 +95,8 @@ function SportsPage() {
               </h2>
               <p className="mt-5 leading-relaxed text-base-content/60">
                 Open the sports view for scores, upcoming schedules, and league
-                standings. Set a favorite team and time window; the compact bar
-                stays useful when the larger window is closed.
+                standings. Set a favorite team and it leads page 1: live games
+                first, then yours, then the rest of the slate.
               </p>
             </div>
             <motion.div
