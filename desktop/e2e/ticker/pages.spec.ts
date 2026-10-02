@@ -72,7 +72,8 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   // SCROLLR-294: the worst case for "all shown": every page kind, with NPR's 30 headlines (8 pages at 1920) among them.
   { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true }, // all shown 295 s since SCROLLR-297 (404 s before)
   // SCROLLR-312: the GitHub page alone (github.board.json's four repos, a cell each; the Clock on the edge).
-  { fixture: "github", width: 1920, laps: 3 },
+  // 1920: five columns, the fifth a thing cell (canvas F1); 1280: three columns, repos only (2 + 2).
+  { fixture: "github", width: 1920, laps: 3, full: true },
   { fixture: "github", width: 1280, laps: 3 },
 ];
 
@@ -168,11 +169,30 @@ const GH_FIRST: Record<string, string> = {
   "sample/scrollr-web": "vercel failed · 3m",
   "sample/infra": "apply running · 3m",
 };
+/** The fixture's things, most urgent first, as thingsFor orders them (never one a repo cell names). */
+const GH = "https://github.com/";
+const GH_THINGS = {
+  one: [`${GH}sample-org/docs/pull/61`, `${GH}sample/myscrollr/pull/479`, `${GH}sample/myscrollr/issues/312`, `${GH}sample/myscrollr/pull/476`],
+  two: [`${GH}sample-org/docs/pull/61`, `${GH}sample/myscrollr/pull/479`, `${GH}sample/myscrollr/issues/312`],
+};
 
-test("github: four repos are a page, a cell per repo in order, at least REPO_MIN_COL wide, the band counting the ones that need you (SCROLLR-312)", async ({ page, context }) => {
+/** The GitHub page up: its cells, their widths, line 1 of each repo cell, the band's chip, and whether GitHub is on the edge. */
+const ghPage = (page: Page) =>
+  page.locator("[data-page]").first().evaluate((p) => ({
+    ids: [...p.querySelectorAll("[data-chip]")].map((c) => c.getAttribute("data-item")),
+    cells: [...p.querySelectorAll("[data-chip]")].map((c) => c.getBoundingClientRect().width),
+    first: Object.fromEntries([...p.querySelectorAll("[data-chip]:not([data-thing])")].map((c) => [c.getAttribute("data-item"), c.querySelector("[data-part=status]")?.textContent])),
+    shipped: [...p.querySelectorAll("[data-thing=shipped]")].map((c) => c.getAttribute("data-item")),
+    chip: document.querySelector("[data-band] [data-chip]")?.getAttribute("data-kind"),
+    count: document.querySelector("[data-band] [data-chip] span:last-child")?.textContent,
+    edge: document.querySelector("[data-edge] [data-widget=github]") !== null,
+  }));
+
+test("github: four repos are a page, a cell per repo in order, then a thing where a column is spare, at least REPO_MIN_COL wide (SCROLLR-312)", async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.clock.install();
-  for (const width of [1920, 1280]) {
+  // 1920 with the Clock: five columns, four repos and one thing. 1280: three columns, repos only (2 + 2).
+  for (const [width, want] of [[1920, [...GH_REPOS, `${GH}sample-org/docs/pull/61`]], [1280, GH_REPOS]] as const) {
     await page.setViewportSize({ width, height: 80 });
     await recordFromStart(page);
     await parkMouse(page);
@@ -187,21 +207,14 @@ test("github: four repos are a page, a cell per repo in order, at least REPO_MIN
     const tr = await readTrace(page);
     const seen = tr.enters.slice(0, tr.enters[0].count);
     const label = `@${width}`;
-    expect(seen.flatMap((e) => e.items.map((i) => i.id)), `${label}: a cell per repo, in order`).toEqual(GH_REPOS);
-    const m = await page.locator("[data-page]").first().evaluate((p) => ({
-      cells: [...p.querySelectorAll("[data-chip]")].map((c) => c.getBoundingClientRect().width),
-      worst: [...p.querySelectorAll("[data-chip]")].map((c) => c.getAttribute("data-worst")),
-      first: Object.fromEntries([...p.querySelectorAll("[data-chip]")].map((c) => [c.getAttribute("data-item"), c.querySelector("[data-part=status]")?.textContent])),
-      chip: document.querySelector("[data-band] [data-chip]")?.getAttribute("data-kind"),
-      count: document.querySelector("[data-band] [data-chip] span:last-child")?.textContent,
-      edge: document.querySelector("[data-edge] [data-widget=github]") !== null,
-    }));
+    expect(seen.flatMap((e) => e.items.map((i) => i.id)), `${label}: a cell per repo, in order, then the things`).toEqual(want);
+    const m = await ghPage(page);
     expect(Math.min(...m.cells), `${label}: REPO_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
     for (const [item, pill] of Object.entries(m.first)) expect(pill, `${label}: ${item}'s status`).toBe(GH_FIRST[item]);
     expect(m, `${label}: the band's chip counts the repos that need you; GitHub is not on the edge`).toMatchObject({ chip: "needs", count: "4", edge: false });
     expect(tr.moved, `${label}: nothing moves`).toEqual([]);
     expect(tr.cuts, `${label}: nothing cut`).toEqual([]);
-    console.log(`[github ${label}] ${seen.map((e) => `${e.page}: ${e.items.map((i) => i.id).join(" ")}`).join(" | ")} cols ${m.cells.map((w) => w.toFixed(0)).join("/")} worst ${m.worst.join(",")}`);
+    console.log(`[github ${label}] ${seen.map((e) => `${e.page}: ${e.items.map((i) => i.id).join(" ")}`).join(" | ")} cols ${m.cells.map((w) => w.toFixed(0)).join("/")}`);
   }
 
   // Quiet hours all day: no GitHub page, and GitHub nowhere on the edge.
@@ -213,32 +226,24 @@ test("github: four repos are a page, a cell per repo in order, at least REPO_MIN
   expect(await page.locator("[data-edge] [data-widget=github]").count(), "quiet hours: not on the edge").toBe(0);
 });
 
-test("github: two repos share ONE edge slot that rotates on the turn and never changes width (SCROLLR-312)", async ({ page, context }) => {
+test("github: one or two repos are a page too, the spare columns filled with what needs you next, then what shipped; never the edge (SCROLLR-312, canvas F1)", async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.clock.install();
   await page.setViewportSize({ width: 1920, height: 80 });
-  await parkMouse(page);
-  // A bar with pages, so the page clock turns (the slot steps on the turn).
-  await page.goto(url("pages", "&github=two"));
-  await parkMouse(page);
-  const slot = page.locator("[data-edge] [data-widget=github] button");
-  await slot.waitFor();
-  expect(await page.locator("[data-page] [data-item^='sample/']").count(), "two repos: no GitHub page").toBe(0);
-  const seen = new Map<string, number[]>();
-  for (let i = 0; i < 40 && seen.size < 2; i++) {
+  for (const n of ["one", "two"] as const) {
+    await parkMouse(page);
+    await page.goto(url("github", `&github=${n}`));
+    await parkMouse(page);
+    await page.waitForSelector("[data-page]");
     await context.clock.runFor(2000);
-    const r = await slot.evaluate((b) => ({
-      item: b.querySelector("[data-item]:last-of-type")?.getAttribute("data-item") ?? "",
-      w: b.getBoundingClientRect().width,
-      dots: b.querySelectorAll("[data-part=dots] > span").length,
-    }));
-    expect(r.dots, "a corner dot per repo").toBe(2);
-    seen.set(r.item, [...(seen.get(r.item) ?? []), r.w]);
+    const m = await ghPage(page);
+    const repos = GH_REPOS.slice(0, n === "one" ? 1 : 2);
+    expect(m.ids, `${n}: the repos first, then the things, a column each (five at 1920 with the Clock)`).toEqual([...repos, ...GH_THINGS[n]]);
+    expect(Math.min(...m.cells), `${n}: REPO_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
+    expect(m.shipped, `${n}: what shipped is marked quieter`).toEqual(n === "one" ? [`${GH}sample/myscrollr/pull/476`] : []);
+    expect(m.edge, `${n}: GitHub is not on the edge`).toBe(false);
+    expect(m.count, `${n}: the band counts repos, never things`).toBe(String(repos.length));
   }
-  expect([...seen.keys()].sort(), "both repos come round").toEqual(["github-sample/myscrollr", "github-sample/scrollr-api"]);
-  const widths = new Set([...seen.values()].flat().map((w) => w.toFixed(1)));
-  console.log(`[github edge] widths ${[...widths].join(",")} over ${[...seen.values()].flat().length} reads`);
-  expect([...widths], "the slot's width is constant across rotations").toEqual(["176.0"]);
 });
 
 test("a truly short widget keeps a page's column width, left-aligned (SCROLLR-292)", async ({ page }) => {

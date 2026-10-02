@@ -136,7 +136,7 @@ const store = new Map<string, unknown>([
 // The GitHub page's sample repos and the config that tracks them (the public feed has no GitHub data, SCROLLR-312).
 const seeded = utils.includes("github")
   ? fixture("github.board").then((j) => {
-      store.set("scrollr:widget:github:board", j?.repos ?? []);
+      store.set("scrollr:widget:github:board", { repos: j?.repos ?? [], queue: j?.queue ?? [], shipped: j?.shipped ?? [] });
       const s = store.get("scrollr:settings") as { widgets: { github: { repos: unknown } } };
       s.widgets.github.repos = j?.config ?? [];
     })

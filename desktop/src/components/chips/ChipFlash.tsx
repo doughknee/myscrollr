@@ -71,7 +71,7 @@ const flashed = new Map<string, number>();
 
 /**
  * Flashes once per new `token` for an item, however often it remounts (an
- * edge slot rolls its items in and out; a rail chip laps). The token is
+ * page cell swipes in again; a rail chip laps). The token is
  * counted upstream (GitHub: `nextFlash`), so a poll that changed nothing
  * never flashes, and the first sight of an item never does either.
  */

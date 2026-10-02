@@ -276,6 +276,83 @@ func TestBoardBudget(t *testing.T) {
 	}
 }
 
+// searchHit is one search result: a PR in repo by author.
+func searchHit(repo string, n int, title, author, updated string, merged string) m {
+	h := m{
+		"number": n, "title": title, "html_url": fmt.Sprintf("https://github.com/%s/pull/%d", repo, n),
+		"repository_url": "https://api.github.com/repos/" + repo, "updated_at": updated, "user": m{"login": author},
+		"pull_request": m{"merged_at": nil},
+	}
+	if merged != "" {
+		h["pull_request"] = m{"merged_at": merged}
+	}
+	return h
+}
+
+// TestBoardQueueAndShipped (F1/F3): the review queue is three searches
+// across every repo the app can see, kept once each in the order review,
+// changes, checks; what shipped is one search over the tracked repos for
+// the last 24 h. Both cached 60 s; a search GitHub refuses answers none.
+func TestBoardQueueAndShipped(t *testing.T) {
+	pinNow(t)
+	f, mr := setupPRs(t)
+	review := searchPath("is:pr is:open archived:false review-requested:@me")
+	changes := searchPath("is:pr is:open archived:false author:@me review:changes_requested")
+	checks := searchPath("is:pr is:open archived:false author:@me status:failure")
+	f.set(review, m{"items": []m{searchHit("sample-org/docs", 61, "Fix the install steps", "kim", "2026-10-02T11:00:00Z", "")}})
+	f.set(changes, m{"items": []m{searchHit("o/r", 479, "Connect GitHub", "octo", "2026-10-02T10:00:00Z", "")}})
+	// #479 is red too: kept once, as changes.
+	f.set(checks, m{"items": []m{
+		searchHit("o/r", 479, "Connect GitHub", "octo", "2026-10-02T10:00:00Z", ""),
+		searchHit("o/b", 7, "Bump deps", "Octo", "2026-10-02T09:00:00Z", ""),
+	}})
+	ctx := context.Background()
+	src := source("user:sub_q")
+	q, _, err := reviewQueue(ctx, src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, it := range q {
+		got = append(got, fmt.Sprintf("%s#%d:%s:%s:%v", it.Repo, it.Number, it.Kind, it.Author, it.Mine))
+	}
+	if strings.Join(got, ",") != "sample-org/docs#61:review:kim:false,o/r#479:changes:octo:true,o/b#7:checks:Octo:true" {
+		t.Errorf("queue = %v", got)
+	}
+	if q[0].URL != "https://github.com/sample-org/docs/pull/61" || q[0].At != "2026-10-02T11:00:00Z" || q[0].Title != "Fix the install steps" {
+		t.Errorf("queue[0] = %+v", q[0])
+	}
+
+	shipped := searchPath("is:pr is:merged merged:>=2026-10-01T12:00:00Z repo:o/a repo:o/r")
+	f.set(shipped, m{"items": []m{searchHit("o/r", 476, "Settings move under App", "octo", "2026-10-02T10:01:00Z", "2026-10-02T10:00:00Z")}})
+	s, _, err := shippedPRs(ctx, src, []string{"o/r", "o/a"})
+	if err != nil || len(s) != 1 || s[0].Kind != "merged" || s[0].At != "2026-10-02T10:00:00Z" || !s[0].Mine || s[0].Repo != "o/r" {
+		t.Fatalf("shipped = %+v, %v", s, err)
+	}
+	if none, _, _ := shippedPRs(ctx, src, nil); none == nil || len(none) != 0 {
+		t.Errorf("no repos: %+v", none)
+	}
+
+	// Cached 60 s: a second ask costs nothing; after a minute, three more for the queue.
+	_, _, _ = reviewQueue(ctx, src)
+	_, _, _ = shippedPRs(ctx, src, []string{"o/a", "o/r"})
+	if n := f.count("/search/"); n != 4 {
+		t.Errorf("search calls = %d, want 4", n)
+	}
+	mr.FastForward(61 * time.Second)
+	_, _, _ = reviewQueue(ctx, src)
+	if n := f.count("/search/"); n != 7 {
+		t.Errorf("search calls after a minute = %d, want 7", n)
+	}
+
+	// A query GitHub will not run (422) answers none, not an error.
+	f.set(review, http.StatusUnprocessableEntity)
+	q, _, err = reviewQueue(ctx, source("user:sub_q422"))
+	if err != nil || len(q) != 2 {
+		t.Errorf("422 = %+v, %v", q, err)
+	}
+}
+
 // ── Handlers ─────────────────────────────────────────────────────
 
 func boardApp() *fiber.App {
@@ -334,6 +411,10 @@ func TestBoardConnectedAndNot(t *testing.T) {
 	out = decode[BoardResponse](t, post(t, boardApp(), `{"repos":[{"repo":"o/r","issues":"new"}]}`, "sub_board_db"))
 	if !out.Connected || out.Login != "octo" || len(out.Repos) != 1 {
 		t.Fatalf("connected = %+v", out)
+	}
+	// No search answers in the fake: the fill is empty lists, never null.
+	if out.Queue == nil || out.Shipped == nil {
+		t.Errorf("queue %v shipped %v", out.Queue, out.Shipped)
 	}
 	r := out.Repos[0]
 	if len(r.Workflows) != 3 || r.PRs == nil || r.PRs.NeedsYou != 3 || r.Issues == nil || r.Issues.Count != 1 {

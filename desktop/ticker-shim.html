@@ -44,8 +44,9 @@
     ?weather=demo     three sample cities (Chicago carries a "Storm watch" alert),
                       and puts weather on the ticker.
     ?github=<n>       SCROLLR-312: one|two|many tracked repos from
-                      github.board.json (1 and 2 ride the edge slot, 4 are
-                      the GitHub page; ?fixture=github is many).
+                      github.board.json, the GitHub page from one repo up,
+                      its spare columns filled from the fixture's queue and
+                      what shipped (?fixture=github is many).
     ?gh=<a,b>         quiet=HH:MM-HH:MM (quiet hours), -flash (the flash off).
     ?weather=alert    only the alerted city, so the edge slot never rotates away
                       from the alert (the contrast spec reads it at rest).
@@ -180,12 +181,13 @@
 
         // ?github=one|two|many, or ?fixture=github (SCROLLR-312): the first
         // 1, 2 or all 4 repos of src/dev/__fixtures__/github.board.json with
-        // the config that asked for them, rebased like a dashboard. Read
-        // synchronously: the store must hold it before boot.
+        // the config that asked for them, the review queue, and what shipped
+        // in those repos (core searches only the tracked ones), rebased like
+        // a dashboard. Read synchronously: the store must hold it before boot.
         var ghQ = params.get("github") || (fixtureName === "github" ? "many" : "");
         var ghN = { one: 1, two: 2, many: 4 }[ghQ] || 0;
         var ghConfig = [];
-        var ghBoard = [];
+        var ghBoard = { repos: [], queue: [], shipped: [] };
         if (ghN) {
           if (utils.indexOf("github") < 0) utils.push("github");
           var ghx = new XMLHttpRequest();
@@ -193,7 +195,12 @@
           ghx.send();
           var ghj = JSON.parse(ghx.responseText);
           ghConfig = ghj.config.slice(0, ghN);
-          ghBoard = rebase(ghj.repos.slice(0, ghN), Date.now() - Date.parse(ghj._captured_at));
+          var ghTracked = ghConfig.map(function (c) { return c.repo; });
+          ghBoard = rebase({
+            repos: ghj.repos.slice(0, ghN),
+            queue: ghj.queue,
+            shipped: ghj.shipped.filter(function (s) { return ghTracked.indexOf(s.repo) >= 0; }),
+          }, Date.now() - Date.parse(ghj._captured_at));
         }
         // ?gh=quiet=22:00-08:00,-flash (SCROLLR-312): quiet hours, the flash off.
         var ghQuiet = { on: false, from: "22:00", to: "08:00" };

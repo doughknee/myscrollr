@@ -29,7 +29,7 @@ import type {
 import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
-import { loadBoard, nextFlash, repoChip, sameRepo } from "../widgets/github/types";
+import { loadBoard, nextFlash, repoChip, sameRepo, thingsFor } from "../widgets/github/types";
 import type { FlashMemo } from "../widgets/github/types";
 import type { GitHubBoardRepo } from "../api/client";
 import { GITHUB_DEFAULTS, inQuietHours, migrateGitHub } from "../widgets/github/config";
@@ -67,6 +67,7 @@ const EMPTY: WidgetTickerData = {
   sysmon: [],
   uptime: [],
   github: [],
+  githubThings: [],
 };
 
 // ── Time formatting helpers ─────────────────────────────────────
@@ -464,16 +465,17 @@ export function useWidgetTickerData(
     return chips;
   }, [enabledWidgets]);
 
-  // ── Build github chips ────────────────────────────────────────
-  const buildGithubChips = useCallback((): GitHubChipData[] => {
-    if (!enabledWidgets.has("github")) return [];
+  // ── Build github chips, and the page's fill ───────────────────
+  const buildGithub = useCallback((): Pick<WidgetTickerData, "github" | "githubThings"> => {
+    if (!enabledWidgets.has("github")) return { github: [], githubThings: [] };
     const quiet = inQuietHours(githubCfg.quietHours);
     // Only repos still tracked, in config order: a removed one leaves at once.
     const board = loadBoard();
-    return githubCfg.repos.flatMap((t) => {
-      const r = board.find((b) => sameRepo(b.repo, t.repo));
+    const github = githubCfg.repos.flatMap((t) => {
+      const r = board.repos.find((b) => sameRepo(b.repo, t.repo));
       return r ? [githubChip(r, githubCfg, quiet)] : [];
     });
+    return { github, githubThings: quiet ? [] : thingsFor(board, githubCfg.repos) };
   }, [enabledWidgets, githubCfg]);
 
   // ── Polling intervals ─────────────────────────────────────────
@@ -506,7 +508,7 @@ export function useWidgetTickerData(
         weather: buildWeatherChips(),
         sysmon: buildSysmonChips(),
         uptime: buildUptimeChips(),
-        github: buildGithubChips(),
+        ...buildGithub(),
       });
     };
 
@@ -556,7 +558,7 @@ export function useWidgetTickerData(
     // GitHub: listen for store changes (repo data written by FeedTab)
     const unsubGithubRepos = hasGithub
       ? onStoreChange(LS_GITHUB_BOARD, () => {
-          setData((prev) => ({ ...prev, github: buildGithubChips() }));
+          setData((prev) => ({ ...prev, ...buildGithub() }));
         })
       : null;
 
@@ -588,7 +590,7 @@ export function useWidgetTickerData(
     const githubMs = 60_000;
     const githubInterval = hasGithub
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, github: buildGithubChips() }));
+          setData((prev) => ({ ...prev, ...buildGithub() }));
         }, githubMs)
       : null;
 
@@ -626,7 +628,7 @@ export function useWidgetTickerData(
     buildWeatherChips,
     buildSysmonChips,
     buildUptimeChips,
-    buildGithubChips,
+    buildGithub,
   ]);
 
   return data;

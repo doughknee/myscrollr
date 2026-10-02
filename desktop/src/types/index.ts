@@ -7,7 +7,7 @@
  */
 import type { DataWidgetRow } from "../api/client";
 import type { SportsMeta } from "../api/queries";
-import type { GitHubNeed, GitHubPill, GitHubStatus, GitHubWorst } from "../widgets/github/types";
+import type { GitHubNeed, GitHubPill, GitHubStatus, GitHubThing, GitHubWorst } from "../widgets/github/types";
 
 // ── Finance ──────────────────────────────────────────────────────
 
@@ -359,7 +359,7 @@ export interface UptimeChipData {
   responseAvg?: string;
 }
 
-/** One tracked repo on the bar (SCROLLR-312): a page cell, an edge slot item, a rail chip. */
+/** One tracked repo on the bar (SCROLLR-312): a page cell, a rail chip. */
 export interface GitHubChipData {
   /** `github-owner/name`. */
   id: string;
@@ -395,6 +395,8 @@ export interface WidgetTickerData {
   sysmon: SysmonChipData[];
   uptime: UptimeChipData[];
   github: GitHubChipData[];
+  /** The GitHub page's fill (SCROLLR-312, `thingsFor`): what needs you past each repo's own cell, then what shipped. Not a tab. */
+  githubThings: GitHubThing[];
 }
 
 import type { Widget, WidgetDef, CatalogResponse } from "./api.generated";

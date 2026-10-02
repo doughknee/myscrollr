@@ -4,16 +4,18 @@ import { OnceFlash } from "../../chips/ChipFlash";
 import { semantic } from "./parts";
 import type { CSSProperties } from "react";
 import type { GitHubChipData } from "../../../types";
-import type { LineTone } from "../../../widgets/github/types";
+import type { ThingTone } from "../../../widgets/github/types";
 
-/** Narrowest column a repo takes (its name, a status and a readable line 2), for pagePlan's `columnsFor`. */
+/** Narrowest column a repo takes (its name, a status and a readable line 2), for pagePlan's `columnsFor`. The thing cells share it. */
 export const REPO_MIN_COL = 300;
 
-/** A line's colour: red and the accent ink carry meaning; dim and faint step back. */
-function toneColor(tone: LineTone, dark: boolean): string {
+/** A line's colour: red, green and the accent ink carry meaning; dim and faint step back. Shared with ThingCell. */
+export function toneColor(tone: ThingTone, dark: boolean): string {
   switch (tone) {
     case "red":
       return semantic("down", dark);
+    case "up":
+      return semantic("up", dark);
     case "accent":
       return "var(--accent-ink)";
     case "dim":

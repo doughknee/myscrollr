@@ -4,8 +4,9 @@
  * workflows checklist, the PR and issue modes, the picker.
  */
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, renderHook, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ShellContext } from "../../shell-context";
 import type { ShellState } from "../../shell-context";
@@ -13,6 +14,7 @@ import { loadPrefs } from "../../preferences";
 import type { AppPreferences } from "../../preferences";
 import type { GitHubTrackedRepo } from "./config";
 import { githubWidget } from "./FeedTab";
+import { useGitHubAutoPick } from "./useAutoPick";
 
 const api = vi.hoisted(() => ({
   status: vi.fn(),
@@ -172,7 +174,7 @@ describe("connected: two panes", () => {
     expect(await screen.findByText("@octo")).toBeTruthy();
     const list = screen.getByRole("list", { name: "On your bar" });
     await waitFor(() => expect(within(list).getAllByRole("listitem").map((b) => b.textContent)).toEqual(["app3", "infra2"]));
-    expect(screen.getByText(/1–2 repos ride the edge in one rotating slot/)).toBeTruthy();
+    expect(screen.getByText(/Your repos get a page on the bar, one cell each/)).toBeTruthy();
     expect(screen.getByText("octo", { selector: "span.font-mono" })).toBeTruthy();
     await waitFor(() => expect(cellLines()).toEqual(["deploy failed · 12m", "Review · Fix the login loop · sam +1"]));
 
@@ -223,16 +225,40 @@ describe("connected: two panes", () => {
   });
 });
 
-describe("+ Add a repo", () => {
-  it("first load with nothing tracked: the active repos, with the defaults", async () => {
-    const { github } = mount([]);
-    await waitFor(() =>
-      expect(github().repos).toEqual([
-        { repo: "octo/app", prs: "mine", issues: "off" },
-        { repo: "octo/site", prs: "mine", issues: "off" },
-      ]),
-    );
+describe("zero setup: the shell's useGitHubAutoPick (SCROLLR-312, F3)", () => {
+  const withRepos = (repos: GitHubTrackedRepo[]): AppPreferences => {
+    const base = loadPrefs();
+    return { ...base, widgets: { ...base.widgets, github: { ...base.widgets.github, repos } } };
+  };
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
+  );
+
+  it("connected with nothing tracked: the active repos with the defaults, once, without the widget's page", async () => {
+    const persist = vi.fn();
+    const { rerender } = renderHook(() => useGitHubAutoPick(withRepos([]), true, true, persist), { wrapper });
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
+    expect(persist.mock.calls[0][0].widgets.github.repos).toEqual([
+      { repo: "octo/app", prs: "mine", issues: "off" },
+      { repo: "octo/site", prs: "mine", issues: "off" },
+    ]);
+    rerender();
+    expect(persist).toHaveBeenCalledTimes(1);
   });
+
+  it("never into a list, never off the ticker, never unconnected", async () => {
+    const persist = vi.fn();
+    renderHook(() => useGitHubAutoPick(withRepos([{ repo: "x/y", prs: "off", issues: "off" }]), true, true, persist), { wrapper });
+    renderHook(() => useGitHubAutoPick(withRepos([]), false, true, persist), { wrapper });
+    api.status.mockResolvedValue({ connected: false });
+    renderHook(() => useGitHubAutoPick(withRepos([]), true, true, persist), { wrapper });
+    await waitFor(() => expect(api.status).toHaveBeenCalledTimes(1));
+    expect(api.repos).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+  });
+});
+
+describe("+ Add a repo", () => {
 
   it("the picker: tick to add with the defaults, untick to remove; inactive ones behind Show all", async () => {
     const { github, spy } = mount([{ repo: "octo/app", prs: "all", issues: "new" }]);

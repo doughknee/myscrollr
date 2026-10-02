@@ -24,7 +24,7 @@ import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { githubApi } from "../../api/client";
 import type { GitHubBoardRepo, GitHubRepoRow, GitHubWorkflowRow } from "../../api/client";
 import { relativeTime } from "../../utils/format";
-import { autoPick, githubBoardQuery, loadBoard, parseRepoUrl, pillsFor, repoChip, repoName, sameRepo, worstOf, MAX_REPOS } from "./types";
+import { githubBoardQuery, loadBoard, parseRepoUrl, pillsFor, repoChip, repoName, sameRepo, worstOf, MAX_REPOS } from "./types";
 import { newRepo } from "./config";
 import type { GitHubIssueMode, GitHubPRMode, GitHubTrackedRepo, GitHubWidgetConfig } from "./config";
 
@@ -46,7 +46,7 @@ export const githubWidget: WidgetManifest = {
     usage: [
       "Connect GitHub, then add repos with + Add a repo; the ones with recent Actions runs start on the bar.",
       "Pick a repo to choose its workflows, its pull requests (off, the ones that need you, all open) and its issues.",
-      "One or two repos share one rotating slot on the bar's edge; three or more get a page, one cell each.",
+      "GitHub gets its own page on the bar: a cell per repo, and spare columns fill with what needs you next, then what just shipped.",
       "Quiet hours and the flash are in the ⋯ menu.",
     ],
   },
@@ -113,21 +113,14 @@ function GitHubFeedTab(_props: FeedTabProps) {
     return () => window.removeEventListener("focus", onFocus);
   }, [connected, refetchYours, queryClient]);
 
-  // First load only, and only into an empty list. The ref lives here, so
-  // removing the last repo does not bring the rest back.
-  const autoPicked = useRef(false);
-  useEffect(() => {
-    if (autoPicked.current || !yours) return;
-    autoPicked.current = true;
-    const picked = autoPick(cfg.repos, yours.repos);
-    if (picked) setRepos(picked);
-  }, [yours, cfg.repos, setRepos]);
+  // An empty list fills itself with your active repos from the shell
+  // (__root.tsx, SCROLLR-312's zero setup), whether or not this page is open.
 
   const { data: board } = useQuery({
     ...githubBoardQuery(cfg.repos, shell.authenticated),
     enabled: connected && cfg.repos.length > 0,
   });
-  const boardRows = board ?? loadBoard();
+  const boardRows = (board ?? loadBoard()).repos;
 
   if (!shell.authenticated) {
     return (
@@ -335,7 +328,7 @@ function TwoPanes({
         )}
 
         <span className="mt-auto px-1.5 pt-4 text-[12px] leading-relaxed text-fg-3">
-          1–2 repos ride the edge in one rotating slot. 3 or more get a page, one cell each.
+          Your repos get a page on the bar, one cell each. Spare columns show what needs you next.
         </span>
       </div>
 

@@ -209,8 +209,10 @@ for (const family of THEME_FAMILIES) {
  * SCROLLR-312: the GitHub page in every palette, github.board.json's four
  * repos on one page (1920), each cell's two lines (canvas C4 · D): the name,
  * the status in every tone (red failed, the ink running, fg-2 all green), the
- * tag, what needs you, who, and the band's count. Every reading at its floor
- * against what is really behind it.
+ * tag, what needs you, who, and the band's count. Then one repo, so the page
+ * is mostly thing cells (canvas F1): every kicker tone (the ink, red, fg-2,
+ * green), where, the checks, the title, and a shipped cell's quieter title
+ * on its wash. Every reading at its floor against what is really behind it.
  */
 for (const family of THEME_FAMILIES) {
   for (const mode of ["dark", "light"] as const) {
@@ -219,8 +221,13 @@ for (const family of THEME_FAMILIES) {
       const all = await readings(page, `/ticker-shim.html?pages=1&fixture=github&utils=&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]");
       const tones = await page.locator("[data-page] [data-part=status]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tone")));
       expect(["red", "accent", "dim"].filter((k) => !tones.includes(k)), `${theme}: every status tone drawn`).toEqual([]);
-      expect(await page.locator("[data-page] [data-chip]").count(), `${theme}: four repos on one page`).toBe(4);
+      expect(await page.locator("[data-page] [data-chip]").count(), `${theme}: four repos and a thing on one page`).toBe(5);
       for (const role of ["title", "status", "tag", "what", "who", "chip"]) expect(all.some((r) => r.role === role), `${theme}: measured ${role}`).toBe(true);
+      all.push(...(await readings(page, `/ticker-shim.html?pages=1&fixture=github&github=one&utils=&theme=${theme}`, ".ticker-container", "[data-page] [data-thing]")));
+      const kickers = await page.locator("[data-page] [data-thing] [data-part=tag]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tone")));
+      expect(["accent", "red", "dim", "up"].filter((k) => !kickers.includes(k)), `${theme}: every kicker tone drawn`).toEqual([]);
+      expect(await page.locator("[data-page] [data-thing=shipped]").count(), `${theme}: a shipped cell`).toBe(1);
+      for (const role of ["where", "right"]) expect(all.some((r) => r.role === role), `${theme}: measured ${role}`).toBe(true);
       const missed = all.filter((r) => r.ratio < r.floor);
       const key = (r: (typeof all)[number]) => `${r.role}@${r.floor}`;
       console.log(`[${theme} github] worst ${[...new Set(all.map(key))].map((k) => `${k} ${Math.min(...all.filter((r) => key(r) === k).map((r) => r.ratio)).toFixed(2)}`).join("  ")}`);

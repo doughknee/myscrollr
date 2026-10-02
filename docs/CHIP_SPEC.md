@@ -61,7 +61,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **horizon** | Continuous only: the per-source time rule deciding what is eligible for the rail. Pages have none: they show the widget page's pool (§P.4a). |
 | **floor** | Continuous only: what a quiet source still shows when nothing is inside its horizon: one item for most sources, the whole next matchday for Sports (§8.1). |
 | **cursor** | Pages: where a widget's next visit continues, per widget, held by the leader window; it survives refreshes and re-plans and wraps (§P.6). |
-| **fill** | Pages only: popular symbols that top a short watchlist's page up to its column count (§P.4a). Never written anywhere; never a setting. |
+| **fill** | Pages only: what tops a short page up to its column count (§P.4a): popular symbols on a short watchlist, GitHub's thing cells on a page its repos leave short. Never written anywhere; never a setting. |
 | **palette** | The `ChipColors` object for a chip's widget. Page cells take one `--accent` variable instead (§P.13). |
 | **status chip** | Continuous: the single grey chip a widget with nothing on the rail shows: why, and when if known (§8.7). Pages say the same words on the Also page. |
 | **source** | A `TickerSource` in `desktop/src/datawidgets/<source>/ticker.tsx`, registered in `tickerRegistry.ts`. Pages read the same sources through the same selectors. |
@@ -103,7 +103,7 @@ SCROLLR-274. Existing users keep a stored `continuous` until the release flips t
 | How much is on screen | Derived: columns = content width / the family's minimum column (§P.4) | Fixed slots per source (§8.1) |
 | What reaches the next item | The visit rule and the page clock (§P.6, §P.7) | Rotation inside slots, only off screen (§8.2 to §8.4) |
 | Pins live | The edge zone, right (§P.11) | The fixed zone (§8.5) |
-| Utilities (clock, timer, weather, sysmon, uptime, GitHub) | The edge zone, one Cycle slot each (§P.10) | One chip each in the rail, or pinned |
+| Utilities (clock, timer, weather, sysmon, uptime) | The edge zone, one Cycle slot each (§P.10). GitHub is a page instead (§P.4a), never on the edge | One chip each in the rail (GitHub too), or pinned |
 | Settings that apply | Scroll mode, Size, Screen edge, Monitors | Those plus Speed, On hover |
 | Width stability | Fixed columns; scores and clocks reserve (§P.9) | Reservation per chip (§4) |
 
@@ -224,7 +224,7 @@ cell family's own export**, never a default in `pagePlan.ts`:
 | Game, every other league | 276px | `gameMinCol(league)` |
 | Quote (stock, coin) | 260px | `QUOTE_MIN_COL` |
 | Headline | 400px | `NEWS_MIN_COL` |
-| Repo (GitHub) | 300px | `REPO_MIN_COL` |
+| Repo and thing (GitHub) | 300px | `REPO_MIN_COL` |
 | Also entry | 300px | `ALSO_MIN_COL` |
 
 Worked columns (NFL, college, quotes, headlines), with the band (SCROLLR-303, 192px): at
@@ -261,7 +261,7 @@ rest round on later laps. Nothing eligible is hidden.
 | Sports | Every game in the app's **default** day window (`SPORTS_WINDOW_DEFAULTS`: yesterday through seven days ahead, local calendar days), never the user's `display` window. `sortForDisplay`: live, then soonest kick-off, then newest finals (`selectSportsForPages`). A Thursday is TNF, Sunday and MNF | The week |
 | News | Every headline the widget holds, newest first, interleaved by feed like the ticker pool; undated counts as current (`selectRssForPages`) | The rss ingester's 7-day storage |
 | Stocks, Crypto | The watchlist, in the user's order (`selectFinanceForTicker`, unchanged) | The watchlist |
-| GitHub | Every tracked repo, one cell each, in the user's order (one tier: a repo is never re-ranked by its state), **only from three tracked repos** (`GITHUB_PAGE_MIN`, `githubWidget` in `widgetPages.ts`); one or two ride the edge slot instead (§P.10). Quiet hours: no page and no Also entry | The tracked list (core answers 20) |
+| GitHub | Every tracked repo, one cell each, in the user's order (one tier: a repo is never re-ranked by its state), **from one repo up** (`githubWidget` in `widgetPages.ts`; SCROLLR-312, canvas F1, Brandon 2 Oct 2026: GitHub never goes on the edge). Quiet hours: no page and no Also entry | The tracked list (core answers 20) |
 
 **Every page is full** (SCROLLR-292): a page shows as many items as it has columns, unless
 the widget has fewer items in total than one page holds. With the whole pool on pages, only
@@ -278,6 +278,7 @@ a short watchlist still needs topping up:
 | Family | Fill, in order (Pages only) | Tier |
 |---|---|---|
 | Sports, News | None: the pool is already everything the widget holds; still short is a short page (§P.3) | |
+| GitHub | **Only when the repos are fewer than a page's columns** (the finance rule: a fill never pushes a repo cell off, and repos that fill pages get no fill). One `ThingCell` per next thing that needs you, from `thingsFor` (`widgets/github/types.ts`), most urgent first: PRs that need you (review asked of you, then changes asked on yours, then your red checks; the tracked repos' own, then core's **review queue** from every repo the app can see), failing runs, new or assigned issues, then what **shipped** (PRs merged in the tracked repos in the last 24 h). Never a thing a repo cell already names (its line 2, or the failing run its line 1 reads), one cell per link (dedupe by URL) | 3, `fill: true`, no pin subject |
 | Stocks, Crypto | **Only when the watchlist (after pins) is shorter than a page.** Popular symbols of the widget's own asset class with a live quote in `/finance/public`: the widget's starter list (SCROLLR-259, `addConfigForWidget(tab).symbols`), then `POPULAR_SYMBOLS` (a constant: nothing counts how many users track a symbol), then the rest of the market by day volume. Never one of the user's own or a pinned one (`selectFinanceFill`) | 3, `fill: true`, no pin subject |
 | Also | None (one entry per quiet widget; a short Also page is a short page, §P.3) | 4 |
 
@@ -453,7 +454,8 @@ data-chip data-item>`, `text-left`. The widget's colour reaches a cell only thro
 | **GameCell** | Stacked: away over home, each row crest, name (14.5px) and score (18px); the home row carries an `@`, hung in the gutter before its crest (away at home). No stadium and no third line (SCROLLR-296: "it adds nothing"; the type is bigger instead). The clock box sits **left-aligned right after the scores, with no rule**, and its 16px gutters (the left one holding the `@`) put the page's column rule between one game and the next, so a clock is never read as the next game's. Wide: one scoreboard line centred on its content, names (15px) and records either side, the scores (22px) with the clock box **between them** (centred), the `@` before the home crest. The clock: live `Q4` over `2:14` (baseball `7th` over `INN`), `FINAL`, `PPD`, today's kick-off over `in 3h05` (ten hours or more out: `TODAY`), a later day's weekday over its time | Wide from a column of 430px (`WIDE_GAME_PX`). A name is the full short name when it sets whole in the room the layout leaves it (`nameRoom`, `nameFits`: measured off-screen on a canvas at the bold weight before paint, never after), else the nickname in US pro leagues (`cellName`) |
 | **NewsCell** | A fixed grid, top-anchored: the headline (15px at every width, up to 2 lines, `font-sans font-semibold`) always starts on the first line, and the meta line (12px) sits at the same y under a one-line and a two-line headline: the age (`9m`, `4h`, `3d`, mono in a 3ch box, `AGE_CH`) then the summary, or the feed's name when there is none. The headline has the column's whole width (the old 26px age column and its gap cost 36px). Real news columns are 426 to 584px, so the old 560px switch to 15px almost never fired | One layout |
 | **QuoteCell** | Price first (SCROLLR-296, three rounds; Brandon: "name top left, value under in large letters, with sparkline and day range on the right"). Two zones read as one cell: the price zone is as wide as the price's reservation (its length plus one), and the day zone takes the rest after a 12px gap (round 4, Brandon: "too much padding between the number and the line"; half and half left 54-63px). Left: the symbol (14px, `fg-2`; a popular fill prefixes it with a `fg-3` `+`, as the label says `+4 POPULAR`), **the price under it, the largest thing in the cell** (20px bold), the change under that (12px), all three on one left edge (round 5: "align left"; a fill's `+` hangs in the gutter): `up`/`down` with its arrow, flat `0.00%` in `fg-3` with none. Right: the day's line across the zone (70%), a 3px track under it filled up to the price in the direction's colour with a 2px marker, and the day's low and high (12px, `fg-3`, whole units from 1,000 so each is at most seven characters, `rangeText`) right under it at the zone's two edges, on the change's baseline | One layout |
-| **RepoCell** | SCROLLR-312, canvas board C4 · D: **two lines, two answers**, each naming the actual thing. Line 1, *is it broken?*: an 8px dot, the repo's name (15px bold, `fg`, never truncated), and right-aligned its status (`statusFor`, 12px mono, ellipsis): the first failing run or check `deploy failed · 12m` (`down`, semibold), else the first running `apply running · 3m` (`--accent-ink`), else `all green · 1h` (`fg-2`, the newest green run's age), else the age of its newest event in `fg-3`. The dot follows line 1, not the repo's worst (`down` / the accent / `up` / `fg-3`): a review waiting on a green repo stays green. Line 2, *does it need me?* (`needFor`, 13px, the text ellipsizes): a tag, what, who. In order: a PR that needs you (308's rule) — `Review` (the ink) + its title + its author, or yours with `Changes` / `Checks failed` (`down`) + title + `#479`; else the commit that broke a run, `Broke on` + its first line + `you` or the pusher (core's `commit` / `actor` / `by_you` on the run); else the newest issue, `Issue` + title; else the newest open PR (All open), `PR` / `Draft` + title + author; else the commit a run is building, `Building`. More of the same kind: `+N` after who (11px mono `fg-3`). Nothing to name: `Nothing needs you` (`Nothing else needs you` when line 1 is red), `Not available`, or `Quiet hours`, in `fg-3`. Click: the most urgent pill's link (the run, the PR, the repo's PRs or issues). The pills (`pillsFor`) still drive the edge slot, the rail chip, the dot's `data-worst` and the band count | One layout |
+| **RepoCell** | SCROLLR-312, canvas board C4 · D: **two lines, two answers**, each naming the actual thing. Line 1, *is it broken?*: an 8px dot, the repo's name (15px bold, `fg`, never truncated), and right-aligned its status (`statusFor`, 12px mono, ellipsis): the first failing run or check `deploy failed · 12m` (`down`, semibold), else the first running `apply running · 3m` (`--accent-ink`), else `all green · 1h` (`fg-2`, the newest green run's age), else the age of its newest event in `fg-3`. The dot follows line 1, not the repo's worst (`down` / the accent / `up` / `fg-3`): a review waiting on a green repo stays green. Line 2, *does it need me?* (`needFor`, 13px, the text ellipsizes): a tag, what, who. In order: a PR that needs you (308's rule) — `Review` (the ink) + its title + its author, or yours with `Changes` / `Checks failed` (`down`) + title + `#479`; else the commit that broke a run, `Broke on` + its first line + `you` or the pusher (core's `commit` / `actor` / `by_you` on the run); else the newest issue, `Issue` + title; else the newest open PR (All open), `PR` / `Draft` + title + author; else the commit a run is building, `Building`. More of the same kind: `+N` after who (11px mono `fg-3`). Nothing to name: `Nothing needs you` (`Nothing else needs you` when line 1 is red), `Not available`, or `Quiet hours`, in `fg-3`. Click: the most urgent pill's link (the run, the PR, the repo's PRs or issues). The pills (`pillsFor`) still drive the rail chip (Continuous), the dot's `data-worst` and the band count | One layout |
+| **ThingCell** | SCROLLR-312, canvas F1: the GitHub page's fill (§P.4a), one next thing per cell, the repo cell's two lines and column (`REPO_MIN_COL`). Line 1, the kicker, 11px mono: the tag in caps, semibold, `tracking-[0.06em]`, in its tone (`REVIEW` the ink; `CHANGES ASKED`, `CHECKS FAILED`, `<WORKFLOW> FAILED` `down`; `NEW ISSUE` / `ISSUE` `fg-2`; `MERGED` `up`, the band chip's lifted red and green), then where in `fg-3` with an ellipsis (`myscrollr #479 · yours`: the repo's name when tracked, `owner/name` when the queue brought it from elsewhere; the number; who, `yours` / `you` for you), and right-aligned (12px) a PR's checks from the repo's own data (`✗ 1 of 5` `down`, `◌ 2 running` the ink, `✓ 5/5` `up`) or an age (`fg-3`; a failing run's in `down`). Line 2: the title (a run's commit), 14px semibold `fg`, ellipsis. **Shipped** (`data-thing="shipped"`): quieter, the title in `fg-2` on a `bg-fg/[0.03]` wash. Click: the item's link. `data-item` is the link | One layout |
 | **AlsoCell** | A code tag (12px) in the widget's colour, then the status text (13px) on one truncating line | One layout (§P.12) |
 
 **Type on a cell** (SCROLLR-296): nothing under 12px, and at most three sizes per cell
@@ -494,9 +496,10 @@ Reused helpers, unchanged from the chips: `teamShortName` (§5.4), `plainText` a
 ### P.10 The edge zone: utilities
 
 `EdgeZone.tsx`. A fixed block at the **right** of the bar, `border-l border-edge`, holding in
-this order: one **slot** per utility on the ticker (clock, timer, weather, sysmon, uptime,
-GitHub), then one cell per pin. With no utility and no pin it renders nothing and takes no
-width.
+this order: one **slot** per utility on the ticker (clock, timer, weather, sysmon, uptime),
+then one cell per pin. With no utility and no pin it renders nothing and takes no
+width. **GitHub never goes on the edge** (SCROLLR-312, canvas F5, Brandon 2 Oct 2026, F1):
+it is a page from one repo up (§P.4a). Pinning a repo to the edge is SCROLLR-319, not built.
 
 **Cycle** (canvas "8c · Edge with several clocks", option A, picked by Brandon 1 Oct 2026):
 a utility is **one slot** showing **one zone, city or metric at a time**, and it steps to
@@ -514,35 +517,44 @@ slots, not five.
   width is therefore constant for as long as the set of zones and cities is unchanged
   (measured: 101.8px with 1, 4 or 6 clocks, 406.3px with three zones, weather and a pin,
   0 empty; zero slot changes outside a swipe in 15 to 19 per 60 s run).
-- A slot is at most `max-w-[180px]` (GitHub's is a fixed `w-[176px]` with no sizers, below); the label is 9.5px caps, the value 16px bold
+- A slot is at most `max-w-[180px]`; the label is 9.5px caps, the value 16px bold
   `tabular-nums`, the detail 9.5px; tones: timer urgent `text-live`, weather alert
-  `text-warning` bold caps, sysmon hot `text-error`, uptime or GitHub down `text-down`; a
+  `text-warning` bold caps, sysmon hot `text-error`, uptime down `text-down`; a
   night zone or paused timer draws its value in `text-fg-2` (no opacity, SCROLLR-287), a
   night clock carries `☾`. Label and detail are `text-fg-3`.
-- **GitHub** (SCROLLR-312, canvas board B3). **The page rule:** with **three or more**
-  tracked repos GitHub is a page (§P.4a, a `RepoCell` each, §P.9) and is **not on the
-  edge**; with **one or two** it is **one slot** here, never two. The slot is a fixed
-  `w-[176px]` whatever it shows (B3: it never widens; a long value truncates), and rotates
-  between the repos on the turn like any slot (slide-up 0.45 s), with a 4px corner dot per
-  repo (`data-part="dots"`, the current one `bg-fg`) when there are two. Each item: the
-  label `GITHUB · REPO`; the mark in the repo's worst state (`down` red dot, `run` the
-  `gh-ring` in the accent, `you` an accent dot, `up` green, `idle` grey) and the value = the
-  repo's most urgent pill (`✗ deploy · 12m` in `text-down`, `2 PRs for you` in
-  `--accent-ink`, `✓ test` in `text-fg-2`); the next pill beneath. The pills, their order
-  and their words are the cell's (`pillsFor`, `repoChip` in `widgets/github/types.ts`).
-  Clicking opens the repo's most urgent link. 0 repos: nothing.
+- **GitHub is a page, not a slot** (SCROLLR-312; canvas board F5 "GitHub off the edge",
+  Brandon picked F1, with F3 for zero setup). Before it, one or two repos rode a rotating
+  176px edge slot and three or more got a page; that slot and its tests are deleted. The
+  page: a `RepoCell` per tracked repo (§P.9), then, while the repos leave columns spare,
+  `ThingCell`s (§P.4a fill, §P.9). The band's `needs` chip counts repos, never things.
+- **GitHub's data** (`POST /github/board`, `api/internal/githubapp/board.go`): per repo as
+  before, plus two lists for the fill, both cached 60 s per user (`cached`, `boardTTL`) from
+  GitHub search with the user's token, four search calls a minute at most (search allows 30):
+  `queue`, open PRs that need you across every repo the app can see (`review-requested:@me`,
+  then `author:@me review:changes_requested`, then `author:@me status:failure`, kept once
+  each in that order), and `shipped`, PRs merged in the tracked repos in the last 24 h (one
+  `is:pr is:merged merged:>=… repo:a repo:b` search). Both are additive (an older desktop
+  ignores them); a search GitHub refuses answers none, never the board. The desktop stores
+  `{repos, queue, shipped}` (`saveBoard`; `loadBoard` still reads the old bare array) and
+  `useWidgetTickerData` turns it into the chips and `githubThings` (`thingsFor`; none in quiet
+  hours). Releases and deploy events are not on the board yet.
+- **Zero setup** (F3): with GitHub on the ticker, connected and nothing tracked, the shell
+  (`useGitHubAutoPick` in `widgets/github/useAutoPick.ts`, run from `__root.tsx`) tracks the
+  repos with recent Actions runs (`autoPick`), so a useful page is on the bar without the
+  widget's page ever being opened. It is the only place that picks: once a session, only into
+  an empty list.
 - **GitHub, what each repo watches** (the widget's FeedTab, `prefs.widgets.github`: `repos:
   [{repo, workflows?, prs, issues}]`, `quietHours`, `flash`; not in Settings or its
   search). Per repo: the workflows to show (absent = the ones that ran on the default branch
   in the last 30 days, which core resolves on every fetch), PRs `off | mine | all` (mine =
   review asked of you or your team, yours with changes requested or failing checks), issues
   `off | assigned | new` (new = opened in the last 24 h). A new repo starts at recent
-  workflows, `mine`, `off`. **Quiet hours** (two local times, may wrap midnight): the slot
-  is a grey dot and the age, the page goes, nothing flashes; the widget's page still shows
+  workflows, `mine`, `off`. **Quiet hours** (two local times, may wrap midnight): the page
+  goes (no Also entry), nothing flashes, the rail chip greys; the widget's page still shows
   everything. **Flash** (on): once, `OnceFlash`, when a repo's worst state changes or more
   PRs need you (`nextFlash`), never on a poll that changed nothing or a roll-in. The shim
   takes `?github=one|two|many` and `?gh=quiet=HH:MM-HH:MM,-flash`.
-- Clicking a slot opens that widget (`onChipClick(tab, id)`), GitHub its link.
+- Clicking a slot opens that widget (`onChipClick(tab, id)`).
 
 Clock and Weather are free of widget slots, so they cost the user none of their plan's
 widget count.
@@ -673,7 +685,7 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   page shows `min(columns, available)`; several pages show full pages unless the pool is
   not a multiple of the columns, then the even split). Laps are cut at visit starts
   (`data-visit`), since a visit no longer always opens on page 1. Fixtures: `nflthursday`
-  (TNF + Sunday + MNF, your Bears on page 1), `github` (SCROLLR-312: `github.board.json`, four repos and their config: PRs for you, a failing deploy, a failing Vercel check, a running apply; the shim seeds it for `fixture=github` or `github=many`, and one or two of them for `github=one|two`), `googl` (one symbol + popular), `sparsenews`
+  (TNF + Sunday + MNF, your Bears on page 1), `github` (SCROLLR-312: `github.board.json`, four repos and their config: PRs for you, a failing deploy, a failing Vercel check, a running apply; a review queue and two merged PRs for the fill; the shim seeds it for `fixture=github` or `github=many`, and one or two of them for `github=one|two`, which are pages of one or two repo cells and then thing cells: at 1920 with the Clock, `one` is myscrollr, REVIEW docs #61, CHANGES ASKED #479, NEW ISSUE #312, MERGED #476), `googl` (one symbol + popular), `sparsenews`
   (nine headlines over three days, all shown), `onegame` (truly short: one column,
   left-aligned, measured), `npr` (SCROLLR-293: 30 headlines over six days). `pages+npr30` (SCROLLR-294: the
   `pages` set with NPR's 3 headlines swapped for `npr`'s 30, the worst case for all shown).
@@ -1216,8 +1228,9 @@ Every pool above is first stripped of the widget's pinned subjects (`dropPinned`
 | Uptime / GitHub | all items | — | `CAPPED_WIDGET_SLOTS = 4` (in `ScrollrTicker.tsx`) | item order | none |
 | Clock / Timer / Weather / Sysmon | all items in one chip | — | n/a | config order | n/a |
 
-Under Pages, Clock / Timer / Weather / Sysmon / Uptime / GitHub are not pages: each is one
-Cycle slot on the edge zone (§P.10), stepping through its items one per page swipe.
+Under Pages, Clock / Timer / Weather / Sysmon / Uptime are not pages: each is one Cycle
+slot on the edge zone (§P.10), stepping through its items one per page swipe. GitHub is a
+page (§P.4a), never on the edge.
 
 Sports favourites (`config.favoriteTeams[league].teamName` matching either team name)
 are **exempt from the slot count** (Continuous): every one is on the rail, keyed
