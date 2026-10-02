@@ -17,7 +17,7 @@ data:
   # 1.6.4 is the first Windows release signed as Scrollr, LLC. Its public
   # updater manifests and Windows/macOS/Linux downloads were verified before
   # raising this floor. Restore 1.1.12 if updater availability regresses.
-  MIN_DESKTOP_VERSION: "1.6.4"
+  MIN_DESKTOP_VERSION: "1.7.0"
   LOGTO_URL: "https://auth.myscrollr.com/oidc"
   LOGTO_JWKS_URL: "https://auth.myscrollr.com/oidc/jwks"
   LOGTO_ENDPOINT: "https://auth.myscrollr.com"
