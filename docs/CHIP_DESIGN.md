@@ -3,7 +3,7 @@
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
-Widget pages are new and arrive with the desktop release after 1.6.10. Until then the app
+Widget pages arrive in desktop 1.7.0. On anything earlier, the app
 you have is the second way of showing the bar, Continuous chips. Anything marked *(lands
 with SCROLLR-xxx)* is decided but not in the app yet.
 
