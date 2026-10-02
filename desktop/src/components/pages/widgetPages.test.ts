@@ -8,7 +8,7 @@ import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
-import { REST_PER_VISIT, dwellFor } from "./pagePlan";
+import { dwellFor } from "./pagePlan";
 import { ALSO_TAB, buildPageWidgets, followPage, newNav, nextTurn, planAll, type PageWidget, type Turn } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;
@@ -73,23 +73,20 @@ describe("nextTurn", () => {
     return turns;
   }
 
-  it("each widget gets one visit (its sticky pages, then one more), then the next widget, then around again", () => {
-    const turns = run(60);
+  it("every widget shows exactly one page per lap, then the next widget; its pages run 1, 2 ... N, 1 (SCROLLR-297)", () => {
+    const turns = run(widgets.length * 20);
     expect(turns.map((t) => t.seq)).toEqual(turns.map((_, i) => i + 1));
-    // Group consecutive turns into visits.
-    const visits: { tab: string; pages: number[] }[] = [];
-    for (const t of turns) {
-      const last = visits.at(-1);
-      if (last?.tab === t.tab) last.pages.push(t.page);
-      else visits.push({ tab: t.tab, pages: [t.page] });
-    }
     const order = widgets.map((w) => w.tab);
-    visits.forEach((v, i) => expect(v.tab).toBe(order[i % order.length]));
-    for (const v of visits.slice(0, -1)) {
-      const plan = plans.get(v.tab)!;
-      expect(v.pages.slice(0, plan.sticky)).toEqual([...Array(plan.sticky).keys()]);
-      expect(v.pages.length).toBe(Math.min(plan.pages.length, plan.sticky + REST_PER_VISIT));
+    turns.forEach((t, i) => expect(t.tab).toBe(order[i % order.length]));
+    for (const tab of order) {
+      const n = plans.get(tab)!.pages.length;
+      const pages = turns.filter((t) => t.tab === tab).map((t) => t.page);
+      expect(pages).toEqual(pages.map((_, i) => i % n));
     }
+    // The fixture has a multi-page widget led by live and yours: page 1 holds them, and it is not on every lap.
+    const nfl = plans.get("sports_nfl")!;
+    expect(nfl.pages.length).toBeGreaterThan(1);
+    expect(nfl.pages[0][0].tier).toBe(0);
   });
 
   it("a page holds dwellFor its size, 6..12 s", () => {
@@ -100,7 +97,7 @@ describe("nextTurn", () => {
     }
   });
 
-  it("a widget that leaves mid-visit: the next turn starts over at the first widget", () => {
+  it("a widget that leaves: the next turn starts over at the first widget", () => {
     const nav = newNav();
     const t1 = nextTurn(null, widgets, plans, nav)!;
     const without = widgets.filter((w) => w.tab !== t1.tab);
@@ -119,7 +116,7 @@ describe("nextTurn", () => {
       if (i >= 4) rss.unshift({ ...rss[0], id: 1, guid: "new" }); // a new headline from visit 5 on
       const ws = buildPageWidgets(d, ["news_npr"], Date.parse(npr._captured_at));
       t = nextTurn(t, ws, planAll(ws, 1920), nav);
-      seen.push([t!.visit, t!.page]);
+      seen.push([t!.seq, t!.page]);
     }
     expect(seen).toEqual([[1, 0], [2, 1], [3, 2], [4, 3], [5, 4], [6, 5], [7, 6], [8, 7], [9, 0]]);
   });

@@ -42,11 +42,10 @@ describe("sports: the whole week, as the widget page shows it (SCROLLR-293)", ()
     expect(plan.pages.map((p) => p.length)).toEqual([6, 5, 5]);
   });
 
-  it("the ladder: your team first (on every visit), then tonight, then soonest kick-off", () => {
+  it("the ladder: your team first (page 1), then tonight, then soonest kick-off", () => {
     const [first, ...rest] = plan.pages.flat();
     expect(first.mine).toBe(true);
     expect(first.tier).toBe(0);
-    expect(plan.sticky).toBe(1);
     expect(rest[0].key).toBe("g:10097632"); // TNF tonight
     const kicks = rest.map((i) => Date.parse((i.data as Game).start_time));
     expect(kicks).toEqual([...kicks].sort((a, b) => a - b));
@@ -78,11 +77,10 @@ describe("news: every headline the widget holds (SCROLLR-293)", () => {
     expect((now - Math.min(...shown)) / 36e5).toBeGreaterThan(48);
   });
 
-  it("30 NPR headlines are 8 pages at 1920, nothing sticky, so visits run 1, 2, 3 ... 8, 1", () => {
+  it("30 NPR headlines are 8 pages at 1920", () => {
     const [w] = buildPageWidgets(asDash(npr), ["news_npr"], at(npr));
     const plan = planAll([w], 1920).get("news_npr")!;
     expect(plan.pages.map((p) => p.length)).toEqual([4, 4, 4, 4, 4, 4, 3, 3]);
-    expect(plan.sticky).toBe(0);
   });
 });
 

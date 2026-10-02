@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   LABEL_W,
-  REST_PER_VISIT,
   TIER,
   columnsFor,
   contentWidth,
@@ -11,7 +10,6 @@ import {
   paginate,
   planWidget,
   refreshPage,
-  visitPages,
   type Tier,
 } from "./pagePlan";
 
@@ -92,18 +90,12 @@ describe("planWidget", () => {
     expect(plan.pages[0].map((g) => g.id)).toEqual([1, 3, 2, 5, 0, 4]);
   });
 
-  it("counts sticky pages: live and yours spill onto page 2", () => {
+  it("live and yours lead: page 1 first, spilling onto page 2", () => {
     const live = Array(5).fill(TIER.live);
     const rest = Array(7).fill(TIER.recent);
     const plan = planWidget(games([...rest, ...live]), tierOf, 4); // 12 items, 3 pages of 4
-    expect(plan.pages.map((p) => p.length)).toEqual([4, 4, 4]);
-    expect(plan.sticky).toBe(2);
-  });
-
-  it("nothing live, nothing sticky (SCROLLR-293), and zero for no items", () => {
-    expect(planWidget(games([3, 3, 3]), tierOf, 4).sticky).toBe(0);
-    expect(planWidget(games([3, 0, 3]), tierOf, 4).sticky).toBe(1);
-    expect(planWidget([], tierOf, 4)).toEqual({ pages: [], sticky: 0 });
+    expect(plan.pages.map((p) => p.map((g) => g.tier))).toEqual([[0, 0, 0, 0], [0, 2, 2, 2], [2, 2, 2, 2]]);
+    expect(planWidget([], tierOf, 4)).toEqual({ pages: [] });
   });
 });
 
@@ -118,74 +110,6 @@ describe("dwellFor", () => {
       expect(dwellFor(n)).toBeGreaterThanOrEqual(6);
       expect(dwellFor(n)).toBeLessThanOrEqual(12);
     }
-  });
-});
-
-describe("visitPages", () => {
-  it("shows a widget whole when its pages fit in sticky + 1", () => {
-    expect(visitPages(0, 1, 1)).toEqual({ pages: [], next: 0 });
-    expect(visitPages(1, 1, 1)).toEqual({ pages: [0], next: 1 });
-    expect(visitPages(2, 1, 1)).toEqual({ pages: [0, 1], next: 1 });
-    expect(visitPages(1, 0, 0)).toEqual({ pages: [0], next: 0 });
-    expect(visitPages(3, 2, 2)).toEqual({ pages: [0, 1, 2], next: 2 });
-  });
-
-  it("with a sticky page: page 1 plus the next one, wrapping", () => {
-    expect(visitPages(3, 1, 1)).toEqual({ pages: [0, 1], next: 2 });
-    expect(visitPages(6, 1, 1)).toEqual({ pages: [0, 1], next: 2 });
-    expect(visitPages(6, 5, 1)).toEqual({ pages: [0, 5], next: 1 });
-    expect(visitPages(12, 2, 2)).toEqual({ pages: [0, 1, 2], next: 3 });
-    expect(visitPages(12, 11, 2)).toEqual({ pages: [0, 1, 11], next: 2 });
-  });
-
-  it("nothing sticky: one page a visit, continuing where the last stopped (30 headlines on 8 pages)", () => {
-    const shown: number[][] = [];
-    let cursor = 0;
-    for (let i = 0; i < 9; i++) {
-      const v = visitPages(8, cursor, 0);
-      shown.push(v.pages);
-      cursor = v.next;
-    }
-    expect(shown).toEqual([[0], [1], [2], [3], [4], [5], [6], [7], [0]]);
-  });
-
-  it("sticky pages show every visit, however many; one more of the rest", () => {
-    const v = visitPages(10, 5, 4);
-    expect(v.pages).toEqual([0, 1, 2, 3, 5]);
-    expect(v.pages).toHaveLength(4 + REST_PER_VISIT);
-    expect(visitPages(5, 5, 9).pages).toEqual([0, 1, 2, 3, 4]); // all sticky: whole widget
-  });
-
-  it("across laps: sticky every lap, every other page comes round fairly, no repeats in a visit", () => {
-    for (const [count, sticky] of [[14, 1], [14, 3], [8, 2], [20, 1], [8, 0], [15, 0]] as const) {
-      let cursor: number = sticky;
-      const seen = new Map<number, number>();
-      for (let lap = 0; lap < count * 2; lap++) {
-        const v = visitPages(count, cursor, sticky);
-        cursor = v.next;
-        expect(new Set(v.pages).size).toBe(v.pages.length);
-        for (let i = 0; i < sticky; i++) expect(v.pages[i]).toBe(i);
-        for (const p of v.pages.slice(sticky)) {
-          expect(p).toBeGreaterThanOrEqual(sticky);
-          expect(p).toBeLessThan(count);
-          seen.set(p, (seen.get(p) ?? 0) + 1);
-        }
-      }
-      expect([...seen.keys()].sort((a, b) => a - b)).toEqual(range(count - sticky).map((i) => i + sticky));
-      const counts = [...seen.values()];
-      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it("the busy Saturday (14 pages, 1 sticky) has shown every page after 13 visits", () => {
-    let cursor = 1;
-    const seen = new Set<number>();
-    for (let lap = 0; lap < 13; lap++) {
-      const v = visitPages(14, cursor, 1);
-      cursor = v.next;
-      v.pages.forEach((p) => seen.add(p));
-    }
-    expect(seen.size).toBe(14);
   });
 });
 

@@ -68,12 +68,14 @@ There's no time window on pages: if NPR has 30 headlines, all 30 come round on t
 - **News:** every headline the feed has (we keep a week of them), newest first.
 - **Stocks and crypto:** your watchlist, in your order.
 
-A visit to a widget shows its pages with a live game or your team in them, plus **one
-more page**, then the bar moves on. **The next visit carries on where the last one
-stopped**, so a feed of 8 pages shows page 1 this trip round, page 2 the next, and so on
-to page 8, then page 1 again. Nothing is left out; it comes round in turn, and the bar
-doesn't sit on one feed. New headlines arriving in between don't send it back to the
-start. The label's 2/8 tells you where you are.
+**Each lap, every widget shows its next page**, one page, then the bar moves on. **The
+next visit carries on where the last one stopped**, so a feed of 8 pages shows page 1 this
+trip round, page 2 the next, and so on to page 8, then page 1 again. Sports work the same
+way: live games and your team are on page 1, so they come round first after the last
+page, but a widget with 4 pages shows them every fourth lap, not every lap. Nothing is
+left out; it comes round in turn, and the bar doesn't sit on one feed. New headlines
+arriving in between don't send it back to the start. The label's 2/8 tells you where you
+are.
 
 ### Every page is full
 
@@ -103,11 +105,11 @@ your place under your cursor.
   crossfade instead.
 - **Hover holds the page.** Put your mouse on the bar and it waits. There is no setting for
   it under Pages.
-- **One visit per widget.** When the bar reaches a widget it shows the pages that have a
-  live game or your team in them, every time, then one more page of the rest in turn,
-  then moves on. A busy Saturday of 56 college games takes a few laps to see everyone,
-  but whatever is live and whatever is yours is never more than one lap away. One trip
-  round the whole bar takes at most a minute.
+- **One page per widget per lap.** When the bar reaches a widget it shows its next page,
+  then moves on. Every widget takes the same one-page turn, news, stocks and sports
+  alike. A busy Saturday of 56 college games takes many laps to see everyone, and a live
+  game waits its turn with the rest: it is on page 1, so it shows each time the widget
+  comes back round to the start. One trip round the whole bar takes at most a minute.
 
 ### The edge
 
@@ -268,8 +270,8 @@ nothing on it is configured.
    Continuous. Never a made-up date.
 3. **Everything eligible gets its turn.** Nothing is dropped. Pages work through it page by
    page; Continuous rotates it through its places.
-4. **Live games and your favourite team come first.** On Pages they're on every visit; on
-   Continuous your favourite team is always on, on top of the usual places.
+4. **Live games and your favourite team come first.** On Pages they're on page 1 of their
+   widget; on Continuous your favourite team is always on, on top of the usual places.
 5. **The bar doesn't care how you sorted the list.** Sorting and filtering are for reading
    the widget page; they don't rearrange the ticker.
 6. **Nothing changes under your eyes.** A page is frozen while it's up; a chip only swaps

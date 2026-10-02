@@ -9,9 +9,9 @@
  *  - `planAll` splits every widget into pages at a bar width, with the
  *    widget's own cell minimum (the cells' exports are the only source of
  *    column widths).
- *  - `nextTurn` is the page clock's step: the next page of this visit, or
- *    the next widget's first visit page. Only the primary ticker window runs
- *    it; the others follow its turns (PagedBar).
+ *  - `nextTurn` is the page clock's step: the next widget, at its next page
+ *    (one page per widget per lap, SCROLLR-297). Only the primary ticker
+ *    window runs it; the others follow its turns (PagedBar).
  */
 import type { DashboardResponse, Game, RssItem, Trade } from "../../types";
 import type { TickerContext } from "../../datawidgets/ticker";
@@ -36,7 +36,6 @@ import {
   dwellFor,
   planWidget,
   topUp,
-  visitPages,
   type Tier,
   type WidgetPlan,
 } from "./pagePlan";
@@ -222,9 +221,8 @@ export function buildPageWidgets(
           code: (cat?.name ?? tab).toUpperCase(),
           sub: `▲${up}  ▼${items.length - up}`,
           minCol: QUOTE_MIN_COL,
-          // Watchlist first in the user's order. Not "live" tier: a long
-          // watchlist takes turns like any other widget instead of putting
-          // every one of its pages on every visit (the prototype's rule).
+          // Watchlist first in the user's order. Not "live" tier: that is
+          // for live games and your team.
           items: items.map((t) => ({
             key: `f:${t.symbol}`,
             tier: listed.has(t.symbol) ? TIER.fresh : TIER.recent,
@@ -304,9 +302,8 @@ export function labelFact(widget: PageWidget, plan: WidgetPlan<PageItem> | undef
  * the same beat.
  */
 export interface Turn {
+  /** Counts turns; a visit is one page of one widget (SCROLLR-297), so the page publishes it as `data-visit` for the browser checks. */
   seq: number;
-  /** Counts visits (one widget's pages in a row); the page publishes it as `data-visit` for the browser checks. */
-  visit: number;
   tab: string;
   /** Page index in the leader's plan. */
   page: number;
@@ -316,15 +313,13 @@ export interface Turn {
   dwell: number;
 }
 
-/** Where the leader is inside a visit, and each widget's rotation cursor. */
+/** Each widget's next page: the leader's rotation cursors. */
 export interface Nav {
-  visit: number[];
-  k: number;
   cursors: Map<string, number>;
 }
 
 export function newNav(): Nav {
-  return { visit: [], k: 0, cursors: new Map() };
+  return { cursors: new Map() };
 }
 
 /**
@@ -338,33 +333,22 @@ export function nextTurn(
   nav: Nav,
 ): Turn | null {
   if (widgets.length === 0) return null;
-  let tab = prev?.tab ?? "";
-  let visit = prev?.visit ?? 0;
-  let plan = plans.get(tab);
-  const nextInVisit = nav.visit[nav.k + 1];
-  if (prev && plan && nextInVisit !== undefined && nextInVisit < plan.pages.length) {
-    nav.k += 1;
-  } else {
-    // Next widget, found by name so a widget appearing or leaving never
-    // skips one. A widget that left: start over from the first.
-    const at = widgets.findIndex((w) => w.tab === tab);
-    tab = widgets[prev && at >= 0 ? (at + 1) % widgets.length : 0].tab;
-    plan = plans.get(tab);
-    if (!plan || plan.pages.length === 0) return null;
-    const v = visitPages(plan.pages.length, nav.cursors.get(tab) ?? plan.sticky, plan.sticky);
-    nav.cursors.set(tab, v.next);
-    nav.visit = v.pages;
-    nav.k = 0;
-    visit += 1;
-  }
-  const page = nav.visit[nav.k];
+  // Next widget, found by name so a widget appearing or leaving never
+  // skips one. A widget that left: start over from the first.
+  const at = widgets.findIndex((w) => w.tab === prev?.tab);
+  const tab = widgets[prev && at >= 0 ? (at + 1) % widgets.length : 0].tab;
+  const plan = plans.get(tab);
+  if (!plan || plan.pages.length === 0) return null;
+  // One page, then the bar moves on; the cursor wraps on the current count,
+  // so a re-plan that adds or drops a page never sends the widget back to 1.
+  const page = (nav.cursors.get(tab) ?? 0) % plan.pages.length;
+  nav.cursors.set(tab, (page + 1) % plan.pages.length);
   return {
     seq: (prev?.seq ?? 0) + 1,
-    visit,
     tab,
     page,
-    pages: plan!.pages.length,
-    dwell: dwellFor(plan!.pages[page].length),
+    pages: plan.pages.length,
+    dwell: dwellFor(plan.pages[page].length),
   };
 }
 

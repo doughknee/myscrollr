@@ -97,7 +97,6 @@ interface Props {
 /** The page as it was frozen at swipe-in. */
 interface Shown {
   seq: number;
-  visit: number;
   widget: PageWidget;
   page: FrozenPage<PageItem>;
   index: number;
@@ -377,7 +376,6 @@ export default function PagedBar({
       const short = plan.pages.length === 1 && items.length < plan.cols;
       shown.current = {
         seq: turn.seq,
-        visit: turn.visit,
         widget: w,
         page: freezePage(items, keyOf),
         index,
@@ -461,7 +459,7 @@ export default function PagedBar({
               <motion.div
                 key={cur.seq}
                 data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`}
-                data-visit={cur.visit}
+                data-visit={cur.seq}
                 data-short={cur.short ? "" : undefined}
                 data-cols={cur.cols}
                 data-total={cur.total}
