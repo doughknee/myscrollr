@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { allShown, dwells, hoverReport, laps, lapStarts, mustSeeIds, pageOrder, parkMouse, readTrace, recordFromStart, startRecording, topFirst, unfilled, visits, type PagesTrace } from "./pages";
+import { allShown, bandMismatch, dwells, hoverReport, laps, lapStarts, mustSeeIds, pageOrder, parkMouse, readTrace, recordFromStart, startRecording, topFirst, unfilled, visits, type PagesTrace } from "./pages";
 
 /**
  * SCROLLR-275: the widget-pages bar (`?pages=1`), measured in a real layout.
@@ -135,7 +135,7 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr }
     expect.soft(tr.moved, "no cell moves while its page is up").toEqual([]);
     expect.soft(tr.cuts, "no cell is cut off").toEqual([]);
     expect.soft(unfilled(tr.enters), "every page shows min(columns, available) items").toEqual([]);
-    expect.soft(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}"`), "the label's cells line is not cut").toEqual([]);
+    expect.soft(bandMismatch(tr.enters), "the band: a pill per page (one track past 24), the page's pill lit, the name whole").toEqual([]);
     if (full) expect.soft(tr.enters.filter((e) => e.items.length !== e.cols).map((e) => `${e.page}: ${e.items.length}/${e.cols}`), "a column per item").toEqual([]);
 
     const d = dwells(tr.enters);
@@ -204,32 +204,38 @@ test("a 30-headline feed: one page a visit, 1, 2, 3 ... 8, 1, a refresh keeps th
   const v = visits(tr.enters);
   console.log(`[npr visits] ${v.map((x) => x.pages.map((p) => p + 1).join(",")).join(" | ")}`);
   expect(v.slice(0, 9).map((x) => x.pages)).toEqual([[0], [1], [2], [3], [4], [5], [6], [7], [0]]);
-  expect(tr.enters.find((e) => e.index === 4)?.pos, "the label counts the page").toBe("5/8");
+  expect(tr.enters.find((e) => e.index === 4)?.band, "the band: 8 pills, the fifth lit").toEqual({ pills: 8, lit: 4, track: null, nameCut: false });
   const firstVisit = tr.enters[0].visit;
   const seen = new Set(tr.enters.filter((e) => e.visit < firstVisit + 9).flatMap((e) => e.items.map((i) => i.id)));
   expect(ids.filter((id) => !seen.has(id)), "every headline seen within 8 laps").toEqual([]);
   expect(seen.has("949999"), "the refresh's new headline reached the bar").toBe(true);
 });
 
-test("the label's cells line fits its 168 px at two-digit cells and pages (SCROLLR-293, SCROLLR-301)", async ({ page, context }) => {
-  // At 1280: NPR is 15 pages of 2 ("30 STORIES · 15 PAGES"), and the busy
-  // Saturday's NCAAF is 14 pages of 4 ("56 GAMES · 14 PAGES"). Run until each
-  // shows a two-digit page; nothing in the label is cut.
+test("the band's pills: one per page to 24, the page's pill lit; past 24 one track with x/y (SCROLLR-303)", async ({ page, context }) => {
+  // At 1280: NPR is 15 pages of 2 and the busy Saturday's NCAAF 19 pages of 3, both pills.
+  // NPR with its 30 headlines doubled is 30 pages: the track, `x/30` in the ink.
   test.setTimeout(300_000);
   await context.clock.install();
   await page.setViewportSize({ width: 1280, height: 80 });
-  for (const fixture of ["npr", "busy"]) {
+  for (const [fixture, double] of [["npr", false], ["busy", false], ["npr", true]] as const) {
     await recordFromStart(page);
     await page.goto(url(fixture));
     await page.waitForSelector("[data-page]");
-    await runUntil(context.clock, async () => (await readTrace(page)).enters.some((e) => e.index >= 9 && e.count >= 10));
+    if (double) {
+      await page.evaluate(() =>
+        window.__shimDashboard!((d) => {
+          const rss = d.data.rss as { id: number; guid: string }[];
+          return { ...d, data: { ...d.data, rss: [...rss, ...rss.map((r) => ({ ...r, id: r.id + 500000, guid: `${r.guid}-2` }))] } };
+        }),
+      );
+    }
+    const want = double ? 25 : 10;
+    await runUntil(context.clock, async () => (await readTrace(page)).enters.some((e) => e.index >= 1 && e.count >= want));
     const tr = await readTrace(page);
-    const two = tr.enters.find((e) => e.index >= 9 && e.count >= 10)!;
-    console.log(`[label ${fixture}] ${two.page}: "${two.fact}"`);
-    expect(two.fact).toMatch(/^[0-9]+ (GAMES|STORIES|STOCKS) · [0-9]+ PAGES$/);
-    expect(two.fact!.endsWith(`· ${two.count} PAGES`), "the line counts the plan's pages").toBe(true);
-    expect(two.pos, "no x/y in the label: the lap counter is the bar's only one").toBeNull();
-    expect(tr.enters.filter((e) => e.factCut).map((e) => `${e.page}: "${e.fact}"`), `${fixture}: the cells line is not cut`).toEqual([]);
+    const two = tr.enters.find((e) => e.index >= 1 && e.count >= want)!;
+    console.log(`[band ${fixture}${double ? " x2" : ""}] ${two.page}: ${JSON.stringify(two.band)}`);
+    expect(two.band).toEqual(double ? { pills: 0, lit: -1, track: `${two.index + 1}/${two.count}`, nameCut: false } : { pills: two.count, lit: two.index, track: null, nameCut: false });
+    expect(bandMismatch(tr.enters), `${fixture}: every page's band`).toEqual([]);
   }
 });
 

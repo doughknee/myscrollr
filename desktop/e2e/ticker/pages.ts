@@ -35,11 +35,8 @@ export interface Enter {
   count: number;
   /** The leader's turn counter (`data-visit`): one page is one visit (SCROLLR-297). */
   visit: number;
-  /** The label's position counter ("2/8"), or null when the widget has one page. */
-  pos: string | null;
-  /** The label's fact line ("6 LIVE") as drawn, and whether the counter beside it cut it short. */
-  fact: string | null;
-  factCut: boolean;
+  /** The band (SCROLLR-303): its pill count, the lit pill's index, the 25+ track's `x/y` (null under 25), and whether the name is cut. */
+  band: { pills: number; lit: number; track: string | null; nameCut: boolean } | null;
   items: SeenItem[];
   initial: boolean;
   /** The page's `data-cols` / `data-total` / `data-avail` (PagedBar): a full page's columns, the widget's items over its pages, what it could have shown. */
@@ -124,8 +121,12 @@ export function installPagesRecorder(opts: { frames: boolean }) {
       const num = (a: string) => Number(el.getAttribute(a));
       r.enters.push({
         t, page: label, tab, index: i - 1, count: n, visit: num("data-visit"), initial: installing,
-        pos: document.querySelector(`[data-label="${tab}"] [data-pos]`)?.textContent ?? null,
-        ...((f) => ({ fact: f?.textContent ?? null, factCut: !!f && f.scrollWidth > f.clientWidth }))(document.querySelector<HTMLElement>(`[data-label="${tab}"] [data-fact]`)),
+        band: ((b) => {
+          if (!b) return null;
+          const pills = [...b.querySelectorAll("[data-pill]")];
+          const name = b.querySelector<HTMLElement>("[data-name]")!;
+          return { pills: pills.length, lit: pills.findIndex((x) => x.hasAttribute("data-lit")), track: b.querySelector("[data-track]")?.getAttribute("data-track") ?? null, nameCut: name.scrollWidth > name.clientWidth };
+        })(document.querySelector(`[data-band] [data-label="${tab}"]`)),
         cols: num("data-cols"), total: num("data-total"), avail: num("data-avail"),
         items: cells.map((c) => ({ id: c.dataset.item!, live: c.hasAttribute("data-live"), mine: c.hasAttribute("data-mine") })),
       });
@@ -357,6 +358,15 @@ export function unfilled(enters: readonly Enter[]): string[] {
       : Math.floor(e.total / e.count);
     const ok = e.count === 1 || e.total === e.count * e.cols ? n === want : n >= want && n <= e.cols;
     return ok ? [] : [`${e.page}: ${n} items, want ${want} (cols ${e.cols}, total ${e.total}, avail ${e.avail})`];
+  });
+}
+
+/** The band (SCROLLR-303) against its page: a pill per page (one `x/y` track past 24), the page's pill lit, the name whole. */
+export function bandMismatch(enters: readonly Enter[]): string[] {
+  return enters.flatMap((e) => {
+    const b = e.band;
+    const want = e.count > 24 ? { pills: 0, lit: -1, track: `${e.index + 1}/${e.count}`, nameCut: false } : { pills: e.count, lit: e.index, track: null, nameCut: false };
+    return b && JSON.stringify(b) === JSON.stringify(want) ? [] : [`${e.page}: ${JSON.stringify(b)}, want ${JSON.stringify(want)}`];
   });
 }
 

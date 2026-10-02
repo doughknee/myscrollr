@@ -25,7 +25,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | Sections | Covers |
 |---|---|
 | §0 vocabulary, §1 invariants | Both |
-| **§P Pages** (P.0 to P.15) | Pages only: the bar, label, columns, visit rule, timings, freeze, cells, edge zone, pins, Also page |
+| **§P Pages** (P.0 to P.15) | Pages only: the bar, the band, columns, visit rule, timings, freeze, cells, edge zone, pins, Also page |
 | §2 to §7 | Continuous chips only (anatomy, geometry, reservations, text, detail row, colour). Page cells reuse the helpers named in §P.9 |
 | §8.0, §8.5 rules 1 to 3 and 5, §8.7 words | Both: what is eligible, the feed-page-versus-ticker rule, what a pin is, what an empty widget says |
 | §8.1 slots, §8.2 to §8.4, §8.5 zone, §8.6 | Continuous only: slots, rotation, the off-screen rule, the fixed zone, the status chip |
@@ -43,7 +43,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **page** | One widget's items laid across the bar in equal columns, shown whole, then swiped away (§P). |
 | **cell** | One item in one page column: a game, a headline, a quote, an Also entry. No card shell. `desktop/src/components/pages/cells/`. |
 | **column** | One equal-width slot of a page. Its width is `content width / items on the page`. |
-| **label** | The 168px block at the left of a page naming the widget (§P.2). |
+| **band** | The 192px block at the bar's left end: edge bar, the widget's name, its chip and page pills, the hover keypad (§P.2). |
 | **visit** | One trip to a widget: exactly one page, the next after the last visit's; then the bar moves to the next widget (§P.6). |
 | **edge zone** | The fixed block at the right of the Pages bar: utilities, then pins (§P.10, §P.11). |
 | **Also page** | The one shared page, last, listing every widget that has nothing on (§P.12). |
@@ -116,32 +116,96 @@ differ only in the window; order, `dropPinned` and the status words are shared).
 ### P.1 The bar
 
 - Height `h-16`, 64px, `ticker-container relative flex w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150`. One height: no density branch (invariant 1).
-- Left to right: **pager** (`PAGER_W` = 88px, `shrink-0`, §P.7a), **label** (168px, `shrink-0`), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty).
+- Left to right: **band** (`BAND_W` = 192px, `shrink-0`, `data-band`, §P.2), **page block** (`min-w-0 flex-1 overflow-hidden`), **edge zone** (`ml-auto shrink-0`, absent when empty). There is no pager (SCROLLR-303).
 - The edge sits outside the page block, so it shows with no page at all.
 - `data-pages` on the bar; `data-motion-style` is `"swipe"` or `"fade"` (reduced motion, §P.7).
-- Nothing to draw (no widget page, no utility, no pin): `EmptyBar` in its Pages look (a label block in the theme accent, then the same one-row message). Two states, decided in `App.tsx`: **sourceless** (signed in, no widgets installed: browse the catalog) and **installedOff** (installed, none showing: open one to turn it on). A clock or a pin on the edge counts as something to show: the bar stays.
+- Nothing to draw (no widget page, no utility, no pin): `EmptyBar` in its Pages look (a `BAND_W` label block in the theme accent, then the same one-row message). Two states, decided in `App.tsx`: **sourceless** (signed in, no widgets installed: browse the catalog) and **installedOff** (installed, none showing: open one to turn it on). A clock or a pin on the edge counts as something to show: the bar stays.
 
-### P.2 The label
+### P.2 The band
 
-- 168px (`LABEL_W`; 112 until the cells line, SCROLLR-301), widget colour mixed at 16% (dark) or 12% (light) over the bar, right border at 40%, vertically centred, `pl-3.5 pr-2`. With the pager it is one anchor block (§P.7a): the pager wears the same tint, a 1px rule at 26% (dark) or 22% (light) between them, and the block's right border is the only hard edge.
-- **Name:** the widget code in the ink (`--accent-ink`, §P.13), `font-sans font-extrabold`, `text-[19px]`; `text-[15px]` when the code is longer than six characters; truncates. Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance: the catalog name in capitals. Also: `ALSO`.
-- **The cells line** beneath, `font-mono text-[9px] font-semibold uppercase tabular-nums text-fg-2`, no letter-spacing (`data-fact`; fg-2, not fg-3: it sits on the label's tint): what the widget has on the bar and how many pages it takes, `56 GAMES · 19 PAGES` (`labelFact`: sports GAMES, news STORIES, finance STOCKS, Also WIDGETS; singular at one). Cells count fills: they are on the bar (a fill's own `+` in the cell says which, §P.4b). It is read live from the plan, so it updates in place while a page is up (a fact, not a layout). It replaced `6 LIVE` + `3/8` (SCROLLR-301): a second x/y beside the widget arrows read as a widget count, and `6 LIVE` said less than the cells do.
-- **No position in the label.** The lap counter in the pager (§P.7a) is the bar's only x/y. The cells line has 145px; two-digit cells and pages (`30 STORIES · 15 PAGES`, 21 characters) measure 139px at the bar's rendered size (`scrollWidth`, Chromium and Edge, DPR 1 and 2), and `pages.spec.ts` asserts the line is cut on no fixture. 160px left 137px, two short.
-- **Widget jump:** with the pointer over the bar, a `ChevronUp` (11px, `data-jump="prev"`) in the band above the name and a `ChevronDown` (`data-jump="next"`) in the band below it, both full label width, 12px tall, in the ink, hidden otherwise (`opacity-0`, `group-hover/bar:opacity-100`, `focus-visible`). They step a whole widget (§P.7a); they sit on the name because that is what they change, so the pager's arrows and the lap counter stay about pages.
-- **Dwell line:** a 2px line along the bottom of the whole anchor block (pager and label) that fills (`scaleX` 0 to 1, linear) over the page's dwell. It stops while the page is held (an active pointer, §P.7), and runs on when the pointer rests.
-- **Wipe:** the whole anchor block (pager, label and dwell line, one `motion.div` keyed on the widget) rolls upward (`y` 100% to 0 in, 0 to -100% out, 0.45s, §P.7) only when the widget changes; a step back to the previous widget rolls it downward (`custom={cur.back}`, the same way the page swipes the other way, §P.7a). Pages of the same widget keep it still.
+SCROLLR-303 (designed with Brandon on the canvas, 2 Oct 2026, boards K6 and S1 to S4:
+`https://claude.ai/artifact/4qFFTLdTAK3tfoTK9in3eJ`). It replaced the 88px pager
+(`‹ 7/25 ›`) and the 168px label (`56 GAMES · 19 PAGES`): one block that says which widget,
+whether anything is happening, how much of this widget there is and where you are in it,
+with nothing to read at rest. `Band` in `PagedBar.tsx`.
+
+- **`BAND_W` = 192px, fixed** (`pagePlan.ts`). The keypad takes no width at rest and the
+  Page controls setting does not change the band (§P.7a). Tint `mix(16)` dark / `mix(12)`
+  light, right border `mix(40)`, text in `--accent-ink` (§P.13). Padding `0 10px 0 14px`
+  (the edge bar sits in the left padding). Name row and pills row are a column, centred,
+  8px apart.
+- **Edge bar** (`data-seg` per widget, `data-active` on the one up): 4px wide, the band's
+  full height, absolute at its left edge, **outside the wipe** (it never moves). One
+  segment per entry of `widgets` (the lap order, the Also page last), each a `<button>`
+  in that widget's `accentFor(hex)` at 32%; the active one solid in its ink. `edgeBar(n)`:
+  1px gaps up to 12 widgets; from 13, no gaps and the active segment `flex-grow: 2`.
+  Background transition 0.35s, so the hand-over fades. A click is a move to that widget
+  the shortest way round (`{tab}`, §P.7a): more than half the lap ahead is a jump back.
+- **Name row** (26px tall, the keypad's height, so hover moves nothing vertically;
+  `data-name`): the widget code (§ below) in the ink, `font-sans font-extrabold
+  tracking-[0.04em]`, **20px**; **15px while the keypad is shown and the code is longer
+  than five characters** (`group-hover/bar:text-[15px]`), never truncated before that
+  (`paging.spec.ts` measures every widget of the `pages` fixture at rest and on hover).
+  Sports: league code (`leagueCode`). News: first word of `sourceTab(feed name)`. Finance:
+  the catalog name in capitals. Also: `ALSO`.
+- **The chip** (`data-chip`, `data-kind`, 10px after the name; `chip(widget)` in
+  `widgetPages.ts`) exists only when something is happening now: an 8px dot with a 3px
+  halo (the dot's colour at 22%; the ink at 25% for news) and, when it has a count, an
+  11px mono semibold number in the dot's colour.
+
+  | `data-kind` | When | Colour | Count |
+  |---|---|---|---|
+  | `live` | A game of this widget is live | `--color-live` | Games live now |
+  | `open` | Stocks: US regular hours, 09:30 to 16:00 ET, Mon to Fri (`usMarketOpen`; no holiday calendar). Never crypto | `--color-up` | None |
+  | `fresh` | A story published in the last hour | the ink | Those stories |
+
+  The red and green are the palette's tokens moved 15% toward white (dark) or black
+  (light), `color-mix`, so the count clears 4.5:1 on the band's tint in all 20 palettes
+  (`pages-themes.spec.ts`); on scrollr-dark that is #ff6271 / #43ce77 against the canvas's
+  #ff6b6b / #5fd38d, which read 3.8:1 on gruvbox-dark. The honest news rule is "new since
+  you looked", which needs a last-seen timestamp; the hour stands in for it. The chip
+  steps aside while the keypad is shown (it comes back on leave).
+- **Pills row** (`data-pill` = index, `data-lit` on the current one): one `<button>` per
+  page of **this widget**, 5px tall, `flex: 1 1 0`, `min-width: 3px`, 3px gaps, radius
+  3px. Earlier pages `mix(30)`, later `mix(60)`, the current one a `mix(30)` track that
+  **fills in the ink over the page's dwell** (`DwellFill`: `scaleX` 0 to 1, linear; it
+  stops while the page is held, §P.7). It replaced the dwell line. A click is a move to
+  that page (`{page, of}`, §P.7a). While the bar is hovered the pills take
+  `brightness(1.25)`. The 3px floor holds to `PILLS_MAX` = **24 pages** (24 × 3 + 23 × 3 =
+  141px of the row's 167px).
+- **25 pages or more**: the row is **one track** (`data-track` = `x/y`, 10px tall row) of
+  5px at `mix(30)` with a **marker** (`data-lit`) at `index / count` of its width, never
+  thinner than 4% (`trackMarker`), `mix(40)`, filling in the ink over the dwell; then a 9px
+  mono `31/50` in the ink at the row's right end. That and the chip's count are the only
+  digits on the band.
+- **The keypad** (`data-keypad`, §P.7a): `‹ ˄ ˅ ›` at the right of the name row
+  (`ml-auto`), four 18x22 `<button>`s (13px lucide chevrons, stroke 2.5, radius 4, hover
+  `bg-white/10`) in a 26px capsule washed `mix(14)`, radius 7. **No width at rest**
+  (`w-0 p-0 overflow-hidden opacity-0`), its own width (76px with four keys) and 2px side
+  padding while the bar is hovered or one of its keys has keyboard focus
+  (`has-[:focus-visible]`). **Hide rule:** ˄ ˅ only with 2+ widgets, ‹ › only
+  when this widget has 2+ pages; neither, no keypad. **Peek:** hovering ˄ or ˅ brightens the
+  segment it would go to to 72%. Page controls off: no keypad at all; the band is
+  otherwise identical.
+- **Motion:** a widget change wipes the name row and the pills row together (one
+  `motion.div` keyed on the widget, carrying the tint and `data-label`), 0.45s (§P.7),
+  **upward for a turn forward, downward for a move back** (`custom={cur.back}`). The edge
+  bar only fades. A page turn inside the widget moves nothing in the band but the lit
+  pill. Reduced motion: a crossfade.
+- **No x/y at rest** (below 25 pages), and no text line of counts: the pills are the count.
 
 ### P.3 Geometry of a page
 
 ```
-|<- 88 ->|<- 168 ->|<---------- content width ---------->|<- edge ->|
-|‹ 7/23 ›| label   | col 1 | col 2 | col 3 | ... all equal | edge     |
+|<-- 192 -->|<----------- content width ----------->|<- edge ->|
+|▌NFL ● 6   | col 1 | col 2 | col 3 | ... all equal  | edge     |
+|▌▬ ▬ ▬     |                                        |          |
 ```
 
-- **Content width** = `bar width - LABEL_W - PAGER_W - edge width` (`contentWidth`); `PAGER_W` only while the pager shows (Page controls, §P.7a), so with it off the columns get its 88px back. The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
+- **Content width** = `bar width - BAND_W - edge width` (`contentWidth`). The Page controls setting does not enter (SCROLLR-303: the keypad takes no width). The edge's width is measured with `offsetWidth` when each page is planned, not with a ResizeObserver (which fires after the first page has been planned against an empty edge).
 - The page block is a grid, `repeat(n, minmax(0, 1fr))` where `n` is the number of items **on that page**. Every page is full (§P.4a), so `n` is the column count except in two cases:
   - **A widget on several pages** whose pool is not a multiple of the columns splits evenly (§P.4): 9 headlines at 8 columns are 5 + 4, each page's columns widened to fill the bar.
-  - **A truly short widget** (one page, fewer items than columns even after the fill: one NFL game all week, a feed holding two headlines) keeps **a full page's column width**, `content width / columns`, **left-aligned** from the label: `repeat(n, colW px)`, `data-short` on the page. Never one item stretched across the bar, and never centred: a centred cell floats away from the label that names it and reads as one item lost on a page (both drawn on SCROLLR-292; left picked).
+  - **A truly short widget** (one page, fewer items than columns even after the fill: one NFL game all week, a feed holding two headlines) keeps **a full page's column width**, `content width / columns`, **left-aligned** from the band: `repeat(n, colW px)`, `data-short` on the page. Never one item stretched across the bar, and never centred: a centred cell floats away from the band that names it and reads as one item lost on a page (both drawn on SCROLLR-292; left picked).
 - `colW = content width / n` (a short page: `/ columns`), frozen with the page (§P.8) and passed to the cell, which picks its own layout from it.
 - A hairline `Rule` (`parts.tsx`) sits between columns: 1px, inset 9px top and bottom, the ink at 40% (clears 1.5:1 on every palette). Cells have no border, no background card, no rounded shell.
 - Height is not an input to any of this.
@@ -159,12 +223,13 @@ cell family's own export**, never a default in `pagePlan.ts`:
 | Headline | 400px | `NEWS_MIN_COL` |
 | Also entry | 300px | `ALSO_MIN_COL` |
 
-Worked columns, no edge: at 1280 the content is 1080px: 4 NFL, 3 college, 4 quotes, 2
-headlines. At 1920 it is 1720px: 6, 6, 6, 4. With the Clock on the edge (102px): 3, 3, 3, 2
-and 6, 5, 6, 4. An edge of 400px takes 400px off the content. The pager (§P.7a, SCROLLR-298)
-costs 88px: before it, 1280 had 1168px (4, 4, 4, 2; with the Clock 4, 3, 4, 2) and 1920 had
-1808px (6, 6, 6, 4 either way), so it costs a column for NFL and quotes at 1280 with the
-Clock and for college at 1920 with it. SCROLLR-296 widened the game
+Worked columns (NFL, college, quotes, headlines), with the band (SCROLLR-303, 192px): at
+1280 the content is 1088px: 4, 3, 4, 2; with the Clock on the edge (102px) 986px: 3, 3, 3,
+2. At 1920 it is 1728px: 6, 6, 6, 4; with the Clock 1626px: 6, 5, 6, 4. An edge of 400px
+takes 400px off the content. Before the band, the pager and the 168px label took 256px:
+1920 with the Clock had 1562px (5, 5, 6, 3), so the band gives that bar **one more NFL
+column and one more headline column**, and loses nothing at 1280 (986 against 922px: 3, 3,
+3, 2 either way; 1088 against 1024px bare: 4, 3, 3, 2 became 4, 3, 4, 2). SCROLLR-296 widened the game
 and quote columns on purpose (Brandon, 1 Oct 2026: "we don't need that many per page. I'd
 rather fit more of the names"; the price "should be the biggest, most important thing"):
 fewer, roomier cells are the feature. Before it they were 212 / 244 / 172 (5, 4, 6, 2 and
@@ -282,7 +347,7 @@ widget back to page 1). It is **leader-owned** (§P.14): only the primary window
 it, and followers show the leader's page, so every monitor agrees. It lives as long as the
 leader's bar (a restart starts each widget at its first page again). A widget appearing or
 leaving never skips another; a widget that left starts the next visit from the first
-widget. Every page swipes the label too when the widget changed. Each turn's `seq` is
+widget. Every page wipes the band too when the widget changed. Each turn's `seq` is
 published as `data-visit` on the page for the browser checks (a visit is one page).
 
 ### P.7 Timing and motion
@@ -290,85 +355,70 @@ published as `data-visit` on the page for the browser checks (a visit is one pag
 | What | Value |
 |---|---|
 | Dwell | `dwellFor(items on page) = clamp(3 + 0.75 x items, 6, 12)` seconds: 6 s for a page of four or fewer, 12 s from twelve |
-| Swipe | 0.6 s (`SWIPE_S`), ease `(0.32, 0.72, 0, 1)`; the new page enters from `x: 100%`, the old leaves to `x: -100%`; a manual step back is mirrored (§P.7a) |
-| Label wipe | 0.45 s, same ease, upward, only when the widget changes |
+| Swipe | 0.6 s (`SWIPE_S`), ease `(0.32, 0.72, 0, 1)`; the new page enters from `x: 100%`, the old leaves to `x: -100%`; a manual move back is mirrored (§P.7a) |
+| Band wipe | 0.45 s (`BAND_S`), same ease, only when the widget changes: upward, downward for a move back (§P.2) |
 | Edge slot roll | 0.45 s, same ease, upward |
 | Reduced motion | The **OS** setting, read directly (`prefers-reduced-motion`); every swipe, wipe and roll becomes a 0.4 s linear crossfade, and `data-motion-style="fade"` |
-| Hover | A page held by an **active** pointer holds, and so does the dwell line; the clock stands still and resumes when the hold ends. Active = over the bar and entering or moving within the last **5 s** (`HOVER_IDLE_MS`, `activeHover.ts`). A pointer that rests 5 s releases the hold and the bar turns again (worst case a further dwell of up to 12 s); moving it grabs the page back; leaving the bar releases at once. Under Pages there is **no hover setting**, whatever `onHover` was left at by Continuous |
+| Hover | A page held by an **active** pointer holds, and so does the lit pill's fill; the clock stands still and resumes when the hold ends. Active = over the bar and entering or moving within the last **5 s** (`HOVER_IDLE_MS`, `activeHover.ts`). A pointer that rests 5 s releases the hold and the bar turns again (worst case a further dwell of up to 12 s); moving it grabs the page back; leaving the bar releases at once. Under Pages there is **no hover setting**, whatever `onHover` was left at by Continuous |
 
 The page clock restarts only on a new turn, never on a data update. Dwell is a floor of 6 s
 by design: nothing on the bar turns faster on its own (a manual step, §P.7a, is the reader's
 choice).
 
-### P.7a Manual paging and the pager
+### P.7a Manual paging and the keypad
 
 SCROLLR-298 (Brandon, 1 Oct 2026: "little buttons or something somewhere that make it easy
 to cycle through them"; then, "arrow keys on the far left and far right might be annoying; I
-have an ultrawide"); then (SCROLLR-301), "hide the controls if you don't want them" and "up
-and down arrows as well for swapping between entire widgets".
+have an ultrawide"); SCROLLR-301, "hide the controls if you don't want them" and "up and
+down arrows as well for swapping between entire widgets"; SCROLLR-303, the band: ‹ › page
+**inside** the widget, ˄ ˅ change it.
 
-- **Page controls** (`ticker.pageControls`, default on; SCROLLR-301): a toggle in Settings ›
-  Ticker › Motion, shown under Pages only (as Speed and On hover show under Continuous
-  only), and the same checkable item in the bar's right-click menu (also Pages only). Off
-  removes the pager (`data-pager` absent): the label starts at x = 0 and `contentWidth`
-  no longer takes `PAGER_W` (`planAll(…, pager)`), so columns are re-planned on the next
-  page. The wheel and the keys keep working. The pager's width is the only thing it
-  changes; every window reads the same pref.
+Two kinds of move, both `stepTurn(prev, move, …)` (`widgetPages.ts`) on the leader's page
+clock, with `move` a `Move`:
 
-- **The pager** sits at the bar's left end, before the label (SCROLLR-300; it sat after
-  the label until then): it counts the whole lap, a bar-level control, so it sits outside
-  the widget's label, a quiet control at the left end against the edge zone's utilities
-  and pins at the right. It has no dwell line; that and the wipe stay on the label.
-  `PAGER_W` = 88px, `shrink-0`, `data-pager`:
-  `‹ 7/23 ›`. The middle is always shown: this page's place in the lap and the lap's total,
-  `font-mono text-[12px] font-semibold tabular-nums text-fg-3`, centred in a 44px box
-  reserved for `99/99` (`data-lap-pos`). The lap is every page of every widget in ticker
-  order, the Also page last: `at` = the pages of the widgets before this one + this page's
-  index + 1, `of` = the sum of every widget's page count, each from **this window's** plans.
-  Both are frozen with the page (§P.8): a re-plan reaches the count on the next page.
-  `contentWidth` takes `PAGER_W` off, so columns stay exact (§P.4 for the cost).
-- **The arrows** either side of the count are `<button>`s (`data-step="prev"|"next"`,
-  `aria-label` "Previous page" / "Next page"), a lucide chevron drawn 18px in a 22px box, in
-  the label's ink (`--accent-ink`), hit area 44px wide by the bar's 64px (an `after:` box
-  11px either side). `opacity-0`, shown while the pointer is over the bar
-  (`group-hover/bar`) or when one has keyboard focus. Together, next to the label, so neither
-  the eye nor the mouse crosses an ultrawide bar; nothing at the far ends.
+| Move | From | Does |
+|---|---|---|
+| `{dir}` | ‹ ›, `←` `→`, the wheel | This widget's previous or next page, **wrapping inside the widget** (back from page 1 is its last page). The lap's order is unchanged. A one-page widget: nothing (null) |
+| `{dir, whole: true}` | ˄ ˅, `↑` `↓`, Shift+wheel | The previous or next widget. Forward lands on that widget's next page (its cursor, what the clock's own turn would show); back on the page it showed last (its last page if it has not been up yet), so `↓` then `↑` returns to what you were reading. One widget: nothing |
+| `{tab}` | an edge-bar segment | That widget, the shortest way round: more than half the lap ahead is a move back, landing as a ˄ does |
+| `{page, of}` | a pill | This widget's page `page` (mapped by share when the sender's count `of` differs, `followPage`); back when it is before the current one; the lit pill is nothing |
+
+- **Every move is a turn like any other:** a new `seq`, the same 0.6 s swipe or crossfade,
+  frozen at swipe-in, the edge slots step, and **the page's dwell starts again**. It moves
+  that widget's cursor (§P.6) to the page after the one shown, so the clock's next turn
+  goes on to the next widget and the widget's next turn does not show that page again. A
+  held page stays held.
+- **A move back swipes the other way** (SCROLLR-300): the page comes in from `x: -100%`
+  and the old one leaves to `x: 100%`; the turn carries `back: true`, the page `data-back`,
+  and AnimatePresence's `custom` hands the direction to the page leaving. The band wipes
+  down instead of up when the widget changes (§P.2). Forward moves and every automatic turn
+  stay right to left.
+- **The keypad** (§P.2) is the on-bar control: `‹ ˄ ˅ ›` beside the name, shown on hover
+  (or keyboard focus) only, with no width at rest. ˄ ˅ peek at the segment they would go
+  to. It sits on the name because the name is what ˄ ˅ change, and next to the page so
+  neither the eye nor the mouse crosses an ultrawide bar; nothing at the far ends. The
+  buttons keep `data-step="prev|next"` (‹ ›) and `data-jump="prev|next"` (˄ ˅).
+- **Page controls** (`ticker.pageControls`, default on): a toggle in Settings › Ticker ›
+  Motion, shown under Pages only, and the same checkable item in the bar's right-click
+  menu. It now means **show the hover keypad**. Off, the band is identical at rest and
+  nothing appears on hover; the wheel, the keys, the pills and the segments still work.
+  It does not change any width (`contentWidth` has no term for it).
 - **The wheel** over the bar is the primary control (the bar lives at a screen edge where
   the wheel is the natural gesture): down or a sideways swipe left (`deltaY` or `deltaX` >
-  0, whichever is larger) is the next page, up or right is the previous. One step per
+  0, whichever is larger) is the next page, up or right the previous. One step per
   gesture: a wheel event steps only after `WHEEL_QUIET_MS` = 200 ms without one, so a flick
-  or a trackpad's glide is one page and notches turned one at a time are a page each. The
-  listener is native and not passive, and calls `preventDefault`, so a sideways swipe never
-  becomes the webview's back gesture; nothing in the ticker scrolls anyway (`overflow:
-  hidden` throughout). WebView2 delivers the wheel to the window under the pointer without
-  focus; the Rust side does nothing with it. A wheel event counts as pointer activity, so
-  the hold (§P.7, Hover) stays while you page.
-- **Keys:** `←` and `→` (no modifier) step when the ticker window has focus (it does after
-  a click on it; it normally has none, being always on top at a screen edge).
-- **A widget jump** (SCROLLR-301): `↓` and `↑` (no modifier), or the wheel with **Shift**
-  held (Chromium hands it over as `deltaX`; the sign rule above still applies), jump a
-  whole widget: `stepTurn(…, whole)`. Forward lands on the next widget at the page its
-  cursor would show next (what the clock's own turn would bring); back on the previous
-  widget at the page it showed last (its last page if it has not been up yet), so `↓`
-  then `↑` returns to what you were reading. Otherwise it is a step like any other below:
-  a back jump swipes left to right, the cursor ends after the page shown, and a follower
-  relays it as `pages:step` `{dir, whole}`. No on-bar button; the ‹ › stay page steps.
-- **A step** is `stepTurn` (`widgetPages.ts`) on the leader's page clock: the next or
-  previous page in the same reading order the pager counts; past a widget's last page is
-  the next widget's first, before its first page is the previous widget's last, and the lap
-  wraps both ways. It is a turn like any other: a new `seq`, the same 0.6 s swipe or
-  crossfade, frozen at swipe-in, the edge slots step, and **the page's dwell starts
-  again**. **A step back swipes the other way** (SCROLLR-300, Brandon: the bar slides the
-  way you asked): the page comes in from `x: -100%` and the old one leaves to `x: 100%`.
-  Forward steps and every automatic turn stay right to left. The turn carries `back: true`
-  (`stepTurn` with dir -1, relayed to followers with the rest of the turn), the page
-  `data-back`, and AnimatePresence's `custom` hands the direction to the page leaving.
-  Reduced motion stays a crossfade. A held page stays held. The step is an immediate turn plus
-  a move of that widget's cursor (§P.6) to the page after the one stepped to, so the
-  clock's next turn moves on to the next widget as after any turn, and the widget's next
-  turn does not show that page again.
-- **Monitors:** a follower's step is sent to the leader as `pages:step` (`{dir}`); the
-  leader applies it and broadcasts the turn, so every window turns together (§P.14).
+  or a trackpad's glide is one page and notches turned one at a time are a page each. With
+  **Shift** held (Chromium hands it over as `deltaX`; the sign rule still applies) it is a
+  widget. The listener is native and not passive, and calls `preventDefault`, so a
+  sideways swipe never becomes the webview's back gesture; nothing in the ticker scrolls
+  anyway (`overflow: hidden` throughout). WebView2 delivers the wheel to the window under
+  the pointer without focus; the Rust side does nothing with it. A wheel event counts as
+  pointer activity, so the hold (§P.7, Hover) stays while you page.
+- **Keys:** `←` `→` and `↑` `↓` (no modifier) when the ticker window has focus (it does
+  after a click on it; it normally has none, being always on top at a screen edge).
+- **Monitors:** a follower's move is sent to the leader as `pages:step` with the `Move`
+  as its payload; the leader applies it and broadcasts the turn, so every window turns
+  together (§P.14). Nothing about it is per-window.
 
 ### P.8 The freeze
 
@@ -380,7 +430,7 @@ swipe-in. Later data goes through `refreshPage` and changes **values only**:
 - a new item, a re-rank, a game turning close or live, a resize, an edge growing: none of
   them reaches the page up; all reach the next one (a resize measured: the current page kept
   7 columns, the next had 4);
-- the label's fact line is not a layout and does update live.
+- the band's chip is not a layout and does update live (its count, the market opening).
 
 Call `freezePage` after `planWidget` has ranked and split. Never read the live pool to place
 a cell. `refreshPage` is fed the pool **and** the fill, so a fill cell's price still moves
@@ -515,7 +565,7 @@ status chip (§8.7); each cell says what the status chip would, in the same word
 - Text comes from `TickerSource.status(raw, ctx)` (§8.7 table), else `nothing to show right
   now`. Never a made-up date (invariant 7).
 - Tier 4, minimum column 300px, one cell per widget: code tag (the widget's own tab text, in
-  its ink on the label's tint, 16/12), then the text on a truncating line. The tag is fixed for the widget's life.
+  its ink on the band's tint, 16/12), then the text on a truncating line. The tag is fixed for the widget's life.
 - The Also page is not counted as "data shown" for the presence check-in
   (`onDisplayedWidgetsChange` excludes it; the edge's tabs are included).
 - This is the Pages half of "no silent empty widgets": a widget you added never just goes
@@ -527,17 +577,17 @@ status chip (§8.7); each cell says what the status chip would, in the same word
   (`catalogItemById(tab).hex`), lifted for the dark bar by `liftForTint` (§7.2), raw on
   light; `--color-fg-3` when there is none. Green, red and amber stay semantic and are never
   the accent.
-- Every tint is `mix(pct)` = `color-mix(in srgb, var(--accent) pct%, transparent)`: label
-  16/12, label border 40, Also code tag 16/12, `mine` and `close` lines 100 (the close-game tint is gone, SCROLLR-296).
+- Every tint is `mix(pct)` = `color-mix(in srgb, var(--accent) pct%, transparent)`: band
+  16/12, band border 40, pills 30/60, track marker 40, keypad wash 14, Also code tag 16/12, `mine` and `close` lines 100 (the close-game tint is gone, SCROLLR-296).
 - **Anything that must be read in the widget's colour uses the ink**, `--accent-ink` =
   `inkFor(hex, dark)` (`readableInk` in `utils/chipAccent.ts`), set beside `--accent` by
   `accentStyle(accent, ink)`: the same hue and saturation, HSL lightness moved only until
   relative luminance is at most 0.07 (light) or at least 0.45 (dark), which reads at 4.5:1
-  on every palette's bar, bare and under the label's tint (`chipAccent.ink.test.ts` checks
-  every catalog colour against every palette). The label's name, the lap counter, the Also code and
+  on every palette's bar, bare and under the band's tint (`chipAccent.ink.test.ts` checks
+  every catalog colour against every palette). The band's name, a pill's fill, the track's `x/y`, the active edge segment, the Also code and
   the hairline (ink at 40%, 1.5:1) use it; tints never do. No colour: the ink is `fg`.
 - **Contrast floors, every palette** (SCROLLR-287; `pages-themes.spec.ts` asserts every
-  reading): text 4.5:1 against what is really behind it (the bar, the label's tint, a close
+  reading): text 4.5:1 against what is really behind it (the bar, the band's tint, a close
   game's tint); large text (24px, or 18.66px bold) 3:1; hairlines 1.5:1. So: no opacity on
   text, `fg-4` never carries text, and the semantic `up`, `down`, `live` tokens are defined
   per palette to clear 4.5 on the bar. A palette change that drops a token under its floor
@@ -589,8 +639,8 @@ state and one window owns it.
 (`pageOrder`), **live and yours lead their widget** (`topFirst`: page 1; every live game and
 your team from the fixture is drawn and marked), a lap of at most 60 s (never raise it),
   **all shown** (`allShown`: every page of every widget up and dwelt, from the first lap's
-  start) within 300 s, two windows in step, the label's cells line is cut
-  nowhere, and **every page is full** (`unfilled`: one
+  start) within 300 s, two windows in step, **the band matches its page** (`bandMismatch`:
+  a pill per page, the page's pill lit, one `x/y` track past 24, the name cut nowhere), and **every page is full** (`unfilled`: one
   page shows `min(columns, available)`; several pages show full pages unless the pool is
   not a multiple of the columns, then the even split). Laps are cut at visit starts
   (`data-visit`), since a visit no longer always opens on page 1. Fixtures: `nflthursday`
@@ -600,8 +650,9 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   `pages` set with NPR's 3 headlines swapped for `npr`'s 30, the worst case for all shown).
   The `npr` checks: visits run 1, 2, 3 ... 8, 1 at 1920 through the live sim's 4 s
   refreshes and an injected refresh with a new headline during visit 4
-  (`window.__shimDashboard`, dev and `?live=1` only); every headline is seen within 8 laps; at 1280 NPR reads `30 STORIES · 15 PAGES`
-  and NCAAF on the busy Saturday `56 GAMES · 14 PAGES` with nothing in the label cut. The shim serves
+  (`window.__shimDashboard`, dev and `?live=1` only); every headline is seen within 8 laps; at 1280 NPR has 15 pills and
+  NCAAF on the busy Saturday 19, and NPR's 30 headlines doubled are 30 pages on one track
+  reading `2/30` (SCROLLR-303). The shim serves
   `/finance/public` from `market.json`. The scorecard gets a `pages` mode: lap, widget
   share, Also share, cells moved or cut, dwell, dropped swipe frames.
 
@@ -615,7 +666,7 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   |---|---|---|---|---|
   | pages @1920 | 51.8 | 38.2 | 85.0 | 82.6 |
   | pages+npr30 @1920 | 51.8 | 38.2 | 404.2 | 295.4 |
-  | mixed @1920 | 42.6 | 27.6 | 314.3 | 248.9; **293.5** with the pager (SCROLLR-298: NCAAF 6 → 5 columns, 12 pages) |
+  | mixed @1920 | 42.6 | 27.6 | 314.3 | 248.9; **293.5** with the pager (SCROLLR-298: NCAAF 6 → 5 columns, 12 pages), and 293.5 with the band (SCROLLR-303: still 5, the Clock is on that edge) |
   | busy @1280 | 18.6 | 6.6 | 306.6 | 114.6 |
   | longnames @1280 | 36.6 | 36.6 | 66.6 | 66.6 |
   | quiet @1920 | 19.4 | 18.6 | 25.4 | 24.6 |
@@ -634,18 +685,26 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
 
 - `e2e/ticker/pages-themes.spec.ts`: one static frame per theme family x light/dark
   (`?theme=<family>-<mode>`), text measured against what is behind it: every reading is
-  asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock and small
-  text in the widget's colour at 4.5:1, the label name at 3:1, every hairline at 1.5:1.
-- `e2e/ticker/hover.spec.ts`: under the fake clock, a still pointer holds 5 s and then the bar turns, a moving pointer holds the page and the dwell line for 40 s, and moving again after a release grabs the page back.
-- `e2e/ticker/paging.spec.ts` (SCROLLR-298), fake clock: the pager sits at x = 0 and
-  `PAGER_W` wide, the label at x = `PAGER_W`, the page after both (SCROLLR-300), and its
-  count's box stays put from `1/n` to `10/n`; a step back swipes in from the left and out
-  to the right while a forward step and the clock's next turn go right to left (the sign
-  of each page's x mid-swipe); wheel down and up, a
-  flick of eight events is one step, a sideways swipe counts the same, back from the
-  first page wraps to the last, nothing scrolls; the arrows are hidden off the bar, shown on
-  it, 44px targets, and step; `←`/`→` step; a step restarts the dwell and the clock then
-  carries on past it; a follower's wheel and arrow turn the leader and both windows.
+  asserted at its floor (§P.13): fg, fg-2, fg-3, finals, up/down, the live clock, the band's
+  chip count and small text in the widget's colour at 4.5:1, the band's name at 3:1, the lit
+  pill's fill against its pill at 3:1, every hairline at 1.5:1.
+- `e2e/ticker/hover.spec.ts`: under the fake clock, a still pointer holds 5 s and then the bar turns, a moving pointer holds the page and the lit pill's fill for 40 s, and moving again after a release grabs the page back.
+- `e2e/ticker/paging.spec.ts` (SCROLLR-298, SCROLLR-303), fake clock: the band at x = 0
+  and `BAND_W` wide, the page at x = `BAND_W`, the edge bar 4px with the widget up active,
+  a pill per page with the first lit, nothing but the name and the chip's count to read
+  at rest; the keypad has no width at rest, shows on hover as four 18x22 keys in a 26px
+  capsule, and the chip steps aside; the name is 20px, 15px on hover past five
+  characters, never cut, on every widget; ‹ › stay in the widget and wrap inside it, ˄ ˅
+  change it and come back to the page you were reading; ˄ ˅ peek at exactly the segment
+  they go to; the hide rule (`npr`: ‹ › only; `onegame`: no keypad); a pill and a
+  segment move (a segment two behind is a move back); wheel down and up, a flick of eight
+  events is one step, a sideways swipe counts the same, back past page 1 wraps inside the
+  widget, nothing scrolls; a step back swipes in from the left and out to the right while a
+  forward step and the clock's next turn go right to left; the band wipes up for the next
+  widget and down for back while the edge bar stays put; a step restarts the dwell and the
+  clock then goes to the next widget; a follower's wheel, keypad, `↓`, Shift+wheel and
+  segment turn the leader and both windows; Page controls off leaves the band and the
+  columns as they were and shows no keypad, and the wheel and keys still page.
 - vitest: `activeHover.test.ts`, `pagePlan.test.ts`, `widgetPages.test.ts`, `pageFill.test.ts` (the pool and the fill per family), `EdgeZone.test.tsx`, one test per cell. `widgetPages.test.ts` rebuilds the widgets from fresh data before every turn and asserts the cursor carries on.
 
 ---
@@ -1526,17 +1585,17 @@ needs both until Continuous is retired.
 - [ ] Every changing value reserves from first render (score `ch`, fixed clock box, price and change `ch`, fixed age column); sometimes-empty parts are always mounted.
 - [ ] Tier ladder respected: only live games and your team are tier 0 (they lead page 1; no page is on every lap); order inside a tier is the source's own, never a live value.
 - [ ] No per-widget slot count; no new setting for how many or which (§1.4).
-- [ ] The pool is the widget page's (§P.4a): no time window under Pages, nothing eligible hidden; the visit cursor continues where the last visit stopped through refreshes and re-plans, leader-owned; the label's cells line (`56 GAMES · 19 PAGES`) is cut nowhere.
+- [ ] The pool is the widget page's (§P.4a): no time window under Pages, nothing eligible hidden; the visit cursor continues where the last visit stopped through refreshes and re-plans, leader-owned; the band matches its page (a pill per page, the page's lit, one track past 24, the name whole: `bandMismatch`).
 - [ ] Every page is full (§P.4a): the family's pool fills its pages (or a fill tops a short one up), `topUp` adds only the last page's empty columns, a fill is never written to the user's config, and a truly short widget is drawn at a page's column width, left-aligned; `pages.spec.ts` `unfilled` green.
 - [ ] Every fixture's lap is at most 60 s and everything is shown within 300 s (`pages.spec.ts`); a visit is exactly one page (`nextTurn`, `pageOrder`); never raise a threshold to pass.
 - [ ] The ticker selector reads no feed prefs; pinned subjects dropped from the pages with `dropPinned`; the pin is on the bar once.
 - [ ] A widget with nothing on reaches the Also page with its status words; nothing fabricated.
 - [ ] Edge: one Cycle slot per utility stepping on the turn `seq`; a sizer for every item so the width is constant; edge width read when the page is planned.
-- [ ] An active pointer (moved within 5 s) holds the page and the dwell line, a resting one does not (`hover.spec.ts`); reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
+- [ ] An active pointer (moved within 5 s) holds the page and the lit pill's fill, a resting one does not (`hover.spec.ts`); reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
 - [ ] Colour only through `--accent` and `mix()`, text in the widget's colour only through `--accent-ink`; red only live or urgent.
 - [ ] Contrast (§P.13): no opacity on text, no `fg-4` text, `pages-themes.spec.ts` green in all 20 palettes.
 - [ ] Process-wide work (page clock, hover, manual steps) runs in the primary window only; followers follow.
-- [ ] The pager (§P.7a) keeps its 88px and the count its reserved box; `contentWidth` still takes `PAGER_W` off; a manual step is a turn (fresh dwell, cursor past it) and reaches every window (`paging.spec.ts`).
+- [ ] The band (§P.2) is `BAND_W` and nothing changes it (not the keypad, not Page controls); nothing to read at rest but the name and a chip's count (and `x/y` past 24 pages); the keypad shows only on hover or focus and only the keys that can act; ‹ › stay in the widget, ˄ ˅ change it; a move is a turn (fresh dwell, cursor past it) and reaches every window (`paging.spec.ts`).
 - [ ] No template-literal classes; served CSS checked.
 - [ ] Verified in the shim at 1280 and 1920 with `?pages=1&live=1`; `npm run test:browser` green.
 - [ ] Any rule from §P that this change relies on and that is not on `main` is marked *(lands with SCROLLR-xxx)*, and any mark whose issue just merged is removed.

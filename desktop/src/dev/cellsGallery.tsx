@@ -23,7 +23,7 @@ import type { LeagueMeta } from "../api/queries";
 import { catalogItemById } from "../marketplace";
 import { isLive, isCloseGame } from "../utils/gameHelpers";
 import { sportsTickerStatus } from "../datawidgets/sports/view";
-import { LABEL_W, columnsFor, contentWidth, paginate } from "../components/pages/pagePlan";
+import { BAND_W, columnsFor, contentWidth, paginate } from "../components/pages/pagePlan";
 import GameCell, { gameMinCol } from "../components/pages/cells/GameCell";
 import NewsCell, { NEWS_MIN_COL, NEWS_PIN_W } from "../components/pages/cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "../components/pages/cells/QuoteCell";
@@ -56,7 +56,7 @@ function Bar({ tab, code, sub, children, caption }: { tab: string; code: string;
       <div className="flex h-16 w-full items-stretch overflow-hidden border-b border-edge/50 bg-base-150" style={accentStyle(accentFor(hex, dark), inkFor(hex, dark))} data-bar={tab}>
         <div
           className="flex shrink-0 flex-col justify-center gap-[3px] pl-3.5 pr-2"
-          style={{ width: LABEL_W, background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
+          style={{ width: BAND_W, background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
         >
           <span className="truncate font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]" style={{ color: "var(--accent-ink)" }}>{code}</span>
           <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-2">{sub}</span>
@@ -84,7 +84,7 @@ function Columns({ children, width }: { children: ReactNode[]; width?: number })
 }
 
 function colWidth(n: number) {
-  return (window.innerWidth - LABEL_W) / n;
+  return (window.innerWidth - BAND_W) / n;
 }
 
 // ── The pages ────────────────────────────────────────────────────

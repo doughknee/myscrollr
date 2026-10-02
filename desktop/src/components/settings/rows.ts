@@ -113,8 +113,8 @@ export const SETTINGS_ROWS = {
     },
     pageControls: {
       label: "Page controls",
-      description: "The page count and arrows at the bar's left end. The mouse wheel and arrow keys page either way.",
-      keywords: "pager arrows counter buttons hide pages wheel keyboard",
+      description: "The arrows that show on the widget's name when you hover the bar. The mouse wheel and arrow keys page either way.",
+      keywords: "keypad arrows buttons hide pages widgets wheel keyboard",
     },
     speed: {
       label: "Speed",

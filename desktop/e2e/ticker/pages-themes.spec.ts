@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { THEME_FAMILIES } from "../../src/preferences";
+import { parkMouse } from "./pages";
 
 /**
  * SCROLLR-275 (Home addition): the widget pages stay legible in every
@@ -38,9 +39,9 @@ const LARGE_FLOOR = 3;
 const RULE_FLOOR = 1.5;
 
 /** Groups every theme must have measured, so a pass is never vacuous. */
-const MEASURED = ["fg", "fg-2", "fg-3", "label-name", "accent", "rule", "warning", "empty-label"];
-/** Parts every theme must have measured: the up/down change and the game clock (live, in the live colour). */
-const PARTS = ["change", "status"];
+const MEASURED = ["fg", "fg-2", "fg-3", "label-name", "accent", "rule", "warning", "empty-label", "pill"];
+/** Parts every theme must have measured: the up/down change, the game clock (live, in the live colour) and the band's chip count (SCROLLR-303). */
+const PARTS = ["change", "status", "chip"];
 
 interface Reading {
   /** The palette token the text is painted in, `accent`, `label-name`, `rule`, or `other:<part>`. */
@@ -101,6 +102,12 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
     for (const root of document.querySelectorAll(rootSel)) {
       for (const el of root.querySelectorAll("*")) {
         const cs = getComputedStyle(el);
+        // The band's lit pill fills in the ink over its pill (SCROLLR-303): a graphic, 3:1 against what is behind it.
+        if (el.matches("[data-band] [data-lit] > span")) {
+          const { bg } = stack(el.parentElement!, root);
+          out.push({ group: "pill", role: "pill", text: el.closest("[data-label]")?.getAttribute("data-label") ?? "", ratio: ratio(paint([...bg, { color: cs.backgroundColor, alpha: 1 }]), paint(bg)), floor: cfg.large });
+          continue;
+        }
         if (cs.visibility === "hidden" || el.closest("[aria-hidden=true]:not(.w-px)") && !el.matches(".w-px")) continue;
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
@@ -140,7 +147,10 @@ function installContrast(cfg: { text: number; large: number; rule: number }) {
 }
 
 async function readings(page: Page, url: string, root: string, ready: string): Promise<Reading[]> {
+  // The pointer off the bar: a hovered band shows its keypad and the chip steps aside (SCROLLR-303).
+  await parkMouse(page);
   await page.goto(url);
+  await parkMouse(page);
   await page.locator(ready).first().waitFor();
   await page.evaluate(() => document.fonts.ready);
   // Colours are measured at rest: a theme applied after first paint transitions, and a mid-fade reading is not the palette's.

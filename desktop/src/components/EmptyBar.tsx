@@ -11,7 +11,7 @@
 import type { ComponentType, ReactNode } from "react";
 import clsx from "clsx";
 import { Plus } from "lucide-react";
-import { LABEL_W } from "./pages/pagePlan";
+import { BAND_W } from "./pages/pagePlan";
 import { accentStyle, mix } from "./pages/cells/parts";
 
 export interface InstalledWidgetMeta {
@@ -126,7 +126,7 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
           className="flex shrink-0 flex-col justify-center gap-[3px] pl-3.5 pr-2"
           style={{
             ...accentStyle("var(--color-primary)", "color-mix(in srgb, var(--color-primary) 50%, var(--color-fg))"),
-            width: LABEL_W,
+            width: BAND_W,
             background: mix(16),
             borderRight: `1px solid ${mix(40)}`,
           }}

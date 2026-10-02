@@ -7,7 +7,7 @@ import npr from "../../dev/__fixtures__/dashboard.npr.json";
 import market from "../../dev/__fixtures__/market.json";
 import { selectFinanceFill } from "../../datawidgets/finance/view";
 import { topUp } from "./pagePlan";
-import { buildPageWidgets, labelFact, planAll } from "./widgetPages";
+import { buildPageWidgets, planAll } from "./widgetPages";
 
 /** SCROLLR-292: every page is full. SCROLLR-293: sports and news fill from their whole pool, so only a short watchlist takes a fill. */
 
@@ -104,8 +104,6 @@ describe("finance: popular symbols fill a short watchlist", () => {
     expect(new Set(syms).size).toBe(syms.length);
     expect(syms.some((s) => s.includes("/"))).toBe(false);
     expect(page.slice(1).every((i) => i.fill && !i.pin)).toBe(true);
-    // The cells line counts the fills too: they are on the bar (SCROLLR-301).
-    expect(labelFact(w, plan)).toBe(`${plan.cols} STOCKS · 1 PAGE`);
   });
 
   it("each symbol the user adds pushes one fill out", () => {

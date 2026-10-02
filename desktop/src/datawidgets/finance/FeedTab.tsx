@@ -324,7 +324,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   // lib/edgeMeasure); with no bar reporting, a 1920 bar's count.
   const room = useEdgeRoom();
   const onBar = prefs.ticker.scrollMode === "pages" && prefs.widgets.widgetsOnTicker.includes(widgetType);
-  const barCols = room ? columnsFor(contentWidth(room.bar, room.util, prefs.ticker.pageControls), QUOTE_MIN_COL) : WATCHLIST_FILL_SHOWN;
+  const barCols = room ? columnsFor(contentWidth(room.bar, room.util), QUOTE_MIN_COL) : WATCHLIST_FILL_SHOWN;
   const barFills = useMemo(() => {
     if (!onBar || !isComfort || !isWatchlist || searchQ || !assetClass || !marketTrades) return [];
     const starters = addConfigForWidget(widgetType)?.symbols;

@@ -12,7 +12,9 @@
  *  - `nextTurn` is the page clock's step: the next widget, at its next page
  *    (one page per widget per lap, SCROLLR-297). Only the primary ticker
  *    window runs it; the others follow its turns (PagedBar). `stepTurn` is a
- *    manual step (wheel, arrows, keys) on the same clock (SCROLLR-298).
+ *    manual move (wheel, keypad, keys, a pill or an edge-bar segment) on the
+ *    same clock (SCROLLR-298, SCROLLR-303).
+ *  - `chip` is the band's "something is happening now" mark (SCROLLR-303).
  */
 import type { DashboardResponse, Game, RssItem, Trade } from "../../types";
 import type { TickerContext } from "../../datawidgets/ticker";
@@ -69,10 +71,8 @@ export interface PageWidget {
   /** Widget id (sports_nfl, news_bbc, finance_stocks), or "also". */
   tab: string;
   kind: PageWidgetKind;
-  /** The label's name: "NFL", "BBC", "STOCKS", "ALSO". */
+  /** The band's name: "NFL", "BBC", "STOCKS", "ALSO". */
   code: string;
-  /** The label's one fact: "6 LIVE", "SUN 4", "▲6 ▼4", "HEADLINES". */
-  sub: string;
   /** Catalog colour; `accentFor` turns it into `--accent`. */
   hex?: string;
   /** Narrowest column, from the cell family (never a local default). */
@@ -111,12 +111,6 @@ function gameTier(g: Game, mine: boolean, now: number): Tier {
 function newsTier(item: RssItem, now: number): Tier {
   const h = (now - Date.parse(item.published_at ?? item.created_at)) / HOUR;
   return h < 2 ? TIER.fresh : h < 6 ? TIER.recent : TIER.quiet;
-}
-
-/** "SUN 4": a game is at most a week away, so the month is noise, and the label's fact line also holds the page counter (SCROLLR-293). */
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${d.getDate()}`.toUpperCase();
 }
 
 /**
@@ -170,7 +164,6 @@ export function buildPageWidgets(
         const rest = eligible.filter((g) => !isLive(g) && !isMine(g));
         const ordered = [...mine, ...live, ...rest];
         const league = config?.leagues?.[0] ?? ordered[0].league;
-        const liveCount = ordered.filter(isLive).length;
         const item = (g: Game, tier: Tier): PageItem => ({
           key: `g:${g.id}`,
           tier,
@@ -182,7 +175,6 @@ export function buildPageWidgets(
         widget = {
           tab, kind: "sports", hex,
           code: leagueCode(league),
-          sub: liveCount ? `${liveCount} LIVE` : dayLabel(ordered[0].start_time),
           minCol: gameMinCol(leagueCode(ordered[0].league)),
           items: ordered.map((g) => item(g, gameTier(g, isMine(g), now))),
           fill: [], // the pool is already the whole week
@@ -198,7 +190,6 @@ export function buildPageWidgets(
         widget = {
           tab, kind: "news", hex,
           code: sourceTab(rows[0]?.source_name ?? cat?.name ?? tab).split(" ")[0],
-          sub: "HEADLINES",
           minCol: NEWS_MIN_COL,
           items: items.map((r) => item(r, newsTier(r, now))),
           fill: [], // the pool is already every headline the widget holds
@@ -216,11 +207,9 @@ export function buildPageWidgets(
         ? selectFinanceFill(market, pool.map((t) => t.symbol).concat(config?.symbols ?? []), Array.isArray(starters) ? (starters as string[]) : [], assetClassForWidget(tab))
         : [];
       if (items.length || popular.length) {
-        const up = items.filter((t) => !(Number(t.percentage_change) < 0)).length;
         widget = {
           tab, kind: "finance", hex,
           code: (cat?.name ?? tab).toUpperCase(),
-          sub: `▲${up}  ▼${items.length - up}`,
           minCol: QUOTE_MIN_COL,
           // Watchlist first in the user's order. Not "live" tier: that is
           // for live games and your team.
@@ -250,7 +239,7 @@ export function buildPageWidgets(
   }
 
   if (also.length) {
-    out.push({ tab: ALSO_TAB, kind: "also", code: "ALSO", sub: "NOTHING ON", minCol: ALSO_MIN_COL, items: also, fill: [] });
+    out.push({ tab: ALSO_TAB, kind: "also", code: "ALSO", minCol: ALSO_MIN_COL, items: also, fill: [] });
   }
   return out;
 }
@@ -268,8 +257,8 @@ export interface PagePlan extends WidgetPlan<PageItem> {
  * (SCROLLR-292): the pool is topped up from the widget's fill until the last
  * page has a column for every item.
  */
-export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0, pager = true): Map<string, PagePlan> {
-  const content = contentWidth(barWidth, edgeWidth, pager);
+export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0): Map<string, PagePlan> {
+  const content = contentWidth(barWidth, edgeWidth);
   return new Map(
     widgets.map((w) => {
       const cols = columnsFor(content, w.minCol);
@@ -281,23 +270,48 @@ export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWi
   );
 }
 
-const NOUN: Record<PageWidgetKind, [one: string, many: string]> = {
-  sports: ["GAME", "GAMES"],
-  news: ["STORY", "STORIES"],
-  finance: ["STOCK", "STOCKS"],
-  also: ["WIDGET", "WIDGETS"],
-};
+/** The band's chip (SCROLLR-303): something is happening now. `live` games (counted), the stock market `open`, `fresh` stories (the last hour's, counted). */
+export interface Chip {
+  kind: "live" | "open" | "fresh";
+  count?: number;
+}
+
+const ET = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23" });
 
 /**
- * The label's second line: what this widget has on the ticker and how many
- * pages it takes, "19 GAMES · 5 PAGES". Cells count fills too: they are on
- * the bar. (It replaced "6 LIVE" + "3/8": a second x/y beside the widget
- * arrows read as a widget count.)
+ * US regular trading hours, 09:30 to 16:00 ET, Monday to Friday.
+ * ponytail: no exchange holidays (a holiday shows the chip); read a market-status feed if that matters.
  */
-export function labelFact(widget: PageWidget, plan: WidgetPlan<PageItem> | undefined): string {
-  const cells = plan ? plan.pages.reduce((n, p) => n + p.length, 0) : widget.items.length + widget.fill.length;
-  const pages = plan ? plan.pages.length : 1;
-  return `${cells} ${NOUN[widget.kind][cells === 1 ? 0 : 1]} · ${pages} ${pages === 1 ? "PAGE" : "PAGES"}`;
+export function usMarketOpen(now: number): boolean {
+  const p = Object.fromEntries(ET.formatToParts(now).map((x) => [x.type, x.value]));
+  const m = Number(p.hour) * 60 + Number(p.minute);
+  return p.weekday !== "Sat" && p.weekday !== "Sun" && m >= 570 && m < 960;
+}
+
+/**
+ * The chip, or null when nothing is happening. Sports: games live now.
+ * Finance: the US market is open (never for crypto). News: stories published in
+ * the last hour (the honest "new since you looked" needs a last-seen
+ * timestamp; the hour stands in for it).
+ */
+export function chip(widget: PageWidget, now: number = Date.now()): Chip | null {
+  switch (widget.kind) {
+    case "sports": {
+      const count = widget.items.filter((i) => isLive(i.data as Game)).length;
+      return count ? { kind: "live", count } : null;
+    }
+    case "finance":
+      return assetClassForWidget(widget.tab) !== "crypto" && usMarketOpen(now) ? { kind: "open" } : null;
+    case "news": {
+      const count = widget.items.filter((i) => {
+        const r = i.data as RssItem;
+        return now - Date.parse(r.published_at ?? r.created_at) < HOUR;
+      }).length;
+      return count ? { kind: "fresh", count } : null;
+    }
+    default:
+      return null;
+  }
 }
 
 /**
@@ -360,47 +374,70 @@ export function nextTurn(
 }
 
 /**
- * A manual step (SCROLLR-298): the next or previous page in reading order, which
- * is every page of every widget in ticker order, the order the label's `n/m`
- * counts. Past a widget's last page is the next widget's first; before its
- * first is the previous widget's last. A step is an immediate turn plus a move
- * of that widget's cursor (mutates `nav`) to the page after the one stepped to,
- * so the clock's next turn moves on to the next widget and the widget's next
- * turn does not show that page again. Null when there is nothing to show.
+ * A manual move (SCROLLR-303's band): `dir` turns this widget's page (‹ ›,
+ * ←/→, the wheel), or with `whole` a widget (˄ ˅, ↑/↓, Shift+wheel); `tab`
+ * jumps to a widget the shortest way round (an edge-bar segment); `page` shows
+ * this widget's page `page` of `of` (a pill; `of` is the sender's count, so a
+ * follower of another width lands on the same share of the way through).
+ */
+export type Move = { dir: 1 | -1; whole?: boolean } | { tab: string } | { page: number; of: number };
+
+/**
+ * A manual move (SCROLLR-298, SCROLLR-303). Mutates `nav`: an immediate turn
+ * plus a move of that widget's cursor to the page after the one shown, so the
+ * clock's next turn moves on to the next widget and the widget's next turn
+ * does not show that page again. Null when there is nothing to move to (a page
+ * turn on a one-page widget, a widget change with one widget).
  *
- * `whole` (↓/↑, Shift+wheel, SCROLLR-301) jumps a whole widget instead. Forward
- * lands on the next widget at the page the clock would show it next; back on
- * the previous widget at the page it showed last (its last page if it has not
- * been up yet), so ↓ then ↑ returns to what you were reading. Either way that
- * widget's cursor ends after the page shown, as on any step.
+ * A page turn stays in the widget and wraps inside it; the lap's order is
+ * unchanged. A widget change lands forward on the widget's next page (what the
+ * clock would show it next) and back on the page it showed last (its last page
+ * if it has not been up yet), so ↓ then ↑ returns to what you were reading.
  */
 export function stepTurn(
   prev: Turn | null,
-  dir: 1 | -1,
+  move: Move,
   widgets: readonly PageWidget[],
   plans: ReadonlyMap<string, WidgetPlan<PageItem>>,
   nav: Nav,
-  whole = false,
 ): Turn | null {
   if (!prev) return nextTurn(prev, widgets, plans, nav);
+  const land = (tab: string, page: number, pages: number, back: boolean): Turn => {
+    nav.cursors.set(tab, (page + 1) % pages);
+    const t: Turn = { seq: prev.seq + 1, tab, page, pages, dwell: dwellFor(plans.get(tab)!.pages[page].length) };
+    if (back) t.back = true;
+    return t;
+  };
   const at = widgets.findIndex((w) => w.tab === prev.tab);
-  let tab = prev.tab;
-  let plan = plans.get(tab);
-  // The plan may have changed since the turn (a refresh, a resize): the same share of the way through.
-  let page = at >= 0 && plan ? followPage(prev, plan.pages.length) + dir : -1;
-  if (whole || !plan || page < 0 || page >= plan.pages.length) {
-    if (widgets.length === 0) return null;
-    tab = widgets[at < 0 ? 0 : (at + dir + widgets.length) % widgets.length].tab;
-    plan = plans.get(tab);
-    if (!plan || plan.pages.length === 0) return null;
-    const n = plan.pages.length;
-    const cursor = nav.cursors.get(tab) ?? 0;
-    page = whole ? (dir > 0 ? cursor % n : (cursor - 1 + n) % n) : dir > 0 ? 0 : n - 1;
+
+  if ("page" in move || ("dir" in move && !move.whole)) {
+    const n = plans.get(prev.tab)?.pages.length ?? 0;
+    if (at < 0 || n === 0) return null;
+    // The plan may have changed since the turn (a refresh, a resize): the same share of the way through.
+    const cur = followPage(prev, n);
+    const page = "page" in move ? followPage({ page: move.page, pages: move.of }, n) : (cur + move.dir + n) % n;
+    if (page === cur) return null;
+    return land(prev.tab, page, n, "page" in move ? page < cur : move.dir < 0);
   }
-  nav.cursors.set(tab, (page + 1) % plan.pages.length);
-  const t: Turn = { seq: prev.seq + 1, tab, page, pages: plan.pages.length, dwell: dwellFor(plan.pages[page].length) };
-  if (dir < 0) t.back = true;
-  return t;
+
+  const count = widgets.length;
+  if (count === 0) return null;
+  let to: number;
+  let back: boolean;
+  if ("tab" in move) {
+    to = widgets.findIndex((w) => w.tab === move.tab);
+    if (to < 0) return null;
+    const delta = (((to - Math.max(0, at)) % count) + count) % count;
+    back = at >= 0 && delta > count / 2;
+  } else {
+    to = at < 0 ? 0 : (at + move.dir + count) % count;
+    back = move.dir < 0;
+  }
+  const tab = widgets[to].tab;
+  const n = plans.get(tab)?.pages.length ?? 0;
+  if (tab === prev.tab || n === 0) return null;
+  const cursor = nav.cursors.get(tab) ?? 0;
+  return land(tab, back ? (cursor - 1 + n) % n : cursor % n, n, back);
 }
 
 /** This window's page for a turn: the same index when the counts agree, else the same share of the way through. */
