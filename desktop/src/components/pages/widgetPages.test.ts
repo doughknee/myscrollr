@@ -171,6 +171,34 @@ describe("stepTurn (SCROLLR-298)", () => {
     expect(key(stepTurn(null, 1, widgets, plans, newNav())!)).toBe(flat[0]);
     expect(stepTurn(null, -1, [], new Map(), newNav())).toBeNull();
   });
+
+  it("a whole-widget jump (SCROLLR-301): forward to the next widget's next page, back to the previous widget's last-shown page, wrapping both ways", () => {
+    const ws = buildPageWidgets(dash, TABS, NOW);
+    const ps = planAll(ws, 1920);
+    const tabs = ws.map((w) => w.tab);
+    const nav = newNav();
+    let t = nextTurn(null, ws, ps, nav)!; // first widget, page 1
+    t = stepTurn(t, 1, ws, ps, nav, true)!;
+    expect([t.tab, t.page, t.back]).toEqual([tabs[1], 0, undefined]);
+    t = stepTurn(t, -1, ws, ps, nav, true)!;
+    expect([t.tab, t.page, t.back], "down then up: back on the page you were reading, swiped in from the left").toEqual([tabs[0], 0, true]);
+    t = stepTurn(t, -1, ws, ps, nav, true)!;
+    const last = tabs.at(-1)!;
+    expect([t.tab, t.page], "back from the first widget wraps to the last, at its last page (not up yet)").toEqual([last, ps.get(last)!.pages.length - 1]);
+    t = stepTurn(t, 1, ws, ps, nav, true)!;
+    expect(t.tab, "forward wraps to the first").toBe(tabs[0]);
+    expect(t.page, "at the page after the one already read").toBe(1 % ps.get(tabs[0])!.pages.length);
+  });
+});
+
+describe("planAll with the pager hidden (SCROLLR-301)", () => {
+  it("gives the pager's 88px to the columns", () => {
+    const ws = buildPageWidgets(dash, TABS, NOW);
+    const on = planAll(ws, 1280, 102);
+    const off = planAll(ws, 1280, 102, false);
+    expect(on.get("sports_nfl")!.cols).toBe(3);
+    expect(off.get("sports_nfl")!.cols, "1280 with the Clock: 4 NFL columns again").toBe(4);
+  });
 });
 
 describe("followPage", () => {

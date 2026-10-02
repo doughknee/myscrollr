@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 7946266556dd -->
+<!-- source: desktop/src/components/settings/rows.ts @ aaf2f728a28f -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -220,6 +220,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Ticker › Screen edge: Which edge of the screen the ticker sits on.
 - Settings › Ticker › Size: Resize the bar. The app window has its own size.
 - Settings › Ticker › Scroll mode: One whole widget per page, or chips that scroll without stopping.
+- Settings › Ticker › Page controls: The page count and arrows at the bar's left end. The mouse wheel and arrow keys page either way.
 - Settings › Ticker › Speed: How fast the chips travel.
 - Settings › Ticker › On hover: What the bar does while your mouse is over it.
 - Settings › Ticker › Stay above other windows: Keep the ticker visible over whatever else is open.
@@ -250,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ b96999b5eafb -->
+<!-- source: docs/CHIP_DESIGN.md @ aa62b67828e9 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -298,7 +299,9 @@ once, at the release, with a one-time notice that Continuous is one click away i
 
 - **The pager** at the far left says where this page is in the whole trip round the bar:
   7/23 means the seventh of 23 pages across every widget. While your mouse is on the bar,
-  a ‹ and a › appear either side of it to go back or forward a page.
+  a ‹ and a › appear either side of it to go back or forward a page. Don't want it? Turn
+  off **Page controls** in Settings › Ticker, or right-click the bar and untick it: the
+  columns get its space, and the wheel and arrow keys still page.
 - **The label** right after it is 112 pixels: the widget's name in its own colour (NFL, BBC,
   Stocks), one fact beneath it (6 LIVE, SUN 4, how many stocks are up and down), and
   where you are in the widget when it has more than one page: 2/8 means page 2 of 8, so
@@ -368,7 +371,8 @@ your place under your cursor.
   page, up for the one before (one page per notch; a trackpad swipe sideways works too).
   Or click the ‹ › at the far left of the bar, or press ← → once you've clicked the bar.
   Going back slides the bar the other way, and from a widget's first page takes you to
-  the previous widget's last. Each page you step
+  the previous widget's last. To skip a whole widget, press ↓ (or hold Shift while you
+  scroll); ↑ goes back to the widget before, on the page you were reading. Each page you step
   to gets its full time, and when the bar moves on by itself it carries on from there, so
   it won't show you again what you just paged through. With a bar on several monitors,
   they all turn together.

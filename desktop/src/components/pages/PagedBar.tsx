@@ -31,7 +31,10 @@
  *    one page in reading order (`stepTurn`). A step is a turn like any other:
  *    the same swipe, frozen at swipe-in, a fresh dwell, and the hold stays. A
  *    follower sends its step to the leader (`pages:step`), which turns every
- *    window.
+ *    window. ↑/↓ and Shift+wheel jump a whole widget the same way (SCROLLR-301).
+ *    The pager can be hidden (Settings › Ticker › Page controls, or the
+ *    bar's right-click menu); its width then goes to the columns and the
+ *    wheel and keys still page.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
@@ -86,7 +89,7 @@ const TURN_EVENT = "pages:turn";
 const HOVER_EVENT = "pages:hover";
 /** Follower → leader: I just started; tell me the page now up. */
 const HELLO_EVENT = "pages:hello";
-/** Follower → leader: step one page, `dir` 1 forward or -1 back (SCROLLR-298). */
+/** Follower → leader: step one page, `dir` 1 forward or -1 back (SCROLLR-298); `whole` jumps a widget (SCROLLR-301). */
 const STEP_EVENT = "pages:step";
 /**
  * A wheel gesture is one step: a wheel event steps only after this long without
@@ -109,6 +112,8 @@ interface Props {
   onDisplayedWidgetsChange?: (widgetIds: string[]) => void;
   /** Drawn instead of the bar when no widget has a page (the empty-state CTAs). */
   empty?: ReactNode;
+  /** The pager at the left end (`prefs.ticker.pageControls`, SCROLLR-301). Off: its width goes to the columns. */
+  pageControls?: boolean;
 }
 
 /** The page as it was frozen at swipe-in. */
@@ -263,6 +268,7 @@ export default function PagedBar({
   onChipClick,
   onDisplayedWidgetsChange,
   empty,
+  pageControls = true,
 }: Props) {
   const leader = useMemo(() => isPrimaryTicker(), []);
   const label = useMemo(() => getCurrentWindow().label, []);
@@ -283,7 +289,9 @@ export default function PagedBar({
 
   // The whole market's quotes, only while a watchlist is shorter than a page
   // (its empty columns fill with popular symbols, SCROLLR-292).
-  const quoteCols = columnsFor(contentWidth(width), QUOTE_MIN_COL);
+  const pagerRef = useRef(pageControls);
+  pagerRef.current = pageControls;
+  const quoteCols = columnsFor(contentWidth(width, 0, pageControls), QUOTE_MIN_COL);
   const shortWatchlist = activeTabs.some((tab) => {
     if (sourceForWidget(tab) !== "finance") return false;
     const symbols = (dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as { symbols?: unknown } | undefined)?.symbols;
@@ -347,14 +355,14 @@ export default function PagedBar({
   // ── Leader: the page clock ──────────────────────────────────────
   const advance = useCallback(() => {
     const ws = widgetsRef.current;
-    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW()), nav.current));
+    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW(), pagerRef.current), nav.current));
     broadcast();
   }, [show, broadcast]);
 
   /** A manual step on the leader: a new turn, so the clock below restarts the page's dwell. */
-  const stepHere = useCallback((dir: 1 | -1) => {
+  const stepHere = useCallback((dir: 1 | -1, whole = false) => {
     const ws = widgetsRef.current;
-    const t = stepTurn(turnRef.current, dir, ws, planAll(ws, widthRef.current, edgeW()), nav.current);
+    const t = stepTurn(turnRef.current, dir, ws, planAll(ws, widthRef.current, edgeW(), pagerRef.current), nav.current, whole);
     if (!t) return;
     show(t);
     broadcast();
@@ -400,8 +408,8 @@ export default function PagedBar({
   useTauriListener(HELLO_EVENT, () => {
     if (leader) broadcast();
   });
-  useTauriListener<{ dir: 1 | -1 }>(STEP_EVENT, (e) => {
-    if (leader) stepHere(e.payload.dir);
+  useTauriListener<{ dir: 1 | -1; whole?: boolean }>(STEP_EVENT, (e) => {
+    if (leader) stepHere(e.payload.dir, e.payload.whole === true);
   });
 
   // ── Followers: take the leader's turns ─────────────────────────
@@ -431,9 +439,9 @@ export default function PagedBar({
   });
 
   // ── Manual paging (SCROLLR-298) ─────────────────────────────────
-  const step = useCallback((dir: 1 | -1) => {
-    if (leader) stepHere(dir);
-    else emit(STEP_EVENT, { dir }).catch(() => {});
+  const step = useCallback((dir: 1 | -1, whole = false) => {
+    if (leader) stepHere(dir, whole);
+    else emit(STEP_EVENT, { dir, whole }).catch(() => {});
   }, [leader, stepHere]);
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -449,7 +457,8 @@ export default function PagedBar({
       const now = performance.now();
       const fresh = now - lastWheel.current >= WHEEL_QUIET_MS;
       lastWheel.current = now;
-      if (fresh && d !== 0) stepRef.current(d > 0 ? 1 : -1);
+      // Shift jumps a whole widget (SCROLLR-301). Chromium hands a Shift+wheel over as deltaX, which the line above already reads.
+      if (fresh && d !== 0) stepRef.current(d > 0 ? 1 : -1, e.shiftKey);
     };
     bar.addEventListener("wheel", onWheel, { passive: false });
     return () => bar.removeEventListener("wheel", onWheel);
@@ -459,6 +468,9 @@ export default function PagedBar({
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       if (e.key === "ArrowRight") stepRef.current(1);
       else if (e.key === "ArrowLeft") stepRef.current(-1);
+      // ↓/↑ jump a whole widget (SCROLLR-301).
+      else if (e.key === "ArrowDown") stepRef.current(1, true);
+      else if (e.key === "ArrowUp") stepRef.current(-1, true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -471,7 +483,7 @@ export default function PagedBar({
   }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── The frozen page ─────────────────────────────────────────────
-  const plans = useMemo(() => planAll(widgets, planWidth, planEdge), [widgets, planWidth, planEdge]);
+  const plans = useMemo(() => planAll(widgets, planWidth, planEdge, pageControls), [widgets, planWidth, planEdge, pageControls]);
   const shown = useRef<Shown | null>(null);
   if (turn && shown.current?.seq !== turn.seq) {
     const w = widgets.find((x) => x.tab === turn.tab);
@@ -493,7 +505,7 @@ export default function PagedBar({
         page: freezePage(items, keyOf),
         index,
         count: plan.pages.length,
-        colW: contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        colW: contentWidth(planWidth, planEdge, pageControls) / (short ? plan.cols : items.length),
         short,
         cols: plan.cols,
         total: plan.pages.reduce((n, p) => n + p.length, 0),
@@ -547,8 +559,9 @@ export default function PagedBar({
               left end (SCROLLR-300). Pages of the same widget keep it; a new widget wipes
               the whole block upward, dwell line and all, so nothing stands still under the
               wipe. The pager is the bar's (the whole lap), the label the widget's; a faint
-              rule between them says so. */}
-          <div className="relative shrink-0 overflow-hidden" style={{ width: PAGER_W + LABEL_W }}>
+              rule between them says so. Page controls off (SCROLLR-301): no pager, and the
+              block is the label's width alone. */}
+          <div className="relative shrink-0 overflow-hidden" style={{ width: (pageControls ? PAGER_W : 0) + LABEL_W }}>
             <AnimatePresence initial={false}>
               <motion.div
                 key={cur.widget.tab}
@@ -556,7 +569,7 @@ export default function PagedBar({
                 style={{ ...accentStyle(accent, ink), background: mix(dark ? 16 : 12), borderRight: `1px solid ${mix(40)}` }}
                 {...(reduced ? fade : wipe)}
               >
-                <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={{ borderRight: `1px solid ${mix(dark ? 26 : 22)}` }} />
+                {pageControls && <Pager at={cur.lapAt} of={cur.lapOf} onStep={step} style={{ borderRight: `1px solid ${mix(dark ? 26 : 22)}` }} />}
                 <div data-label={cur.widget.tab} className="flex min-w-0 flex-1 flex-col justify-center gap-[3px] pl-3.5 pr-2">
                   <span
                     className={

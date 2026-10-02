@@ -111,6 +111,11 @@ export const SETTINGS_ROWS = {
       description: "One whole widget per page, or chips that scroll without stopping.",
       keywords: "pages page continuous scroll marquee step",
     },
+    pageControls: {
+      label: "Page controls",
+      description: "The page count and arrows at the bar's left end. The mouse wheel and arrow keys page either way.",
+      keywords: "pager arrows counter buttons hide pages wheel keyboard",
+    },
     speed: {
       label: "Speed",
       description: "How fast the chips travel.",

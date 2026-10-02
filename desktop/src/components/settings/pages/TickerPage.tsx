@@ -157,6 +157,16 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
               onChange={(v) => setTicker("scrollMode", v)}
             />
           </Row>
+          {paged && (
+            <Row id="pageControls">
+              <ToggleRow
+                label={R.pageControls.label}
+                description={R.pageControls.description}
+                checked={ticker.pageControls}
+                onChange={(v) => setTicker("pageControls", v)}
+              />
+            </Row>
+          )}
           {!paged && (
             <Row id="speed">
               <SegmentedRow

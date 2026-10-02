@@ -268,8 +268,8 @@ export interface PagePlan extends WidgetPlan<PageItem> {
  * (SCROLLR-292): the pool is topped up from the widget's fill until the last
  * page has a column for every item.
  */
-export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0): Map<string, PagePlan> {
-  const content = contentWidth(barWidth, edgeWidth);
+export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0, pager = true): Map<string, PagePlan> {
+  const content = contentWidth(barWidth, edgeWidth, pager);
   return new Map(
     widgets.map((w) => {
       const cols = columnsFor(content, w.minCol);
@@ -363,6 +363,12 @@ export function nextTurn(
  * of that widget's cursor (mutates `nav`) to the page after the one stepped to,
  * so the clock's next turn moves on to the next widget and the widget's next
  * turn does not show that page again. Null when there is nothing to show.
+ *
+ * `whole` (↓/↑, Shift+wheel, SCROLLR-301) jumps a whole widget instead. Forward
+ * lands on the next widget at the page the clock would show it next; back on
+ * the previous widget at the page it showed last (its last page if it has not
+ * been up yet), so ↓ then ↑ returns to what you were reading. Either way that
+ * widget's cursor ends after the page shown, as on any step.
  */
 export function stepTurn(
   prev: Turn | null,
@@ -370,6 +376,7 @@ export function stepTurn(
   widgets: readonly PageWidget[],
   plans: ReadonlyMap<string, WidgetPlan<PageItem>>,
   nav: Nav,
+  whole = false,
 ): Turn | null {
   if (!prev) return nextTurn(prev, widgets, plans, nav);
   const at = widgets.findIndex((w) => w.tab === prev.tab);
@@ -377,12 +384,14 @@ export function stepTurn(
   let plan = plans.get(tab);
   // The plan may have changed since the turn (a refresh, a resize): the same share of the way through.
   let page = at >= 0 && plan ? followPage(prev, plan.pages.length) + dir : -1;
-  if (!plan || page < 0 || page >= plan.pages.length) {
+  if (whole || !plan || page < 0 || page >= plan.pages.length) {
     if (widgets.length === 0) return null;
     tab = widgets[at < 0 ? 0 : (at + dir + widgets.length) % widgets.length].tab;
     plan = plans.get(tab);
     if (!plan || plan.pages.length === 0) return null;
-    page = dir > 0 ? 0 : plan.pages.length - 1;
+    const n = plan.pages.length;
+    const cursor = nav.cursors.get(tab) ?? 0;
+    page = whole ? (dir > 0 ? cursor % n : (cursor - 1 + n) % n) : dir > 0 ? 0 : n - 1;
   }
   nav.cursors.set(tab, (page + 1) % plan.pages.length);
   const t: Turn = { seq: prev.seq + 1, tab, page, pages: plan.pages.length, dwell: dwellFor(plan.pages[page].length) };
