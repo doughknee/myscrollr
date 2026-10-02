@@ -1,5 +1,5 @@
 /**
- * SEC 04 ／ MAKE IT YOURS — theme family swatches + mode/pin/scroll
+ * SEC 04 ／ MAKE IT YOURS — theme family swatches + mode/pin/view
  * controls, all driving the live bar (and, for theme + mode, the whole
  * site) through useBar + useTheme.
  * Mirrors the app's Appearance settings: theme FAMILY and color MODE
@@ -75,9 +75,9 @@ export function MakeItYours() {
               <span className="text-primary">Dress it, park it.</span>
             </h2>
             <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
-              Ten themes, each light or dark. Top or bottom of any monitor.
-              Pages, or a continuous scroll if you prefer. Try it right here.
-              The bar takes orders.
+              Twenty palettes. Top or bottom of any monitor. Pages or a
+              continuous scroll. Try it right here: this is the real bar,
+              running live.
             </p>
             <div className="flex flex-col gap-3">
               <ControlRow
@@ -99,7 +99,7 @@ export function MakeItYours() {
                 onChange={setPos}
               />
               <ControlRow
-                label="SCROLL"
+                label="VIEW"
                 value={scroll}
                 options={[
                   { id: 'pages' as const, label: 'PAGES' },

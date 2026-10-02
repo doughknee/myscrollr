@@ -22,7 +22,7 @@ export function StepsSection() {
             {
               num: '02',
               title: 'Pick your widgets',
-              body: `Leagues, markets, feeds, your favorite outlets: ${widgets.length} widgets and counting. Each one is a page on your bar, and your bar has room for 3 pages on Free. Clock and Weather sit on its edge, free.`,
+              body: `Leagues, markets, feeds, your favorite outlets: ${widgets.length} widgets and counting. Each one is a page on your bar. Three are free, and Clock and Weather ride the edge without counting.`,
             },
             {
               num: '03',

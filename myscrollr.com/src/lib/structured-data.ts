@@ -160,7 +160,7 @@ export function faqPage(items: ReadonlyArray<FaqEntry>) {
 }
 
 /**
- * Homepage FAQ items — the 4 "Quick answers" on the landing page.
+ * Homepage FAQ items — the 5 "Quick answers" on the landing page.
  * `components/landing/QuickAnswers.tsx` renders these objects directly,
  * so the visible FAQ and the `faqPage` JSON-LD can never drift. Answers
  * are plain text per Google's FAQPage rich-result policy:
@@ -173,12 +173,17 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Is it really free?',
     answer:
-      'Yes. Your bar has room for three pages on the free tier, forever, and each widget is one page. You can download and browse without an account; sign in to add live data widgets and sync settings. Clock and Weather sit on the edge of the bar and are free. Uplink exists if you outgrow three.',
+      'Yes. Three pages on your bar are free, forever: a league, a news source, a watchlist, whatever you like. Clock and Weather ride the edge and never count. Download and look around without an account; sign in for live data and synced settings. Uplink is there if you outgrow three.',
   },
   {
     question: 'Will it slow my computer down?',
     answer:
       'No. Scrollr is a small native app (Tauri), not a browser in disguise. It sips memory and idles quietly.',
+  },
+  {
+    question: 'Can it show my GitHub?',
+    answer:
+      'Yes. Connect GitHub in the widget and pick your repos, private ones too. Failing CI and pull requests waiting on you show up on the bar; everything else stays quiet.',
   },
   {
     question: 'What does Scrollr collect about me?',

@@ -24,27 +24,11 @@ export interface ProductScreenshotProps {
    *
    * Examples:
    *   `channels/finance`              -> public/screenshots/channels/finance-*
-   *   `themes/dracula`                -> public/screenshots/themes/dracula-*
    *   `support/getting-started`       -> public/screenshots/support/getting-started-*
    */
   basename: string
   /** Required alt text. Describe what the screenshot shows, not its purpose. */
   alt: string
-  /**
-   * Override the theme. When omitted the component reads the site theme
-   * via `useTheme()`. Useful inside the theme gallery, where each tile
-   * forces its own theme regardless of the site setting.
-   */
-  themeOverride?: 'light' | 'dark'
-  /**
-   * Force a specific theme suffix that isn't `light`/`dark`. Used by the
-   * theme switcher to render a named accent theme:
-   *
-   *   variantSuffix="dracula-dark"  ->  `/screenshots/themes/dracula-dark@*.webp`
-   *
-   * When set, `themeOverride` and the resolved site theme are ignored.
-   */
-  variantSuffix?: string
   /** Aspect ratio as `w / h`. Defaults to `1600 / 1134`. */
   aspect?: string
   /** Intrinsic image width attribute. Defaults to 1600. */
@@ -85,13 +69,9 @@ export interface ProductScreenshotProps {
  *
  * The component is intentionally thin: it does not animate, fade,
  * crossfade, or coordinate with siblings. Consumers wrap it in motion
- * components when they need movement (see HeroProductShowcase /
- * MakeItYoursSection for the crossfade pattern).
+ * components when they need movement.
  *
- * Theme resolution order:
- *   1. `variantSuffix` (explicit, wins)
- *   2. `themeOverride` (forces light/dark)
- *   3. Site theme via `useTheme()`
+ * The theme comes from the site theme via `useTheme()`.
  *
  * SSR safety: `useTheme()` returns `'dark'` during server rendering, so
  * the prerendered HTML always references the dark variant. On hydration,
@@ -114,19 +94,6 @@ export interface ProductScreenshotProps {
 const buildWidthSrcSet = (base: string) =>
   `${base}@sm.webp 800w, ${base}@md.webp 1200w, ${base}@1x.webp 1600w, ${base}@2x.webp 3200w`
 
-// Legacy DPR srcset for the ticker images. The ticker captures are
-// ~2930×80-124 px with an extreme aspect ratio (24-37:1) that breaks
-// downscaling — the optimize script intentionally only emits @1x/@2x
-// for them and keeps both at near-native width. Width-descriptor
-// srcset would point at nonexistent `@sm`/`@md` files for these.
-const buildDprSrcSet = (base: string) =>
-  `${base}@1x.webp 1x, ${base}@2x.webp 2x`
-
-// Ticker images live under `screenshots/ticker/...` and need the legacy
-// DPR srcset (see buildDprSrcSet for the reasoning). Detect via the
-// basename prefix so consumers don't have to opt in manually.
-const isTickerBasename = (basename: string) => basename.startsWith('ticker/')
-
 // Default `sizes` hint. Calibrated to the hero/channel-card layout:
 // full viewport width on phones, ~half on tablets, fixed-ish on desktop.
 // Overshooting `sizes` is safe (browser picks a larger file than needed);
@@ -139,8 +106,6 @@ const DEFAULT_SIZES =
 export function ProductScreenshot({
   basename,
   alt,
-  themeOverride,
-  variantSuffix,
   aspect = DEFAULT_ASPECT,
   width = DEFAULT_WIDTH,
   height = DEFAULT_HEIGHT,
@@ -152,13 +117,9 @@ export function ProductScreenshot({
   draggable = false,
 }: ProductScreenshotProps) {
   const { theme: siteTheme } = useTheme()
-  const suffix = variantSuffix ?? themeOverride ?? siteTheme
-  const base = `/screenshots/${basename}-${suffix}`
+  const base = `/screenshots/${basename}-${siteTheme}`
 
-  // Ticker images keep the legacy DPR srcset; dashboard screenshots
-  // use the new width-descriptor srcset for mobile LCP savings.
-  const useDpr = isTickerBasename(basename)
-  const srcSet = useDpr ? buildDprSrcSet(base) : buildWidthSrcSet(base)
+  const srcSet = buildWidthSrcSet(base)
 
   return (
     <picture
@@ -169,15 +130,11 @@ export function ProductScreenshot({
         ...style,
       }}
     >
-      <source
-        srcSet={srcSet}
-        sizes={useDpr ? undefined : sizes}
-        type="image/webp"
-      />
+      <source srcSet={srcSet} sizes={sizes} type="image/webp" />
       <img
         src={`${base}@1x.webp`}
         srcSet={srcSet}
-        sizes={useDpr ? undefined : sizes}
+        sizes={sizes}
         alt={alt}
         width={width}
         height={height}

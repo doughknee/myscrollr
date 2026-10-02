@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react'
 // SupportAccordion — generic single-expanded-at-a-time accordion used
 // for FAQ, troubleshooting, and billing sections on /support.
 //
-// Why not reuse landing/FAQSection.tsx? That one uses a split desktop
+// Why not reuse a landing FAQ? The old one used a split desktop
 // layout with iconography per item and a sliding spring panel — great
 // for the homepage but heavy for a long-page support reference where
 // users want to scan many items quickly. This is the simpler, denser

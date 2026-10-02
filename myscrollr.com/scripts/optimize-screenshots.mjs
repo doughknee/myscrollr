@@ -9,20 +9,12 @@
  * Source layout (input — all under myscrollr.com/ so Docker can copy them):
  *   screenshot-sources/darkmode/dark-<slug>.png
  *   screenshot-sources/lightmode/light-<slug>.png
- *   screenshot-sources/themes/dark/theme-<name>-dark-settings.png
- *   screenshot-sources/themes/light/theme-<name>-light-settings.png
- *   screenshot-sources-ticker/<density>/<theme>/<channel>-<theme>-<density>.png
  *
  * Output layout (public):
  *   public/screenshots/<category>/<basename>-<theme>@1x.webp
  *   public/screenshots/<category>/<basename>-<theme>@2x.webp
- *   public/screenshots/ticker/<channel>-<density>-<theme>@{1,2}x.webp
  *
- * Two widths are emitted per source: 1600w (1x) and 3200w (2x) for
- * dashboard captures; native-width / native-width-halved for tickers
- * (their extreme aspect ratio makes a 1600w resize destroy the text).
- *
- * Source PNGs are 2478x1478 (dashboard) or ~2930x80-124 (ticker).
+ * Source PNGs are 2478x1478.
  * The dashboard 2x output is downscaled to 3200w (slightly wider than
  * source) but `withoutEnlargement: true` keeps it at native size to
  * avoid upscaling artifacts.
@@ -48,7 +40,6 @@ const root = join(__dirname, '..')
 // (which copies only myscrollr.com/) has access to them. The previous
 // location at the repo root was outside the Docker context and broke CI.
 const srcRoot = join(root, 'screenshot-sources')
-const tickerSrcRoot = join(root, 'screenshot-sources-ticker')
 const outRoot = join(root, 'public', 'screenshots')
 
 const FORCE = process.argv.includes('--force')
@@ -97,7 +88,6 @@ const FEED_MAP = [
     category: 'configure',
     basename: 'sysmon',
   },
-  { slug: 'ticker-settings', category: 'configure', basename: 'ticker' },
   {
     slug: 'settings-appearance',
     category: 'configure',
@@ -122,11 +112,6 @@ const FEED_MAP = [
     slug: 'home-live-feed-overview',
     category: 'overview',
     basename: 'home',
-  },
-  {
-    slug: 'catalog-all-channels',
-    category: 'overview',
-    basename: 'catalog',
   },
   {
     slug: 'account-plan-limits',
@@ -184,43 +169,6 @@ const SINGLE_THEME_MAP = [
     theme: 'light',
   },
 ]
-
-// ── Theme settings panels ─────────────────────────────────────────
-// Source: ss/cropped/themes/{dark,light}/theme-<name>-{dark,light}-settings.png
-// Output: public/screenshots/themes/<name>-{dark,light}@{1,2}x.webp
-
-const THEME_NAMES = [
-  'catppuccin',
-  'dracula',
-  'everforest',
-  'gruvbox',
-  'nord',
-  'one',
-  'rose-pine',
-  'solarized',
-  'tokyo-night',
-]
-
-// ── Ticker strips ─────────────────────────────────────────────────
-//
-// Source:  ss/cropped-ticker/{compact,detailed}/{dark,light}/<channel>-<theme>-<density>.png
-// Output:  public/screenshots/ticker/<channel>-<density>-<theme>@{1,2}x.webp
-//
-// These are the always-on-top edge ticker views (≈2930px wide, 80-124px
-// tall). Aspect ratio is extreme (~24-37:1) so the optimize step does
-// NOT resize to 1600w like the other categories — that would compress
-// them down to ~40-55px tall and the text would mush. Instead we keep
-// them at native width for both @1x and @2x; the file size is still
-// tiny because there's very little vertical content.
-//
-// Encoding intent: the ticker rows are mostly flat color + crisp text.
-// Quality stays high (82) because banding around solid-color price
-// chips or league logos is visible immediately.
-
-const TICKER_CHANNELS = ['all-purpose', 'finance', 'news', 'sports']
-const TICKER_DENSITIES = ['compact', 'detailed']
-const TICKER_QUALITY_1X = 82
-const TICKER_QUALITY_2X = 76
 
 // ── Encoding parameters ───────────────────────────────────────────
 
@@ -315,32 +263,6 @@ async function encodePair(srcPath, outPrefix) {
   }
 }
 
-/**
- * Encode a (1x, 2x) ticker pair. Ticker sources are ~2930px wide but
- * only 80-124px tall, so the usual 1600w / 3200w resize math doesn't
- * apply — 1600w would compress them to ~44-67px tall and the text
- * would mush. Instead we emit:
- *   @1x: source width / 2  (≈1465w, sized for non-retina)
- *   @2x: source width      (≈2930w, sized for retina)
- * Both pass through sharp's WebP encoder at the ticker quality level.
- */
-async function encodeTickerPair(srcPath, outPrefix) {
-  const out1x = `${outPrefix}@1x.webp`
-  const out2x = `${outPrefix}@2x.webp`
-
-  // Read source dimensions once so the resize math is exact rather
-  // than guessing at the ~2930px source width.
-  const meta = await sharp(srcPath).metadata()
-  const sourceWidth = meta.width ?? 2930
-  const targetWidth1x = Math.round(sourceWidth / 2)
-
-  const [r1, r2] = await Promise.all([
-    encode(srcPath, out1x, targetWidth1x, TICKER_QUALITY_1X),
-    encode(srcPath, out2x, sourceWidth, TICKER_QUALITY_2X),
-  ])
-  return { out1x, out2x, skipped1: r1.skipped, skipped2: r2.skipped }
-}
-
 // ── Orchestration ──────────────────────────────────────────────────
 
 /**
@@ -361,43 +283,12 @@ async function verifySources() {
     const path = join(srcRoot, folder, `${theme}-${slug}.png`)
     if (!existsSync(path)) missing.push(path)
   }
-  for (const name of THEME_NAMES) {
-    const dark = join(
-      srcRoot,
-      'themes',
-      'dark',
-      `theme-${name}-dark-settings.png`,
-    )
-    const light = join(
-      srcRoot,
-      'themes',
-      'light',
-      `theme-${name}-light-settings.png`,
-    )
-    if (!existsSync(dark)) missing.push(dark)
-    if (!existsSync(light)) missing.push(light)
-  }
-  for (const density of TICKER_DENSITIES) {
-    for (const channel of TICKER_CHANNELS) {
-      for (const theme of ['dark', 'light']) {
-        const path = join(
-          tickerSrcRoot,
-          density,
-          theme,
-          `${channel}-${theme}-${density}.png`,
-        )
-        if (!existsSync(path)) missing.push(path)
-      }
-    }
-  }
   if (missing.length > 0) {
     console.error('\n[optimize-screenshots] Missing source files:')
     for (const m of missing) console.error('  ' + m)
     console.error(
-      '\nFix the FEED_MAP / SINGLE_THEME_MAP / THEME_NAMES / TICKER_*\n' +
-        'tables in this script, or add the missing PNGs under\n' +
-        'myscrollr.com/screenshot-sources/ or\n' +
-        'myscrollr.com/screenshot-sources-ticker/.\n',
+      '\nFix the FEED_MAP / SINGLE_THEME_MAP tables in this script, or\n' +
+        'add the missing PNGs under myscrollr.com/screenshot-sources/.\n',
     )
     process.exit(1)
   }
@@ -448,70 +339,6 @@ async function main() {
         }
       }),
     )
-  }
-
-  // Theme map: dark + light pair per theme name
-  for (const name of THEME_NAMES) {
-    const darkSrc = join(
-      srcRoot,
-      'themes',
-      'dark',
-      `theme-${name}-dark-settings.png`,
-    )
-    const lightSrc = join(
-      srcRoot,
-      'themes',
-      'light',
-      `theme-${name}-light-settings.png`,
-    )
-    const outDir = join(outRoot, 'themes')
-    jobs.push(
-      encodePair(darkSrc, join(outDir, `${name}-dark`)).then((r) => {
-        for (const s of [r.skippedSm, r.skippedMd, r.skipped1, r.skipped2]) {
-          if (s) skipped++
-          else written++
-        }
-      }),
-    )
-    jobs.push(
-      encodePair(lightSrc, join(outDir, `${name}-light`)).then((r) => {
-        for (const s of [r.skippedSm, r.skippedMd, r.skipped1, r.skipped2]) {
-          if (s) skipped++
-          else written++
-        }
-      }),
-    )
-  }
-
-  // Ticker strips: emit native-width @1x/@2x because the source aspect
-  // is too extreme to downscale further without destroying the text.
-  // Output basename pattern: `<channel>-<density>-<theme>` so a
-  // consumer like <ProductScreenshot basename="ticker/finance-compact"
-  // themeOverride="dark" /> resolves to the right file.
-  for (const density of TICKER_DENSITIES) {
-    for (const channel of TICKER_CHANNELS) {
-      for (const theme of ['dark', 'light']) {
-        const src = join(
-          tickerSrcRoot,
-          density,
-          theme,
-          `${channel}-${theme}-${density}.png`,
-        )
-        const outFile = join(
-          outRoot,
-          'ticker',
-          `${channel}-${density}-${theme}`,
-        )
-        jobs.push(
-          encodeTickerPair(src, outFile).then((r) => {
-            if (r.skipped1) skipped++
-            else written++
-            if (r.skipped2) skipped++
-            else written++
-          }),
-        )
-      }
-    }
   }
 
   // Run jobs in batches of 6 to keep CPU/memory in check on dev
