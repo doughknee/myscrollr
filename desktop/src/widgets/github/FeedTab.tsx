@@ -36,7 +36,7 @@ export const githubWidget: WidgetManifest = {
   id: "github",
   name: "GitHub",
   tabLabel: "GitHub",
-  description: "Your repos on the bar: the workflows, pull requests and issues you choose",
+  description: "CI and pull requests that need you, from your GitHub",
   hex: HEX,
   icon: Github,
   info: {
