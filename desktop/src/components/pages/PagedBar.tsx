@@ -316,7 +316,7 @@ function Band({ cur, live, widgets, turn, held, dark, keypad, reduced, onMove, w
                   aria-label={`Page ${i + 1} of ${cur.count}`}
                   onClick={() => onMove({ page: i, of: cur.count })}
                   className="block min-w-[3px] flex-1 basis-0 cursor-pointer overflow-hidden rounded-[3px] p-0 group-hover/bar:brightness-125"
-                  style={{ background: mix(i > cur.index ? 60 : 30) }}
+                  style={{ background: mix(i < cur.index ? 75 : 30) }}
                 >
                   {i === cur.index && fill}
                 </button>

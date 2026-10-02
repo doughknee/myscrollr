@@ -56,8 +56,8 @@ once, at the release, with a one-time notice that Continuous is one click away i
     the US stock market is open (crypto never gets one), or the feed's own colour with
     the number of stories from the last hour. No dot means nothing is on right now.
   - **A row of small pills** along the bottom, one per page of this widget. The one
-    you're on fills up as the page runs out of time; the ones you've seen are dimmer than
-    the ones still to come. Click a pill to go to that page. A widget with more than 24
+    you're on fills up as the page runs out of time; the ones you've already seen are lit,
+    the ones still to come are dim. Click a pill to go to that page. A widget with more than 24
     pages gets one track with a marker instead, and the only number on the band: 31/50.
   - **Hover the bar** and four small arrows appear beside the name: ‹ › for the page
     before or after (past this widget's last page, › carries on into the next widget, so

@@ -167,7 +167,7 @@ with nothing to read at rest. `Band` in `PagedBar.tsx`.
   steps aside while the keypad is shown (it comes back on leave).
 - **Pills row** (`data-pill` = index, `data-lit` on the current one): one `<button>` per
   page of **this widget**, 5px tall, `flex: 1 1 0`, `min-width: 3px`, 3px gaps, radius
-  3px. Earlier pages `mix(30)`, later `mix(60)`, the current one a `mix(30)` track that
+  3px. Pages already seen `mix(75)`, pages still to come `mix(30)`, the current one a `mix(30)` track that
   **fills in the ink over the page's dwell** (`DwellFill`: `scaleX` 0 to 1, linear; it
   stops while the page is held, §P.7). It replaced the dwell line. A click is a move to
   that page (`{page, of}`, §P.7a). While the bar is hovered the pills take
@@ -580,7 +580,7 @@ status chip (§8.7); each cell says what the status chip would, in the same word
   light; `--color-fg-3` when there is none. Green, red and amber stay semantic and are never
   the accent.
 - Every tint is `mix(pct)` = `color-mix(in srgb, var(--accent) pct%, transparent)`: band
-  16/12, band border 40, pills 30/60, track marker 40, keypad wash 14, Also code tag 16/12, `mine` and `close` lines 100 (the close-game tint is gone, SCROLLR-296).
+  16/12, band border 40, pills 75 (seen) / 30 (to come), track marker 40, keypad wash 14, Also code tag 16/12, `mine` and `close` lines 100 (the close-game tint is gone, SCROLLR-296).
 - **Anything that must be read in the widget's colour uses the ink**, `--accent-ink` =
   `inkFor(hex, dark)` (`readableInk` in `utils/chipAccent.ts`), set beside `--accent` by
   `accentStyle(accent, ink)`: the same hue and saturation, HSL lightness moved only until
