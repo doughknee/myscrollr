@@ -56,7 +56,13 @@ jobs:
             # skipped run behind (dry run, 2 Oct: that picked a September run).
             SHA=$(gh release view "$TAG" --json targetCommitish --jq .targetCommitish)
             [ -n "$SHA" ] || { echo "::error::No release $TAG"; exit 1; }
-            RUN_ID=$(gh run list --workflow "Desktop Release" --commit "$SHA" --json databaseId,conclusion --jq '[.[] | select(.conclusion != "skipped")][0].databaseId')
+            # Several runs can share the commit (a push that skipped, a manual
+            # re-cut that built): take the newest one whose build jobs ran.
+            RUN_ID=""
+            for id in $(gh run list --workflow "Desktop Release" --commit "$SHA" --json databaseId --jq '.[].databaseId'); do
+              ran=$(gh run view "$id" --json jobs --jq '[.jobs[] | select((.name | startswith("build")) and .conclusion != "skipped")] | length')
+              if [ "$ran" -gt 0 ]; then RUN_ID=$id; break; fi
+            done
           fi
           [ -n "$RUN_ID" ] || { echo "::error::No Desktop Release run found for $TAG"; exit 1; }
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
