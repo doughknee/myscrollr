@@ -1,336 +1,172 @@
+/** The GitHub widget's data and its pills (SCROLLR-312). */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import type { GitHubPRRow } from "../../api/client";
-import type { GitHubRepo } from "./types";
+import type { GitHubBoardRepo } from "../../api/client";
+import fixture from "../../dev/__fixtures__/github.board.json";
 
 const signedOut = vi.fn(() => false);
+const board = vi.fn();
 const runs = vi.fn();
 const directFetch = vi.fn();
 
 vi.mock("../../auth", () => ({ isSignedOut: () => signedOut() }));
-const prs = vi.fn(async (_r: string[]): Promise<unknown> => ({ connected: false, repos: [] }));
-vi.mock("../../api/client", () => ({ githubApi: { runs: (r: string[]) => runs(r), prs: (r: string[]) => prs(r) } }));
+vi.mock("../../api/client", () => ({ githubApi: { board: (r: unknown) => board(r), runs: (r: string[]) => runs(r) } }));
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: (...a: unknown[]) => directFetch(...a) }));
 
-const { fetchRepos, toggleRepo, autoPick } = await import("./types");
+const { autoPick, fetchBoard, fitPills, nextFlash, parseRepoUrl, pillWidth, pillsFor, repoChip, worstOf } = await import("./types");
 
-describe("Your repos → prefs (SCROLLR-307)", () => {
-  const row = (full_name: string, active: boolean) => ({ full_name, private: false, active });
+const NOW = Date.parse("2026-10-02T12:00:00Z");
+const repos = fixture.repos as unknown as GitHubBoardRepo[];
+const cfg = fixture.config as Array<{ repo: string; prs: "off" | "mine" | "all"; issues: "off" | "assigned" | "new" }>;
+const texts = (r: GitHubBoardRepo, i: number) => pillsFor(r, cfg[i], NOW).map((p) => `${p.kind}:${p.text}`);
 
-  it("ticking appends owner/repo; unticking removes it, case-insensitively", () => {
-    const config = [{ owner: "o", repo: "pasted" }];
-    expect(toggleRepo(config, "Org/App", true)).toEqual([
-      { owner: "o", repo: "pasted" },
-      { owner: "Org", repo: "App" },
-    ]);
-    expect(toggleRepo([{ owner: "org", repo: "app" }, ...config], "Org/App", false)).toEqual(config);
+describe("pills, worst first (canvas B3)", () => {
+  it("each fixture repo's row", () => {
+    expect(texts(repos[0], 0)).toEqual(["you:2 PRs for you", "ok:✓ test", "ok:✓ deploy", "quiet:1 new issue"]);
+    expect(texts(repos[1], 1)).toEqual(["red:✗ deploy · 12m", "ok:✓ test", "quiet:3 open PRs"]);
+    // Another CI's failing check on main turns the cell red, by its own name.
+    expect(texts(repos[2], 2)).toEqual(["red:✗ vercel · 3m", "ok:✓ build", "ok:✓ lighthouse"]);
+    expect(texts(repos[3], 3)).toEqual(["run:◌ apply · 3m", "quiet:2 new issues"]);
   });
 
-  it("ticking a repo already in the list (pasted with other casing) adds nothing", () => {
-    const config = [{ owner: "org", repo: "app" }];
-    expect(toggleRepo(config, "Org/App", true)).toBe(config);
+  it("the dot is the first pill's kind; nothing to say is none", () => {
+    expect(repos.map((r, i) => worstOf(pillsFor(r, cfg[i], NOW)))).toEqual(["accent", "red", "red", "accent"]);
+    expect(worstOf([])).toBe("none");
   });
 
-  it("first load with no repos configured ticks the active ones", () => {
-    expect(autoPick([], [row("o/a", true), row("o/b", false), row("o/c", true)])).toEqual([
-      { owner: "o", repo: "a" },
-      { owner: "o", repo: "c" },
-    ]);
+  it("zero counts, workflows with no result and an issues permission error say nothing", () => {
+    const r: GitHubBoardRepo = {
+      repo: "o/r",
+      available: true,
+      workflows: [{ name: "nightly", state: "none" }],
+      prs: { count: 0, needs_you: 0, items: [] },
+      issues: { count: 0, items: [], error: "permission" },
+    };
+    expect(pillsFor(r, { prs: "mine", issues: "assigned" }, NOW)).toEqual([]);
   });
 
-  it("never adds to an existing list", () => {
-    expect(autoPick([{ owner: "x", repo: "y" }], [row("o/a", true)])).toBeNull();
+  it("one PR or issue links to it; more link to the repo's list; a workflow to its run", () => {
+    const one: GitHubBoardRepo = { ...repos[0], prs: { count: 1, needs_you: 1, items: repos[0].prs!.items.slice(0, 1) } };
+    expect(pillsFor(one, cfg[0], NOW)[0]).toEqual({ kind: "you", text: "1 PR for you", url: "https://github.com/sample/myscrollr/pull/478" });
+    expect(pillsFor(repos[0], cfg[0], NOW)[0].url).toBe("https://github.com/sample/myscrollr/pulls");
+    expect(pillsFor(repos[1], cfg[1], NOW)[0].url).toBe("https://github.com/sample/scrollr-api/actions/runs/3");
   });
 
-  it("nothing active: leaves the list empty", () => {
-    expect(autoPick([], [row("o/a", false)])).toBeNull();
-  });
-
-  it("caps the auto-pick at the 20 repos core's runs endpoint answers", () => {
-    const rows = Array.from({ length: 30 }, (_, i) => row(`o/r${i}`, true));
-    expect(autoPick([], rows)).toHaveLength(20);
+  it("assigned issues read as assigned", () => {
+    expect(texts({ ...repos[3], workflows: [] }, 3)).toEqual(["quiet:2 new issues"]);
+    expect(pillsFor({ ...repos[3], workflows: [] }, { prs: "mine", issues: "assigned" }, NOW).map((p) => p.text)).toEqual(["2 assigned"]);
   });
 });
 
-describe("fetchRepos (SCROLLR-304)", () => {
-  beforeEach(() => {
-    signedOut.mockReturnValue(false);
-    runs.mockReset();
-    directFetch.mockReset();
+describe("fitPills: what does not fit becomes +N", () => {
+  const pills = pillsFor(repos[0], cfg[0], NOW);
+  const all = pills.reduce((s, p, i) => s + (i ? 6 : 0) + pillWidth(p.text), 0);
+
+  it("all of them when they fit", () => {
+    expect(fitPills(pills, all)).toEqual({ shown: pills, more: 0 });
   });
 
-  it("signed in: asks core and maps its rows by repo, case-insensitively", async () => {
+  it("one short: the last two go, so the +2 fits", () => {
+    const got = fitPills(pills, all - 1);
+    expect(got.more).toBeGreaterThan(0);
+    expect(got.shown).toEqual(pills.slice(0, pills.length - got.more));
+    const used = got.shown.reduce((s, p, i) => s + (i ? 6 : 0) + pillWidth(p.text), 0) + 6 + pillWidth(`+${got.more}`);
+    expect(used).toBeLessThanOrEqual(all - 1);
+  });
+
+  it("the worst pill is the last to go", () => {
+    expect(fitPills(pills, pillWidth(pills[0].text) + 6 + pillWidth("+3")).shown).toEqual([pills[0]]);
+    expect(fitPills(pills, 10)).toEqual({ shown: [], more: pills.length });
+  });
+});
+
+describe("repoChip", () => {
+  it("the cell's facts: label, age of the newest event, the most urgent link", () => {
+    const c = repoChip(repos[1], cfg[1], false, NOW);
+    expect(c).toMatchObject({ id: "github-sample/scrollr-api", label: "scrollr-api", worst: "red", age: "12m", url: "https://github.com/sample/scrollr-api/actions/runs/3", quiet: false });
+  });
+
+  it("quiet hours: no pills, no colour, still the age", () => {
+    const c = repoChip(repos[1], cfg[1], true, NOW);
+    expect(c).toMatchObject({ pills: [], worst: "none", age: "12m", quiet: true });
+  });
+});
+
+describe("nextFlash", () => {
+  it("never on first sight; on the worst state changing or more needing you; not on fewer", () => {
+    let m = nextFlash(undefined, "ok", 0);
+    expect(m.token).toBe(0);
+    m = nextFlash(m, "ok", 0);
+    expect(m.token).toBe(0);
+    m = nextFlash(m, "red", 0);
+    expect(m).toMatchObject({ token: 1, tone: "down" });
+    m = nextFlash(m, "red", 2);
+    expect(m.token).toBe(2);
+    m = nextFlash(m, "red", 1);
+    expect(m.token).toBe(2);
+  });
+});
+
+describe("fetchBoard", () => {
+  const tracked = [
+    { repo: "o/a", prs: "mine" as const, issues: "off" as const },
+    { repo: "o/b", prs: "off" as const, issues: "new" as const, workflows: ["test"] },
+  ];
+  beforeEach(() => {
+    vi.clearAllMocks();
+    signedOut.mockReturnValue(false);
+  });
+
+  it("connected: one board call with each repo's modes, answered in config order", async () => {
+    board.mockResolvedValue({ connected: true, repos: [{ repo: "O/B", available: true, workflows: [] }, { repo: "o/a", available: true, workflows: [] }] });
+    const got = await fetchBoard(tracked);
+    expect(board).toHaveBeenCalledWith([
+      { repo: "o/a", workflows: undefined, prs: "mine", issues: "off" },
+      { repo: "o/b", workflows: ["test"], prs: "off", issues: "new" },
+    ]);
+    expect(got.map((r) => r.repo)).toEqual(["o/a", "O/B"]);
+    expect(runs).not.toHaveBeenCalled();
+  });
+
+  it("not connected (or a core without /github/board): each repo's latest run as one workflow", async () => {
+    board.mockResolvedValue({ connected: false, connect: true, repos: [] });
     runs.mockResolvedValue({
-      connected: true,
+      connected: false,
       runs: [
-        {
-          repo: "Org/Private",
-          available: true,
-          status: "completed",
-          conclusion: "success",
-          name: "CI",
-          html_url: "https://github.com/Org/Private/actions/runs/1",
-          head_branch: "main",
-          run_started_at: "2026-10-02T08:00:00Z",
-          updated_at: "2026-10-02T08:05:00Z",
-          commit_message: "fix",
-        },
-        { repo: "org/gone", available: false },
+        { repo: "o/a", available: true, status: "completed", conclusion: "failure", name: "CI", updated_at: "2026-10-02T11:00:00Z", html_url: "u" },
+        { repo: "o/b", available: false },
       ],
     });
-    const out = await fetchRepos([
-      { owner: "org", repo: "private" },
-      { owner: "org", repo: "gone" },
-    ]);
-    expect(runs).toHaveBeenCalledWith(["org/private", "org/gone"]);
-    expect(directFetch).not.toHaveBeenCalled();
-    expect(out[0]).toMatchObject({
-      status: "success",
-      workflowName: "CI",
-      branch: "main",
-      commitMessage: "fix",
-      startedAt: "2026-10-02T08:00:00Z",
-    });
-    expect(out[1].status).toBe("unavailable");
+    const got = await fetchBoard(tracked);
+    expect(got[0].workflows).toEqual([{ name: "CI", state: "failing", at: "2026-10-02T11:00:00Z", url: "u" }]);
+    expect(got[1]).toMatchObject({ repo: "o/b", available: false, workflows: [] });
+    board.mockRejectedValue(new Error("404"));
+    expect((await fetchBoard(tracked))[0].workflows[0].state).toBe("failing");
   });
 
-  it("signed out: no core session, so GitHub directly as before", async () => {
+  it("signed out: GitHub directly, one call a repo", async () => {
     signedOut.mockReturnValue(true);
-    directFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ workflow_runs: [{ status: "in_progress", conclusion: null, name: "CI" }] }),
-    });
-    const out = await fetchRepos([{ owner: "o", repo: "r" }]);
-    expect(runs).not.toHaveBeenCalled();
-    expect(out[0].status).toBe("in_progress");
+    directFetch.mockResolvedValue({ ok: true, json: async () => ({ workflow_runs: [{ name: "CI", status: "in_progress", conclusion: null, run_started_at: "2026-10-02T11:58:00Z" }] }) });
+    const got = await fetchBoard(tracked);
+    expect(directFetch).toHaveBeenCalledTimes(2);
+    expect(got[0].workflows[0]).toMatchObject({ name: "CI", state: "running", at: "2026-10-02T11:58:00Z" });
+    expect(board).not.toHaveBeenCalled();
   });
 });
 
-// ── SCROLLR-308: pull requests and the chip's state ─────────────
-
-const { needsYou, chipState, nextFlash, shortAge, withPRs, pagePRs, barPrefs, inQuietHours, GITHUB_BAR_DEFAULTS } = await import("./types");
-
-const pr = (n: number, over: Partial<GitHubPRRow> = {}): GitHubPRRow => ({
-  number: n,
-  title: `PR ${n}`,
-  html_url: "",
-  author: "bob",
-  is_mine: false,
-  review_requested: false,
-  review_state: "none",
-  draft: false,
-  head_branch: "b",
-  head_sha: `s${n}`,
-  updated_at: "2026-10-02T08:00:00Z",
-  checks: { total: 0, passed: 0, failed: 0, running: 0 },
-  checks_state: "none",
-  ...over,
-});
-
-const repo = (over: Partial<GitHubRepo> = {}): GitHubRepo => ({
-  owner: "o",
-  repo: "r",
-  status: "success",
-  workflowName: "CI",
-  runUrl: null,
-  commitMessage: null,
-  updatedAt: null,
-  branch: null,
-  startedAt: null,
-  ...over,
-});
-
-describe("needsYou (SCROLLR-308)", () => {
-  it("counts each PR once: a review asked of you, yours with changes requested or failing checks", () => {
-    const prs = [
-      pr(1, { review_requested: true }),
-      // yours, changes requested AND failing: still one
-      pr(2, { is_mine: true, review_state: "changes_requested", checks_state: "failing" }),
-      pr(3, { is_mine: true, checks_state: "failing" }),
-      pr(4, { is_mine: true, review_state: "approved", checks_state: "passing" }),
-      pr(5, { review_state: "changes_requested", checks_state: "failing" }), // not yours
+describe("the picker's first load and URLs", () => {
+  it("autoPick: the active repos with the defaults, never into an existing list", () => {
+    const rows = [
+      { full_name: "o/a", private: false, active: true },
+      { full_name: "o/b", private: false, active: false },
     ];
-    expect(needsYou(prs).map((p) => p.number)).toEqual([1, 2, 3]);
-  });
-});
-
-describe("chipState (SCROLLR-308)", () => {
-  const failing = { state: "failing" as const, workflow: "deploy", updated_at: "2026-10-02T08:00:00Z" };
-  const passing = { state: "passing" as const, workflow: "CI", updated_at: "2026-10-02T08:00:00Z" };
-
-  it("needs you beats broken beats running on yours beats passing", () => {
-    const all = { prs: [pr(1, { review_requested: true })], defaultCi: failing, mineRunning: 2 };
-    const pulse = { ...GITHUB_BAR_DEFAULTS, pulse: true };
-    expect(chipState(repo(all), pulse)).toBe("needs");
-    expect(chipState(repo({ ...all, prs: [] }), pulse)).toBe("broken");
-    expect(chipState(repo({ ...all, prs: [], defaultCi: passing }), pulse)).toBe("running");
-    expect(chipState(repo({ ...all, prs: [], defaultCi: passing, mineRunning: 0 }), pulse)).toBe("passing");
+    expect(autoPick([], rows)).toEqual([{ repo: "o/a", prs: "mine", issues: "off" }]);
+    expect(autoPick([{ repo: "x/y", prs: "off", issues: "off" }], rows)).toBeNull();
   });
 
-  it("not connected, or no settled default-branch run: today's latest-run form", () => {
-    expect(chipState(repo())).toBeUndefined();
-    expect(chipState(repo({ prs: [], defaultCi: { state: "running" } }))).toBeUndefined();
-    expect(chipState(repo({ prs: [] }))).toBeUndefined();
-  });
-
-  it("withPRs merges only an available answer", () => {
-    const p = { repo: "o/r", available: true, prs: [pr(1)], default_ci: passing, mine_running: 1, mine_since: "x", mine_branch: "b" };
-    expect(withPRs(repo(), p)).toMatchObject({ prs: [pr(1)], defaultCi: passing, mineRunning: 1, mineSince: "x", mineBranch: "b" });
-    expect(withPRs(repo(), { ...p, available: false }).prs).toBeUndefined();
-  });
-});
-
-// ── SCROLLR-309: the GitHub page and what goes on the bar ─────────
-
-describe("pagePRs: the GitHub page's items and their order (SCROLLR-309)", () => {
-  // Input deliberately out of order.
-  const prs = [
-    pr(1, { is_mine: true, checks_state: "failing" }), // yours, failing: 2
-    pr(2, { is_mine: true, review_state: "approved", checks_state: "passing" }), // yours, quiet: 3
-    pr(3, { is_mine: true, review_state: "changes_requested", checks_state: "failing" }), // changes (and failing): 1, once
-    pr(4, { review_requested: true }), // review asked of you: 0
-    pr(5, { review_state: "changes_requested" }), // someone else's: never
-    pr(6, { review_requested: true, checks_state: "running" }), // review: 0
-  ];
-  const nums = (bar = GITHUB_BAR_DEFAULTS, quiet = false) => pagePRs(repo({ prs }), bar, quiet).map((p) => p.number);
-
-  it("review requests, then changes requested, then failing checks; each PR once; never someone else's quiet PR", () => {
-    expect(nums()).toEqual([4, 6, 3, 1]);
-    expect(pagePRs(repo({ prs })).map((p) => [p.repo, p.why])).toEqual([["r", 0], ["r", 0], ["r", 1], ["r", 2]]);
-  });
-
-  it("'My other open PRs' adds yours after the ones that need you; the needs-you count does not change", () => {
-    const bar = { ...GITHUB_BAR_DEFAULTS, otherPRs: true };
-    expect(nums(bar)).toEqual([4, 6, 3, 1, 2]);
-    expect(needsYou(prs, bar)).toHaveLength(4);
-  });
-
-  it("each switch takes its reason off the page and out of the chip's count", () => {
-    expect(nums({ ...GITHUB_BAR_DEFAULTS, reviews: false })).toEqual([3, 1]);
-    // PR 3 has changes requested AND failing checks: with changes off it is on the page for its checks.
-    expect(nums({ ...GITHUB_BAR_DEFAULTS, changes: false })).toEqual([4, 6, 1, 3]);
-    expect(nums({ ...GITHUB_BAR_DEFAULTS, changes: false, failingChecks: false })).toEqual([4, 6]);
-    expect(needsYou(prs, { ...GITHUB_BAR_DEFAULTS, reviews: false, changes: false, failingChecks: false })).toEqual([]);
-  });
-
-  it("quiet hours: nothing on the page; not connected: nothing", () => {
-    expect(nums(GITHUB_BAR_DEFAULTS, true)).toEqual([]);
-    expect(pagePRs(repo())).toEqual([]);
-  });
-});
-
-describe("chipState with the bar prefs (SCROLLR-309)", () => {
-  const failing = { state: "failing" as const, workflow: "deploy", updated_at: "2026-10-02T08:00:00Z" };
-  const passing = { state: "passing" as const, workflow: "CI", updated_at: "2026-10-02T08:00:00Z" };
-  const review = [pr(1, { review_requested: true })];
-
-  it("the pulse is off by default: a run on your branch alone is not a state", () => {
-    expect(chipState(repo({ prs: [], defaultCi: passing, mineRunning: 1 }))).toBe("passing");
-  });
-
-  it("review requests off: a review alone is not 'needs you'", () => {
-    expect(chipState(repo({ prs: review, defaultCi: passing }), { ...GITHUB_BAR_DEFAULTS, reviews: false })).toBe("passing");
-  });
-
-  it("failing CI off: a red main is quiet (grey), never the green dot", () => {
-    expect(chipState(repo({ prs: [], defaultCi: failing }), { ...GITHUB_BAR_DEFAULTS, failingCi: false })).toBe("quiet");
-  });
-
-  it("quiet hours silence every state", () => {
-    expect(chipState(repo({ prs: review, defaultCi: failing, mineRunning: 1 }), { ...GITHUB_BAR_DEFAULTS, pulse: true }, true)).toBe("quiet");
-    expect(chipState(repo(), GITHUB_BAR_DEFAULTS, true)).toBeUndefined(); // not connected: today's form
-  });
-});
-
-describe("barPrefs and quiet hours (SCROLLR-309)", () => {
-  it("defaults: quiet by default, the four that need you on, the pulse and other PRs off", () => {
-    expect(barPrefs(undefined)).toEqual(GITHUB_BAR_DEFAULTS);
-    expect(GITHUB_BAR_DEFAULTS).toMatchObject({ failingCi: true, reviews: true, changes: true, failingChecks: true, pulse: false, otherPRs: false, flash: true, quiet: false });
-  });
-
-  it("keeps only well-typed stored fields", () => {
-    expect(barPrefs({ pulse: true, reviews: "yes", quietFrom: "25:00", quietTo: "07:30" })).toEqual({ ...GITHUB_BAR_DEFAULTS, pulse: true, quietTo: "07:30" });
-  });
-
-  const at = (h: number, m = 0) => new Date(2026, 9, 2, h, m);
-  it("a window inside one day", () => {
-    const bar = { ...GITHUB_BAR_DEFAULTS, quiet: true, quietFrom: "12:00", quietTo: "13:30" };
-    expect([at(11, 59), at(12), at(13, 29), at(13, 30)].map((d) => inQuietHours(bar, d))).toEqual([false, true, true, false]);
-  });
-
-  it("a window across midnight, and off when the switch is off or the times are equal", () => {
-    const bar = { ...GITHUB_BAR_DEFAULTS, quiet: true, quietFrom: "22:00", quietTo: "08:00" };
-    expect([at(21, 59), at(22), at(2), at(7, 59), at(8)].map((d) => inQuietHours(bar, d))).toEqual([false, true, true, true, false]);
-    expect(inQuietHours({ ...bar, quiet: false }, at(2))).toBe(false);
-    expect(inQuietHours({ ...bar, quietTo: "22:00" }, at(22))).toBe(false);
-  });
-});
-
-describe("nextFlash (SCROLLR-308)", () => {
-  it("fires once per change: broke, recovered, more need you; never on a poll that changed nothing", () => {
-    const tokens: number[] = [];
-    let m = nextFlash(undefined, false, 0); // first sight: no flash
-    tokens.push(m.token);
-    for (const [broken, needs] of [
-      [false, 0], // nothing changed
-      [true, 0], // passing → failing
-      [true, 0], // same poll again
-      [false, 0], // failing → passing
-      [false, 1], // needs you up
-      [false, 1], // same
-      [false, 0], // needs you down: no flash
-      [false, 2], // up again
-    ] as const) {
-      m = nextFlash(m, broken, needs);
-      tokens.push(m.token);
-    }
-    expect(tokens).toEqual([0, 0, 1, 1, 2, 3, 3, 3, 4]);
-  });
-
-  it("a break flashes red, everything else green", () => {
-    expect(nextFlash(nextFlash(undefined, false, 0), true, 0).tone).toBe("down");
-    expect(nextFlash(nextFlash(undefined, true, 0), false, 0).tone).toBe("up");
-  });
-});
-
-describe("shortAge", () => {
-  const now = Date.parse("2026-10-02T12:00:00Z");
-  it("is at most three characters", () => {
-    const ago = (ms: number) => shortAge(new Date(now - ms).toISOString(), now);
-    expect(ago(30_000)).toBe("now");
-    expect(ago(12 * 60_000)).toBe("12m");
-    expect(ago(5 * 3_600_000)).toBe("5h");
-    expect(ago(3 * 86_400_000)).toBe("3d");
-    expect(ago(60 * 86_400_000)).toBe("8w");
-    expect(ago(800 * 86_400_000)).toBe("2y");
-    expect(shortAge(undefined, now)).toBe("");
-  });
-});
-
-describe("fetchRepos with pull requests (SCROLLR-308)", () => {
-  beforeEach(() => {
-    signedOut.mockReturnValue(false);
-    runs.mockReset();
-    prs.mockReset();
-  });
-
-  it("one /github/prs call for every repo, merged into each record", async () => {
-    runs.mockResolvedValue({ connected: true, runs: [{ repo: "o/a", available: true, status: "completed", conclusion: "success" }] });
-    prs.mockResolvedValue({
-      connected: true,
-      repos: [{ repo: "O/A", available: true, prs: [pr(7, { review_requested: true })], mine_running: 0 }],
-    } as never);
-    const out = await fetchRepos([{ owner: "o", repo: "a" }, { owner: "o", repo: "b" }]);
-    expect(prs).toHaveBeenCalledTimes(1);
-    expect(prs).toHaveBeenCalledWith(["o/a", "o/b"]);
-    expect(out[0].prs?.[0].number).toBe(7);
-    expect(out[1].prs).toBeUndefined();
-  });
-
-  it("an older core without /github/prs leaves the runs as they were", async () => {
-    runs.mockResolvedValue({ connected: true, runs: [{ repo: "o/a", available: true, status: "completed", conclusion: "success" }] });
-    prs.mockRejectedValue(new Error("404"));
-    const out = await fetchRepos([{ owner: "o", repo: "a" }]);
-    expect(out[0]).toMatchObject({ status: "success" });
-    expect(out[0].prs).toBeUndefined();
+  it("parseRepoUrl: URLs and owner/name, nothing else", () => {
+    expect(parseRepoUrl("https://github.com/Org/App/actions")).toBe("Org/App");
+    expect(parseRepoUrl("github.com/o/r.git")).toBe("o/r");
+    expect(parseRepoUrl("o/r")).toBe("o/r");
+    expect(parseRepoUrl("not a repo")).toBeNull();
   });
 });

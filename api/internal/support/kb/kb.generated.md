@@ -251,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 626c5a12111b -->
+<!-- source: docs/CHIP_DESIGN.md @ 6cd636896107 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -409,24 +409,27 @@ own empty page. All of them share one page at the very end: "EPL · next match S
 
 #### GitHub
 
-GitHub is a utility, so each repo you tick has a spot on the edge: a count of the pull
-requests that need you, a red dot when the main branch is failing, or a green dot and how
-long ago it last ran. When pull requests need you, GitHub also gets a page, a column per pull
-request, the way NFL is a column per game: reviews asked of you first, then your pull
-requests with changes requested, then yours with failing checks. Each column is the title,
-then the repo, number, author and age, with a tag (Review requested, Changes requested,
-Approved) and the checks (`✓ 5/5`, `✗ 1 failing`, `◌ 2 running`). Clicking one opens it
-on GitHub. Nothing needs you: no page, just the edge.
+Each repo you track is one cell. The cell has a dot in the repo's worst state, its name,
+how long ago something last happened, and a row of pills, the worst first: a failing
+workflow (`✗ deploy · 12m`, red), one running (`◌ apply · 3m`), pull requests that need
+you (`2 PRs for you`), the green workflows (`✓ test`), then quieter counts (`3 open PRs`,
+`1 new issue`, `2 assigned`). What doesn't fit becomes `+2`. A failing check from any CI
+on main counts too, under its own name (`✗ vercel · 3m`). Clicking the cell opens its most
+urgent thing on GitHub.
+
+One or two repos share one slot on the edge that never changes width: it shows one repo
+at a time (`GITHUB · MYSCROLLR`, its most urgent pill) and rolls to the next as the page
+turns, with a dot per repo in its corner. Three or more get a page, one cell each, in your
+order, and leave the edge; the band counts the repos that need you.
 
 GitHub is the one widget where you choose what reaches the bar, because a developer's day
-has more events than anyone wants to see. In the widget, under Your repos, **What goes on
-the bar** has a switch each for failing CI on main, review requests, changes requested on
-your pull requests, your pull requests with failing checks, runs on your branches (off by
-default), your other open pull requests on the page (off by default) and the flash when
-something changes; and quiet hours, two times between which the bar goes silent while the
-widget page still shows everything. They choose which kinds of event are yours to hear
-about, never how many or in what order. Green pull requests waiting on others stay off the
-bar.
+has more events than anyone wants to see. In the widget, pick a repo on the left and choose
+on the right what it watches: which workflows (the ones that ran in the last 30 days start
+ticked), its pull requests (off, only the ones that need you, or all open) and its issues
+(off, assigned to you, or every new one; GitHub asks you once to approve reading issues).
+A live preview shows the repo's cell as you change it. Quiet hours and the flash are in the
+⋯ menu: between the two times the bar goes silent for GitHub, while the widget page still
+shows everything.
 
 #### Colour and a new account
 

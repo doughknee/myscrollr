@@ -46,7 +46,7 @@ import { WIDGET_ORDER } from "../widgets/registry";
 import { getStore } from "../lib/store";
 import { formatTemp, weatherCodeToIcon } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
-import { loadRepoData } from "../widgets/github/types";
+import { loadBoard, pillsFor, worstOf } from "../widgets/github/types";
 import {
   LS_TIMER_STATE,
   LS_WEATHER_CITIES,
@@ -862,12 +862,15 @@ function getWidgetValue(id: string, units: UnitsPrefs): string {
       return `${up} up`;
     }
     case "github": {
-      const repos = loadRepoData();
+      const repos = loadBoard();
       if (repos.length === 0) return "No repos";
-      const passing = repos.filter((r) => r.status === "success").length;
-      const failing = repos.filter((r) => r.status === "failure").length;
-      if (failing > 0) return `${passing} passing / ${failing} failing`;
-      return `${passing} passing`;
+      const worst = repos.map((r) => worstOf(pillsFor(r)));
+      const failing = worst.filter((w) => w === "red").length;
+      const needs = worst.filter((w) => w === "accent").length;
+      const parts = [`${repos.length} repo${repos.length === 1 ? "" : "s"}`];
+      if (failing > 0) parts.push(`${failing} failing`);
+      if (needs > 0) parts.push(`${needs} need you`);
+      return parts.join(" / ");
     }
     default:
       return "";

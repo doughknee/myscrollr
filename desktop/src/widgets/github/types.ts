@@ -1,404 +1,154 @@
 /**
- * GitHub Actions widget types, fetch logic, and storage helpers.
+ * The GitHub widget's data (SCROLLR-312): one board entry per tracked repo,
+ * and what its bar cell says about it.
  *
- * Signed in, runs come from core's GET /github/runs (SCROLLR-304): with
- * the user's own GitHub token once they connect the Scrollr Desktop GitHub
- * App (private repos included), through core's shared fallback otherwise.
- * Signed out there is no core session to ask, so the app still calls
- * GitHub directly for public repos, exactly as before.
+ * Connected, everything comes from core's POST /github/board with the user's
+ * own token: each repo's chosen workflows, its PRs and its issues as the
+ * repo's modes ask. Signed in but not connected, core's shared fallback
+ * (GET /github/runs) gives each repo its latest run; signed out there is no
+ * core session to ask, so the app calls GitHub directly for public repos.
+ * Either way the bar draws the same pills.
  */
 import { fetch } from "@tauri-apps/plugin-http";
-import { LS_GITHUB_REPOS } from "../../constants";
+import { LS_GITHUB_BOARD } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
 import { githubApi } from "../../api/client";
-import type {
-  GitHubDefaultCI,
-  GitHubPRRow,
-  GitHubRepoPRs,
-  GitHubRepoRow,
-  GitHubRunRow,
-} from "../../api/client";
+import type { GitHubBoardRepo, GitHubBoardRun, GitHubRepoRow, GitHubRunRow } from "../../api/client";
+import { newRepo } from "./config";
+import type { GitHubTrackedRepo } from "./config";
+import type { GitHubChipData } from "../../types";
 
-// ── GitHub Actions API response ────────────────────────────────
+// ── Repo names ─────────────────────────────────────────────────
 
-interface GitHubWorkflowRun {
-  id: number;
-  name: string;
-  status: string;
-  conclusion: string | null;
-  html_url: string;
-  head_commit: { message: string } | null;
-  updated_at: string;
-  /** Already in the response — we just weren't reading them. */
-  head_branch: string | null;
-  run_started_at: string | null;
-}
-
-interface GitHubActionsResponse {
-  total_count: number;
-  workflow_runs: GitHubWorkflowRun[];
-}
-
-// ── Internal model ─────────────────────────────────────────────
-
-export type CIStatus = "success" | "failure" | "in_progress" | "unavailable";
-
-export const CI_STATUS_LABELS: Record<CIStatus, string> = {
-  success: "Passing",
-  failure: "Failing",
-  in_progress: "Running",
-  unavailable: "Unavailable",
-};
-
-export const CI_STATUS_COLORS: Record<CIStatus, string> = {
-  success: "bg-up",
-  failure: "bg-down",
-  in_progress: "bg-warning",
-  unavailable: "bg-fg-4",
-};
-
-export const CI_STATUS_TEXT: Record<CIStatus, string> = {
-  success: "text-up",
-  failure: "text-down",
-  in_progress: "text-warning",
-  unavailable: "text-fg-4",
-};
-
-export interface GitHubRepo {
-  owner: string;
-  repo: string;
-  status: CIStatus;
-  workflowName: string | null;
-  runUrl: string | null;
-  commitMessage: string | null;
-  updatedAt: string | null;
-  /** Branch the run is on, e.g. "main". */
-  branch: string | null;
-  /** When the run started — used for the chip's elapsed value. */
-  startedAt: string | null;
-  // From core's /github/prs when GitHub is connected (SCROLLR-308);
-  // absent otherwise, and the chip keeps its latest-run form.
-  prs?: GitHubPRRow[];
-  defaultCi?: GitHubDefaultCI;
-  mineRunning?: number;
-  mineSince?: string;
-  mineBranch?: string;
-}
-
-// ── Helpers ────────────────────────────────────────────────────
-
-/** Map GitHub API status/conclusion to our CIStatus. */
-function toCIStatus(status: string, conclusion: string | null): CIStatus {
-  if (status === "in_progress" || status === "queued") return "in_progress";
-  if (conclusion === "success") return "success";
-  if (conclusion === "failure" || conclusion === "timed_out") return "failure";
-  // cancelled, skipped, action_required, stale, etc.
-  return "unavailable";
-}
-
-/**
- * Parse a GitHub repo URL into owner/repo.
- *
- * Accepts:
- *   https://github.com/owner/repo
- *   https://github.com/owner/repo/anything/else
- *   github.com/owner/repo
- */
 /** Valid GitHub owner/repo name: alphanumeric, hyphens, dots, underscores. */
 const GITHUB_NAME_RE = /^[a-zA-Z0-9_.-]+$/;
 
-export function parseRepoUrl(
-  url: string,
-): { owner: string; repo: string } | null {
-  const trimmed = url.trim().replace(/\/+$/, "");
-  const match = trimmed.match(/(?:https?:\/\/)?github\.com\/([^/]+)\/([^/]+)/i);
+/**
+ * Parse a GitHub repo URL (or "owner/name") into "owner/name".
+ *
+ * Accepts https://github.com/owner/repo, …/owner/repo/anything/else,
+ * github.com/owner/repo and owner/repo.
+ */
+export function parseRepoUrl(url: string): string | null {
+  const trimmed = url.trim().replace(/\/+$/, "").replace(/\.git$/, "");
+  const match =
+    trimmed.match(/(?:https?:\/\/)?github\.com\/([^/]+)\/([^/]+)/i) ?? trimmed.match(/^([^/\s]+)\/([^/\s]+)$/);
   if (!match) return null;
-
-  const owner = match[1];
-  const repo = match[2];
+  const [, owner, repo] = match;
   if (!GITHUB_NAME_RE.test(owner) || !GITHUB_NAME_RE.test(repo)) return null;
-
-  return { owner, repo };
+  return `${owner}/${repo}`;
 }
 
-/** Format owner/repo as a stable key for exclusion lists. */
-export function repoKey(r: { owner: string; repo: string }): string {
-  return `${r.owner}/${r.repo}`;
-}
+export const sameRepo = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+/** "owner/name" → "name". */
+export const repoName = (repo: string) => repo.slice(repo.indexOf("/") + 1);
 
 // ── Fetch ──────────────────────────────────────────────────────
 
-/**
- * Fetch the latest workflow run for a single repo.
- * Returns a GitHubRepo with status "unavailable" on any error
- * (404, rate limit, network failure) rather than throwing.
- */
-export async function fetchRepoStatus(
-  owner: string,
-  repo: string,
-): Promise<GitHubRepo> {
-  const unavailable: GitHubRepo = {
-    owner,
+type RunState = GitHubBoardRun["state"];
+
+/** GitHub's status/conclusion as a board state. */
+function runState(status: string | undefined, conclusion: string | null | undefined): RunState {
+  if (status && status !== "completed") return "running";
+  if (conclusion === "success" || conclusion === "neutral" || conclusion === "skipped") return "passing";
+  if (conclusion === "failure" || conclusion === "timed_out" || conclusion === "startup_failure") return "failing";
+  return "none";
+}
+
+/** A latest-run answer (core's fallback, or GitHub itself) as a board entry: one workflow pill. */
+export function fromRun(repo: string, row: GitHubRunRow | undefined): GitHubBoardRepo {
+  if (!row?.available) return { repo, available: false, stale: row?.stale, workflows: [] };
+  const state = runState(row.status, row.conclusion || null);
+  return {
     repo,
-    status: "unavailable",
-    workflowName: null,
-    runUrl: null,
-    commitMessage: null,
-    updatedAt: null,
-    branch: null,
-    startedAt: null,
+    available: true,
+    stale: row.stale,
+    workflows: [{ name: row.name || "CI", state, at: (state === "running" ? row.run_started_at : row.updated_at) || undefined, url: row.html_url || undefined }],
   };
+}
 
+/** Signed out: GitHub's public API, one call per repo. Errors read as unavailable. */
+async function fetchDirect(repo: string): Promise<GitHubBoardRepo> {
   try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=1`;
-    const res = await fetch(url, {
+    const res = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=1`, {
       method: "GET",
-      headers: {
-        Accept: "application/vnd.github+json",
-        "User-Agent": "Scrollr/1.0",
-      },
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "Scrollr/1.0" },
     });
-
-    if (!res.ok) return unavailable;
-
-    const data = (await res.json()) as GitHubActionsResponse;
-    const run = data.workflow_runs?.[0];
-    if (!run) return unavailable;
-
-    return {
-      owner,
+    if (!res.ok) return fromRun(repo, undefined);
+    const run = ((await res.json()) as { workflow_runs?: Array<Record<string, string | null>> }).workflow_runs?.[0];
+    if (!run) return fromRun(repo, undefined);
+    return fromRun(repo, {
       repo,
-      status: toCIStatus(run.status, run.conclusion),
-      workflowName: run.name,
-      runUrl: run.html_url,
-      commitMessage: run.head_commit?.message ?? null,
-      updatedAt: run.updated_at,
-      branch: run.head_branch,
-      startedAt: run.run_started_at,
-    };
+      available: true,
+      status: run.status ?? undefined,
+      conclusion: run.conclusion ?? undefined,
+      name: run.name ?? undefined,
+      html_url: run.html_url ?? undefined,
+      run_started_at: run.run_started_at ?? undefined,
+      updated_at: run.updated_at ?? undefined,
+    });
   } catch {
-    return unavailable;
+    return fromRun(repo, undefined);
   }
 }
 
 /**
- * Fetch status for all configured repos in parallel.
- * Uses Promise.allSettled so one failure doesn't break others.
+ * The widget's fetch, one entry per tracked repo in config order. Connected:
+ * the board. Not connected (or an older core without /github/board): each
+ * repo's latest run through core. Signed out: GitHub directly.
  */
-export async function fetchAllRepos(
-  repos: Array<{ owner: string; repo: string }>,
-): Promise<GitHubRepo[]> {
-  const results = await Promise.allSettled(
-    repos.map((r) => fetchRepoStatus(r.owner, r.repo)),
-  );
-
-  return results.map((r, i) =>
-    r.status === "fulfilled"
-      ? r.value
-      : {
-          owner: repos[i].owner,
-          repo: repos[i].repo,
-          status: "unavailable" as CIStatus,
-          workflowName: null,
-          runUrl: null,
-          commitMessage: null,
-          updatedAt: null,
-          branch: null,
-          startedAt: null,
-        },
-  );
+export async function fetchBoard(tracked: GitHubTrackedRepo[]): Promise<GitHubBoardRepo[]> {
+  if (tracked.length === 0) return [];
+  if (isSignedOut()) return Promise.all(tracked.map((t) => fetchDirect(t.repo)));
+  const board = await githubApi
+    .board(tracked.map(({ repo, workflows, prs, issues }) => ({ repo, workflows, prs, issues })))
+    .catch(() => null);
+  if (board?.connected) {
+    return tracked.map((t) => board.repos.find((r) => sameRepo(r.repo, t.repo)) ?? { repo: t.repo, available: false, workflows: [] });
+  }
+  const res = await githubApi.runs(tracked.map((t) => t.repo));
+  return tracked.map((t) => fromRun(t.repo, res.runs.find((r) => sameRepo(r.repo, t.repo))));
 }
 
-/** Map core's run row onto the widget model. */
-export function fromRunRow(
-  r: { owner: string; repo: string },
-  row: GitHubRunRow | undefined,
-): GitHubRepo {
+/**
+ * The one board query (the shell's 60 s poll and the widget page share its
+ * key, so they never double-fetch). Keyed on the whole config: a changed
+ * mode or tick refetches at once, which is what moves the page's preview.
+ */
+export function githubBoardQuery(tracked: GitHubTrackedRepo[], authenticated: boolean) {
   return {
-    owner: r.owner,
-    repo: r.repo,
-    status: row?.available
-      ? toCIStatus(row.status ?? "", row.conclusion || null)
-      : "unavailable",
-    workflowName: row?.name || null,
-    runUrl: row?.html_url || null,
-    commitMessage: row?.commit_message || null,
-    updatedAt: row?.updated_at || null,
-    branch: row?.head_branch || null,
-    startedAt: row?.run_started_at || null,
+    queryKey: ["github-board", authenticated, JSON.stringify(tracked)],
+    queryFn: async () => {
+      const data = await fetchBoard(tracked);
+      saveBoard(data);
+      return data;
+    },
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: 1,
   };
 }
 
-/**
- * The widget's fetch: core when signed in, GitHub directly when signed out.
- */
-export async function fetchRepos(
-  repos: Array<{ owner: string; repo: string }>,
-): Promise<GitHubRepo[]> {
-  if (isSignedOut()) return fetchAllRepos(repos);
-  const keys = repos.map(repoKey);
-  // PRs are an extra: an older core (404) or a hiccup leaves the runs.
-  const [res, prs] = await Promise.all([
-    githubApi.runs(keys),
-    (async () => githubApi.prs(keys))().catch(() => null),
-  ]);
-  const byKey = new Map(res.runs.map((row) => [row.repo.toLowerCase(), row]));
-  const prsByKey = new Map(
-    (prs?.connected ? prs.repos : []).map((p) => [p.repo.toLowerCase(), p]),
-  );
-  return repos.map((r) => {
-    const k = repoKey(r).toLowerCase();
-    return withPRs(fromRunRow(r, byKey.get(k)), prsByKey.get(k));
-  });
-}
-
-/** Merge one repo's PR answer into its record. */
-export function withPRs(r: GitHubRepo, p: GitHubRepoPRs | undefined): GitHubRepo {
-  if (!p?.available) return r;
-  return {
-    ...r,
-    prs: p.prs,
-    defaultCi: p.default_ci,
-    mineRunning: p.mine_running,
-    mineSince: p.mine_since,
-    mineBranch: p.mine_branch,
-  };
-}
-
-// ── What goes on the bar (SCROLLR-309) ─────────────────────────
+// ── The cell: pills, worst first (canvas B3, T3) ───────────────
 
 /**
- * The developer's own say over what the GitHub widget puts on the bar, kept
- * in the widget's prefs (`prefs.widgets.github.bar`) and set in its FeedTab.
- * Quiet by default: nothing that is green and waiting on others.
+ * `red` a failing workflow or check; `run` a workflow running; `you` PRs
+ * that need you; `ok` a passing workflow; `quiet` counts that ask nothing
+ * of you (all open PRs, new issues, issues assigned).
  */
-export interface GitHubBarPrefs {
-  /** The default branch failing turns the edge chip red. */
-  failingCi: boolean;
-  /** A review asked of you (or your team). */
-  reviews: boolean;
-  /** Your PRs with changes requested. */
-  changes: boolean;
-  /** Your PRs with failing checks. */
-  failingChecks: boolean;
-  /** A run in progress on one of your branches (the pulse). */
-  pulse: boolean;
-  /** Your other open PRs, after the ones that need you, on the GitHub page. */
-  otherPRs: boolean;
-  /** The chip flashes once when something changes. */
-  flash: boolean;
-  /** Between `quietFrom` and `quietTo` (local, "HH:MM") the chip and the page go silent. */
-  quiet: boolean;
-  quietFrom: string;
-  quietTo: string;
+export type PillKind = "red" | "run" | "you" | "ok" | "quiet";
+
+export interface GitHubPill {
+  kind: PillKind;
+  text: string;
+  /** Where a click on the cell goes when this is its most urgent pill. */
+  url: string;
 }
 
-export const GITHUB_BAR_DEFAULTS: GitHubBarPrefs = {
-  failingCi: true,
-  reviews: true,
-  changes: true,
-  failingChecks: true,
-  pulse: false,
-  otherPRs: false,
-  flash: true,
-  quiet: false,
-  quietFrom: "22:00",
-  quietTo: "08:00",
-};
-
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-/** Stored prefs over the defaults, each field type-checked (prefs come from disk). */
-export function barPrefs(raw: unknown): GitHubBarPrefs {
-  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const out = { ...GITHUB_BAR_DEFAULTS };
-  for (const k of Object.keys(out) as (keyof GitHubBarPrefs)[]) {
-    const v = o[k];
-    if (typeof out[k] === "boolean" ? typeof v === "boolean" : typeof v === "string" && HHMM.test(v)) {
-      (out as Record<string, unknown>)[k] = v;
-    }
-  }
-  return out;
-}
-
-/** Inside quiet hours at local time `now`. A window may wrap midnight; from = to is never. */
-export function inQuietHours(bar: GitHubBarPrefs, now: Date = new Date()): boolean {
-  if (!bar.quiet || bar.quietFrom === bar.quietTo) return false;
-  const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return bar.quietFrom < bar.quietTo
-    ? t >= bar.quietFrom && t < bar.quietTo
-    : t >= bar.quietFrom || t < bar.quietTo;
-}
-
-/**
- * Why a PR is on the GitHub page, which is also its place in the page's
- * order: 0 a review asked of you, 1 yours with changes requested, 2 yours
- * with failing checks, 3 your other open PRs (only with `otherPRs`).
- * Null: not on the page. Each PR once, at its first reason.
- */
-export function whyOn(p: GitHubPRRow, bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS): 0 | 1 | 2 | 3 | null {
-  if (bar.reviews && p.review_requested) return 0;
-  if (!p.is_mine) return null;
-  if (bar.changes && p.review_state === "changes_requested") return 1;
-  if (bar.failingChecks && p.checks_state === "failing") return 2;
-  return bar.otherPRs ? 3 : null;
-}
-
-// ── The edge chip's state (SCROLLR-308) ────────────────────────
-
-/**
- * The PRs that need you, each once: a review asked of you (or your team),
- * or yours with changes requested or failing checks, as far as the bar
- * prefs let each reason count.
- */
-export function needsYou(prs: GitHubPRRow[] = [], bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS): GitHubPRRow[] {
-  return prs.filter((p) => {
-    const why = whyOn(p, bar);
-    return why !== null && why < 3;
-  });
-}
-
-/** One PR on the GitHub page: the row, its repo's name and why it is there. */
-export interface GitHubPagePR extends GitHubPRRow {
-  repo: string;
-  why: 0 | 1 | 2 | 3;
-}
-
-/** A repo's PRs for the GitHub page, in the page's order. None in quiet hours. */
-export function pagePRs(r: GitHubRepo, bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS, quiet = false): GitHubPagePR[] {
-  if (quiet || !r.prs) return [];
-  const out: GitHubPagePR[] = [];
-  for (const p of r.prs) {
-    const why = whyOn(p, bar);
-    if (why !== null) out.push({ ...p, repo: r.repo, why });
-  }
-  return out.sort((a, b) => a.why - b.why);
-}
-
-/** `quiet`: quiet hours, or the default branch failing with that toggle off: a grey dot and the age. */
-export type GitHubChipState = "needs" | "broken" | "running" | "passing" | "quiet";
-
-/**
- * Needs you › broken › running on yours › passing, each as far as the bar
- * prefs allow. Undefined without PR data (not connected) or with no settled
- * default-branch run: the chip keeps its latest-run form.
- */
-export function chipState(
-  r: GitHubRepo,
-  bar: GitHubBarPrefs = GITHUB_BAR_DEFAULTS,
-  quiet = false,
-): GitHubChipState | undefined {
-  if (!r.prs) return undefined;
-  if (quiet) return "quiet";
-  if (needsYou(r.prs, bar).length > 0) return "needs";
-  const ci = r.defaultCi?.state;
-  if (ci === "failing" && bar.failingCi) return "broken";
-  if (bar.pulse && (r.mineRunning ?? 0) > 0) return "running";
-  if (ci === "passing") return "passing";
-  if (ci === "failing") return "quiet";
-  return undefined;
-}
+/** The order on the bar: the worst first, then the quiet counts. */
+const RANK: Record<PillKind, number> = { red: 0, run: 1, you: 2, ok: 3, quiet: 4 };
 
 /** "now", "12m", "5h", "3d", "6w", "2y": at most three characters. */
 export function shortAge(iso: string | null | undefined, now = Date.now()): string {
@@ -415,9 +165,122 @@ export function shortAge(iso: string | null | undefined, now = Date.now()): stri
   return `${Math.floor(d / 365)}y`;
 }
 
+const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
+
+/**
+ * A repo's pills, worst first: `✗ deploy · 12m`, `◌ apply · 3m`, `2 PRs for
+ * you`, `✓ test`, then `3 open PRs`, `1 new issue`, `2 assigned`. Counts of
+ * zero and workflows with no result say nothing. `t` is the repo's config
+ * (its PR mode decides which PR pill); absent, PRs read as "mine".
+ */
+export function pillsFor(r: GitHubBoardRepo, t?: Pick<GitHubTrackedRepo, "prs" | "issues">, now = Date.now()): GitHubPill[] {
+  const home = `https://github.com/${r.repo}`;
+  const out: GitHubPill[] = [];
+  for (const w of [...(r.checks ?? []), ...r.workflows]) {
+    const url = w.url || `${home}/actions`;
+    const age = shortAge(w.at, now);
+    if (w.state === "failing") out.push({ kind: "red", text: age ? `✗ ${w.name} · ${age}` : `✗ ${w.name}`, url });
+    else if (w.state === "running") out.push({ kind: "run", text: age ? `◌ ${w.name} · ${age}` : `◌ ${w.name}`, url });
+    else if (w.state === "passing") out.push({ kind: "ok", text: `✓ ${w.name}`, url });
+  }
+  const prs = r.prs;
+  if (prs && prs.count > 0) {
+    const url = prs.count === 1 ? prs.items[0]?.html_url || `${home}/pulls` : `${home}/pulls`;
+    if ((t?.prs ?? "mine") === "all") out.push({ kind: "quiet", text: `${prs.count} open ${plural(prs.count, "PR")}`, url });
+    else out.push({ kind: "you", text: `${prs.count} ${plural(prs.count, "PR")} for you`, url });
+  }
+  const is = r.issues;
+  if (is && !is.error && is.count > 0) {
+    const url = is.count === 1 ? is.items[0]?.url || `${home}/issues` : `${home}/issues`;
+    out.push({ kind: "quiet", text: t?.issues === "new" ? `${is.count} new ${plural(is.count, "issue")}` : `${is.count} assigned`, url });
+  }
+  // Array.prototype.sort is stable: inside a kind, checks then workflows in the chosen order, then PRs, then issues.
+  return out.sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+}
+
+/** A repo's worst state, its dot: red, the accent (running or needs you), green, or nothing to say. */
+export type GitHubWorst = "red" | "accent" | "ok" | "none";
+
+export function worstOf(pills: readonly GitHubPill[]): GitHubWorst {
+  const k = pills[0]?.kind;
+  return k === "red" ? "red" : k === "run" || k === "you" ? "accent" : k === "ok" ? "ok" : "none";
+}
+
+/** The newest event a repo's cell knows of: a run, a check, a PR update, an issue opened. */
+export function latestAt(r: GitHubBoardRepo): string | undefined {
+  const all = [
+    ...r.workflows.map((w) => w.at),
+    ...(r.checks ?? []).map((c) => c.at),
+    ...(r.prs?.items ?? []).map((p) => p.updated_at),
+    ...(r.issues?.items ?? []).map((i) => i.created_at),
+  ].filter((s): s is string => !!s && !Number.isNaN(Date.parse(s)));
+  return all.length ? all.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a)) : undefined;
+}
+
+/**
+ * The approximate width of a pill: 12px mono at 0.6em a character, 14px of
+ * padding, a 6px gap. ponytail: an estimate, not a measurement, so a cell
+ * decides its pills before paint and never re-lays them while up (§P.8);
+ * measure with a canvas if a font ever runs wider.
+ */
+export const PILL_CH_PX = 7.2;
+const PILL_PAD_PX = 14;
+const PILL_GAP_PX = 6;
+export const pillWidth = (text: string) => Math.ceil([...text].length * PILL_CH_PX) + PILL_PAD_PX;
+
+/**
+ * How many pills fit in `width`: the rest become one `+N` pill, which must
+ * fit too. All of them when they fit as they are.
+ */
+export function fitPills(pills: readonly GitHubPill[], width: number): { shown: GitHubPill[]; more: number } {
+  let used = 0;
+  for (let i = 0; i < pills.length; i++) {
+    used += (i ? PILL_GAP_PX : 0) + pillWidth(pills[i].text);
+    if (used > width) {
+      // Step back until the shown pills and the "+N" fit.
+      let n = i;
+      while (n > 0) {
+        const shown = pills.slice(0, n);
+        const w = shown.reduce((s, p, j) => s + (j ? PILL_GAP_PX : 0) + pillWidth(p.text), 0);
+        if (w + PILL_GAP_PX + pillWidth(`+${pills.length - n}`) <= width) break;
+        n--;
+      }
+      return { shown: pills.slice(0, n), more: pills.length - n };
+    }
+  }
+  return { shown: [...pills], more: 0 };
+}
+
+/**
+ * One tracked repo as the bar draws it: pills worst first, the dot, the
+ * age, the most urgent link. Quiet hours empty the pills (the slot greys,
+ * the page goes). No flash: the ticker adds it (`githubChip`).
+ */
+export function repoChip(
+  r: GitHubBoardRepo,
+  t: Pick<GitHubTrackedRepo, "prs" | "issues"> | undefined,
+  quiet = false,
+  now = Date.now(),
+): GitHubChipData {
+  const pills = quiet ? [] : pillsFor(r, t, now);
+  return {
+    id: `github-${r.repo}`,
+    repo: r.repo,
+    label: repoName(r.repo),
+    pills,
+    worst: worstOf(pills),
+    age: shortAge(latestAt(r), now),
+    url: pills[0]?.url ?? `https://github.com/${r.repo}`,
+    quiet,
+    available: r.available,
+  };
+}
+
+// ── Flash (308's rule) ─────────────────────────────────────────
+
 /** What a repo's flash remembers: the last verdict and the token. */
 export interface FlashMemo {
-  broken: boolean;
+  worst: GitHubWorst;
   needs: number;
   /** Counts worthy changes; 0 until the first. */
   token: number;
@@ -425,65 +288,42 @@ export interface FlashMemo {
 }
 
 /**
- * One flash per worthy change: the default branch broke or recovered, or
- * more PRs need you. A poll that changed nothing (or only lowered the
- * count) keeps the token. The first sighting never flashes.
+ * One flash per worthy change: the repo's worst state changed, or more PRs
+ * need you. A poll that changed nothing (or only lowered the count) keeps
+ * the token. The first sighting never flashes.
  */
-export function nextFlash(
-  prev: FlashMemo | undefined,
-  broken: boolean,
-  needs: number,
-): FlashMemo {
-  if (!prev) return { broken, needs, token: 0, tone: "up" };
-  if (broken !== prev.broken || needs > prev.needs) {
-    return { broken, needs, token: prev.token + 1, tone: broken ? "down" : "up" };
+export function nextFlash(prev: FlashMemo | undefined, worst: GitHubWorst, needs: number): FlashMemo {
+  if (!prev) return { worst, needs, token: 0, tone: "up" };
+  if (worst !== prev.worst || needs > prev.needs) {
+    return { worst, needs, token: prev.token + 1, tone: worst === "red" ? "down" : "up" };
   }
-  return { ...prev, broken, needs };
+  return { ...prev, worst, needs };
 }
 
 // ── Your repos picker (SCROLLR-307) ────────────────────────────
 
-type RepoRef = { owner: string; repo: string };
-
-/** Core's GET /github/runs answers at most this many repos (maxRepos). */
-const MAX_AUTO_PICK = 20;
-
-function refOf(fullName: string): RepoRef {
-  const [owner, repo] = fullName.split("/");
-  return { owner, repo };
-}
+/** Core's /github/board answers at most this many repos (maxRepos). */
+export const MAX_REPOS = 20;
 
 /**
- * The configured list with one of the user's repos ticked or unticked —
- * the same list the URL box writes. Matched case-insensitively, since a
- * pasted URL may not match GitHub's casing.
- */
-export function toggleRepo(config: RepoRef[], fullName: string, on: boolean): RepoRef[] {
-  const key = fullName.toLowerCase();
-  const has = config.some((r) => repoKey(r).toLowerCase() === key);
-  if (on === has) return config;
-  if (!on) return config.filter((r) => repoKey(r).toLowerCase() !== key);
-  return [...config, refOf(fullName)];
-}
-
-/**
- * The first-load rule: with nothing configured, start from the repos with
+ * The first-load rule: with nothing tracked, start from the repos with
  * recent Actions activity. Never adds to an existing list (null = leave it).
  */
-export function autoPick(config: RepoRef[], rows: GitHubRepoRow[]): RepoRef[] | null {
-  if (config.length > 0) return null;
-  const active = rows.filter((r) => r.active).slice(0, MAX_AUTO_PICK);
-  return active.length > 0 ? active.map((r) => refOf(r.full_name)) : null;
+export function autoPick(tracked: GitHubTrackedRepo[], rows: GitHubRepoRow[]): GitHubTrackedRepo[] | null {
+  if (tracked.length > 0) return null;
+  const active = rows.filter((r) => r.active).slice(0, MAX_REPOS);
+  return active.length > 0 ? active.map((r) => newRepo(r.full_name)) : null;
 }
 
-// ── Store persistence ──────────────────────────────────────────
+// ── Store persistence (the ticker windows read it) ─────────────
 
-export function loadRepoData(): GitHubRepo[] {
-  return getStore<GitHubRepo[]>(LS_GITHUB_REPOS, []);
+export function loadBoard(): GitHubBoardRepo[] {
+  const v = getStore<unknown>(LS_GITHUB_BOARD, []);
+  return Array.isArray(v) ? v.filter((r): r is GitHubBoardRepo => !!r && typeof r.repo === "string" && Array.isArray(r.workflows)) : [];
 }
 
 /** Writes only when something changed, so followers do not re-render. */
-export function saveRepoData(repos: GitHubRepo[]): void {
-  if (JSON.stringify(repos) === JSON.stringify(loadRepoData())) return;
-  setStore(LS_GITHUB_REPOS, repos);
+export function saveBoard(repos: GitHubBoardRepo[]): void {
+  if (JSON.stringify(repos) === JSON.stringify(loadBoard())) return;
+  setStore(LS_GITHUB_BOARD, repos);
 }

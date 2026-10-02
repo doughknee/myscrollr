@@ -122,13 +122,17 @@ const store = new Map<string, unknown>([
         scrollMode: params.get("mode") === "continuous" ? "continuous" : "pages",
         pageControls: params.get("keypad") !== "0",
       },
-      widgets: { enabledWidgets: utils, widgetsOnTicker: utils, github: { repos: [], bar: {} }, pins: [] },
+      widgets: { enabledWidgets: utils, widgetsOnTicker: utils, github: { repos: [] }, pins: [] },
     },
   ],
 ]);
-// The GitHub page's sample repos (the public feed has no GitHub data).
+// The GitHub page's sample repos and the config that tracks them (the public feed has no GitHub data, SCROLLR-312).
 const seeded = utils.includes("github")
-  ? fixture("github.prs").then((j) => void store.set("scrollr:widget:github:repos", j?.repos ?? []))
+  ? fixture("github.board").then((j) => {
+      store.set("scrollr:widget:github:board", j?.repos ?? []);
+      const s = store.get("scrollr:settings") as { widgets: { github: { repos: unknown } } };
+      s.widgets.github.repos = j?.config ?? [];
+    })
   : Promise.resolve();
 
 // ── Tauri stand-in ─────────────────────────────────────────────────

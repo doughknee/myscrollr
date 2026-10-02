@@ -5,9 +5,9 @@
  * extension/widgets/types, and myscrollr.com/src/datawidgets/types.
  * The desktop is a standalone codebase — no cross-project imports.
  */
-import type { DataWidgetRow, GitHubDefaultCI, GitHubPRRow } from "../api/client";
+import type { DataWidgetRow } from "../api/client";
 import type { SportsMeta } from "../api/queries";
-import type { GitHubPagePR } from "../widgets/github/types";
+import type { GitHubPill, GitHubWorst } from "../widgets/github/types";
 
 // ── Finance ──────────────────────────────────────────────────────
 
@@ -359,40 +359,27 @@ export interface UptimeChipData {
   responseAvg?: string;
 }
 
+/** One tracked repo on the bar (SCROLLR-312): a page cell, an edge slot item, a rail chip. */
 export interface GitHubChipData {
+  /** `github-owner/name`. */
   id: string;
+  /** "owner/name". */
+  repo: string;
+  /** The repo's name. */
   label: string;
-  status: "success" | "failure" | "in_progress" | "unavailable";
-  workflowName: string;
-  detail?: string;
-  /** Branch the run is on. Rendered in the widget accent at 80%. */
-  branch?: string;
-  /**
-   * Right-hand value: duration for a finished or running job, "queued"
-   * when it hasn't started. The design gives failures the failed STEP
-   * name here instead — that's the thing you'd otherwise open GitHub to
-   * find — which needs the workflow-run jobs payload we don't fetch
-   * yet, so `failedStep` stays optional and the duration is the
-   * fallback.
-   */
-  elapsed?: string;
-  /** Name of the step that failed, when known. */
-  failedStep?: string;
-  // ── Connected GitHub (SCROLLR-308); all absent when not connected ──
-  /** Needs you › broken › running on yours › passing (`chipState`). */
-  state?: "needs" | "broken" | "running" | "passing" | "quiet";
-  /** PRs that need you, each once (`needsYou`). */
-  needs?: number;
-  /** The age the state shows ("12m"): since the default-branch run, or your run started. */
-  age?: string;
-  defaultCi?: GitHubDefaultCI;
-  mineRunning?: number;
-  mineBranch?: string;
-  /** Open PRs. */
-  prs?: GitHubPRRow[];
-  /** This repo's PRs on the GitHub page, in its order, as the bar prefs and quiet hours allow (`pagePRs`, SCROLLR-309). */
-  page?: GitHubPagePR[];
-  /** Counts worthy changes (`nextFlash`); 0 until the first. */
+  /** Worst first (`pillsFor`); none in quiet hours. */
+  pills: GitHubPill[];
+  /** The dot: the first pill's kind (`worstOf`); `none` in quiet hours. */
+  worst: GitHubWorst;
+  /** Age of the newest event the cell knows of ("12m"). */
+  age: string;
+  /** The most urgent pill's link, else the repo. */
+  url: string;
+  /** Quiet hours: the slot greys, nothing flashes, the page goes. */
+  quiet: boolean;
+  /** GitHub would not say (no access, gone, never ran). */
+  available: boolean;
+  /** Counts worthy changes (`nextFlash`); 0 until the first. Absent with the flash off. */
   flash?: number;
   flashTone?: "up" | "down";
 }

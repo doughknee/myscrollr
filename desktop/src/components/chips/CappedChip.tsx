@@ -17,7 +17,6 @@ import { getChipColors, chipBaseClasses } from "./chipColors";
 import { ChipCap, cappedChipClasses } from "./ChipCap";
 import type { CapTone } from "./ChipCap";
 import { OnceFlash } from "./ChipFlash";
-import { needsYou } from "../../widgets/github/types";
 import type { GitHubChipData, UptimeChipData } from "../../types";
 
 // ── Status → cap ────────────────────────────────────────────────
@@ -33,34 +32,6 @@ const UPTIME_CAP: Record<
   pending: { tone: "warning", text: "···", label: "Pending" },
 };
 
-const GITHUB_CAP: Record<
-  GitHubChipData["status"],
-  { tone: CapTone; text: string; label: string; pulse?: boolean }
-> = {
-  success: { tone: "up", text: "✓", label: "Success" },
-  failure: { tone: "down", text: "✗", label: "Failure" },
-  in_progress: {
-    tone: "warning",
-    text: "●",
-    label: "In progress",
-    pulse: true,
-  },
-  // Queued isn't a problem, it's an absence — the whole chip dims.
-  unavailable: { tone: "neutral", text: "○", label: "Queued" },
-};
-
-// Connected GitHub (SCROLLR-308): the same four states as the edge slot.
-// Needs you leads with the count; nothing ever says "passing".
-const GITHUB_STATE_CAP: Record<
-  NonNullable<GitHubChipData["state"]>,
-  { tone: CapTone; text: string; label: string; pulse?: boolean }
-> = {
-  needs: { tone: "info", text: "", label: "Needs you" },
-  broken: { tone: "down", text: "✗", label: "Default branch failing" },
-  running: { tone: "warning", text: "●", label: "Running on yours", pulse: true },
-  passing: { tone: "up", text: "✓", label: "Default branch green" },
-  quiet: { tone: "neutral", text: "○", label: "Quiet" },
-};
 
 // ── Shared shell ────────────────────────────────────────────────
 
@@ -225,8 +196,24 @@ export function UptimeCappedChip({
   );
 }
 
-// ── GitHub ──────────────────────────────────────────────────────
+// ── GitHub (SCROLLR-312) ────────────────────────────────────────
 
+/** The repo's worst state on the cap: red, the accent's question, green, nothing to say. */
+const GITHUB_CAP: Record<
+  GitHubChipData["worst"],
+  { tone: CapTone; text: string; label: string; pulse?: boolean }
+> = {
+  red: { tone: "down", text: "✗", label: "Failing", pulse: true },
+  accent: { tone: "info", text: "●", label: "Needs a look" },
+  ok: { tone: "up", text: "✓", label: "Green" },
+  none: { tone: "neutral", text: "○", label: "Quiet" },
+};
+
+/**
+ * One tracked repo on the rail: its worst state on the cap, the name and
+ * its most urgent pill, the rest of its pills beneath, the age in the fixed
+ * cell (the same pills as the page cell and the edge slot).
+ */
 export function GitHubCappedChip({
   item,
   onClick,
@@ -235,112 +222,26 @@ export function GitHubCappedChip({
   onClick?: () => void;
 }) {
   const c = getChipColors("github");
-  if (item.state) return <GitHubStateChip item={item} onClick={onClick} />;
-  const cap = GITHUB_CAP[item.status] ?? GITHUB_CAP.unavailable;
-  const failed = item.status === "failure";
-  const queued = item.status === "unavailable";
-
-  // A failure's most useful value is WHERE it broke — that's the thing
-  // you'd otherwise open GitHub to find. Falls back to duration when
-  // the jobs payload hasn't given us a step name.
-  const value = failed
-    ? item.failedStep
-      ? `at ${item.failedStep}`
-      : (item.elapsed ?? "failed")
-    : (item.elapsed ?? "");
-
+  const red = item.worst === "red";
+  const [top, ...rest] = item.pills;
   return (
     <CapShell
-      cap={cap}
+      cap={GITHUB_CAP[item.worst]}
       type="github"
-      alert={failed}
-      dim={queued}
+      alert={red}
+      dim={item.worst === "none"}
       onClick={onClick}
-    >
-      <span className="flex items-baseline gap-1.5">
-        <span className={clsx("font-semibold", c.text)}>
-          {item.workflowName}
-        </span>
-        {item.branch && (
-          <span className="text-widget-github/80">{item.branch}</span>
-        )}
-        {value && (
-          <span
-            className={clsx(
-              "tabular-nums",
-              failed ? "font-semibold text-down" : c.textDim,
-            )}
-          >
-            {value}
-          </span>
-        )}
-      </span>
-      {item.detail && (
-        <span className={clsx("truncate text-ui-chip", c.textFaint)}>
-          {item.detail}
-        </span>
-      )}
-    </CapShell>
-  );
-}
-
-/** A connected repo: the state on the cap, its age in the fixed cell. */
-function GitHubStateChip({
-  item,
-  onClick,
-}: {
-  item: GitHubChipData;
-  onClick?: () => void;
-}) {
-  const state = item.state!;
-  const c = getChipColors("github");
-  const base = GITHUB_STATE_CAP[state];
-  const cap =
-    state === "needs"
-      ? { ...base, text: (item.needs ?? 0) > 99 ? "99+" : String(item.needs ?? 0) }
-      : base;
-  const broken = state === "broken";
-  const ci = item.defaultCi;
-  const top =
-    state === "needs"
-      ? "for you"
-      : state === "running"
-        ? "yours"
-        : (ci?.workflow ?? item.workflowName);
-  const detail =
-    state === "needs"
-      ? (item.page ?? needsYou(item.prs))[0]?.title
-      : state === "running"
-        ? item.mineBranch
-        : ci?.commit_message?.split("\n")[0];
-  return (
-    <CapShell
-      cap={cap}
-      type="github"
-      alert={broken}
-      onClick={onClick}
-      end={
-        state === "needs" ? undefined : (
-          <span className={broken ? "text-down" : c.textDim}>{item.age}</span>
-        )
-      }
-      flash={
-        item.flash !== undefined ? (
-          <OnceFlash id={item.id} token={item.flash} tone={item.flashTone} />
-        ) : undefined
-      }
+      end={<span className={red ? "text-down" : c.textDim}>{item.age}</span>}
+      flash={item.flash !== undefined ? <OnceFlash id={item.id} token={item.flash} tone={item.flashTone} /> : undefined}
     >
       <span className="flex items-baseline gap-1.5">
         <span className={clsx("font-semibold", c.text)}>{item.label}</span>
-        <span className={broken ? "font-semibold text-down" : c.textDim}>
-          {top}
-        </span>
+        {top && <span className={red ? "font-semibold text-down" : c.textDim}>{top.text}</span>}
       </span>
-      {detail && (
-        <span className={clsx("truncate text-ui-chip", c.textFaint)}>
-          {detail}
-        </span>
+      {rest.length > 0 && (
+        <span className={clsx("truncate text-ui-chip", c.textFaint)}>{rest.map((p) => p.text).join(" · ")}</span>
       )}
     </CapShell>
   );
 }
+

@@ -1,499 +1,466 @@
 /**
- * GitHub Actions widget FeedTab.
+ * The GitHub widget's page (SCROLLR-312, canvas board T3): two panes.
  *
- * Tracks CI/Actions workflow run status for user-configured GitHub repos.
- * Repos are added via URL input, or, once connected, ticked in the Your
- * repos picker (SCROLLR-307). Connecting GitHub (the Scrollr Desktop GitHub
- * App, brokered by core) adds private repos and the user's own rate limit
- * (SCROLLR-304). Data is cached in the Tauri store
- * for cross-window ticker sync.
+ * Left: the account, the repos on your bar, "+ Add a repo" (the picker of
+ * SCROLLR-307 as a popover, or a URL for any public repo) and the one rule
+ * of the bar. Right: the selected repo, a live preview of its bar cell, and
+ * what it watches: workflows, pull requests, issues.
+ *
+ * Not connected: only the Connect state (SCROLLR-304). Core holds the token;
+ * this page only reads and writes the widget's config.
  */
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { clsx } from "clsx";
-import { Github, Plus, X, ExternalLink, Lock } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { Github, Lock, MoreHorizontal, Plus, X } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
-import Tooltip from "../../components/Tooltip";
-import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
-import QueryErrorBanner from "../../components/QueryErrorBanner";
+import OverflowMenu from "../../components/OverflowMenu";
 import LoadingGlyph from "../../components/LoadingGlyph";
-import { controlTransition, tooltipMotion } from "../../lib/motion";
-import type { GitHubBarPrefs, GitHubRepo } from "./types";
-import {
-  parseRepoUrl,
-  repoKey,
-  fetchRepos,
-  loadRepoData,
-  saveRepoData,
-  toggleRepo,
-  autoPick,
-  barPrefs,
-  CI_STATUS_LABELS,
-  CI_STATUS_COLORS,
-  CI_STATUS_TEXT,
-} from "./types";
+import RepoCell from "../../components/pages/cells/RepoCell";
+import { accentFor, accentStyle, inkFor } from "../../components/pages/cells/parts";
 import { useShell } from "../../shell-context";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
-import { useSyncedQuery } from "../../hooks/useSyncedQuery";
-import { LS_GITHUB_REPOS } from "../../constants";
 import { githubApi } from "../../api/client";
+import type { GitHubBoardRepo, GitHubRepoRow, GitHubWorkflowRow } from "../../api/client";
 import { relativeTime } from "../../utils/format";
-import type { GitHubRepoRow } from "../../api/client";
+import { autoPick, githubBoardQuery, loadBoard, parseRepoUrl, pillsFor, repoChip, repoName, sameRepo, worstOf, MAX_REPOS } from "./types";
+import { newRepo } from "./config";
+import type { GitHubIssueMode, GitHubPRMode, GitHubTrackedRepo, GitHubWidgetConfig } from "./config";
 
 // ── Widget manifest ─────────────────────────────────────────────
+
+const HEX = "#f97316";
 
 export const githubWidget: WidgetManifest = {
   id: "github",
   name: "GitHub",
   tabLabel: "GitHub",
   description: "CI and pull requests that need you, from your GitHub",
-  hex: "#f97316",
+  hex: HEX,
   icon: Github,
   info: {
     about:
-      "The GitHub widget tracks the latest workflow run status for " +
-      "your GitHub repositories. Connect GitHub to include private ones.",
+      "The GitHub widget puts each repo you track on the bar as one cell, " +
+      "showing what you chose for it: workflows, pull requests, issues.",
     usage: [
-      "Connect GitHub and tick your repos under Your repos; the ones with recent Actions runs start ticked.",
-      "Paste a GitHub repo URL to add any other public repo (e.g. https://github.com/org/repo).",
-      "Disconnect GitHub any time.",
-      "Each repo shows its latest GitHub Actions workflow run status.",
-      "Click a repo row to open the workflow run on GitHub.",
+      "Connect GitHub, then add repos with + Add a repo; the ones with recent Actions runs start on the bar.",
+      "Pick a repo to choose its workflows, its pull requests (off, the ones that need you, all open) and its issues.",
+      "One or two repos share one rotating slot on the bar's edge; three or more get a page, one cell each.",
+      "Quiet hours and the flash are in the ⋯ menu.",
     ],
   },
   FeedTab: GitHubFeedTab,
 };
 
+/** The app's install page: choose which repos it may see, and approve new permissions. */
+const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
+
+const openExternal = (url: string) => void invoke("open_external", { url }).catch(() => {});
+
+const PR_OPTIONS: Array<[GitHubPRMode, string]> = [
+  ["off", "Off"],
+  ["mine", "Only ones that need me"],
+  ["all", "All open"],
+];
+const ISSUE_OPTIONS: Array<[GitHubIssueMode, string]> = [
+  ["off", "Off"],
+  ["assigned", "Assigned to me"],
+  ["new", "Every new issue"],
+];
+
+const isDark = () => !document.documentElement.getAttribute("data-theme")?.endsWith("-light");
+
 // ── FeedTab ─────────────────────────────────────────────────────
 
-/** Seconds between GitHub fetches. Not a user setting (REL-206). */
-const POLL_INTERVAL = 120;
-
-const REMOVE_MOTION = {
-  hidden: {
-    opacity: 0,
-    transform: "scale(0.9)",
-    pointerEvents: "none" as const,
-  },
-  visible: {
-    opacity: 1,
-    transform: "scale(1)",
-    pointerEvents: "auto" as const,
-  },
-};
-
-function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
-  const compact = feedMode === "compact";
+function GitHubFeedTab(_props: FeedTabProps) {
   const shell = useShell();
-  const configRepos = shell.prefs.widgets.github.repos;
+  const cfg = shell.prefs.widgets.github;
 
-  const [inputUrl, setInputUrl] = useState("");
-  const [inputError, setInputError] = useState<string | null>(null);
-
-  // Auto-refresh + cross-window sync via useSyncedQuery
-  const {
-    data: repoData,
-    error,
-    isFetching,
-    refetch,
-  } = useSyncedQuery<GitHubRepo>({
-    storeKey: LS_GITHUB_REPOS,
-    loadFn: loadRepoData,
-    saveFn: saveRepoData,
-    queryKey: ["github-actions", shell.authenticated, configRepos.map(repoKey)],
-    queryFn: () => fetchRepos(configRepos),
-    enabled: configRepos.length > 0,
-    pollInterval: POLL_INTERVAL,
-    retry: 1,
-  });
-
-  // ── Write the configured repos (URL box, Remove and the picker) ──
-
-  const setRepos = useCallback(
-    (nextRepos: Array<{ owner: string; repo: string }>) => {
-      const next = updateWidgetPrefs(shell.prefs, "github", { repos: nextRepos });
+  const write = useCallback(
+    (patch: Partial<GitHubWidgetConfig>) => {
+      const next = updateWidgetPrefs(shell.prefs, "github", patch);
       shell.onPrefsChange(next);
       savePrefs(next);
-
-      // Drop removed repos from the cached data the ticker reads.
-      const keep = new Set(nextRepos.map(repoKey));
-      if (repoData.some((r) => !keep.has(repoKey(r)))) {
-        saveRepoData(repoData.filter((r) => keep.has(repoKey(r))));
-      }
     },
-    [repoData, shell],
+    [shell],
   );
-
-  // ── Your repos (SCROLLR-307) ──────────────────────────────────
+  const setRepos = useCallback((repos: GitHubTrackedRepo[]) => write({ repos }), [write]);
 
   const { data: status } = useQuery({
     queryKey: ["github-status"],
     queryFn: githubApi.status,
     enabled: shell.authenticated,
   });
+  const connected = !!status?.connected;
   const { data: yours, refetch: refetchYours } = useQuery({
     queryKey: ["github-repos"],
     queryFn: githubApi.repos,
-    enabled: shell.authenticated && !!status?.connected,
+    enabled: shell.authenticated && connected,
     retry: false,
   });
 
-  // Back from "Choose repos on GitHub" (SCROLLR-309): the window regaining
-  // focus re-reads the list (core dropped its cached copy on the callback).
+  // Back from GitHub (repos chosen, permissions approved): the window
+  // regaining focus re-reads the list and the board.
+  const queryClient = useQueryClient();
   useEffect(() => {
-    if (!status?.connected) return;
-    const onFocus = () => void refetchYours();
+    if (!connected) return;
+    const onFocus = () => {
+      void refetchYours();
+      void queryClient.invalidateQueries({ queryKey: ["github-board"] });
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [status?.connected, refetchYours]);
+  }, [connected, refetchYours, queryClient]);
 
-  // ── What goes on the bar (SCROLLR-309) ────────────────────────
-  const bar = barPrefs(shell.prefs.widgets.github.bar);
-  const setBar = useCallback(
-    (patch: Partial<GitHubBarPrefs>) => {
-      const next = updateWidgetPrefs(shell.prefs, "github", { bar: { ...barPrefs(shell.prefs.widgets.github.bar), ...patch } });
-      shell.onPrefsChange(next);
-      savePrefs(next);
-    },
-    [shell],
-  );
-
-  // First load only, and only into an empty list. The ref lives here, not
-  // in the picker, so unticking the last repo does not re-tick the rest.
+  // First load only, and only into an empty list. The ref lives here, so
+  // removing the last repo does not bring the rest back.
   const autoPicked = useRef(false);
   useEffect(() => {
     if (autoPicked.current || !yours) return;
     autoPicked.current = true;
-    const picked = autoPick(configRepos, yours.repos);
+    const picked = autoPick(cfg.repos, yours.repos);
     if (picked) setRepos(picked);
-  }, [yours, configRepos, setRepos]);
+  }, [yours, cfg.repos, setRepos]);
 
-  const picker =
-    status?.connected && yours ? (
-      <>
-        <YourRepos rows={yours.repos} configRepos={configRepos} onChange={setRepos} />
-        <OnTheBar bar={bar} onChange={setBar} />
-      </>
-    ) : null;
+  const { data: board } = useQuery({
+    ...githubBoardQuery(cfg.repos, shell.authenticated),
+    enabled: connected && cfg.repos.length > 0,
+  });
+  const boardRows = board ?? loadBoard();
 
-  // ── Add repo handler ──────────────────────────────────────────
-
-  const handleAddRepo = useCallback(() => {
-    const parsed = parseRepoUrl(inputUrl);
-    if (!parsed) {
-      setInputError("Invalid GitHub URL. Expected: https://github.com/owner/repo");
-      return;
-    }
-
-    // Check for duplicates
-    const key = repoKey(parsed);
-    if (configRepos.some((r) => repoKey(r) === key)) {
-      setInputError("This repo is already added.");
-      return;
-    }
-
-    setRepos([...configRepos, parsed]);
-    setInputUrl("");
-    setInputError(null);
-  }, [inputUrl, configRepos, setRepos]);
-
-  // ── Remove repo handler ───────────────────────────────────────
-
-  const removeRepo = useCallback(
-    (owner: string, repo: string) => {
-      const key = repoKey({ owner, repo });
-      setRepos(configRepos.filter((r) => repoKey(r) !== key));
-    },
-    [configRepos, setRepos],
-  );
-
-  // ── Empty state ───────────────────────────────────────────────
-
-  if (configRepos.length === 0) {
+  if (!shell.authenticated) {
     return (
-      <div className="p-4 flex flex-col items-center justify-center gap-3">
+      <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
         <Github size={24} className="text-widget-github/60" />
-        <span className="text-xs font-mono text-fg-2 text-center">
-          Add a GitHub repo to track CI status
-        </span>
-
-        <div className="w-full max-w-sm">
-          <GitHubAccount />
-        </div>
-
-        {picker && <div className="w-full max-w-sm">{picker}</div>}
-
-        <div className="w-full max-w-sm space-y-2">
-          <input
-            type="url"
-            value={inputUrl}
-            onChange={(e) => { setInputUrl(e.target.value); setInputError(null); }}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAddRepo(); }}
-            placeholder="https://github.com/owner/repo"
-            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none "
-          />
-          <button
-            onClick={handleAddRepo}
-            disabled={!inputUrl.trim()}
-            className="w-full text-xs font-mono font-semibold text-widget-github px-3 py-2 rounded-lg bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15  disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <Plus size={12} />
-            Add Repo
-          </button>
-        </div>
-
-        {inputError && (
-          <p className="text-[11px] font-mono text-error text-center max-w-sm">
-            {inputError}
-          </p>
-        )}
+        <p className="text-xs text-fg-2">Sign in to Scrollr, then connect GitHub to put your repos on the bar.</p>
       </div>
     );
   }
+  if (!status) {
+    return (
+      <div className="flex justify-center p-6">
+        <LoadingGlyph size={14} className="text-fg-3" />
+      </div>
+    );
+  }
+  if (!connected) {
+    return (
+      <div className="mx-auto flex max-w-sm flex-col items-center gap-3 p-6">
+        <Github size={24} className="text-widget-github/60" />
+        <GitHubAccount />
+      </div>
+    );
+  }
+  return (
+    <TwoPanes
+      cfg={cfg}
+      login={status.login ?? ""}
+      board={boardRows}
+      yours={yours?.repos}
+      write={write}
+    />
+  );
+}
 
-  // ── Connected state ───────────────────────────────────────────
+// ── The two panes ───────────────────────────────────────────────
 
-  const passCount = repoData.filter((r) => r.status === "success").length;
-  const failCount = repoData.filter((r) => r.status === "failure").length;
+function TwoPanes({
+  cfg,
+  login,
+  board,
+  yours,
+  write,
+}: {
+  cfg: GitHubWidgetConfig;
+  login: string;
+  board: GitHubBoardRepo[];
+  yours: GitHubRepoRow[] | undefined;
+  write: (patch: Partial<GitHubWidgetConfig>) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [quietOpen, setQuietOpen] = useState(false);
+
+  const sel = cfg.repos.find((r) => selected && sameRepo(r.repo, selected)) ?? cfg.repos[0];
+  const rowOf = (repo: string) => board.find((b) => sameRepo(b.repo, repo));
+
+  const setRepos = (repos: GitHubTrackedRepo[]) => write({ repos });
+  const updateRepo = (repo: string, patch: Partial<GitHubTrackedRepo>) =>
+    setRepos(cfg.repos.map((r) => (sameRepo(r.repo, repo) ? { ...r, ...patch } : r)));
+  const addRepo = (repo: string) => {
+    if (cfg.repos.some((r) => sameRepo(r.repo, repo))) return;
+    setRepos([...cfg.repos, newRepo(repo)]);
+    setSelected(repo);
+  };
+  const removeRepo = (repo: string) => {
+    setRepos(cfg.repos.filter((r) => !sameRepo(r.repo, repo)));
+    setSelected(null);
+  };
+
+  const disconnect = async () => {
+    try {
+      await githubApi.disconnect();
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: ["github-status"] });
+      await queryClient.invalidateQueries({ queryKey: ["github-board"] });
+    }
+  };
+
+  const addPublic = () => {
+    const name = parseRepoUrl(publicUrl ?? "");
+    if (!name) return setUrlError("Expected https://github.com/owner/repo");
+    if (cfg.repos.some((r) => sameRepo(r.repo, name))) return setUrlError("That repo is already on your bar.");
+    addRepo(name);
+    setPublicUrl(null);
+    setUrlError(null);
+  };
 
   return (
-    <div className="p-3 space-y-2">
-      {/* Header */}
-      <div className="flex items-center justify-between px-1 mb-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-semibold text-widget-github/80 uppercase tracking-wider">
-            GitHub
+    <div className="grid min-h-[480px] grid-cols-[240px_minmax(0,1fr)]" data-section="github-panes">
+      {/* ── Left: account, the repos on the bar, add ── */}
+      <div className="flex min-h-0 flex-col gap-1.5 border-r border-edge p-3.5">
+        <div className="flex items-center gap-2 px-1.5 pb-2">
+          <span className="text-[17px] font-extrabold text-fg">GitHub</span>
+          <span className="truncate font-mono text-[11.5px] text-fg-3">@{login}</span>
+          <span className="ml-auto">
+            <OverflowMenu
+              triggerLabel="GitHub options"
+              trigger={
+                <button type="button" aria-label="GitHub options" className="flex size-7 items-center justify-center rounded-md text-fg-3 hover:bg-surface-hover hover:text-fg">
+                  <MoreHorizontal size={15} />
+                </button>
+              }
+              items={[
+                { key: "quiet", label: "Quiet hours…", hint: cfg.quietHours.on ? `${cfg.quietHours.from} to ${cfg.quietHours.to}` : "Off", onSelect: () => setQuietOpen((v) => !v) },
+                { key: "flash", label: "Flash on change", hint: cfg.flash ? "On" : "Off", onSelect: () => write({ flash: !cfg.flash }) },
+                { key: "public", label: "Track a public repo…", onSelect: () => setPublicUrl("") },
+                { key: "choose", label: "Choose repos on GitHub ↗", onSelect: () => openExternal(INSTALL_URL) },
+                { key: "d", divider: true },
+                { key: "disconnect", label: "Disconnect", destructive: true, onSelect: () => void disconnect() },
+              ]}
+            />
           </span>
-          <span className="text-[10px] font-mono text-fg-4">
-            {configRepos.length} repo{configRepos.length !== 1 ? "s" : ""}
-          </span>
+        </div>
+
+        {quietOpen && <QuietHours cfg={cfg} write={write} />}
+
+        <span className="px-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-3">On your bar</span>
+        <div className="flex flex-col gap-0.5" role="list" aria-label="On your bar">
+          {cfg.repos.map((t) => {
+            const row = rowOf(t.repo);
+            const pills = row ? pillsFor(row, t) : [];
+            const worst = worstOf(pills);
+            return (
+              <button
+                key={t.repo}
+                type="button"
+                role="listitem"
+                onClick={() => setSelected(t.repo)}
+                aria-current={sel && sameRepo(sel.repo, t.repo) ? "true" : undefined}
+                className={clsx(
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left",
+                  sel && sameRepo(sel.repo, t.repo) ? "bg-surface-3 text-fg" : "text-fg-2 hover:bg-surface-2",
+                )}
+              >
+                <span
+                  className={clsx(
+                    "size-2 shrink-0 rounded-full",
+                    worst === "red" ? "bg-down" : worst === "accent" ? "bg-widget-github" : worst === "ok" ? "bg-up" : "bg-fg-4",
+                  )}
+                />
+                <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{repoName(t.repo)}</span>
+                <span className="font-mono text-[11px] text-fg-3">{pills.length || ""}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="mt-1 flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] text-fg-3 hover:text-fg"
+            aria-expanded={adding}
+          >
+            <Plus size={12} /> Add a repo
+          </button>
+          {adding && (
+            <RepoPicker
+              rows={yours}
+              tracked={cfg.repos}
+              onToggle={(name, on) => (on ? addRepo(name) : removeRepo(name))}
+              onClose={() => setAdding(false)}
+              onPublic={() => {
+                setAdding(false);
+                setPublicUrl("");
+              }}
+            />
+          )}
+        </div>
+
+        {publicUrl !== null && (
+          <div className="flex flex-col gap-1 px-1.5">
+            <div className="flex gap-1.5">
+              <input
+                type="url"
+                autoFocus
+                aria-label="Public repo URL"
+                value={publicUrl}
+                onChange={(e) => {
+                  setPublicUrl(e.target.value);
+                  setUrlError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addPublic();
+                  if (e.key === "Escape") setPublicUrl(null);
+                }}
+                placeholder="https://github.com/owner/repo"
+                className="min-w-0 flex-1 rounded-md border border-edge bg-surface-2 px-2 py-1.5 font-mono text-[11px] text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={addPublic}
+                disabled={!publicUrl.trim()}
+                className="rounded-md border border-widget-github/25 bg-widget-github/10 px-2.5 text-[11px] font-semibold text-widget-github disabled:opacity-40"
+              >
+                Add
+              </button>
+            </div>
+            {urlError && <p className="text-[11px] text-error">{urlError}</p>}
+          </div>
+        )}
+
+        <span className="mt-auto px-1.5 pt-4 text-[12px] leading-relaxed text-fg-3">
+          1–2 repos ride the edge in one rotating slot. 3 or more get a page, one cell each.
+        </span>
+      </div>
+
+      {/* ── Right: the selected repo ── */}
+      {sel ? (
+        <RepoPane
+          key={sel.repo}
+          t={sel}
+          row={rowOf(sel.repo)}
+          onChange={(patch) => updateRepo(sel.repo, patch)}
+          onRemove={() => removeRepo(sel.repo)}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
+          <Github size={22} className="text-widget-github/60" />
+          <p className="text-[13px] text-fg-2">Nothing on your bar yet.</p>
+          <button type="button" onClick={() => setAdding(true)} className="text-[12.5px] font-semibold text-widget-github hover:underline">
+            + Add a repo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── The selected repo ───────────────────────────────────────────
+
+function RepoPane({
+  t,
+  row,
+  onChange,
+  onRemove,
+}: {
+  t: GitHubTrackedRepo;
+  row: GitHubBoardRepo | undefined;
+  onChange: (patch: Partial<GitHubTrackedRepo>) => void;
+  onRemove: () => void;
+}) {
+  const owner = t.repo.slice(0, t.repo.indexOf("/"));
+  const { data: wf, isPending } = useQuery({
+    queryKey: ["github-workflows", t.repo.toLowerCase()],
+    queryFn: () => githubApi.workflows(t.repo),
+    staleTime: 5 * 60_000,
+  });
+  const workflows: GitHubWorkflowRow[] = wf?.workflows ?? [];
+  // Absent: the ones that ran recently, as core resolves it.
+  const ticked = useMemo(
+    () => new Set(t.workflows ?? workflows.filter((w) => w.ran_recently).map((w) => w.name)),
+    [t.workflows, workflows],
+  );
+  const toggle = (name: string) => {
+    const next = new Set(ticked);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    // In the list's order; a name the list no longer has is dropped with it.
+    onChange({ workflows: workflows.map((w) => w.name).filter((n) => next.has(n)) });
+  };
+
+  const dark = isDark();
+  const chip = row ? repoChip(row, t, false) : null;
+  const permission = t.issues !== "off" && row?.issues?.error === "permission";
+
+  return (
+    <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-7 py-5" data-section="github-repo">
+      <div className="flex items-center gap-2.5">
+        <span className="truncate text-[20px] font-extrabold text-fg">{repoName(t.repo)}</span>
+        <span className="font-mono text-[12px] text-fg-3">{owner}</span>
+        <button type="button" onClick={onRemove} className="ml-auto flex items-center gap-1 px-2 py-1 text-[12.5px] text-fg-3 hover:text-down">
+          <X size={12} /> Remove from bar
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-3">On the bar it looks like</span>
+        <div
+          data-part="preview"
+          className="h-16 w-[420px] max-w-full overflow-hidden rounded-md border border-edge bg-base-150"
+          style={accentStyle(accentFor(HEX, dark), inkFor(HEX, dark))}
+        >
+          {chip ? (
+            <RepoCell chip={chip} width={420} dark={dark} onClick={() => openExternal(chip.url)} />
+          ) : (
+            <span className="flex h-full items-center gap-2 px-4 text-[12px] text-fg-3">
+              <LoadingGlyph size={10} /> Reading GitHub…
+            </span>
+          )}
         </div>
       </div>
 
-      <GitHubAccount />
-
-      {/* Status summary */}
-      <div className="flex items-center gap-3 px-1 text-[11px] font-mono text-fg-3">
-        {passCount > 0 && <span className="text-up">{passCount} passing</span>}
-        {failCount > 0 && <span className="text-down">{failCount} failing</span>}
-        {passCount === 0 && failCount === 0 && repoData.length > 0 && (
-          <span className="text-fg-4">checking...</span>
-        )}
-      </div>
-
-      {/* Error banner */}
-      <QueryErrorBanner
-        error={error}
-        message="Couldn't refresh repository status."
-        onRetry={() => void refetch()}
-        retrying={isFetching}
-      />
-
-      {picker}
-
-      {/* Add repo input */}
-      <div className="flex gap-1.5 px-1">
-        <input
-          type="url"
-          value={inputUrl}
-          onChange={(e) => { setInputUrl(e.target.value); setInputError(null); }}
-          onKeyDown={(e) => { if (e.key === "Enter") handleAddRepo(); }}
-          placeholder="Add another repo..."
-          className="flex-1 text-[11px] font-mono px-2.5 py-1.5 rounded-md bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none "
-        />
-        <Tooltip content="Add repo">
-          <button
-            onClick={handleAddRepo}
-            disabled={!inputUrl.trim()}
-            aria-label="Add repo"
-            className="text-[11px] font-mono font-semibold text-widget-github px-2.5 py-1.5 rounded-md bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15  disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Plus size={11} />
-          </button>
-        </Tooltip>
-      </div>
-      {inputError && (
-        <p className="text-[10px] font-mono text-error px-1">
-          {inputError}
-        </p>
-      )}
-
-      {/* Repo list */}
-      <div className={compact ? "space-y-1" : "space-y-1.5"}>
-        <AnimatePresence initial={false}>
-          {configRepos.map((configRepo) => {
-            const rd = repoData.find((r) => repoKey(r) === repoKey(configRepo));
-            return (
-              <motion.div
-                key={repoKey(configRepo)}
-                layout="position"
-                variants={tooltipMotion}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                transition={{ layout: controlTransition }}
+      <div className="grid grid-cols-2 gap-6">
+        <fieldset className="flex min-w-0 flex-col gap-0.5">
+          <legend className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-3">Workflows</legend>
+          {isPending && <span className="px-2.5 text-[12px] text-fg-3">Reading .github/workflows…</span>}
+          {!isPending && workflows.length === 0 && <span className="px-2.5 text-[12px] text-fg-3">No workflows in .github/workflows.</span>}
+          {workflows.map((w) => (
+            <label key={w.path || w.name} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] hover:bg-surface-2">
+              <input type="checkbox" checked={ticked.has(w.name)} onChange={() => toggle(w.name)} className="accent-widget-github" />
+              <span className="min-w-0 flex-1 truncate text-fg">{w.name}</span>
+              <span
+                className={clsx(
+                  "font-mono text-[11.5px]",
+                  w.last === "failing" ? "text-down" : w.last === "running" ? "text-widget-github" : "text-fg-3",
+                )}
               >
-                <RepoRow
-                  owner={configRepo.owner}
-                  repo={configRepo.repo}
-                  data={rd ?? null}
-                  compact={compact}
-                  onRemove={() => removeRepo(configRepo.owner, configRepo.repo)}
-                />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
+                {w.last === "none" ? (w.last_at ? "" : "no runs") : w.last}
+              </span>
+            </label>
+          ))}
+          <span className="px-2.5 pt-1.5 text-[12px] leading-relaxed text-fg-3">
+            Ticked ones show on the bar; a failure, a run or a change in what needs you can flash.
+          </span>
+        </fieldset>
 
-// ── YourRepos (SCROLLR-307) ─────────────────────────────────────
-
-function activityLabel(r: GitHubRepoRow, now: number): string {
-  if (r.last_run_at) return `last run ${relativeTime(r.last_run_at, now, { suffix: true })}`;
-  if (r.pushed_at) return `pushed ${relativeTime(r.pushed_at, now, { suffix: true })}`;
-  return "";
-}
-
-/**
- * The connected user's repos as checkboxes. Ticking writes the same list
- * the URL box writes. Active repos (and anything already ticked) show by
- * default; "Show all" reveals the rest.
- */
-function YourRepos({
-  rows,
-  configRepos,
-  onChange,
-}: {
-  rows: GitHubRepoRow[];
-  configRepos: Array<{ owner: string; repo: string }>;
-  onChange: (next: Array<{ owner: string; repo: string }>) => void;
-}) {
-  const [showAll, setShowAll] = useState(false);
-  const ticked = new Set(configRepos.map((r) => repoKey(r).toLowerCase()));
-  const isTicked = (r: GitHubRepoRow) => ticked.has(r.full_name.toLowerCase());
-  const hiddenCount = rows.filter((r) => !r.active && !isTicked(r)).length;
-  const visible = showAll ? rows : rows.filter((r) => r.active || isTicked(r));
-  const now = Date.now();
-
-  return (
-    <div className="px-1 space-y-1">
-      <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-fg-4">
-        Your repos
-      </div>
-      <div className="space-y-0.5">
-        {visible.map((r) => (
-          <label
-            key={r.full_name}
-            className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2 cursor-pointer"
-          >
-            <input
-              type="checkbox"
-              checked={isTicked(r)}
-              onChange={(e) => onChange(toggleRepo(configRepos, r.full_name, e.target.checked))}
-              className="shrink-0 accent-widget-github"
-            />
-            <span className="min-w-0 flex-1 truncate text-left text-[11px] font-mono text-fg">
-              {r.full_name}
-            </span>
-            {r.private && <Lock size={10} aria-label="Private" className="shrink-0 text-fg-4" />}
-            <span className="shrink-0 text-[10px] font-mono text-fg-4">{activityLabel(r, now)}</span>
-          </label>
-        ))}
-      </div>
-      {hiddenCount > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          className="text-[10px] font-mono text-widget-github hover:underline"
-        >
-          {showAll ? "Show active only" : `Show all (${hiddenCount} more)`}
-        </button>
-      )}
-      {/* The app sees only the repos it is installed on (SCROLLR-309). */}
-      <p className="text-[10px] font-mono text-fg-3">
-        Not seeing a repo?{" "}
-        <button
-          type="button"
-          onClick={() => void invoke("open_external", { url: INSTALL_URL }).catch(() => {})}
-          className="font-semibold text-widget-github hover:underline"
-        >
-          Choose repos on GitHub
-        </button>
-      </p>
-    </div>
-  );
-}
-
-/** The app's install page: choose which repos it may see (the window re-reads the list on focus). */
-const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
-
-const BAR_TOGGLES: Array<[keyof GitHubBarPrefs, string]> = [
-  ["failingCi", "Failing CI on main"],
-  ["reviews", "Review requests to me"],
-  ["changes", "Changes requested on my PRs"],
-  ["failingChecks", "My PRs with failing checks"],
-  ["pulse", "Runs on my branches (the pulse)"],
-  ["otherPRs", "My other open PRs on the page"],
-  ["flash", "Flash when something changes"],
-];
-
-/**
- * What goes on the bar (SCROLLR-309): the developer decides, quiet by
- * default. Lives in the widget, not Settings (and so not in the settings
- * search). Quiet hours silence the bar's chip and page between two local
- * times; this page still shows everything.
- */
-function OnTheBar({ bar, onChange }: { bar: GitHubBarPrefs; onChange: (patch: Partial<GitHubBarPrefs>) => void }) {
-  const row = "flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2 cursor-pointer";
-  return (
-    <div className="px-1 space-y-1" data-section="on-the-bar">
-      <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-fg-4">
-        What goes on the bar
-      </div>
-      <div className="space-y-0.5">
-        {BAR_TOGGLES.map(([key, label]) => (
-          <label key={key} className={row}>
-            <input
-              type="checkbox"
-              checked={bar[key] as boolean}
-              onChange={(e) => onChange({ [key]: e.target.checked })}
-              className="shrink-0 accent-widget-github"
-            />
-            <span className="min-w-0 flex-1 text-left text-[11px] font-mono text-fg">{label}</span>
-          </label>
-        ))}
-        <div className={clsx(row, "flex-wrap")}>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={bar.quiet}
-              onChange={(e) => onChange({ quiet: e.target.checked })}
-              className="shrink-0 accent-widget-github"
-            />
-            <span className="text-[11px] font-mono text-fg">Quiet hours</span>
-          </label>
-          {bar.quiet && (
-            <span className="flex items-center gap-1 text-[11px] font-mono text-fg-3">
-              <input
-                type="time"
-                aria-label="Quiet from"
-                value={bar.quietFrom}
-                onChange={(e) => e.target.value && onChange({ quietFrom: e.target.value })}
-                className="rounded bg-surface-2 border border-edge px-1 text-fg"
-              />
-              to
-              <input
-                type="time"
-                aria-label="Quiet until"
-                value={bar.quietTo}
-                onChange={(e) => e.target.value && onChange({ quietTo: e.target.value })}
-                className="rounded bg-surface-2 border border-edge px-1 text-fg"
-              />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Radios name={`prs-${t.repo}`} legend="Pull requests" options={PR_OPTIONS} value={t.prs} onChange={(prs) => onChange({ prs })} />
+          <div className="pt-3.5">
+            <Radios name={`issues-${t.repo}`} legend="Issues" options={ISSUE_OPTIONS} value={t.issues} onChange={(issues) => onChange({ issues })} />
+          </div>
+          {permission ? (
+            <button type="button" onClick={() => openExternal(INSTALL_URL)} className="self-start px-2.5 pt-1.5 text-[12.5px] font-semibold text-widget-github hover:underline">
+              Approve on GitHub ↗
+            </button>
+          ) : (
+            <span className="px-2.5 pt-1.5 text-[12px] leading-relaxed text-fg-3">
+              Issues needs one more GitHub permission; the first time you turn it on, GitHub asks you to approve it.
             </span>
           )}
         </div>
@@ -502,22 +469,151 @@ function OnTheBar({ bar, onChange }: { bar: GitHubBarPrefs; onChange: (patch: Pa
   );
 }
 
-// ── GitHubAccount ───────────────────────────────────────────────
+function Radios<T extends string>({
+  name,
+  legend,
+  options,
+  value,
+  onChange,
+}: {
+  name: string;
+  legend: string;
+  options: Array<[T, string]>;
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-0.5">
+      <legend className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-3">{legend}</legend>
+      {options.map(([v, label]) => (
+        <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-fg hover:bg-surface-2">
+          <input type="radio" name={name} checked={value === v} onChange={() => onChange(v)} className="accent-widget-github" />
+          {label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+// ── Quiet hours ─────────────────────────────────────────────────
+
+function QuietHours({ cfg, write }: { cfg: GitHubWidgetConfig; write: (patch: Partial<GitHubWidgetConfig>) => void }) {
+  const q = cfg.quietHours;
+  const set = (patch: Partial<typeof q>) => write({ quietHours: { ...q, ...patch } });
+  return (
+    <div className="mx-1.5 mb-2 flex flex-col gap-1.5 rounded-md border border-edge bg-surface-2 px-2.5 py-2 text-[12px]" data-section="quiet-hours">
+      <label className="flex cursor-pointer items-center gap-2 text-fg">
+        <input type="checkbox" checked={q.on} onChange={(e) => set({ on: e.target.checked })} className="accent-widget-github" />
+        Quiet hours
+      </label>
+      {q.on && (
+        <span className="flex items-center gap-1 font-mono text-fg-3">
+          <input type="time" aria-label="Quiet from" value={q.from} onChange={(e) => e.target.value && set({ from: e.target.value })} className="rounded border border-edge bg-surface px-1 text-fg" />
+          to
+          <input type="time" aria-label="Quiet until" value={q.to} onChange={(e) => e.target.value && set({ to: e.target.value })} className="rounded border border-edge bg-surface px-1 text-fg" />
+        </span>
+      )}
+      <span className="text-fg-3">The bar goes silent for GitHub; this page still shows everything.</span>
+    </div>
+  );
+}
+
+// ── + Add a repo: the picker (SCROLLR-307) ──────────────────────
+
+function activityLabel(r: GitHubRepoRow, now: number): string {
+  if (r.last_run_at) return `last run ${relativeTime(r.last_run_at, now, { suffix: true })}`;
+  if (r.pushed_at) return `pushed ${relativeTime(r.pushed_at, now, { suffix: true })}`;
+  return "";
+}
+
+/**
+ * The connected user's repos as checkboxes, in a popover. Active repos (and
+ * anything already on the bar) show by default; "Show all" reveals the rest.
+ */
+function RepoPicker({
+  rows,
+  tracked,
+  onToggle,
+  onClose,
+  onPublic,
+}: {
+  rows: GitHubRepoRow[] | undefined;
+  tracked: GitHubTrackedRepo[];
+  onToggle: (fullName: string, on: boolean) => void;
+  onClose: () => void;
+  onPublic: () => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const down = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("mousedown", down);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", down);
+      document.removeEventListener("keydown", key);
+    };
+  }, [onClose]);
+  const isTicked = (r: GitHubRepoRow) => tracked.some((t) => sameRepo(t.repo, r.full_name));
+  const all = rows ?? [];
+  const hidden = all.filter((r) => !r.active && !isTicked(r)).length;
+  const visible = showAll ? all : all.filter((r) => r.active || isTicked(r));
+  const full = tracked.length >= MAX_REPOS;
+  const now = Date.now();
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label="Your repos"
+      className="absolute left-0 top-full z-20 mt-1 flex max-h-[360px] w-[320px] flex-col gap-1 overflow-y-auto rounded-lg border border-edge bg-surface p-2 shadow-lg"
+    >
+      <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-fg-3">Your repos</span>
+      {!rows && <LoadingGlyph size={10} className="m-2 text-fg-3" />}
+      {visible.map((r) => (
+        <label key={r.full_name} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2">
+          <input
+            type="checkbox"
+            checked={isTicked(r)}
+            disabled={full && !isTicked(r)}
+            onChange={(e) => onToggle(r.full_name, e.target.checked)}
+            className="shrink-0 accent-widget-github"
+          />
+          <span className="min-w-0 flex-1 truncate text-left font-mono text-[11px] text-fg">{r.full_name}</span>
+          {r.private && <Lock size={10} aria-label="Private" className="shrink-0 text-fg-3" />}
+          <span className="shrink-0 font-mono text-[10px] text-fg-3">{activityLabel(r, now)}</span>
+        </label>
+      ))}
+      {hidden > 0 && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} className="self-start px-1 text-[11px] text-widget-github hover:underline">
+          {showAll ? "Show active only" : `Show all (${hidden} more)`}
+        </button>
+      )}
+      <div className="mt-1 flex flex-wrap gap-x-3 border-t border-edge px-1 pt-1.5 text-[11px]">
+        <button type="button" onClick={() => openExternal(INSTALL_URL)} className="font-semibold text-widget-github hover:underline">
+          Choose repos on GitHub
+        </button>
+        <button type="button" onClick={onPublic} className="text-fg-3 hover:text-fg">
+          Track a public repo…
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Connect (SCROLLR-304) ───────────────────────────────────────
 
 /** After Connect opens the browser: check every 5 s, for 2 minutes. */
 const CONNECT_POLL_MS = 5_000;
 const CONNECT_WINDOW_MS = 120_000;
 
-const ACCOUNT_BUTTON =
-  "shrink-0 text-[11px] font-mono font-semibold px-2.5 py-1 rounded-md border disabled:opacity-40 disabled:cursor-not-allowed";
-
 /**
- * Connect GitHub (SCROLLR-304). Core holds the token; this only shows the
- * state and starts or ends the connection. Signed out there is no account
- * to connect, so nothing renders and public repos work as they always did.
+ * The Connect state. Core holds the token; this only shows the state and
+ * starts the connection.
  */
 function GitHubAccount() {
-  const shell = useShell();
   const queryClient = useQueryClient();
   const [waitUntil, setWaitUntil] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -527,19 +623,17 @@ function GitHubAccount() {
   const { data: status } = useQuery({
     queryKey: ["github-status"],
     queryFn: githubApi.status,
-    enabled: shell.authenticated,
-    refetchInterval: waiting ? CONNECT_POLL_MS : POLL_INTERVAL * 1000,
+    refetchInterval: waiting ? CONNECT_POLL_MS : 120_000,
   });
 
-  // Connected while waiting: stop polling and refetch runs with the token.
+  // Connected while waiting: stop polling and read the board with the token.
   useEffect(() => {
     if (waiting && status?.connected) {
       setWaitUntil(0);
-      void queryClient.invalidateQueries({ queryKey: ["github-actions"] });
+      void queryClient.invalidateQueries({ queryKey: ["github-board"] });
     }
   }, [waiting, status?.connected, queryClient]);
 
-  // End the 5 s cadence when the window closes without a connection.
   useEffect(() => {
     if (!waitUntil) return;
     const t = setTimeout(() => setWaitUntil(0), Math.max(0, waitUntil - Date.now()));
@@ -560,148 +654,22 @@ function GitHubAccount() {
     }
   }, []);
 
-  const disconnect = useCallback(async () => {
-    setBusy(true);
-    setActionError(null);
-    try {
-      await githubApi.disconnect();
-      await queryClient.invalidateQueries({ queryKey: ["github-status"] });
-      await queryClient.invalidateQueries({ queryKey: ["github-actions"] });
-    } catch {
-      setActionError("Couldn't disconnect GitHub. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }, [queryClient]);
-
-  if (!shell.authenticated || !status) return null;
-
   return (
-    <div className="px-1 space-y-1">
-      <div className="flex items-center justify-between gap-2 rounded-md bg-surface-2 border border-edge px-2.5 py-1.5">
-        <span className="min-w-0 truncate text-[11px] font-mono text-fg-3">
-          {status.connected
-            ? `Connected as @${status.login}`
-            : waiting
-              ? "Finish in your browser…"
-              : status.reason
-                ? "GitHub needs reconnecting"
-                : "Connect GitHub for private repos"}
+    <div className="w-full space-y-1">
+      <div className="flex items-center justify-between gap-2 rounded-md border border-edge bg-surface-2 px-2.5 py-1.5">
+        <span className="min-w-0 truncate font-mono text-[11px] text-fg-3">
+          {waiting ? "Finish in your browser…" : status?.reason ? "GitHub needs reconnecting" : "Connect GitHub to put your repos on the bar"}
         </span>
-        {status.connected ? (
-          <button
-            type="button"
-            onClick={() => void disconnect()}
-            disabled={busy}
-            className={clsx(ACCOUNT_BUTTON, "text-fg-3 border-edge hover:text-fg")}
-          >
-            Disconnect
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void connect()}
-            disabled={busy}
-            className={clsx(
-              ACCOUNT_BUTTON,
-              "text-widget-github bg-widget-github/10 border-widget-github/25 hover:bg-widget-github/15",
-            )}
-          >
-            {status.reason ? "Reconnect GitHub" : "Connect GitHub"}
-          </button>
-        )}
-      </div>
-      {(actionError || (!status.connected && status.reason)) && (
-        <p className="text-[10px] font-mono text-error">
-          {actionError ?? status.reason}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ── RepoRow ─────────────────────────────────────────────────────
-
-function RepoRow({
-  owner,
-  repo,
-  data,
-  compact,
-  onRemove,
-}: {
-  owner: string;
-  repo: string;
-  data: GitHubRepo | null;
-  compact: boolean;
-  onRemove: () => void;
-}) {
-  const status = data?.status ?? "unavailable";
-  const isLoading = !data;
-  const [removeVisible, setRemoveVisible] = useState(false);
-
-  return (
-    <motion.div
-      onHoverStart={() => setRemoveVisible(true)}
-      onHoverEnd={() => setRemoveVisible(false)}
-      className={clsx(
-        FEED_CARD,
-        FEED_CARD_STATIC,
-        "relative flex items-center gap-2 overflow-hidden",
-        compact && "px-2 py-1.5",
-      )}
-    >
-      {/* Status dot */}
-      {isLoading ? (
-        <LoadingGlyph size={10} className="text-fg-4" />
-      ) : (
-        <span className={`w-2 h-2 rounded-full shrink-0 ${CI_STATUS_COLORS[status]}${status === "failure" ? " " : ""}`} />
-      )}
-
-      {/* Repo name + workflow */}
-      <div className="flex-1 min-w-0">
-        {data?.runUrl ? (
-          <a
-            href={data.runUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-mono text-fg hover:text-widget-github  truncate block"
-          >
-            {owner}/{repo}
-            <ExternalLink size={9} className="inline ml-1 opacity-40" />
-          </a>
-        ) : (
-          <span className="text-xs font-mono text-fg truncate block">
-            {owner}/{repo}
-          </span>
-        )}
-        {!compact && data?.workflowName && (
-          <span className="text-[10px] font-mono text-fg-4 truncate block">
-            {data.workflowName}
-          </span>
-        )}
-      </div>
-
-      {/* Status label */}
-      <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider shrink-0 ${CI_STATUS_TEXT[status]}`}>
-        {isLoading ? "Checking" : CI_STATUS_LABELS[status]}
-      </span>
-
-      <Tooltip content="Remove repo">
-        <motion.button
+        <button
           type="button"
-          initial={false}
-          animate={removeVisible ? REMOVE_MOTION.visible : REMOVE_MOTION.hidden}
-          transition={controlTransition}
-          whileTap={{ transform: "scale(0.95)" }}
-          onFocus={() => setRemoveVisible(true)}
-          onBlur={() => setRemoveVisible(false)}
-          onClick={onRemove}
-          aria-label="Remove repo"
-          className="absolute right-2 top-2 z-10 flex h-7 min-w-16 items-center justify-center gap-1 rounded-md border border-down/30 bg-surface-3 px-2.5 text-ui-chip font-semibold text-down shadow-md hover:bg-surface-hover"
+          onClick={() => void connect()}
+          disabled={busy}
+          className="shrink-0 rounded-md border border-widget-github/25 bg-widget-github/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-widget-github hover:bg-widget-github/15 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Remove <X size={11} />
-        </motion.button>
-      </Tooltip>
-    </motion.div>
+          {status?.reason ? "Reconnect GitHub" : "Connect GitHub"}
+        </button>
+      </div>
+      {(actionError || status?.reason) && <p className="font-mono text-[10px] text-error">{actionError ?? status?.reason}</p>}
+    </div>
   );
 }

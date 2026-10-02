@@ -42,9 +42,7 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
     uptime: {
       url: "",
     },
-    github: {
-      repos: [],
-    },
+    github: { repos: [], quietHours: { on: false, from: "22:00", to: "08:00" }, flash: true },
   };
 }
 

@@ -1,156 +1,84 @@
 /**
- * The GitHub edge slot's four connected states (SCROLLR-308, canvas board 1)
- * and its one flash per change.
+ * GitHub on the edge (SCROLLR-312, canvas B3): one or two repos share ONE
+ * fixed-width slot that rotates on the page turn; three or more are a page
+ * and leave the edge. Plus the Continuous chip, the same pills.
  */
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
+import type { GitHubBoardRepo } from "../../api/client";
 import type { GitHubChipData, WidgetTickerData } from "../../types";
-import type { GitHubPRRow } from "../../api/client";
+import gh from "../../dev/__fixtures__/github.board.json";
+import { repoChip } from "../../widgets/github/types";
+import { githubChip } from "../../hooks/useWidgetTickerData";
+import { GITHUB_DEFAULTS } from "../../widgets/github/config";
 import { GitHubCappedChip } from "../chips/CappedChip";
-import EdgeZone, { GH_RESERVE, buildEdge } from "./EdgeZone";
-import { connectedChip } from "../../hooks/useWidgetTickerData";
-import { GITHUB_BAR_DEFAULTS, type GitHubRepo } from "../../widgets/github/types";
+import EdgeZone, { buildEdge } from "./EdgeZone";
 
-const pr = (n: number, over: Partial<GitHubPRRow> = {}): GitHubPRRow => ({
-  number: n,
-  title: `Fix the thing #${n}`,
-  html_url: "",
-  author: "bob",
-  is_mine: false,
-  review_requested: true,
-  review_state: "none",
-  draft: false,
-  head_branch: "b",
-  head_sha: "s",
-  updated_at: "",
-  checks: { total: 0, passed: 0, failed: 0, running: 0 },
-  checks_state: "none",
-  ...over,
-});
-
-const chip = (id: string, over: Partial<GitHubChipData>): GitHubChipData => ({
-  id,
-  label: id,
-  status: "success",
-  workflowName: "CI",
-  defaultCi: { state: "passing", workflow: "CI", commit_message: "feat: ship it\n\nbody" },
-  flash: 0,
-  ...over,
-});
-
-const STATES: GitHubChipData[] = [
-  chip("myscrollr", { state: "passing", age: "2h" }),
-  chip("scrollr-api", { state: "broken", age: "12m", defaultCi: { state: "failing", workflow: "deploy", commit_message: "fix: the deploy" } }),
-  chip("scrollr-web", { state: "running", age: "3m", mineRunning: 2, mineBranch: "feat-x" }),
-  chip("infra", { state: "needs", needs: 12, prs: [pr(1), pr(2)] }),
-];
+const NOW = Date.parse(gh._captured_at);
+const repos = gh.repos as unknown as GitHubBoardRepo[];
+const chips = (n: number, quiet = false): GitHubChipData[] => repos.slice(0, n).map((r, i) => repoChip(r, gh.config[i] as never, quiet, NOW));
 
 const edgeOf = (github: GitHubChipData[]) =>
   buildEdge({ clock: [], timer: [], weather: [], sysmon: [], uptime: [], github } as WidgetTickerData, [], null, ["github"]);
 
-describe("GitHub edge slot: four states", () => {
-  const items = edgeOf(STATES).utilities[0].items;
-
-  it("passing: a green dot and the age, never the word", () => {
-    expect(items[0]).toMatchObject({ mark: "up", value: "2h", dim: true, detail: "feat: ship it" });
-    expect(JSON.stringify(items[0]).toLowerCase()).not.toContain("passing");
+describe("the GitHub edge slot", () => {
+  it("0 repos: nothing; 1 or 2: one slot; 3 or more: none (the page has them)", () => {
+    expect(edgeOf([]).utilities).toEqual([]);
+    expect(edgeOf(chips(1)).utilities).toHaveLength(1);
+    expect(edgeOf(chips(2)).utilities.map((u) => u.items.length)).toEqual([2]);
+    expect(edgeOf(chips(3)).utilities).toEqual([]);
+    expect(edgeOf(chips(4)).utilities).toEqual([]);
   });
 
-  it("broken: a red dot, the workflow and its age, the commit beneath", () => {
-    expect(items[1]).toMatchObject({ mark: "down", value: "deploy · 12m", tone: "down", detail: "fix: the deploy" });
+  it("label GITHUB · REPO, the dot and the most urgent pill, the next pill beneath, the most urgent link", () => {
+    const [a, b] = edgeOf(chips(2)).utilities[0].items;
+    expect(a).toMatchObject({ label: "GITHUB · myscrollr", mark: "you", value: "2 PRs for you", tone: "ink", detail: "✓ test", url: "https://github.com/sample/myscrollr/pulls" });
+    expect(b).toMatchObject({ label: "GITHUB · scrollr-api", mark: "down", value: "✗ deploy · 12m", tone: "down", detail: "✓ test" });
   });
 
-  it("running on yours: the ring, `yours · 3m`, the branch (+ the others) beneath", () => {
-    expect(items[2]).toMatchObject({ mark: "run", value: "yours · 3m", tone: "ink", detail: "feat-x +1" });
+  it("a running workflow rings; quiet hours grey the slot to the age", () => {
+    const infra = repoChip(repos[3], gh.config[3] as never, false, NOW);
+    expect(edgeOf([infra]).utilities[0].items[0]).toMatchObject({ mark: "run", value: "◌ apply · 3m" });
+    expect(edgeOf(chips(1, true)).utilities[0].items[0]).toMatchObject({ mark: "idle", value: "1h", dim: true });
   });
 
-  it("needs you: the count pill and `for you`, the first PR beneath", () => {
-    expect(items[3]).toMatchObject({ mark: "count", count: 12, value: "for you", tone: "ink", detail: "Fix the thing #1" });
-  });
-
-  it("a long workflow is cut to fit the reservation", () => {
-    const long = edgeOf([chip("r", { state: "broken", age: "12m", defaultCi: { state: "failing", workflow: "Desktop Release" } })]);
-    expect(long.utilities[0].items[0].value).toBe("Desktop… · 12m");
-    expect(long.utilities[0].items[0].value.length).toBeLessThanOrEqual(GH_RESERVE.length);
-  });
-
-  it("every state reserves the same widest form, so a state change never moves the slot", () => {
-    expect(new Set(items.map((i) => i.reserve))).toEqual(new Set([GH_RESERVE]));
-    const { container } = render(<EdgeZone edge={edgeOf(STATES)} tick={3} reduced dark />);
-    const sizers = [...container.querySelectorAll('[aria-hidden="true"]')].filter((s) => s.textContent?.includes(GH_RESERVE));
-    expect(sizers).toHaveLength(4);
-    // Each sizer holds a dot's room, never the item's own mark.
-    for (const s of sizers) expect(s.querySelector("[data-mark]")).toBeNull();
-    // tick 3 shows the needs-you item: a two-digit count in the pill.
-    expect(container.querySelector('[data-mark="count"]')!.textContent).toBe("12");
-  });
-
-  it("not connected: the latest-run form, as before", () => {
-    const old = edgeOf([{ id: "o", label: "o", status: "failure", workflowName: "CI", elapsed: "4m" }]).utilities[0].items[0];
-    expect(old).toMatchObject({ value: "✗ 4m", tone: "down" });
-    expect(old.mark).toBeUndefined();
+  it("rotates on the turn, one fixed width whichever repo is up, with a corner dot per repo", () => {
+    const edge = edgeOf(chips(2));
+    const at = (tick: number) => render(<EdgeZone edge={edge} tick={tick} reduced dark />).container;
+    const one = at(0);
+    const btn = one.querySelector("[data-widget=github] button")!;
+    expect(btn.classList.contains("w-[176px]")).toBe(true);
+    expect(one.querySelector("[data-item]")!.getAttribute("data-item")).toBe("github-sample/myscrollr");
+    expect(one.querySelectorAll("[data-part=dots] > span")).toHaveLength(2);
+    expect(one.querySelector("[data-part=dots] [data-on]")).toBe(one.querySelectorAll("[data-part=dots] > span")[0]);
+    const two = at(1);
+    expect(two.querySelector("[data-item]")!.getAttribute("data-item")).toBe("github-sample/scrollr-api");
+    expect(two.querySelector("[data-widget=github] button")!.classList.contains("w-[176px]")).toBe(true);
+    expect(two.querySelector("[data-part=dots] [data-on]")).toBe(two.querySelectorAll("[data-part=dots] > span")[1]);
+    // One repo: no rotation, no dots.
+    const solo = render(<EdgeZone edge={edgeOf(chips(1))} tick={5} reduced dark />).container;
+    expect(solo.querySelector("[data-part=dots]")).toBeNull();
   });
 });
 
-describe("GitHub flash", () => {
-  const one = (flash: number) => edgeOf([chip("flash-repo", { state: "passing", age: "1m", flash })]);
-  const flashes = (c: HTMLElement) => c.querySelectorAll(".chip-flash").length;
-
-  it("fires once per new token; a poll that changed nothing, or a remount, never fires", () => {
-    const { container, rerender, unmount } = render(<EdgeZone edge={one(0)} tick={0} reduced dark />);
-    expect(flashes(container)).toBe(0);
-    rerender(<EdgeZone edge={one(0)} tick={0} reduced dark />); // a poll, nothing changed
-    expect(flashes(container)).toBe(0);
-    rerender(<EdgeZone edge={one(1)} tick={0} reduced dark />); // passing → failing
-    expect(flashes(container)).toBe(1);
-    const el = container.querySelector(".chip-flash");
-    rerender(<EdgeZone edge={one(1)} tick={0} reduced dark />);
-    expect(container.querySelector(".chip-flash")).toBe(el); // same element: the animation does not replay
-    unmount();
-    const again = render(<EdgeZone edge={one(1)} tick={0} reduced dark />); // rolls back in
-    expect(flashes(again.container)).toBe(0);
-  });
-});
-
-describe("what goes on the bar, on the chip (SCROLLR-309)", () => {
-  const repo: GitHubRepo = {
-    owner: "o", repo: "bar-prefs", status: "failure", workflowName: "CI", runUrl: null, commitMessage: null,
-    updatedAt: null, branch: null, startedAt: null,
-    prs: [pr(1), pr(2, { review_requested: false, is_mine: true, review_state: "approved" })],
-    defaultCi: { state: "failing", workflow: "deploy", updated_at: new Date().toISOString() },
-  };
-
-  it("defaults: needs you, the page holds the review only, it can flash", () => {
-    const c = connectedChip(repo, "bp-1");
-    expect(c).toMatchObject({ state: "needs", needs: 1, flash: 0 });
-    expect(c.page!.map((p) => p.number)).toEqual([1]);
-  });
-
-  it("quiet hours: a grey dot, no count, nothing on the page, no flash", () => {
-    const c = connectedChip(repo, "bp-2", GITHUB_BAR_DEFAULTS, true);
-    expect(c).toMatchObject({ state: "quiet", page: [], flash: undefined });
-    expect(edgeOf([chip("q", c)]).utilities[0].items[0]).toMatchObject({ mark: "idle", dim: true });
-  });
-
-  it("flash off: the state stays, the flash does not", () => {
-    expect(connectedChip(repo, "bp-3", { ...GITHUB_BAR_DEFAULTS, flash: false })).toMatchObject({ state: "needs", flash: undefined });
-  });
-
-  it("other PRs on: the page gains yours, the count does not", () => {
-    const c = connectedChip(repo, "bp-4", { ...GITHUB_BAR_DEFAULTS, otherPRs: true });
-    expect(c.needs).toBe(1);
-    expect(c.page!.map((p) => p.number)).toEqual([1, 2]);
+describe("the flash (308's rule)", () => {
+  it("the first sight never flashes; the worst state changing does; the flash off says nothing", () => {
+    const green: GitHubBoardRepo = { repo: "o/flash", available: true, workflows: [{ name: "ci", state: "passing", at: "2026-10-02T11:00:00Z" }] };
+    const red: GitHubBoardRepo = { ...green, workflows: [{ name: "ci", state: "failing", at: "2026-10-02T11:30:00Z" }] };
+    const cfg = { ...GITHUB_DEFAULTS, repos: [{ repo: "o/flash", prs: "mine" as const, issues: "off" as const }] };
+    expect(githubChip(green, cfg, false, NOW).flash).toBe(0);
+    expect(githubChip(green, cfg, false, NOW).flash).toBe(0);
+    expect(githubChip(red, cfg, false, NOW)).toMatchObject({ flash: 1, flashTone: "down" });
+    expect(githubChip(red, { ...cfg, flash: false }, false, NOW).flash).toBeUndefined();
   });
 });
 
 describe("GitHubCappedChip (Continuous)", () => {
-  it("needs you: the count on the cap and `for you`; others put the age in the fixed cell", () => {
-    const needs = render(<GitHubCappedChip item={STATES[3]} />);
-    expect(needs.container.textContent).toContain("12");
-    expect(needs.container.textContent).toContain("for you");
-    const broken = render(<GitHubCappedChip item={STATES[1]} />);
-    expect(broken.container.textContent).toContain("deploy");
-    expect(broken.container.textContent).toContain("12m");
-    expect(broken.container.textContent?.toLowerCase()).not.toContain("passing");
+  it("the worst state on the cap, the most urgent pill, the rest beneath, the age", () => {
+    const { container } = render(<GitHubCappedChip item={chips(2)[1]} />);
+    expect(container.textContent).toContain("scrollr-api");
+    expect(container.textContent).toContain("✗ deploy · 12m");
+    expect(container.textContent).toContain("✓ test · 3 open PRs");
+    expect(container.textContent).toContain("12m");
   });
 });

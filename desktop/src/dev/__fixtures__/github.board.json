@@ -1,0 +1,99 @@
+{
+  "_note": "SCROLLR-312 github: four tracked repos as the GitHub store holds them (core's POST /github/board answer) with the widget config that asked for them, after canvas board B3. Representative sample data, not production rows (CHIP_SPEC §10.2: GitHub is per-user, not in the seed). myscrollr: 2 PRs for you, two green workflows, 1 new issue. scrollr-api: deploy failing 12m ago, test green, 3 open PRs (All open). scrollr-web: two green workflows and Vercel failing on main (a commit status: any CI turns the cell red). infra: apply running 3m, 2 new issues. The shim seeds it for ?fixture=github or ?github=one|two|many (the first 1, 2 or all 4).",
+  "_captured_at": "2026-10-02T12:00:00Z",
+  "config": [
+    { "repo": "sample/myscrollr", "prs": "mine", "issues": "new" },
+    { "repo": "sample/scrollr-api", "prs": "all", "issues": "off" },
+    { "repo": "sample/scrollr-web", "prs": "off", "issues": "off" },
+    { "repo": "sample/infra", "prs": "mine", "issues": "new" }
+  ],
+  "repos": [
+    {
+      "repo": "sample/myscrollr",
+      "available": true,
+      "workflows": [
+        { "name": "test", "state": "passing", "at": "2026-10-02T10:00:00Z", "url": "https://github.com/sample/myscrollr/actions/runs/1" },
+        { "name": "deploy", "state": "passing", "at": "2026-10-02T10:05:00Z", "url": "https://github.com/sample/myscrollr/actions/runs/2" }
+      ],
+      "checks": [],
+      "prs": {
+        "count": 2,
+        "needs_you": 2,
+        "items": [
+          {
+            "number": 478, "title": "The band: edge bar, name and page pills replace the pager", "html_url": "https://github.com/sample/myscrollr/pull/478",
+            "author": "sample-dev", "is_mine": false, "review_requested": true, "review_state": "none", "draft": false,
+            "head_branch": "band", "head_sha": "a478", "updated_at": "2026-10-02T10:00:00Z",
+            "checks": { "total": 5, "passed": 5, "failed": 0, "running": 0 }, "checks_state": "passing"
+          },
+          {
+            "number": 479, "title": "Connect GitHub: core brokers the Scrollr Desktop app", "html_url": "https://github.com/sample/myscrollr/pull/479",
+            "author": "you", "is_mine": true, "review_requested": false, "review_state": "changes_requested", "draft": false,
+            "head_branch": "connect", "head_sha": "a479", "updated_at": "2026-10-02T09:40:00Z",
+            "checks": { "total": 5, "passed": 4, "failed": 1, "running": 0 }, "checks_state": "failing"
+          }
+        ]
+      },
+      "issues": {
+        "count": 1,
+        "items": [{ "number": 312, "title": "Sample: the widget page is overwhelming", "url": "https://github.com/sample/myscrollr/issues/312", "created_at": "2026-10-02T09:00:00Z" }]
+      }
+    },
+    {
+      "repo": "sample/scrollr-api",
+      "available": true,
+      "workflows": [
+        { "name": "deploy", "state": "failing", "at": "2026-10-02T11:48:00Z", "url": "https://github.com/sample/scrollr-api/actions/runs/3" },
+        { "name": "test", "state": "passing", "at": "2026-10-02T11:40:00Z", "url": "https://github.com/sample/scrollr-api/actions/runs/4" }
+      ],
+      "checks": [],
+      "prs": {
+        "count": 3,
+        "needs_you": 0,
+        "items": [
+          {
+            "number": 212, "title": "Sample: board endpoint", "html_url": "https://github.com/sample/scrollr-api/pull/212",
+            "author": "sample-dev", "is_mine": false, "review_requested": false, "review_state": "approved", "draft": false,
+            "head_branch": "board", "head_sha": "b212", "updated_at": "2026-10-02T08:00:00Z",
+            "checks": { "total": 3, "passed": 3, "failed": 0, "running": 0 }, "checks_state": "passing"
+          },
+          {
+            "number": 215, "title": "Sample: issues mode", "html_url": "https://github.com/sample/scrollr-api/pull/215",
+            "author": "sample-dev", "is_mine": false, "review_requested": false, "review_state": "none", "draft": true,
+            "head_branch": "issues", "head_sha": "b215", "updated_at": "2026-10-02T07:00:00Z",
+            "checks": { "total": 3, "passed": 3, "failed": 0, "running": 0 }, "checks_state": "passing"
+          },
+          {
+            "number": 220, "title": "Sample: workflows endpoint", "html_url": "https://github.com/sample/scrollr-api/pull/220",
+            "author": "sample-dev", "is_mine": false, "review_requested": false, "review_state": "none", "draft": false,
+            "head_branch": "wf", "head_sha": "b220", "updated_at": "2026-10-02T06:00:00Z",
+            "checks": { "total": 3, "passed": 3, "failed": 0, "running": 0 }, "checks_state": "passing"
+          }
+        ]
+      }
+    },
+    {
+      "repo": "sample/scrollr-web",
+      "available": true,
+      "workflows": [
+        { "name": "build", "state": "passing", "at": "2026-10-01T12:00:00Z", "url": "https://github.com/sample/scrollr-web/actions/runs/5" },
+        { "name": "lighthouse", "state": "passing", "at": "2026-10-01T12:10:00Z", "url": "https://github.com/sample/scrollr-web/actions/runs/6" }
+      ],
+      "checks": [{ "name": "vercel", "state": "failing", "at": "2026-10-02T11:57:00Z", "url": "https://vercel.com/sample/scrollr-web" }]
+    },
+    {
+      "repo": "sample/infra",
+      "available": true,
+      "workflows": [{ "name": "apply", "state": "running", "at": "2026-10-02T11:57:00Z", "url": "https://github.com/sample/infra/actions/runs/7" }],
+      "checks": [],
+      "prs": { "count": 0, "needs_you": 0, "items": [] },
+      "issues": {
+        "count": 2,
+        "items": [
+          { "number": 41, "title": "Sample: rotate the registry token", "url": "https://github.com/sample/infra/issues/41", "created_at": "2026-10-02T10:30:00Z" },
+          { "number": 40, "title": "Sample: bump node pool", "url": "https://github.com/sample/infra/issues/40", "created_at": "2026-10-02T08:30:00Z" }
+        ]
+      }
+    }
+  ]
+}

@@ -587,7 +587,7 @@ describe("dead prefs are shed on load (REL-208)", () => {
     expect("weather" in prefs.widgets).toBe(false);
     // pollInterval went with REL-206 (see below).
     expect(prefs.widgets.uptime).toEqual({ url: "https://status.example" });
-    expect(prefs.widgets.github).toEqual({ repos: [] });
+    expect(prefs.widgets.github).toEqual({ repos: [], quietHours: { on: false, from: "22:00", to: "08:00" }, flash: true });
     // Sysmon's stat toggles are real content selection and stay.
     expect(prefs.widgets.sysmon.ticker).toEqual({ cpu: true, memory: true, gpu: true, gpuPower: true });
   });
@@ -622,7 +622,9 @@ describe("startup page folds (REL-206, SCROLLR-281)", () => {
       ticker: { cpu: true, memory: false, gpu: true, gpuPower: false },
     });
     expect(persisted.widgets.uptime).toEqual({ url: "https://status.example" });
-    expect(persisted.widgets.github).toEqual({ repos: [{ owner: "a", repo: "b" }] });
+    // SCROLLR-312 migrates the repo list to the per-repo shape.
+    expect(persisted.widgets.github.repos).toEqual([{ repo: "a/b", prs: "mine", issues: "off" }]);
+    expect(persisted.widgets.github).not.toHaveProperty("pollInterval");
   });
 });
 

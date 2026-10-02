@@ -4,16 +4,18 @@ package githubapp
 // you, whether the default branch is broken, and whether CI is running on
 // your branches. Connected accounts only; the user's own token and budget.
 //
-// The app has no checks:read permission, so a PR's checks are its head
-// commit's Actions runs.
+// A PR's checks are its head commit's check runs plus its commit statuses
+// (any CI, SCROLLR-312); an install that has not approved Checks: read yet
+// gets its Actions runs instead.
 //
 // Budget (TestPRBudget): per repo per 60 s refresh, steady state, two calls
 // (open pulls, the 20 most recent runs). Everything slower-moving is cached
 // on a key that changes when it does: the default branch (24 h), a PR's
 // reviews (its updated_at), a commit's settled checks (its sha plus the
-// latest run update the recent list shows for it, so a re-run refetches),
-// the user's teams (1 h, only when a PR asks a team). Five repos polled for
-// an hour cost ~635 calls; the 5,000/h user budget has room.
+// latest run update the recent list shows for it, so an Actions re-run
+// refetches; ponytail: another CI's re-run of the same commit shows within
+// the hour), the user's teams (1 h, only when a PR asks a team). Five repos
+// polled for an hour cost 650 calls; the 5,000/h user budget has room.
 // ponytail: a commit whose checks are still running is refetched on every
 // refresh, so 20 PRs all running at once cost 20 calls a minute while they
 // run. The rate-limit hold below serves the last answer if that ever bites.
@@ -134,11 +136,13 @@ type ghPull struct {
 
 type ghRun struct {
 	Name         string  `json:"name"`
+	WorkflowID   int64   `json:"workflow_id"`
 	Status       string  `json:"status"`
 	Conclusion   *string `json:"conclusion"`
 	HTMLURL      string  `json:"html_url"`
 	HeadBranch   *string `json:"head_branch"`
 	HeadSHA      string  `json:"head_sha"`
+	CreatedAt    string  `json:"created_at"`
 	RunStartedAt *string `json:"run_started_at"`
 	UpdatedAt    string  `json:"updated_at"`
 	Actor        ghLogin `json:"actor"`
@@ -345,17 +349,9 @@ func buildRepoPRs(ctx context.Context, src prSource, repo string) (RepoPRs, erro
 	out := RepoPRs{Repo: repo, PRs: []PR{}}
 	path := "/repos/" + repo
 
-	var branch string
-	if !cacheJSON(ctx, prKey(src.ns, "branch", repo), &branch) {
-		var meta struct {
-			DefaultBranch string `json:"default_branch"`
-		}
-		status, err := getJSON(ctx, src.ns, path, src.token, &meta)
-		if err != nil || status != http.StatusOK {
-			return out, err // 404 / no access: not available
-		}
-		branch = meta.DefaultBranch
-		storeJSON(ctx, prKey(src.ns, "branch", repo), branch, branchTTL)
+	branch, found, err := repoBranch(ctx, src, repo)
+	if !found {
+		return out, err // 404 / no access: not available
 	}
 
 	var pulls []ghPull
@@ -447,6 +443,24 @@ func buildRepoPRs(ctx context.Context, src prSource, repo string) (RepoPRs, erro
 	return out, g.Wait()
 }
 
+// repoBranch is the repo's default branch, cached 24 h. found is false for
+// a repo the token cannot see (404) or on an error.
+func repoBranch(ctx context.Context, src prSource, repo string) (branch string, found bool, err error) {
+	key := prKey(src.ns, "branch", repo)
+	if cacheJSON(ctx, key, &branch) {
+		return branch, true, nil
+	}
+	var meta struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	status, err := getJSON(ctx, src.ns, "/repos/"+repo, src.token, &meta)
+	if err != nil || status != http.StatusOK {
+		return "", false, err
+	}
+	storeJSON(ctx, key, meta.DefaultBranch, branchTTL)
+	return meta.DefaultBranch, true, nil
+}
+
 func prReviews(ctx context.Context, src prSource, repo string, pr PR) (string, error) {
 	key := prKey(src.ns, "reviews", repo, fmt.Sprint(pr.Number), pr.UpdatedAt)
 	var state string
@@ -469,6 +483,71 @@ func prReviews(ctx context.Context, src prSource, repo string, pr PR) (string, e
 	return state, nil
 }
 
+// commitChecks is a commit's (or a branch's) check runs as runs, each
+// with its app's slug in Actor. ok is false when GitHub would not say
+// (403 before the install approves Checks: read, 404).
+func commitChecks(ctx context.Context, src prSource, repo, ref string) (runs []ghRun, ok bool, err error) {
+	var body struct {
+		CheckRuns []struct {
+			Name        string  `json:"name"`
+			Status      string  `json:"status"`
+			Conclusion  *string `json:"conclusion"`
+			HTMLURL     string  `json:"html_url"`
+			StartedAt   *string `json:"started_at"`
+			CompletedAt *string `json:"completed_at"`
+			App         struct {
+				Slug string `json:"slug"`
+			} `json:"app"`
+		} `json:"check_runs"`
+	}
+	status, err := getJSON(ctx, src.ns, fmt.Sprintf("/repos/%s/commits/%s/check-runs?per_page=100", repo, url.PathEscape(ref)), src.token, &body)
+	if err != nil || status != http.StatusOK {
+		return nil, false, err
+	}
+	for _, c := range body.CheckRuns {
+		at := deref(c.CompletedAt)
+		if at == "" {
+			at = deref(c.StartedAt)
+		}
+		runs = append(runs, ghRun{Name: c.Name, Status: c.Status, Conclusion: c.Conclusion, HTMLURL: c.HTMLURL,
+			RunStartedAt: c.StartedAt, UpdatedAt: at, Actor: ghLogin{Login: c.App.Slug}})
+	}
+	return runs, true, nil
+}
+
+// commitStatuses is a commit's (or a branch's) statuses as runs: pending
+// runs, success passes, failure and error fail. None on a 403 or 404.
+func commitStatuses(ctx context.Context, src prSource, repo, ref string) ([]ghRun, error) {
+	var body struct {
+		Statuses []struct {
+			Context   string `json:"context"`
+			State     string `json:"state"`
+			TargetURL string `json:"target_url"`
+			UpdatedAt string `json:"updated_at"`
+		} `json:"statuses"`
+	}
+	status, err := getJSON(ctx, src.ns, fmt.Sprintf("/repos/%s/commits/%s/status", repo, url.PathEscape(ref)), src.token, &body)
+	if err != nil || status != http.StatusOK {
+		return nil, err
+	}
+	var runs []ghRun
+	for _, s := range body.Statuses {
+		r := ghRun{Name: s.Context, Status: "completed", HTMLURL: s.TargetURL, UpdatedAt: s.UpdatedAt}
+		switch s.State {
+		case "pending":
+			r.Status = "in_progress"
+		case "success":
+			r.Conclusion = ptr("success")
+		default: // failure, error
+			r.Conclusion = ptr("failure")
+		}
+		runs = append(runs, r)
+	}
+	return runs, nil
+}
+
+func ptr(s string) *string { return &s }
+
 func prChecks(ctx context.Context, src prSource, repo, sha, touched string) (Checks, string, error) {
 	key := prKey(src.ns, "checks", repo, sha, touched)
 	var cached struct {
@@ -478,15 +557,29 @@ func prChecks(ctx context.Context, src prSource, repo, sha, touched string) (Che
 	if cacheJSON(ctx, key, &cached) {
 		return cached.Checks, cached.State, nil
 	}
-	var runs ghRuns
-	status, err := getJSON(ctx, src.ns, fmt.Sprintf("/repos/%s/actions/runs?per_page=20&head_sha=%s", repo, url.QueryEscape(sha)), src.token, &runs)
+	// Any CI (SCROLLR-312): the commit's check runs (Actions jobs and every
+	// other app) plus its commit statuses (Vercel, Netlify). An install that
+	// has not approved Checks: read gets 403: its Actions runs stand in.
+	checks, ok, err := commitChecks(ctx, src, repo, sha)
 	if err != nil {
 		return Checks{}, "unknown", err
 	}
-	if status != http.StatusOK {
-		return Checks{}, "unknown", nil
+	if !ok {
+		var runs ghRuns
+		status, err := getJSON(ctx, src.ns, fmt.Sprintf("/repos/%s/actions/runs?per_page=20&head_sha=%s", repo, url.QueryEscape(sha)), src.token, &runs)
+		if err != nil {
+			return Checks{}, "unknown", err
+		}
+		if status != http.StatusOK {
+			return Checks{}, "unknown", nil
+		}
+		checks = runs.WorkflowRuns
 	}
-	cached.Checks, cached.State = countChecks(runs.WorkflowRuns)
+	statuses, err := commitStatuses(ctx, src, repo, sha)
+	if err != nil {
+		return Checks{}, "unknown", err
+	}
+	cached.Checks, cached.State = countChecks(append(checks, statuses...))
 	if cached.Checks.Running == 0 {
 		storeJSON(ctx, key, cached, prDetailTTL)
 	}
@@ -554,46 +647,9 @@ func HandlePRs(c *fiber.Ctx) error {
 // userPRs answers every repo with the user's token, refreshing it once on a
 // 401; a refused refresh marks the connection broken.
 func userPRs(ctx context.Context, conn *connection, repos []string) (res []RepoPRs, broken bool) {
-	token, refresh := userTokens(ctx, conn)
-	ns := userNS(conn.Sub)
-	var teams map[string]bool
-	src := func() (prSource, error) {
-		tok, err := token()
-		return prSource{ns: ns, login: conn.Login, token: tok, teams: func() map[string]bool {
-			if teams == nil {
-				teams = userTeams(ctx, ns, tok)
-			}
-			return teams
-		}}, err
-	}
-	ok := false
-	res = make([]RepoPRs, 0, len(repos))
-	for _, repo := range repos {
-		s, err := src()
-		var r RepoPRs
-		if err == nil {
-			r, err = repoPRs(ctx, s, repo)
-		}
-		if errors.Is(err, errUnauthorized) {
-			if err = refresh(); err == nil {
-				if s, err = src(); err == nil {
-					r, err = repoPRs(ctx, s, repo)
-				}
-			}
-		}
-		if errors.Is(err, errUnauthorized) || errors.Is(err, errRefreshRefused) {
-			markBroken(ctx, conn.Sub, err.Error())
-			return nil, true
-		}
-		if err != nil {
-			log.Printf("[GitHub] prs: %v", err)
-			r = RepoPRs{Repo: repo, PRs: []PR{}}
-		}
-		ok = ok || r.Available
-		res = append(res, r)
-	}
-	if ok {
-		markOK(ctx, conn.Sub)
-	}
-	return res, false
+	res, broken = eachRepo(ctx, conn, len(repos), func(i int, src prSource) (RepoPRs, error) {
+		return repoPRs(ctx, src, repos[i])
+	}, func(i int) RepoPRs { return RepoPRs{Repo: repos[i], PRs: []PR{}} })
+	markAnyOK(ctx, conn, res, func(r RepoPRs) bool { return r.Available })
+	return res, broken
 }

@@ -42,7 +42,7 @@ import { leagueCode } from "../../utils/gameHelpers";
 import { formatTempRange } from "../../utils/format";
 import { teamShortName } from "../../utils/teamShortName";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { needsYou } from "../../widgets/github/types";
+import { GITHUB_PAGE_MIN } from "./widgetPages";
 import { OnceFlash } from "../chips/ChipFlash";
 import GameCell, { gameMinCol } from "./cells/GameCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
@@ -67,11 +67,12 @@ export interface SlotItem {
   tone?: Tone;
   dim?: boolean;
   /**
-   * A mark before the value (GitHub, SCROLLR-308): a dot (`up`, `down`), a
-   * ring breathing in the accent (`run`), or a count pill (`count`).
+   * A mark before the value (GitHub): a dot (`up`, `down`, the accent for `you`,
+   * grey for `idle`), or a ring breathing in the accent (`run`).
    */
-  mark?: "up" | "down" | "run" | "count" | "idle";
-  count?: number;
+  mark?: "up" | "down" | "run" | "you" | "idle";
+  /** Where a click goes (GitHub: the repo's most urgent link). */
+  url?: string;
   /** Counts worthy changes; the slot flashes once per new token. */
   flash?: number;
   flashTone?: "up" | "down";
@@ -108,41 +109,29 @@ export function reserveOf(value: string, digits: number): string {
   return value.replace(/\d+/, (m) => m.padStart(digits, "0")).replace(/\d/g, "0");
 }
 
-const GH_GLYPH: Record<GitHubChipData["status"], string> = { success: "✓", failure: "✗", in_progress: "●", unavailable: "○" };
-
 /**
- * Every connected GitHub state reserves the widest one, a broken branch: a
- * workflow name of up to eight characters and its age, behind a dot. So a
- * repo going passing → broken → needs you never changes the slot's width.
+ * One tracked repo in GitHub's edge slot (SCROLLR-312, canvas B3): the
+ * label `GITHUB · REPO`, the dot in its worst state and its most urgent pill;
+ * the next pill beneath. Quiet hours: a grey dot and the age. The slot is
+ * a fixed width (`GH_SLOT_W`), so the value truncates rather than widen it.
  */
-export const GH_RESERVE = "00000000 · 00m";
-const GH_WORKFLOW_CH = 8;
-
-const firstLine = (s: string | undefined) => s?.split("\n")[0] || undefined;
-
-/** The four connected states (SCROLLR-308, canvas board 1). Never says "passing". */
 function githubSlot(g: GitHubChipData): SlotItem {
-  const base = { id: g.id, label: g.label, reserve: GH_RESERVE, flash: g.flash, flashTone: g.flashTone };
-  const ci = g.defaultCi;
-  switch (g.state) {
-    case "needs":
-      return { ...base, mark: "count", count: g.needs, value: "for you", tone: "ink", detail: (g.page ?? needsYou(g.prs))[0]?.title };
-    case "broken": {
-      const wf = ci?.workflow ?? "CI";
-      const name = wf.length > GH_WORKFLOW_CH ? `${wf.slice(0, GH_WORKFLOW_CH - 1)}…` : wf;
-      return { ...base, mark: "down", value: `${name} · ${g.age ?? ""}`, tone: "down", detail: firstLine(ci?.commit_message) ?? wf };
-    }
-    case "running": {
-      const more = (g.mineRunning ?? 0) > 1 ? ` +${(g.mineRunning ?? 0) - 1}` : "";
-      return { ...base, mark: "run", value: `yours · ${g.age ?? ""}`, tone: "ink", detail: g.mineBranch ? `${g.mineBranch}${more}` : undefined };
-    }
-    case "quiet":
-      // Quiet hours, or a red default branch the user asked not to hear about (SCROLLR-309): a grey dot.
-      return { ...base, mark: "idle", value: g.age ?? "", dim: true, detail: firstLine(ci?.commit_message) ?? ci?.workflow };
+  const [top, next] = g.pills;
+  const base = { id: g.id, label: `GITHUB · ${g.label}`, reserve: "", url: g.url, flash: g.flash, flashTone: g.flashTone, detail: next?.text };
+  switch (g.worst) {
+    case "red":
+      return { ...base, mark: "down", value: top.text, tone: "down" };
+    case "accent":
+      return { ...base, mark: top.kind === "run" ? "run" : "you", value: top.text, tone: "ink" };
+    case "ok":
+      return { ...base, mark: "up", value: top.text, dim: true };
     default:
-      return { ...base, mark: "up", value: g.age ?? "", dim: true, detail: firstLine(ci?.commit_message) ?? ci?.workflow };
+      return { ...base, mark: "idle", value: g.quiet ? g.age : g.available ? "nothing to watch" : "not available", dim: true };
   }
 }
+
+/** GitHub's slot is this wide whatever it shows (B3: it never widens). */
+export const GH_SLOT_W = 176;
 
 function slotOf(tab: Utility, raw: unknown): SlotItem {
   switch (tab) {
@@ -171,12 +160,8 @@ function slotOf(tab: Utility, raw: unknown): SlotItem {
       // A down monitor shows how long, not its percentage (the chip's rule).
       return { id: u.id, label: u.label, value: down ? u.outageFor ?? "DOWN" : u.uptime, reserve: "000.00%", detail: u.responseAvg ?? u.detail, tone: down ? "down" : undefined };
     }
-    case "github": {
-      const g = raw as GitHubChipData;
-      if (g.state) return githubSlot(g);
-      const value = `${GH_GLYPH[g.status]} ${g.elapsed ?? ""}`.trim();
-      return { id: g.id, label: g.label, value, reserve: reserveOf(value, 2), detail: g.failedStep ?? g.workflowName, tone: g.status === "failure" ? "down" : undefined };
-    }
+    case "github":
+      return githubSlot(raw as GitHubChipData);
   }
 }
 
@@ -190,6 +175,8 @@ export function buildEdge(
   const utilities: EdgeUtility[] = [];
   for (const tab of UTILITIES) {
     const items = widgetData?.[tab] ?? [];
+    // Three or more repos are a page and leave the edge (SCROLLR-312); in quiet hours they are nowhere.
+    if (tab === "github" && items.length >= GITHUB_PAGE_MIN) continue;
     if (activeTabs.includes(tab) && items.length) {
       utilities.push({ tab, hex: catalogItemById(tab)?.hex, items: items.map((i) => slotOf(tab, i)) });
     }
@@ -230,19 +217,6 @@ const EASE = [0.32, 0.72, 0, 1] as const;
 /** The mark before a value. A sizer holds a dot's room: the widest state is a dot's. */
 function Mark({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
   if (!it.mark) return null;
-  if (it.mark === "count" && !sizer) {
-    const n = it.count ?? 0;
-    return (
-      <span
-        data-mark="count"
-        className="inline-flex h-[18px] min-w-[20px] shrink-0 items-center justify-center rounded-full px-[5px] text-[13px] font-bold leading-none tabular-nums"
-        // The ink, not the accent: the bar colour on it is the pair inkFor proves at 4.5:1 (the raw accent read 2.6:1 on light, SCROLLR-309).
-        style={{ background: "var(--accent-ink)", color: "var(--color-base-150)" }}
-      >
-        {n > 99 ? "99+" : n}
-      </span>
-    );
-  }
   return (
     <span
       data-mark={sizer ? undefined : it.mark}
@@ -253,7 +227,7 @@ function Mark({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
         !sizer && it.mark === "idle" && "bg-fg-3",
         !sizer && it.mark === "run" && "gh-ring",
       )}
-      style={!sizer && it.mark === "run" ? { background: "var(--accent)" } : undefined}
+      style={!sizer && (it.mark === "run" || it.mark === "you") ? { background: "var(--accent)" } : undefined}
     />
   );
 }
@@ -267,16 +241,16 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
         sizer ? "invisible col-start-1 row-start-1 h-0 overflow-hidden" : "h-full",
       )}
     >
-      <span className="truncate whitespace-nowrap text-[9.5px] font-bold uppercase leading-none tracking-[0.08em] text-fg-3">
+      <span className={clsx("truncate whitespace-nowrap text-[9.5px] font-bold uppercase leading-none tracking-[0.08em] text-fg-3", it.id.startsWith("github-") && "pr-4")}>
         {it.label}
         {!sizer && it.dim && it.id.startsWith("clock") ? " ☾" : ""}
       </span>
-      <span className={clsx("inline-flex whitespace-nowrap", it.mark ? "items-center gap-[6px]" : "items-baseline gap-1")}>
+      <span className={clsx("inline-flex max-w-full whitespace-nowrap", it.mark ? "items-center gap-[6px]" : "items-baseline gap-1")}>
         {it.icon && <span className="text-[12px] leading-none">{it.icon}</span>}
         <Mark it={it} sizer={sizer} />
         <span
           className={clsx(
-            "text-[16px] font-bold leading-none tabular-nums",
+            "min-w-0 truncate text-[16px] font-bold leading-none tabular-nums",
             it.tone === "live" ? "text-live" : it.tone === "down" ? "text-down" : it.tone === "error" ? "text-error" : it.tone === "warning" ? "text-warning" : it.tone === "ink" ? "" : it.dim ? "text-fg-2" : "text-fg",
           )}
           style={it.tone === "ink" && !sizer ? { color: "var(--accent-ink)" } : undefined}
@@ -294,16 +268,32 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
 }
 
 /** One utility: every item sized in, the one for this turn shown, rolled in with the swipe. */
-const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string) => void }) {
-  const it = u.items[((tick % u.items.length) + u.items.length) % u.items.length];
+const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string, url?: string) => void }) {
+  const at = ((tick % u.items.length) + u.items.length) % u.items.length;
+  const it = u.items[at];
   const roll = reduced
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.4, ease: "linear" as const } }
     : { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: 0.45, ease: EASE } };
+  // GitHub's slot is a fixed width (B3), with a corner dot per repo when it rotates; the rest size to their widest item.
+  const github = u.tab === "github";
   return (
-    <button type="button" onClick={() => onClick?.(it.id)} data-chip="" className="relative grid h-full max-w-[180px] shrink-0 overflow-hidden">
-      {u.items.map((x) => (
-        <SlotFace key={x.id} it={x} sizer />
-      ))}
+    <button
+      type="button"
+      onClick={() => onClick?.(it.id, it.url)}
+      data-chip=""
+      className={clsx("relative grid h-full shrink-0 overflow-hidden", github ? "w-[176px]" : "max-w-[180px]")}
+    >
+      {!github &&
+        u.items.map((x) => (
+          <SlotFace key={x.id} it={x} sizer />
+        ))}
+      {github && u.items.length > 1 && (
+        <span data-part="dots" className="absolute right-2 top-[9px] z-10 flex gap-[3px]">
+          {u.items.map((x, i) => (
+            <span key={x.id} data-on={i === at || undefined} className={clsx("size-1 rounded-full", i === at ? "bg-fg" : "bg-fg-3")} />
+          ))}
+        </span>
+      )}
       <AnimatePresence initial={false}>
         <motion.span key={it.id} data-item={it.id} className="absolute inset-0" {...roll}>
           <SlotFace it={it} />
@@ -360,7 +350,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
         {edge.utilities.map((u, i) => (
           <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark))}>
             {i > 0 && <Rule />}
-            <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
+            <Slot u={u} tick={tick} reduced={reduced} onClick={(id, url) => onChipClick?.(u.tab, id, url)} />
           </div>
         ))}
       </div>
