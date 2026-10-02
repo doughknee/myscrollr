@@ -42,7 +42,7 @@ once, at the release, with a one-time notice that Continuous is one click away i
 ### What a page looks like
 
 ```
-[ label ] [ game ] [ game ] [ game ] [ game ] [ game ] | [ clock ] [ pin ]
+[ label ] ‹ 7/23 › [ game ] [ game ] [ game ] [ game ] [ game ] | [ clock ] [ pin ]
 ```
 
 - **The label** on the left is 112 pixels: the widget's name in its own colour (NFL, BBC,
@@ -50,6 +50,9 @@ once, at the release, with a one-time notice that Continuous is one click away i
   where you are in the widget when it has more than one page: 2/8 means page 2 of 8, so
   you can see there's more and that it comes round. A line along its bottom edge fills as
   the page runs out of time.
+- **The pager** right after the label says where this page is in the whole trip round the
+  bar: 7/23 means the seventh of 23 pages across every widget. While your mouse is on the
+  bar, a ‹ and a › appear either side of it to go back or forward a page.
 - **The page** is one widget's items in equal columns that fill the bar. How many columns
   is a matter of your screen width and how much room that kind of thing needs: four NFL
   games on a 1280-pixel bar, six on a 1920 one, but only two headlines, because a
@@ -110,6 +113,13 @@ your place under your cursor.
   alike. A busy Saturday of 56 college games takes many laps to see everyone, and a live
   game waits its turn with the rest: it is on page 1, so it shows each time the widget
   comes back round to the start. One trip round the whole bar takes at most a minute.
+- **Page through it yourself.** Scroll the mouse wheel over the bar: down for the next
+  page, up for the one before (one page per notch; a trackpad swipe sideways works too).
+  Or click the ‹ › beside the label, or press ← → once you've clicked the bar. Going back
+  from a widget's first page takes you to the previous widget's last. Each page you step
+  to gets its full time, and when the bar moves on by itself it carries on from there, so
+  it won't show you again what you just paged through. With a bar on several monitors,
+  they all turn together.
 
 ### The edge
 

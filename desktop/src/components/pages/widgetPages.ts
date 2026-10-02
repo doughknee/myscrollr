@@ -11,7 +11,8 @@
  *    column widths).
  *  - `nextTurn` is the page clock's step: the next widget, at its next page
  *    (one page per widget per lap, SCROLLR-297). Only the primary ticker
- *    window runs it; the others follow its turns (PagedBar).
+ *    window runs it; the others follow its turns (PagedBar). `stepTurn` is a
+ *    manual step (wheel, arrows, keys) on the same clock (SCROLLR-298).
  */
 import type { DashboardResponse, Game, RssItem, Trade } from "../../types";
 import type { TickerContext } from "../../datawidgets/ticker";
@@ -350,6 +351,39 @@ export function nextTurn(
     pages: plan.pages.length,
     dwell: dwellFor(plan.pages[page].length),
   };
+}
+
+/**
+ * A manual step (SCROLLR-298): the next or previous page in reading order, which
+ * is every page of every widget in ticker order, the order the label's `n/m`
+ * counts. Past a widget's last page is the next widget's first; before its
+ * first is the previous widget's last. A step is an immediate turn plus a move
+ * of that widget's cursor (mutates `nav`) to the page after the one stepped to,
+ * so the clock's next turn moves on to the next widget and the widget's next
+ * turn does not show that page again. Null when there is nothing to show.
+ */
+export function stepTurn(
+  prev: Turn | null,
+  dir: 1 | -1,
+  widgets: readonly PageWidget[],
+  plans: ReadonlyMap<string, WidgetPlan<PageItem>>,
+  nav: Nav,
+): Turn | null {
+  if (!prev) return nextTurn(prev, widgets, plans, nav);
+  const at = widgets.findIndex((w) => w.tab === prev.tab);
+  let tab = prev.tab;
+  let plan = plans.get(tab);
+  // The plan may have changed since the turn (a refresh, a resize): the same share of the way through.
+  let page = at >= 0 && plan ? followPage(prev, plan.pages.length) + dir : -1;
+  if (!plan || page < 0 || page >= plan.pages.length) {
+    if (widgets.length === 0) return null;
+    tab = widgets[at < 0 ? 0 : (at + dir + widgets.length) % widgets.length].tab;
+    plan = plans.get(tab);
+    if (!plan || plan.pages.length === 0) return null;
+    page = dir > 0 ? 0 : plan.pages.length - 1;
+  }
+  nav.cursors.set(tab, (page + 1) % plan.pages.length);
+  return { seq: prev.seq + 1, tab, page, pages: plan.pages.length, dwell: dwellFor(plan.pages[page].length) };
 }
 
 /** This window's page for a turn: the same index when the counts agree, else the same share of the way through. */

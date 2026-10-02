@@ -40,20 +40,19 @@ const SKEW_MS = 400;
 
 /**
  * Every page of every widget has been up within this (the scorecard's "all
- * shown", SCROLLR-266/294), and the virtual time to spend finding out. A run
- * marked `over5` is measured and must still show everything, but is known to
- * take longer than ALL_SHOWN_MAX_S (SCROLLR-294; all three are under it since
- * SCROLLR-297's one page a lap, and keep the mark as decided: dropping it is
- * Home's call, never a raised threshold).
+ * shown", SCROLLR-266/294), and the virtual time to spend finding out. Every
+ * run is held to it: the `over5` exemptions went once SCROLLR-297's one page a
+ * lap brought mixed, busy and pages+npr30 under it (Home, SCROLLR-298). Never
+ * raise it to pass.
  */
 const ALL_SHOWN_MAX_S = 300;
 const ALL_CAP_MS = 600_000;
 
-const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; full?: boolean; npr30?: boolean; over5?: boolean }[] = [
+const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; full?: boolean; npr30?: boolean }[] = [
   { fixture: "pages", width: 1920, laps: 2, live: true }, // every page kind: NFL (yours + live), stocks, crypto, news, the Also page
-  { fixture: "mixed", width: 1920, laps: 2, live: true, over5: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 249 s since SCROLLR-297; 314 s before)
+  { fixture: "mixed", width: 1920, laps: 2, live: true }, // 56-game Saturday beside stocks and news, live and yours (all shown 293.5 s with the pager, SCROLLR-298: NCAAF 5 columns, 12 pages; 249 s before it)
   // SCROLLR-296 round 2: college cells at 276px give 3 columns at 1280 with the Clock (was 4), 19 pages: all shown 306.6 s. Flagged to Home (their call; 264 would keep 4 columns and ~217 s).
-  { fixture: "busy", width: 1280, live: true, over5: true }, // the overflow case: 19 pages of 3 games (all shown 115 s since SCROLLR-297; 307 s before)
+  { fixture: "busy", width: 1280, live: true }, // the overflow case: 19 pages of 3 games (all shown 115 s since SCROLLR-297; 307 s before)
   { fixture: "longnames", width: 1280 }, // the longest names, in the narrowest columns
   { fixture: "quiet", width: 1920 }, // nothing live: the floor
   { fixture: "default", width: 1920, live: true },
@@ -69,7 +68,7 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   { fixture: "npr", width: 1280, laps: 3 },
   { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
   // SCROLLR-294: the worst case for "all shown": every page kind, with NPR's 30 headlines (8 pages at 1920) among them.
-  { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true, over5: true }, // all shown 295 s since SCROLLR-297 (404 s before)
+  { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true }, // all shown 295 s since SCROLLR-297 (404 s before)
 ];
 
 /** dashboard.npr.json's 30 headlines, rebased onto now as the shim rebases a fixture. */
@@ -102,7 +101,7 @@ function summarise(tr: PagesTrace) {
   return `pages=${tr.enters.length} laps=[${l.map((x) => x.toFixed(1)).join(", ")}]s dwell=${Math.min(...d).toFixed(2)}..${Math.max(...d).toFixed(2)}s moved=${tr.moved.length} cuts=${tr.cuts.length}`;
 }
 
-for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr, over5 } of RUNS) {
+for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr } of RUNS) {
   test(`pages ${fixture}${swapNpr ? "+npr30" : ""} @${width}: still, whole, long enough, one page a lap, live first, short lap, all shown`, async ({ page, context }) => {
     test.setTimeout(600_000);
     await context.clock.install();
@@ -131,7 +130,7 @@ for (const { fixture, width, laps: wantLaps = LAPS, live, full, npr30: swapNpr, 
     const lapLens = laps(tr.enters);
     expect.soft(lapLens.length, `observed at least ${wantLaps} full laps`).toBeGreaterThanOrEqual(wantLaps);
     expect.soft(all, `every page of every widget up within ${ALL_CAP_MS / 1000}s of virtual time`).not.toBeNull();
-    if (all !== null && !over5) expect.soft(all, "all shown (s)").toBeLessThanOrEqual(ALL_SHOWN_MAX_S);
+    if (all !== null) expect.soft(all, "all shown (s)").toBeLessThanOrEqual(ALL_SHOWN_MAX_S);
 
     expect.soft(tr.moved, "no cell moves while its page is up").toEqual([]);
     expect.soft(tr.cuts, "no cell is cut off").toEqual([]);

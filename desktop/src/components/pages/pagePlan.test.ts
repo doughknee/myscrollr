@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LABEL_W,
+  PAGER_W,
   TIER,
   columnsFor,
   contentWidth,
@@ -22,7 +23,7 @@ describe("columns", () => {
     expect(columnsFor(1920 - LABEL_W, 212)).toBe(8);
     expect(columnsFor(1280 - LABEL_W, 400)).toBe(2);
     expect(columnsFor(0, 172)).toBe(1);
-    expect(contentWidth(1920, 300)).toBe(1920 - LABEL_W - 300);
+    expect(contentWidth(1920, 300)).toBe(1920 - LABEL_W - PAGER_W - 300);
     expect(contentWidth(50)).toBe(0);
   });
 

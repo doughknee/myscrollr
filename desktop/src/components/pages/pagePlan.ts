@@ -12,7 +12,7 @@
  *
  *  - WIDTHS. Every width in this file is in CSS pixels. `barWidth` is the full
  *    width of the ticker window. `contentWidth(barWidth, edgeWidth)` is what is
- *    left for columns after the label block (LABEL_W) and the fixed edge zone
+ *    left for columns after the label block (LABEL_W), the pager (PAGER_W) and the fixed edge zone
  *    (`edgeWidth`, 0 until the edge zone ships). `columnsFor` takes the CONTENT
  *    width. Height does not enter: comfort mode changes the row height, not how
  *    many columns fit.
@@ -55,9 +55,15 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 /** Width of the label block on the left of every page. */
 export const LABEL_W = 112;
 
-/** Width left for columns once the label and the edge zone are taken. */
+/**
+ * Width of the pager beside the label, `‹ 7/23 ›` (SCROLLR-298): two 22px arrows
+ * around a counter reserved for `99/99` at 12px mono.
+ */
+export const PAGER_W = 88;
+
+/** Width left for columns once the label, the pager and the edge zone are taken. */
 export function contentWidth(barWidth: number, edgeWidth = 0): number {
-  return Math.max(0, barWidth - LABEL_W - edgeWidth);
+  return Math.max(0, barWidth - LABEL_W - PAGER_W - edgeWidth);
 }
 
 /**
