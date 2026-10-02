@@ -120,7 +120,7 @@ test("the name is 20 px, 15 px beside the keypad when longer than five character
   expect(seen.some((s) => s.endsWith("15px")), `a long code was measured: ${seen.join(", ")}`).toBe(true);
 });
 
-test("‹ › stay in the widget and wrap inside it; ˄ ˅ change the widget", async ({ page, context }) => {
+test("‹ › read on: through this widget's pages, then into the next widget; ˄ ˅ skip a widget", async ({ page, context }) => {
   await open(page, context);
   const { tab, of } = await where(page);
   await page.mouse.move(900, 30);
@@ -134,14 +134,21 @@ test("‹ › stay in the widget and wrap inside it; ˄ ˅ change the widget", a
   await settle(context);
   await key("Previous page").click();
   await settle(context);
-  expect(await where(page), "back from page 1 is this widget's last page").toEqual({ tab, at: of, of });
+  const prevTab = await tabUp(page);
+  expect(prevTab, "back from page 1 reads on into the previous widget").not.toBe(tab);
+  const there = await where(page);
+  expect(there, "at its last page").toEqual({ tab: prevTab, at: there.of, of: there.of });
+  expect(await page.locator("[data-page][data-back]").count(), "swiped back").toBe(1);
+  await key("Next page").click();
+  await settle(context);
+  expect(await where(page), "and forward past its last page comes back to page 1 here").toEqual({ tab, at: 1, of });
   await key("Next widget").click();
   await settle(context);
   const next = await tabUp(page);
   expect(next).not.toBe(tab);
   await key("Previous widget").click();
   await settle(context);
-  expect(await where(page), "and back to the page you were reading").toEqual({ tab, at: of, of });
+  expect(await where(page), "and back to the page you were reading").toEqual({ tab, at: 1, of });
 });
 
 test("hovering ˄ or ˅ brightens the segment it would go to", async ({ page, context }) => {
@@ -163,16 +170,17 @@ test("hovering ˄ or ˅ brightens the segment it would go to", async ({ page, co
   expect(rest.map((c, i) => (c === up[i] ? -1 : i)).filter((i) => i >= 0), "the previous widget's, wrapping to the last").toEqual([rest.length - 1]);
 });
 
-test("the keypad's hide rule: ˄ ˅ only with 2+ widgets, ‹ › only with 2+ pages, nothing with neither", async ({ page, context }) => {
+test("the keypad never changes shape: four keys always, the ones that cannot act dimmed", async ({ page, context }) => {
   await open(page, context, "", "npr"); // one widget, many pages
   await page.mouse.move(900, 30);
-  expect(await page.locator("[data-keypad] button").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Previous page", "Next page"]);
+  const keys = (p: Page) => p.locator("[data-keypad] button").evaluateAll((els) => els.map((e) => `${e.getAttribute("aria-label")}${e.getAttribute("aria-disabled") ? " (off)" : ""}`));
+  expect(await keys(page)).toEqual(["Previous page", "Previous widget (off)", "Next widget (off)", "Next page"]);
   const one = await context.newPage();
   await parkMouse(one);
   await one.goto("/ticker-shim.html?pages=1&fixture=onegame");
   await one.waitForSelector("[data-band] [data-name]");
   await one.mouse.move(900, 30);
-  expect(await one.locator("[data-keypad]").count(), "one widget, one page: no keypad").toBe(0);
+  expect(await keys(one), "one widget, one page: all four, all dimmed").toEqual(["Previous page (off)", "Previous widget (off)", "Next widget (off)", "Next page (off)"]);
 });
 
 test("a pill shows its page; a segment jumps to its widget the shortest way round", async ({ page, context }) => {
@@ -217,7 +225,9 @@ test("wheel down turns this widget's page, wheel up back, a flick is one step, a
   expect(await at(page)).toBe(2);
   await wheel(page, context, -100);
   await wheel(page, context, -100);
-  expect(await where(page), "back past page 1 wraps to this widget's last").toEqual({ tab, at: of, of });
+  const prev = await where(page);
+  expect(prev.tab, "back past page 1 reads on into the previous widget").not.toBe(tab);
+  expect(prev, "at its last page").toEqual({ tab: prev.tab, at: prev.of, of: prev.of });
   expect(await page.evaluate(() => scrollX + scrollY + document.scrollingElement!.scrollTop), "the wheel scrolled nothing").toBe(0);
 });
 

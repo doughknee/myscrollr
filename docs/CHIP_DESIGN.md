@@ -60,9 +60,10 @@ once, at the release, with a one-time notice that Continuous is one click away i
     the ones still to come. Click a pill to go to that page. A widget with more than 24
     pages gets one track with a marker instead, and the only number on the band: 31/50.
   - **Hover the bar** and four small arrows appear beside the name: ‹ › for the page
-    before or after **in this widget**, ˄ ˅ for the widget before or after. Pointing at
-    ˄ or ˅ lights up the segment it would go to. Arrows that would do nothing don't show
-    (no ˄ ˅ with one widget, no ‹ › on a one-page widget). Don't want them? Turn off
+    before or after (past this widget's last page, › carries on into the next widget, so
+    you can click through the whole bar), ˄ ˅ to skip a widget. Pointing at ˄ or ˅ lights
+    up the segment it would go to. An arrow that would do nothing stays put, dimmed, so the
+    keys never shift under your pointer. Don't want them? Turn off
     **Page controls** in Settings › Ticker, or right-click the bar and untick it; the
     band looks the same and the wheel and arrow keys still work.
 - **The page** is one widget's items in equal columns that fill the bar. How many columns

@@ -415,9 +415,19 @@ export function stepTurn(
     if (at < 0 || n === 0) return null;
     // The plan may have changed since the turn (a refresh, a resize): the same share of the way through.
     const cur = followPage(prev, n);
-    const page = "page" in move ? followPage({ page: move.page, pages: move.of }, n) : (cur + move.dir + n) % n;
-    if (page === cur) return null;
-    return land(prev.tab, page, n, "page" in move ? page < cur : move.dir < 0);
+    if ("page" in move) {
+      const page = followPage({ page: move.page, pages: move.of }, n);
+      return page === cur ? null : land(prev.tab, page, n, page < cur);
+    }
+    const page = cur + move.dir;
+    if (page >= 0 && page < n) return land(prev.tab, page, n, move.dir < 0);
+    // Off the end: ‹ › read on into the next widget's first page (or back to the
+    // previous one's last), so holding › walks the whole bar. One widget: wrap inside.
+    if (widgets.length < 2) return n < 2 ? null : land(prev.tab, (page + n) % n, n, move.dir < 0);
+    const to = widgets[(at + move.dir + widgets.length) % widgets.length];
+    const m = plans.get(to.tab)?.pages.length ?? 0;
+    if (m === 0) return null;
+    return land(to.tab, move.dir > 0 ? 0 : m - 1, m, move.dir < 0);
   }
 
   const count = widgets.length;

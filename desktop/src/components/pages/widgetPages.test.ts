@@ -133,20 +133,28 @@ describe("stepTurn (SCROLLR-298, SCROLLR-303)", () => {
   const pages = plans.get(multi.tab)!.pages.length;
   const on = (page: number): Turn => ({ seq: 5, tab: multi.tab, page, pages, dwell: 6 });
 
-  it("‹ › turn this widget's page and wrap inside it; the widget never changes", () => {
+  it("‹ › turn this widget's page, then read on into the next widget's first page (back: the previous one's last)", () => {
     const nav = newNav();
     let t = on(0);
     const fwd = [];
-    for (let i = 0; i < pages; i++) fwd.push((t = stepTurn(t, { dir: 1 }, widgets, plans, nav)!).page);
-    expect(fwd).toEqual([...Array(pages).keys()].map((i) => (i + 1) % pages));
+    for (let i = 0; i < pages - 1; i++) fwd.push((t = stepTurn(t, { dir: 1 }, widgets, plans, nav)!).page);
+    expect(fwd).toEqual([...Array(pages - 1).keys()].map((i) => i + 1));
     expect(t.tab).toBe(multi.tab);
+    const at = widgets.indexOf(multi);
+    const next = widgets[(at + 1) % widgets.length];
+    t = stepTurn(t, { dir: 1 }, widgets, plans, nav)!;
+    expect([t.tab, t.page, t.back], "past the last page: the next widget, page 1").toEqual([next.tab, 0, undefined]);
+    const before = widgets[(at - 1 + widgets.length) % widgets.length];
     t = stepTurn(on(0), { dir: -1 }, widgets, plans, nav)!;
-    expect([t.tab, t.page, t.back], "back from page 1 is this widget's last page, swiped in from the left").toEqual([multi.tab, pages - 1, true]);
+    expect([t.tab, t.page, t.back], "back from page 1: the previous widget's last page, swiped in from the left").toEqual([before.tab, plans.get(before.tab)!.pages.length - 1, true]);
   });
 
-  it("a page turn on a one-page widget, or a widget change with one widget, is nothing", () => {
+  it("a page turn on a one-page widget reads on to the next widget; alone, a one-page widget is nothing, a many-page one wraps", () => {
     const one = widgets.find((w) => plans.get(w.tab)!.pages.length === 1)!;
-    expect(stepTurn({ seq: 1, tab: one.tab, page: 0, pages: 1, dwell: 6 }, { dir: 1 }, widgets, plans, newNav())).toBeNull();
+    const t = stepTurn({ seq: 1, tab: one.tab, page: 0, pages: 1, dwell: 6 }, { dir: 1 }, widgets, plans, newNav())!;
+    expect(t.tab).toBe(widgets[(widgets.indexOf(one) + 1) % widgets.length].tab);
+    expect(stepTurn({ seq: 1, tab: one.tab, page: 0, pages: 1, dwell: 6 }, { dir: 1 }, [one], plans, newNav())).toBeNull();
+    expect(stepTurn(on(pages - 1), { dir: 1 }, [multi], plans, newNav())!.page, "one widget: wraps inside").toBe(0);
     expect(stepTurn(on(0), { dir: 1, whole: true }, [multi], plans, newNav())).toBeNull();
   });
 

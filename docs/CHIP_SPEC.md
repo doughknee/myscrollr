@@ -183,8 +183,10 @@ with nothing to read at rest. `Band` in `PagedBar.tsx`.
   `bg-white/10`) in a 26px capsule washed `mix(14)`, radius 7. **No width at rest**
   (`w-0 p-0 overflow-hidden opacity-0`), its own width (76px with four keys) and 2px side
   padding while the bar is hovered or one of its keys has keyboard focus
-  (`has-[:focus-visible]`). **Hide rule:** ˄ ˅ only with 2+ widgets, ‹ › only
-  when this widget has 2+ pages; neither, no keypad. **Peek:** hovering ˄ or ˅ brightens the
+  (`has-[:focus-visible]`). **Four keys, always** (Brandon, 2 Oct: a key that vanishes
+  under the pointer breaks clicking through): a key that cannot act stays put, dimmed
+  (`aria-disabled`, `opacity-35`, no hover wash, no click) — ˄ ˅ with one widget, ‹ › with
+  one widget of one page. **Peek:** hovering ˄ or ˅ brightens the
   segment it would go to to 72%. Page controls off: no keypad at all; the band is
   otherwise identical.
 - **Motion:** a widget change wipes the name row and the pills row together (one
@@ -378,7 +380,7 @@ clock, with `move` a `Move`:
 
 | Move | From | Does |
 |---|---|---|
-| `{dir}` | ‹ ›, `←` `→`, the wheel | This widget's previous or next page, **wrapping inside the widget** (back from page 1 is its last page). The lap's order is unchanged. A one-page widget: nothing (null) |
+| `{dir}` | ‹ ›, `←` `→`, the wheel | This widget's previous or next page; **off the end it reads on**: past the last page is the next widget's page 1 (forward), before page 1 is the previous widget's last page (back, swiped from the left), so holding › walks the whole bar one page at a time. The lap's order is unchanged. One widget: wraps inside it; one widget of one page: nothing (null) |
 | `{dir, whole: true}` | ˄ ˅, `↑` `↓`, Shift+wheel | The previous or next widget. Forward lands on that widget's next page (its cursor, what the clock's own turn would show); back on the page it showed last (its last page if it has not been up yet), so `↓` then `↑` returns to what you were reading. One widget: nothing |
 | `{tab}` | an edge-bar segment | That widget, the shortest way round: more than half the lap ahead is a move back, landing as a ˄ does |
 | `{page, of}` | a pill | This widget's page `page` (mapped by share when the sender's count `of` differs, `followPage`); back when it is before the current one; the lit pill is nothing |
@@ -694,12 +696,12 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   a pill per page with the first lit, nothing but the name and the chip's count to read
   at rest; the keypad has no width at rest, shows on hover as four 18x22 keys in a 26px
   capsule, and the chip steps aside; the name is 20px, 15px on hover past five
-  characters, never cut, on every widget; ‹ › stay in the widget and wrap inside it, ˄ ˅
-  change it and come back to the page you were reading; ˄ ˅ peek at exactly the segment
-  they go to; the hide rule (`npr`: ‹ › only; `onegame`: no keypad); a pill and a
+  characters, never cut, on every widget; ‹ › read on through this widget into the next, ˄ ˅
+  skip a widget and come back to the page you were reading; ˄ ˅ peek at exactly the segment
+  they go to; four keys always, the ones that cannot act dimmed (`npr`: ˄ ˅ off; `onegame`: all four off); a pill and a
   segment move (a segment two behind is a move back); wheel down and up, a flick of eight
-  events is one step, a sideways swipe counts the same, back past page 1 wraps inside the
-  widget, nothing scrolls; a step back swipes in from the left and out to the right while a
+  events is one step, a sideways swipe counts the same, back past page 1 reads on into the
+  previous widget, nothing scrolls; a step back swipes in from the left and out to the right while a
   forward step and the clock's next turn go right to left; the band wipes up for the next
   widget and down for back while the edge bar stays put; a step restarts the dwell and the
   clock then goes to the next widget; a follower's wheel, keypad, `↓`, Shift+wheel and

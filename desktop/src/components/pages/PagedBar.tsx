@@ -38,6 +38,7 @@
  *    the band's width and everything else stay.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import clsx from "clsx";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { emit } from "@tauri-apps/api/event";
@@ -172,15 +173,18 @@ function DwellFill({ seq, dwell, held }: { seq: number; dwell: number; held: boo
 }
 
 /** One 18x22 key on the keypad: a 13px chevron in the ink, a 10% white wash on hover. */
-function Key({ icon: Icon, label, onClick, onPeek, ...data }: { icon: LucideIcon; label: string; onClick: () => void; onPeek?: (on: boolean) => void } & Record<`data-${string}`, string>) {
+function Key({ icon: Icon, label, onClick, onPeek, off, ...data }: { icon: LucideIcon; label: string; onClick: () => void; onPeek?: (on: boolean) => void; off?: boolean } & Record<`data-${string}`, string>) {
+  // A key that cannot act stays where it is, dimmed: the keypad never changes
+  // shape under the pointer, so "click through everything" keeps its rhythm.
   return (
     <button
       type="button"
       aria-label={label}
-      onClick={onClick}
-      onMouseEnter={onPeek && (() => onPeek(true))}
-      onMouseLeave={onPeek && (() => onPeek(false))}
-      className="flex h-[22px] w-[18px] shrink-0 cursor-pointer items-center justify-center rounded-[4px] transition-colors duration-[120ms] hover:bg-white/10"
+      aria-disabled={off || undefined}
+      onClick={off ? undefined : onClick}
+      onMouseEnter={onPeek && !off ? () => onPeek(true) : undefined}
+      onMouseLeave={onPeek && !off ? () => onPeek(false) : undefined}
+      className={clsx("flex h-[22px] w-[18px] shrink-0 items-center justify-center rounded-[4px] transition-colors duration-[120ms]", off ? "cursor-default opacity-35" : "cursor-pointer hover:bg-white/10")}
       style={{ color: "var(--accent-ink)" }}
       {...data}
     >
@@ -230,9 +234,10 @@ function Band({ cur, live, widgets, turn, held, dark, keypad, reduced, onMove, w
   const bar = edgeBar(n);
   const c = chip(live);
   const hue = c ? chipColor(c.kind, dark) : "";
-  const pageKeys = cur.count >= 2;
+  // ‹ › read on into the next widget, so they act whenever there is a second page anywhere.
+  const pageKeys = cur.count >= 2 || n >= 2;
   const widgetKeys = n >= 2;
-  const showKeypad = keypad && (pageKeys || widgetKeys);
+  const showKeypad = keypad;
   const accent = accentFor(cur.widget.hex, dark);
   const ink = inkFor(cur.widget.hex, dark);
   const fill = turn && <DwellFill seq={turn.seq} dwell={turn.dwell} held={held} />;
@@ -282,10 +287,10 @@ function Band({ cur, live, widgets, turn, held, dark, keypad, reduced, onMove, w
                 className="ml-auto flex h-[26px] w-0 shrink-0 items-center overflow-hidden rounded-[7px] p-0 opacity-0 transition-opacity duration-150 group-hover/bar:w-auto group-hover/bar:px-[2px] group-hover/bar:opacity-100 has-[:focus-visible]:w-auto has-[:focus-visible]:px-[2px] has-[:focus-visible]:opacity-100"
                 style={{ background: mix(14) }}
               >
-                {pageKeys && <Key icon={ChevronLeft} label="Previous page" data-step="prev" onClick={() => onMove({ dir: -1 })} />}
-                {widgetKeys && <Key icon={ChevronUp} label="Previous widget" data-jump="prev" onClick={() => onMove({ dir: -1, whole: true })} onPeek={peekOn(-1)} />}
-                {widgetKeys && <Key icon={ChevronDown} label="Next widget" data-jump="next" onClick={() => onMove({ dir: 1, whole: true })} onPeek={peekOn(1)} />}
-                {pageKeys && <Key icon={ChevronRight} label="Next page" data-step="next" onClick={() => onMove({ dir: 1 })} />}
+                <Key icon={ChevronLeft} label="Previous page" data-step="prev" off={!pageKeys} onClick={() => onMove({ dir: -1 })} />
+                <Key icon={ChevronUp} label="Previous widget" data-jump="prev" off={!widgetKeys} onClick={() => onMove({ dir: -1, whole: true })} onPeek={peekOn(-1)} />
+                <Key icon={ChevronDown} label="Next widget" data-jump="next" off={!widgetKeys} onClick={() => onMove({ dir: 1, whole: true })} onPeek={peekOn(1)} />
+                <Key icon={ChevronRight} label="Next page" data-step="next" off={!pageKeys} onClick={() => onMove({ dir: 1 })} />
               </span>
             )}
           </div>
