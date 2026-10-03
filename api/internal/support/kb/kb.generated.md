@@ -778,8 +778,26 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.7.0 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.7.1 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.7.1 — GitHub, rebuilt (`desktop-v1.7.1`, 2026-10-03)
+
+#### Scrollr 1.7.1 — GitHub, rebuilt
+
+The GitHub widget is new from the ground up. It tells you what broke and what's waiting on you, by name, instead of a row of counts.
+
+**A page per repo.** Each repo you track gets its own page on the bar. The first cell is the repo itself, in two lines: is it broken (`deploy failed · 12m`, `apply running · 3m`, `all green · 1h`), and what needs you, named (`Review` + the pull request's title and who opened it, `Broke on` + the commit that broke the build, and `you` if it was yours). The rest of the page is that repo's next things, one per cell: reviews asked of you, changes requested on your PRs, failing checks and runs, new issues, and what merged today.
+
+**Reviews from everywhere.** A review someone asks of you shows up even in repos you don't track.
+
+**Choose what each repo watches.** In the widget, pick your repos, then for each one: which workflows to follow (any CI counts, not just GitHub Actions — a failing Vercel check turns it red too), pull requests (off, only the ones that need you, or all open) and issues (off, assigned to you, or every new one).
+
+**Works the moment you connect.** Press **Connect GitHub** and your two most recently pushed repos are on the bar straight away. Add or remove repos any time.
+
+**Off the edge.** GitHub is always a page now, never squeezed into the edge, which stays for your clocks, weather and timers.
+
+**Also:** when there's only one page on the bar, the edge's clocks and weather still rotate on their own.
 
 ### Scrollr 1.7.0 — Pages (`desktop-v1.7.0`, 2026-10-02)
 
@@ -892,19 +910,3 @@ Your ticker contents, tracked symbols, teams, feeds and other apps' activity rem
 #### Fixes
 
 - Changing an analytics preference no longer undoes another privacy setting you changed while it was saving.
-
-### Scrollr 1.6.4 — Signed and transparent (`desktop-v1.6.4`, 2026-09-11)
-
-Two trust improvements: Windows can verify who made Scrollr, and product activity remains a choice you make explicitly.
-
-#### 🛡️ Windows knows who made it
-
-**Windows downloads now identify Scrollr, LLC as their verified publisher.** The app, setup program, and MSI installer are code-signed and carry trusted timestamps. The update packages keep their separate cryptographic signatures too, so both Windows and Scrollr verify what you install.
-
-#### 🔒 Product activity stays your choice
-
-**There is a new, separate “Share product activity” switch in Settings → Data & privacy. It is off by default and appears only while you are signed in.**
-
-If you turn it on, Scrollr records one daily fact after the native ticker has been visible with an enabled widget for 30 continuous seconds. That fact can include only broad categories such as sports, markets, news, fantasy, predictions, and utilities. It does not include symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint.
-
-Activity facts are retained for 90 days. Turning the switch off stops collection and deletes the stored activity facts and cohort metadata for your account. Crash reporting remains a separate setting.
