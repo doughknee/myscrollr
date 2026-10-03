@@ -167,16 +167,16 @@ that needs you: `Review` and the pull request's title and who opened it, `Change
 Nothing to name says `Nothing needs you`. Clicking the cell opens its most urgent thing
 on GitHub.
 
-GitHub gets its own page from the first repo, one cell per repo in your order, and never
-sits on the edge (the edge is for clocks, weather and timers). When your repos leave
-columns spare, the page fills itself with the next things that need you, one per cell:
-a review someone asked of you (from any repo the app can see, not only the ones you track),
-changes asked on one of yours, your failing checks, a failing run, a new or assigned
-issue. Each says what kind on top (`REVIEW`, `CHANGES ASKED`, `NEW ISSUE`), where and who
+GitHub gets a page per repo, in your order, from the first repo, and never sits on the
+edge (the edge is for clocks, weather and timers). Each page is the repo's cell, then the
+next things in that repo that need you, one per cell: a review someone asked of you,
+changes asked on one of yours, your failing checks, a failing run, a new or assigned issue.
+Each says what kind on top (`REVIEW`, `CHANGES ASKED`, `NEW ISSUE`), where and who
 (`myscrollr #479 · yours`) and the checks (`✗ 1 of 5`), with the title beneath. Nothing it
-shows repeats what a repo cell already says. Out of things that need you, it shows what was
-merged in the last day, drawn quieter (`MERGED`). Repos that fill the page get no extras.
-The band counts the repos that need you.
+shows repeats what the repo cell already says. Out of things that need you, it shows what
+was merged in the last day, drawn quieter (`MERGED`). A page with only a few cells spreads
+them across the bar, so titles read in full. Reviews asked of you in repos you don't track,
+and repos with nothing to add, share the last page. The band counts the repos that need you.
 
 Connect GitHub and do nothing else, and the page is already there: the repos with recent
 Actions runs go on the bar by themselves, without opening the widget.

@@ -648,7 +648,9 @@ export default function PagedBar({
       const items = plan.pages[index];
       // Truly short (one page, fewer items than columns, nothing left to
       // fill with): a full page's column width, not one item across the bar.
-      const short = plan.pages.length === 1 && items.length < plan.cols;
+      // GitHub's short pages (a repo with two things) stretch instead: wider
+      // cells show whole titles, and a page per repo is never a gap.
+      const short = plan.pages.length === 1 && w.kind !== "github" && items.length < plan.cols;
       shown.current = {
         seq: turn.seq,
         widget: w,

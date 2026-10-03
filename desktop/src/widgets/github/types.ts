@@ -303,6 +303,8 @@ export type ThingTone = "accent" | "red" | "dim" | "up" | "faint";
 export interface GitHubThing {
   /** Its link: the key on the page and where a click goes. */
   url: string;
+  /** "owner/name": which repo's page it fills (a page per repo). */
+  repo: string;
   /** The kicker: `REVIEW`, `CHANGES ASKED`, `DEPLOY FAILED`, `NEW ISSUE`, `MERGED`. */
   tag: string;
   tone: ThingTone;
@@ -365,13 +367,13 @@ export function thingsFor(
       const kind: PRKind = p.review_requested ? "review" : p.review_state === "changes_requested" ? "changes" : "checks";
       const [tag, tone] = PR_TAG[kind];
       const [right, rightTone] = checksText(p, now);
-      prs.push({ rank: PR_RANK[kind], url: p.html_url, tag, tone, where: `${label(r.repo)} #${p.number} · ${p.is_mine ? "yours" : p.author}`, right, rightTone, title: p.title });
+      prs.push({ rank: PR_RANK[kind], url: p.html_url, repo: r.repo, tag, tone, where: `${label(r.repo)} #${p.number} · ${p.is_mine ? "yours" : p.author}`, right, rightTone, title: p.title });
     }
   }
   for (const q of board.queue) {
     if (q.kind === "merged") continue;
     const [tag, tone] = PR_TAG[q.kind];
-    prs.push({ rank: PR_RANK[q.kind], url: q.url, tag, tone, where: `${label(q.repo)} #${q.number} · ${q.mine ? "yours" : q.author}`, right: shortAge(q.at, now), rightTone: "faint", title: q.title });
+    prs.push({ rank: PR_RANK[q.kind], url: q.url, repo: q.repo, tag, tone, where: `${label(q.repo)} #${q.number} · ${q.mine ? "yours" : q.author}`, right: shortAge(q.at, now), rightTone: "faint", title: q.title });
   }
   prs.sort((a, b) => a.rank - b.rank); // stable: the tracked repos' own first, in your order
 
@@ -380,6 +382,7 @@ export function thingsFor(
       .filter((w) => w.state === "failing" && w.url)
       .map((w): GitHubThing => ({
         url: w.url!,
+        repo: r.repo,
         tag: `${w.name.toUpperCase()} FAILED`,
         tone: "red",
         where: [label(r.repo), w.by_you ? "you" : w.actor].filter(Boolean).join(" · "),
@@ -391,6 +394,7 @@ export function thingsFor(
   const issues = repos.flatMap(({ r, t }) =>
     (r.issues && !r.issues.error ? r.issues.items : []).map((i): GitHubThing => ({
       url: i.url,
+      repo: r.repo,
       tag: t.issues === "new" ? "NEW ISSUE" : "ISSUE",
       tone: "dim",
       where: `${label(r.repo)} #${i.number}`,
@@ -401,6 +405,7 @@ export function thingsFor(
   );
   const shipped = board.shipped.map((s): GitHubThing => ({
     url: s.url,
+    repo: s.repo,
     tag: "MERGED",
     tone: "up",
     where: `${label(s.repo)} #${s.number} · ${s.mine ? "you" : s.author}`,

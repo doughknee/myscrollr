@@ -71,9 +71,9 @@ const RUNS: { fixture: string; width: number; laps?: number; live?: boolean; ful
   { fixture: "onegame", width: 1920, laps: 3 }, // truly short: one game, at a page's column width
   // SCROLLR-294: the worst case for "all shown": every page kind, with NPR's 30 headlines (8 pages at 1920) among them.
   { fixture: "pages", width: 1920, laps: 2, live: true, npr30: true }, // all shown 295 s since SCROLLR-297 (404 s before)
-  // SCROLLR-312: the GitHub page alone (github.board.json's four repos, a cell each; the Clock on the edge).
-  // 1920: five columns, the fifth a thing cell (canvas F1); 1280: three columns, repos only (2 + 2).
-  { fixture: "github", width: 1920, laps: 3, full: true },
+  // SCROLLR-312: GitHub alone (github.board.json's four repos; the Clock on the edge), a page per repo:
+  // its cell, then its things. A repo's page is as long as it has things, so not every page is full.
+  { fixture: "github", width: 1920, laps: 3 },
   { fixture: "github", width: 1280, laps: 3 },
 ];
 
@@ -169,11 +169,18 @@ const GH_FIRST: Record<string, string> = {
   "sample/scrollr-web": "vercel failed · 3m",
   "sample/infra": "apply running · 3m",
 };
-/** The fixture's things, most urgent first, as thingsFor orders them (never one a repo cell names). */
 const GH = "https://github.com/";
-const GH_THINGS = {
-  one: [`${GH}sample-org/docs/pull/61`, `${GH}sample/myscrollr/pull/479`, `${GH}sample/myscrollr/issues/312`, `${GH}sample/myscrollr/pull/476`],
-  two: [`${GH}sample-org/docs/pull/61`, `${GH}sample/myscrollr/pull/479`, `${GH}sample/myscrollr/issues/312`],
+/** myscrollr's page: its cell, then its things most urgent first (never the one its cell names). */
+const GH_MY = ["sample/myscrollr", `${GH}sample/myscrollr/pull/479`, `${GH}sample/myscrollr/issues/312`, `${GH}sample/myscrollr/pull/476`];
+/**
+ * The fixture's pages with the Clock, a page per repo in your order. What is
+ * left (the review queue from a repo you do not track, and scrollr-web, which
+ * has nothing beyond its cell) shares the last page. 1280 has three columns,
+ * so myscrollr keeps its two most urgent things.
+ */
+const GH_PAGES = {
+  1920: [GH_MY, ["sample/scrollr-api", `${GH}sample/scrollr-api/pull/210`], ["sample/infra", `${GH}sample/infra/issues/40`], [`${GH}sample-org/docs/pull/61`, "sample/scrollr-web"]],
+  1280: [GH_MY.slice(0, 3), ["sample/scrollr-api", `${GH}sample/scrollr-api/pull/210`], ["sample/infra", `${GH}sample/infra/issues/40`], [`${GH}sample-org/docs/pull/61`, "sample/scrollr-web"]],
 };
 
 /** The GitHub page up: its cells, their widths, line 1 of each repo cell, the band's chip, and whether GitHub is on the edge. */
@@ -188,11 +195,11 @@ const ghPage = (page: Page) =>
     edge: document.querySelector("[data-edge] [data-widget=github]") !== null,
   }));
 
-test("github: four repos are a page, a cell per repo in order, then a thing where a column is spare, at least REPO_MIN_COL wide (SCROLLR-312)", async ({ page, context }) => {
+test("github: a page per repo in your order, its cell then its things, at least REPO_MIN_COL wide (SCROLLR-312)", async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.clock.install();
-  // 1920 with the Clock: five columns, four repos and one thing. 1280: three columns, repos only (2 + 2).
-  for (const [width, want] of [[1920, [...GH_REPOS, `${GH}sample-org/docs/pull/61`]], [1280, GH_REPOS]] as const) {
+  for (const width of [1920, 1280] as const) {
+    const want = GH_PAGES[width];
     await page.setViewportSize({ width, height: 80 });
     await recordFromStart(page);
     await parkMouse(page);
@@ -207,7 +214,7 @@ test("github: four repos are a page, a cell per repo in order, then a thing wher
     const tr = await readTrace(page);
     const seen = tr.enters.slice(0, tr.enters[0].count);
     const label = `@${width}`;
-    expect(seen.flatMap((e) => e.items.map((i) => i.id)), `${label}: a cell per repo, in order, then the things`).toEqual(want);
+    expect(seen.map((e) => e.items.map((i) => i.id)), `${label}: a page per repo, in order, its cell then its things`).toEqual(want);
     const m = await ghPage(page);
     expect(Math.min(...m.cells), `${label}: REPO_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
     for (const [item, pill] of Object.entries(m.first)) expect(pill, `${label}: ${item}'s status`).toBe(GH_FIRST[item]);
@@ -226,7 +233,7 @@ test("github: four repos are a page, a cell per repo in order, then a thing wher
   expect(await page.locator("[data-edge] [data-widget=github]").count(), "quiet hours: not on the edge").toBe(0);
 });
 
-test("github: one or two repos are a page too, the spare columns filled with what needs you next, then what shipped; never the edge (SCROLLR-312, canvas F1)", async ({ page, context }) => {
+test("github: one or two repos are pages too, a repo's page filled with what needs you next, then what shipped; never the edge (SCROLLR-312)", async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.clock.install();
   await page.setViewportSize({ width: 1920, height: 80 });
@@ -238,9 +245,9 @@ test("github: one or two repos are a page too, the spare columns filled with wha
     await context.clock.runFor(2000);
     const m = await ghPage(page);
     const repos = GH_REPOS.slice(0, n === "one" ? 1 : 2);
-    expect(m.ids, `${n}: the repos first, then the things, a column each (five at 1920 with the Clock)`).toEqual([...repos, ...GH_THINGS[n]]);
+    expect(m.ids, `${n}: page 1 is myscrollr's: its cell, then its things`).toEqual(GH_MY);
     expect(Math.min(...m.cells), `${n}: REPO_MIN_COL (300)`).toBeGreaterThanOrEqual(300);
-    expect(m.shipped, `${n}: what shipped is marked quieter`).toEqual(n === "one" ? [`${GH}sample/myscrollr/pull/476`] : []);
+    expect(m.shipped, `${n}: what shipped is marked quieter`).toEqual([`${GH}sample/myscrollr/pull/476`]);
     expect(m.edge, `${n}: GitHub is not on the edge`).toBe(false);
     expect(m.count, `${n}: the band counts repos, never things`).toBe(String(repos.length));
   }

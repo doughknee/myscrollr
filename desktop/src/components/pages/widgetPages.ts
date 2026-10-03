@@ -21,6 +21,7 @@ import type { TickerContext } from "../../datawidgets/ticker";
 import { dropPinned, scopedRows } from "../../datawidgets/ticker";
 import type { WidgetPin } from "../../preferences";
 import type { GitHubThing } from "../../widgets/github/types";
+import { sameRepo } from "../../widgets/github/types";
 import { TICKER_SOURCES } from "../../datawidgets/tickerRegistry";
 import { TICKER_FINAL_HOURS, selectSportsForPages } from "../../datawidgets/sports/view";
 import { selectRssForPages } from "../../datawidgets/rss/view";
@@ -276,6 +277,31 @@ function githubWidget(chips: readonly GitHubChipData[], things: readonly GitHubT
   };
 }
 
+/**
+ * GitHub's pages (SCROLLR-312): a page per repo, in your order — its cell,
+ * then its things, most urgent first. What is left shares the last pages:
+ * things from repos you do not track (the review queue from everywhere),
+ * then the repos with nothing beyond their cell, so neither is ever a lone
+ * cell on a page of its own. ponytail: one page per repo, so a repo with
+ * more things than columns drops the least urgent; continue onto a second
+ * page if that bites.
+ */
+export function githubPages(repos: readonly PageItem[], things: readonly PageItem[], cols: number): PageItem[][] {
+  const c = Math.max(1, Math.floor(cols));
+  const repoOf = (i: PageItem) => (i.data as GitHubChipData | GitHubThing).repo;
+  const rest = things.filter((t) => !repos.some((r) => sameRepo(repoOf(r), repoOf(t))));
+  const pages: PageItem[][] = [];
+  const quiet: PageItem[] = [];
+  for (const r of repos) {
+    const own = things.filter((t) => sameRepo(repoOf(t), repoOf(r)));
+    if (own.length) pages.push([r, ...own].slice(0, c));
+    else quiet.push(r);
+  }
+  rest.push(...quiet);
+  for (let i = 0; i < rest.length; i += c) pages.push(rest.slice(i, i + c));
+  return pages;
+}
+
 /** A widget's pages at this bar width, how many columns a full page has, and how many items it could have shown. */
 export interface PagePlan extends WidgetPlan<PageItem> {
   cols: number;
@@ -296,8 +322,8 @@ export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWi
       const cols = columnsFor(content, w.minCol);
       // Popular symbols fill a watchlist SHORTER than a page, never the tail of a long one
       // (10 symbols at 9 columns are two pages of 5, not 9 of yours and 1 of yours + 8 of theirs);
-      // GitHub's things fill only a page the repos leave short (SCROLLR-312).
-      const fill = (w.kind === "finance" || w.kind === "github") && w.items.length >= cols ? [] : w.fill;
+      if (w.kind === "github") return [w.tab, { pages: githubPages(w.items, w.fill, cols), cols, avail: w.items.length + w.fill.length }];
+      const fill = w.kind === "finance" && w.items.length >= cols ? [] : w.fill;
       return [w.tab, { ...planWidget(topUp(w.items, fill, cols), (i) => i.tier, cols), cols, avail: w.items.length + fill.length }];
     }),
   );

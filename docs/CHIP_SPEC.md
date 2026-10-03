@@ -61,7 +61,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 | **horizon** | Continuous only: the per-source time rule deciding what is eligible for the rail. Pages have none: they show the widget page's pool (§P.4a). |
 | **floor** | Continuous only: what a quiet source still shows when nothing is inside its horizon: one item for most sources, the whole next matchday for Sports (§8.1). |
 | **cursor** | Pages: where a widget's next visit continues, per widget, held by the leader window; it survives refreshes and re-plans and wraps (§P.6). |
-| **fill** | Pages only: what tops a short page up to its column count (§P.4a): popular symbols on a short watchlist, GitHub's thing cells on a page its repos leave short. Never written anywhere; never a setting. |
+| **fill** | Pages only: what tops a short page up to its column count (§P.4a): popular symbols on a short watchlist, GitHub's thing cells on each repo's page (§P.4a). Never written anywhere; never a setting. |
 | **palette** | The `ChipColors` object for a chip's widget. Page cells take one `--accent` variable instead (§P.13). |
 | **status chip** | Continuous: the single grey chip a widget with nothing on the rail shows: why, and when if known (§8.7). Pages say the same words on the Also page. |
 | **source** | A `TickerSource` in `desktop/src/datawidgets/<source>/ticker.tsx`, registered in `tickerRegistry.ts`. Pages read the same sources through the same selectors. |
@@ -261,7 +261,7 @@ rest round on later laps. Nothing eligible is hidden.
 | Sports | Every game in the app's **default** day window (`SPORTS_WINDOW_DEFAULTS`: yesterday through seven days ahead, local calendar days), never the user's `display` window. `sortForDisplay`: live, then soonest kick-off, then newest finals (`selectSportsForPages`). A Thursday is TNF, Sunday and MNF | The week |
 | News | Every headline the widget holds, newest first, interleaved by feed like the ticker pool; undated counts as current (`selectRssForPages`) | The rss ingester's 7-day storage |
 | Stocks, Crypto | The watchlist, in the user's order (`selectFinanceForTicker`, unchanged) | The watchlist |
-| GitHub | Every tracked repo, one cell each, in the user's order (one tier: a repo is never re-ranked by its state), **from one repo up** (`githubWidget` in `widgetPages.ts`; SCROLLR-312, canvas F1, Brandon 2 Oct 2026: GitHub never goes on the edge). Quiet hours: no page and no Also entry | The tracked list (core answers 20) |
+| GitHub | A page per tracked repo in the user's order: its cell, then its things (`githubPages`; one tier, a repo is never re-ranked by its state), **from one repo up** (SCROLLR-312: GitHub never goes on the edge). Leftovers (untracked repos' things, then repos with nothing to add) share the last pages. Quiet hours: no page and no Also entry | The tracked list (core answers 20) |
 
 **Every page is full** (SCROLLR-292): a page shows as many items as it has columns, unless
 the widget has fewer items in total than one page holds. With the whole pool on pages, only
@@ -278,7 +278,7 @@ a short watchlist still needs topping up:
 | Family | Fill, in order (Pages only) | Tier |
 |---|---|---|
 | Sports, News | None: the pool is already everything the widget holds; still short is a short page (§P.3) | |
-| GitHub | **Only when the repos are fewer than a page's columns** (the finance rule: a fill never pushes a repo cell off, and repos that fill pages get no fill). One `ThingCell` per next thing that needs you, from `thingsFor` (`widgets/github/types.ts`), most urgent first: PRs that need you (review asked of you, then changes asked on yours, then your red checks; the tracked repos' own, then core's **review queue** from every repo the app can see), failing runs, new or assigned issues, then what **shipped** (PRs merged in the tracked repos in the last 24 h). Never a thing a repo cell already names (its line 2, or the failing run its line 1 reads), one cell per link (dedupe by URL) | 3, `fill: true`, no pin subject |
+| GitHub | **Each repo's own page**, after its cell (`githubPages`, not `topUp`): one `ThingCell` per next thing that needs you, from `thingsFor` (`widgets/github/types.ts`), most urgent first: PRs that need you (review asked of you, then changes asked on yours, then your red checks; the tracked repos' own, then core's **review queue** from every repo the app can see), failing runs, new or assigned issues, then what **shipped** (PRs merged in the tracked repos in the last 24 h). Never a thing a repo cell already names (its line 2, or the failing run its line 1 reads), one cell per link (dedupe by URL) | 3, `fill: true`, no pin subject |
 | Stocks, Crypto | **Only when the watchlist (after pins) is shorter than a page.** Popular symbols of the widget's own asset class with a live quote in `/finance/public`: the widget's starter list (SCROLLR-259, `addConfigForWidget(tab).symbols`), then `POPULAR_SYMBOLS` (a constant: nothing counts how many users track a symbol), then the rest of the market by day volume. Never one of the user's own or a pinned one (`selectFinanceFill`) | 3, `fill: true`, no pin subject |
 | Also | None (one entry per quiet widget; a short Also page is a short page, §P.3) | 4 |
 
@@ -525,8 +525,14 @@ slots, not five.
 - **GitHub is a page, not a slot** (SCROLLR-312; canvas board F5 "GitHub off the edge",
   Brandon picked F1, with F3 for zero setup). Before it, one or two repos rode a rotating
   176px edge slot and three or more got a page; that slot and its tests are deleted. The
-  page: a `RepoCell` per tracked repo (§P.9), then, while the repos leave columns spare,
-  `ThingCell`s (§P.4a fill, §P.9). The band's `needs` chip counts repos, never things.
+  pages (Brandon, 2 Oct 2026, after living with F1: "a page per repo"): **one page per
+  tracked repo, in your order**, each its `RepoCell` (§P.9) then that repo's `ThingCell`s,
+  most urgent first, up to the page's columns (`githubPages` in `widgetPages.ts`; one page
+  per repo, so the least urgent drop past the columns). What is left shares the last pages:
+  things from repos you do not track (the review queue), then the repos with nothing beyond
+  their cell, so neither stands alone. A GitHub page shorter than its columns **stretches**
+  its cells across the bar (`short` is never set for `kind: "github"`): wider cells show whole
+  titles. The band's pills are the pages; its `needs` chip counts repos, never things.
 - **GitHub's data** (`POST /github/board`, `api/internal/githubapp/board.go`): per repo as
   before, plus two lists for the fill, both cached 60 s per user (`cached`, `boardTTL`) from
   GitHub search with the user's token, four search calls a minute at most (search allows 30):
@@ -685,7 +691,7 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
   page shows `min(columns, available)`; several pages show full pages unless the pool is
   not a multiple of the columns, then the even split). Laps are cut at visit starts
   (`data-visit`), since a visit no longer always opens on page 1. Fixtures: `nflthursday`
-  (TNF + Sunday + MNF, your Bears on page 1), `github` (SCROLLR-312: `github.board.json`, four repos and their config: PRs for you, a failing deploy, a failing Vercel check, a running apply; a review queue and two merged PRs for the fill; the shim seeds it for `fixture=github` or `github=many`, and one or two of them for `github=one|two`, which are pages of one or two repo cells and then thing cells: at 1920 with the Clock, `one` is myscrollr, REVIEW docs #61, CHANGES ASKED #479, NEW ISSUE #312, MERGED #476), `googl` (one symbol + popular), `sparsenews`
+  (TNF + Sunday + MNF, your Bears on page 1), `github` (SCROLLR-312: `github.board.json`, four repos and their config: PRs for you, a failing deploy, a failing Vercel check, a running apply; a review queue and two merged PRs for the fill; the shim seeds it for `fixture=github` or `github=many`, and one or two of them for `github=one|two`, a page per repo: at 1920 with the Clock, myscrollr's page is its cell, CHANGES ASKED #479, NEW ISSUE #312, MERGED #476, and REVIEW docs #61 shares the last page), `googl` (one symbol + popular), `sparsenews`
   (nine headlines over three days, all shown), `onegame` (truly short: one column,
   left-aligned, measured), `npr` (SCROLLR-293: 30 headlines over six days). `pages+npr30` (SCROLLR-294: the
   `pages` set with NPR's 3 headlines swapped for `npr`'s 30, the worst case for all shown).

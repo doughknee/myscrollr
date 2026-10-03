@@ -286,7 +286,7 @@ describe("followPage", () => {
   });
 });
 
-describe("the GitHub page (SCROLLR-312, canvas F1): a cell per repo from one up, then things", () => {
+describe("the GitHub pages (SCROLLR-312): a page per repo, its cell then its things", () => {
   const GH_NOW = Date.parse(gh._captured_at);
   const chips = (n: number, quiet = false) =>
     (gh.repos as unknown as GitHubBoardRepo[]).slice(0, n).map((r, i) => repoChip(r, gh.config[i] as never, quiet, GH_NOW));
@@ -299,34 +299,41 @@ describe("the GitHub page (SCROLLR-312, canvas F1): a cell per repo from one up,
     expect(buildPageWidgets(null, ["github"], NOW)).toEqual([]);
   });
 
-  it("one repo: its cell, then the next things that need you, then what shipped; one page, every column full", () => {
+  it("one repo: its page is its cell, then its things, most urgent first; the rest share the last page", () => {
     const [w] = page(1);
     expect(w).toMatchObject({ tab: "github", kind: "github", minCol: REPO_MIN_COL });
     // 1920 with no edge: 1728px, five columns.
-    expect(keys(w, 1920)).toEqual([["github-sample/myscrollr", "t:sample-org/docs/pull/61", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312", "t:sample/myscrollr/pull/476"]]);
+    expect(keys(w, 1920)).toEqual([
+      ["github-sample/myscrollr", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312", "t:sample/myscrollr/pull/476"],
+      // A review asked of you in a repo you do not track, and a merge in one: never a page of their own.
+      ["t:sample-org/docs/pull/61", "t:sample/scrollr-api/pull/210"],
+    ]);
     // The band counts repos, never things.
     expect(chip(w)).toEqual({ kind: "needs", count: 1 });
   });
 
-  it("two repos: both cells first, then the things", () => {
-    const [w] = page(2);
-    expect(keys(w, 1920)).toEqual([["github-sample/myscrollr", "github-sample/scrollr-api", "t:sample-org/docs/pull/61", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312"]]);
-  });
-
-  it("repos that fill a page: repo cells only, never a thing pushing a repo off", () => {
+  it("a page per repo, in your order; a quiet repo never stands alone, it shares the last page", () => {
     const [w] = page(4);
-    // 1280 with the Clock: three columns, four repos: 2 + 2, no things.
-    expect(keys(w, 1280, 102)).toEqual([["github-sample/myscrollr", "github-sample/scrollr-api"], ["github-sample/scrollr-web", "github-sample/infra"]]);
+    expect(keys(w, 1920)).toEqual([
+      ["github-sample/myscrollr", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312", "t:sample/myscrollr/pull/476"],
+      ["github-sample/scrollr-api", "t:sample/scrollr-api/pull/210"],
+      ["github-sample/infra", "t:sample/infra/issues/40"],
+      ["t:sample-org/docs/pull/61", "github-sample/scrollr-web"],
+    ]);
   });
 
-  it("four repos at 1920: a cell per repo in the user's order, then one thing; the band counting the repos that need you", () => {
+  it("a repo with more things than columns keeps its most urgent, on its one page", () => {
+    const [w] = page(1);
+    // 1280 with the Clock: three columns.
+    expect(keys(w, 1280, 102)[0]).toEqual(["github-sample/myscrollr", "t:sample/myscrollr/pull/479", "t:sample/myscrollr/issues/312"]);
+  });
+
+  it("the band counts the repos that need you, in your order, never re-ranked", () => {
     const [w] = page(4);
     expect(w).toMatchObject({ tab: "github", kind: "github", code: "GITHUB", minCol: REPO_MIN_COL });
     expect(w.items.map((i) => i.key)).toEqual(["github-sample/myscrollr", "github-sample/scrollr-api", "github-sample/scrollr-web", "github-sample/infra"]);
     // All four are red or the accent.
     expect(chip(w)).toEqual({ kind: "needs", count: 4 });
-    // The ladder never re-ranks a repo by its state: one tier, the user's order.
-    expect(keys(w, 1920)).toEqual([[...w.items.map((i) => i.key), "t:sample-org/docs/pull/61"]]);
     expect(chip(page(3)[0])).toEqual({ kind: "needs", count: 3 });
   });
 

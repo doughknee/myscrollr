@@ -218,15 +218,29 @@ for (const family of THEME_FAMILIES) {
   for (const mode of ["dark", "light"] as const) {
     const theme = `${family}-${mode}`;
     test(`${theme}: the github page's two lines and band chip clear 4.5:1`, async ({ page }) => {
+      // A page per repo: read each of the four pages (repo cells, every kind of thing), stepping with → (the one widget wraps).
       const all = await readings(page, `/ticker-shim.html?pages=1&fixture=github&utils=&theme=${theme}`, ".ticker-container", "[data-page] [data-chip]");
-      const tones = await page.locator("[data-page] [data-part=status]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tone")));
+      const tones: (string | null)[] = [];
+      const kickers: (string | null)[] = [];
+      const repos = new Set<string | null>();
+      let shipped = 0;
+      for (let i = 0; i < 4; i++) {
+        if (i > 0) {
+          await page.keyboard.press("ArrowRight");
+          await page.waitForTimeout(150);
+          await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+          all.push(...(await page.evaluate(() => window.__contrast(".ticker-container"))));
+        }
+        tones.push(...(await page.locator("[data-page] [data-part=status]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tone")))));
+        for (const r of await page.locator("[data-page] [data-worst]").evaluateAll((els) => els.map((e) => e.getAttribute("data-item")))) repos.add(r);
+        kickers.push(...(await page.locator("[data-page] [data-thing] [data-part=tag]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tone")))));
+        shipped += await page.locator("[data-page] [data-thing=shipped]").count();
+      }
       expect(["red", "accent", "dim"].filter((k) => !tones.includes(k)), `${theme}: every status tone drawn`).toEqual([]);
-      expect(await page.locator("[data-page] [data-chip]").count(), `${theme}: four repos and a thing on one page`).toBe(5);
+      expect(repos.size, `${theme}: all four repos measured`).toBe(4);
       for (const role of ["title", "status", "tag", "what", "who", "chip"]) expect(all.some((r) => r.role === role), `${theme}: measured ${role}`).toBe(true);
-      all.push(...(await readings(page, `/ticker-shim.html?pages=1&fixture=github&github=one&utils=&theme=${theme}`, ".ticker-container", "[data-page] [data-thing]")));
-      const kickers = await page.locator("[data-page] [data-thing] [data-part=tag]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tone")));
       expect(["accent", "red", "dim", "up"].filter((k) => !kickers.includes(k)), `${theme}: every kicker tone drawn`).toEqual([]);
-      expect(await page.locator("[data-page] [data-thing=shipped]").count(), `${theme}: a shipped cell`).toBe(1);
+      expect(shipped, `${theme}: a shipped cell`).toBeGreaterThan(0);
       for (const role of ["where", "right"]) expect(all.some((r) => r.role === role), `${theme}: measured ${role}`).toBe(true);
       const missed = all.filter((r) => r.ratio < r.floor);
       const key = (r: (typeof all)[number]) => `${r.role}@${r.floor}`;
