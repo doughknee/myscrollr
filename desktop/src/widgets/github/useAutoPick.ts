@@ -7,7 +7,7 @@ import type { AppPreferences } from "../../preferences";
 
 /**
  * Zero setup (SCROLLR-312, canvas F3): connected to GitHub with nothing
- * tracked, the repos with recent Actions runs go on the bar without the
+ * tracked, the two repos you pushed to last go on the bar without the
  * widget's page ever being opened. The shell runs it, and it is the only
  * place this happens: once a session, and only into an empty list. Same
  * query keys as the GitHub page, so the two never double-fetch.

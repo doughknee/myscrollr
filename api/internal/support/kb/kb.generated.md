@@ -251,7 +251,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ## How the ticker works
 
-<!-- source: docs/CHIP_DESIGN.md @ 76f42c4f0b5d -->
+<!-- source: docs/CHIP_DESIGN.md @ 1177caec2133 -->
 *The short version of the ticker rules. Read this first; the exact spec with every number,
 class and file is `docs/CHIP_SPEC.md`. If the two ever disagree, the spec wins.*
 
@@ -430,8 +430,8 @@ was merged in the last day, drawn quieter (`MERGED`). A page with only a few cel
 them across the bar, so titles read in full. Reviews asked of you in repos you don't track,
 and repos with nothing to add, share the last page. The band counts the repos that need you.
 
-Connect GitHub and do nothing else, and the page is already there: the repos with recent
-Actions runs go on the bar by themselves, without opening the widget.
+Connect GitHub and do nothing else, and the page is already there: the two repos you
+pushed to most recently go on the bar by themselves, without opening the widget.
 
 GitHub is the one widget where you choose what reaches the bar, because a developer's day
 has more events than anyone wants to see. In the widget, pick a repo on the left and choose

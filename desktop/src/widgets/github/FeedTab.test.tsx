@@ -121,8 +121,8 @@ beforeEach(() => {
     connected: true,
     login: "octo",
     repos: [
-      { full_name: "octo/app", private: true, active: true, last_run_at: ago(2 * 1440) },
-      { full_name: "octo/site", private: false, active: true },
+      { full_name: "octo/app", private: true, active: true, last_run_at: ago(2 * 1440), pushed_at: ago(60) },
+      { full_name: "octo/site", private: false, active: true, pushed_at: ago(600) },
       { full_name: "octo/dusty", private: false, active: false, pushed_at: "2025-01-01T00:00:00Z" },
     ],
   });
@@ -234,7 +234,7 @@ describe("zero setup: the shell's useGitHubAutoPick (SCROLLR-312, F3)", () => {
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
   );
 
-  it("connected with nothing tracked: the active repos with the defaults, once, without the widget's page", async () => {
+  it("connected with nothing tracked: the two repos pushed to last, with the defaults, once, without the widget's page", async () => {
     const persist = vi.fn();
     const { rerender } = renderHook(() => useGitHubAutoPick(withRepos([]), true, true, persist), { wrapper });
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));

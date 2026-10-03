@@ -533,21 +533,18 @@ export function nextFlash(prev: FlashMemo | undefined, worst: GitHubWorst, needs
 /** Core's /github/board answers at most this many repos (maxRepos). */
 export const MAX_REPOS = 20;
 
-/**
- * The first-load rule: with nothing tracked, start from the repos with
- * recent Actions activity. Never adds to an existing list (null = leave it).
- */
-/**
- * Zero setup picks at most this many: each tracked repo costs about 5 GitHub
- * calls a poll, so 20 would spend ~6,000/h of the user's 5,000/h and go stale.
- * Six fill a 1920 page and cost ~1,800/h. The user can still add up to MAX_REPOS.
- */
-export const AUTO_PICK_MAX = 6;
+/** Zero setup picks this many: the repos you pushed to most recently. */
+export const AUTO_PICK = 2;
 
+/**
+ * The first-load rule (SCROLLR-312, F3): with nothing tracked, start from
+ * the two repos you pushed to most recently, Actions or not, so the widget
+ * is never empty after Connect. Never adds to an existing list (null = leave it).
+ */
 export function autoPick(tracked: GitHubTrackedRepo[], rows: GitHubRepoRow[]): GitHubTrackedRepo[] | null {
   if (tracked.length > 0) return null;
-  const active = rows.filter((r) => r.active).slice(0, AUTO_PICK_MAX);
-  return active.length > 0 ? active.map((r) => newRepo(r.full_name)) : null;
+  const recent = [...rows].sort((a, b) => (b.pushed_at ?? "").localeCompare(a.pushed_at ?? "")).slice(0, AUTO_PICK);
+  return recent.length > 0 ? recent.map((r) => newRepo(r.full_name)) : null;
 }
 
 // ── Store persistence (the ticker windows read it) ─────────────

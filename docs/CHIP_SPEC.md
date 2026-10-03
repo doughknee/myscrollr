@@ -546,7 +546,7 @@ slots, not five.
   hours). Releases and deploy events are not on the board yet.
 - **Zero setup** (F3): with GitHub on the ticker, connected and nothing tracked, the shell
   (`useGitHubAutoPick` in `widgets/github/useAutoPick.ts`, run from `__root.tsx`) tracks the
-  repos with recent Actions runs (`autoPick`), so a useful page is on the bar without the
+  two repos you pushed to most recently, Actions or not (`autoPick`, `AUTO_PICK`), so a useful page is on the bar without the
   widget's page ever being opened. It is the only place that picks: once a session, only into
   an empty list.
 - **GitHub, what each repo watches** (the widget's FeedTab, `prefs.widgets.github`: `repos:

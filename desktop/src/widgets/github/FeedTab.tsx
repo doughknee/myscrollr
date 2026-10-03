@@ -44,7 +44,7 @@ export const githubWidget: WidgetManifest = {
       "The GitHub widget puts each repo you track on the bar as one cell, " +
       "showing what you chose for it: workflows, pull requests, issues.",
     usage: [
-      "Connect GitHub, then add repos with + Add a repo; the ones with recent Actions runs start on the bar.",
+      "Connect GitHub, then add repos with + Add a repo; the two you pushed to last start on the bar.",
       "Pick a repo to choose its workflows, its pull requests (off, the ones that need you, all open) and its issues.",
       "GitHub gets its own page on the bar: a cell per repo, and spare columns fill with what needs you next, then what just shipped.",
       "Quiet hours and the flash are in the ⋯ menu.",

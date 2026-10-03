@@ -161,15 +161,18 @@ describe("fetchBoard", () => {
 });
 
 describe("the picker's first load and URLs", () => {
-  it("autoPick: the active repos with the defaults, never into an existing list", () => {
+  it("autoPick: the two repos you pushed to last, Actions or not, never into an existing list", () => {
     const rows = [
-      { full_name: "o/a", private: false, active: true },
-      { full_name: "o/b", private: false, active: false },
+      { full_name: "o/old", private: false, active: true, pushed_at: "2026-09-01T00:00:00Z" },
+      { full_name: "o/newest", private: false, active: false, pushed_at: "2026-10-02T09:00:00Z" },
+      { full_name: "o/second", private: true, active: false, pushed_at: "2026-10-01T09:00:00Z" },
     ];
-    expect(autoPick([], rows)).toEqual([{ repo: "o/a", prs: "mine", issues: "off" }]);
+    expect(autoPick([], rows)).toEqual([
+      { repo: "o/newest", prs: "mine", issues: "off" },
+      { repo: "o/second", prs: "mine", issues: "off" },
+    ]);
     expect(autoPick([{ repo: "x/y", prs: "off", issues: "off" }], rows)).toBeNull();
-    const many = Array.from({ length: 12 }, (_, i) => ({ ...rows[0], full_name: `o/r${i}`, active: true }));
-    expect(autoPick([], many)).toHaveLength(6); // AUTO_PICK_MAX: the rate budget, not MAX_REPOS
+    expect(autoPick([], [])).toBeNull();
   });
 
   it("parseRepoUrl: URLs and owner/name, nothing else", () => {
