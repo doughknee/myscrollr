@@ -93,3 +93,6 @@ docker/compose.override.yml
 desktop/.vite/
 playwright-report/
 test-results/
+
+# SCROLLR-302 lag measurement output (scripts/measure/live-lag.mjs)
+results/
