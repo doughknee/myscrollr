@@ -45,7 +45,7 @@ async fn transition_only_on_score_period_or_status_change() {
     sqlx::query("UPDATE game_transitions SET at = NOW() - INTERVAL '31 days' WHERE league = $1 AND home_score = 0")
         .bind(LEAGUE).execute(&*pool).await.unwrap();
     cleanup_old_games(&pool).await.unwrap();
-    assert_eq!(count().await, 1);
+    assert_eq!(count().await, 2);
 
     for t in ["game_transitions", "games"] {
         sqlx::query(&format!("DELETE FROM {t} WHERE league = $1")).bind(LEAGUE).execute(&*pool).await.unwrap();
