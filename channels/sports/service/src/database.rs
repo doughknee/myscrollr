@@ -380,6 +380,10 @@ pub async fn cleanup_old_games(pool: &Arc<PgPool>) -> Result<u64> {
     )
     .execute(&mut *connection)
     .await?;
+    // SCROLLR-320: transitions keep 30 days, longer than the games they describe.
+    query("DELETE FROM game_transitions WHERE at < NOW() - INTERVAL '30 days'")
+        .execute(&mut *connection)
+        .await?;
     Ok(result.rows_affected())
 }
 
@@ -434,7 +438,14 @@ pub async fn get_game_row(pool: &Arc<PgPool>, league: &str, external_game_id: &s
 // =============================================================================
 
 pub async fn upsert_game(pool: Arc<PgPool>, game: CleanedData) -> Result<()> {
+    // SCROLLR-320: one statement. `prev` is the row as it stood before the
+    // write; a game_transitions row lands only for a new game or when score,
+    // period (status_short) or status (state) differ from it.
     let statement = "
+        WITH prev AS (
+            SELECT true AS existed, home_team_score, away_team_score, status_short, state
+            FROM games WHERE league = $1 AND external_game_id = $3
+        ), up AS (
         INSERT INTO games (
             league, sport, external_game_id, link,
             home_team_name, home_team_logo, home_team_score, home_team_code,
@@ -463,7 +474,17 @@ pub async fn upsert_game(pool: Arc<PgPool>, game: CleanedData) -> Result<()> {
             timer = EXCLUDED.timer,
             venue = EXCLUDED.venue,
             season = EXCLUDED.season,
-            updated_at = CURRENT_TIMESTAMP;
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING league, external_game_id, home_team_score, away_team_score, status_short, state
+        )
+        INSERT INTO game_transitions (league, external_game_id, home_score, away_score, period, status)
+        SELECT up.league, up.external_game_id, up.home_team_score, up.away_team_score, up.status_short, up.state
+        FROM up LEFT JOIN prev ON true
+        WHERE prev.existed IS NULL
+           OR prev.home_team_score IS DISTINCT FROM up.home_team_score
+           OR prev.away_team_score IS DISTINCT FROM up.away_team_score
+           OR prev.status_short IS DISTINCT FROM up.status_short
+           OR prev.state IS DISTINCT FROM up.state;
     ";
     let mut connection = pool.acquire().await?;
     query(statement)

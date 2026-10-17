@@ -11,7 +11,13 @@
 //   node scripts/measure/live-lag.mjs --sport baseball --minutes 3
 //   node scripts/measure/live-lag.mjs --sport nfl --from 2026-10-06T00:00:00Z --until 2026-10-06T04:30:00Z
 //   node scripts/measure/live-lag.mjs summary results/2026-10-06-nfl-lag.jsonl
+//   node scripts/measure/live-lag.mjs retro --sport nfl --date 2026-10-18 --transitions results/nfl-2026-10-18-transitions.jsonl
 //   node scripts/measure/live-lag.mjs selftest
+//
+// retro (SCROLLR-320) needs no sampler: our side is the game_transitions table the ingester fills
+// (scripts/measure/transitions.sql, run via the psql pod, gives the --transitions file), the reference
+// is ESPN's per-play wallclock. The table is core-owned, so the file is the simplest hand-off: no DB
+// credentials in this script.
 //
 // API_SPORTS_KEY comes from the environment only. It is never printed or written.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
@@ -262,10 +268,62 @@ function selftest() {
   console.log('selftest ok\n' + summarize(L))
 }
 
+// ── retro ──
+
+// ESPN game summary -> the same samples `espn` yields live, but from play wallclocks, so any past game works
+export function espnFromSummary(ev, plays) {
+  const c = ev.competitions[0]
+  const home = c.competitors.find((x) => x.homeAway === 'home').team.displayName
+  const away = c.competitors.find((x) => x.homeAway === 'away').team.displayName
+  const base = { key: keyOf(home, away, ev.date), home, away }
+  const timed = plays.filter((p) => p.wallclock)
+  if (!timed.length) return []
+  const at = (p) => new Date(p.wallclock).toISOString()
+  return [
+    { ...base, t: new Date(Date.parse(timed[0].wallclock) - 1000).toISOString(), hs: 0, as: 0, period: null, state: 'pre' },
+    ...timed.map((p) => ({ ...base, t: at(p), hs: p.homeScore ?? 0, as: p.awayScore ?? 0, period: p.period?.number ?? null, state: 'in' })),
+    { ...base, t: at(timed.at(-1)), ...{ hs: timed.at(-1).homeScore ?? 0, as: timed.at(-1).awayScore ?? 0 }, period: timed.at(-1).period?.number ?? null, state: 'post' },
+  ]
+}
+
+export function prodFromTransition(r) {
+  return {
+    src: 'prod', t: r.at, key: keyOf(r.home_team_name, r.away_team_name, r.start_time),
+    home: r.home_team_name, away: r.away_team_name, hs: Number(r.home_score), as: Number(r.away_score),
+    period: periodOf(r.period), state: { pre: 'pre', in: 'in', final: 'post' }[r.status] ?? 'other',
+  }
+}
+
+async function retro() {
+  const cfg = SPORTS[arg('sport') ?? 'nfl']
+  const date = arg('date'), file = arg('transitions')
+  if (!cfg || !/^\d{4}-\d\d-\d\d$/.test(date ?? '') || !file) throw new Error('need --sport nfl|baseball --date YYYY-MM-DD --transitions <jsonl from transitions.sql>')
+  const espn = `https://site.api.espn.com/apis/site/v2/sports/${cfg.espn}`
+  const day = (d) => d.replaceAll('-', '')
+  const next = new Date(Date.parse(date) + 864e5).toISOString().slice(0, 10) // late games start after UTC midnight
+  const rows = load(file).map(prodFromTransition)
+  const wanted = new Set(rows.map((r) => r.key))
+  const lines = [...rows]
+  const seen = new Set()
+  for (const d of [date, next]) {
+    for (const ev of (await getJson(`${espn}/scoreboard?dates=${day(d)}`)).events) {
+      const c = ev.competitions[0]
+      const k = keyOf(c.competitors.find((x) => x.homeAway === 'home').team.displayName, c.competitors.find((x) => x.homeAway === 'away').team.displayName, ev.date)
+      if (!wanted.has(k) || seen.has(ev.id)) continue
+      seen.add(ev.id)
+      const sum = await getJson(`${espn}/summary?event=${ev.id}`)
+      const plays = sum.plays ?? (sum.drives?.previous ?? []).flatMap((x) => x.plays ?? [])
+      lines.push(...espnFromSummary(ev, plays).map((s) => ({ src: 'espn', ...s })))
+    }
+  }
+  console.log(summarize(lines))
+}
+
 const cmd = process.argv[2]
 const load = (f) => readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
 if (process.argv[1].endsWith('live-lag.mjs')) {
   if (cmd === 'summary') console.log(summarize(load(process.argv[3])))
   else if (cmd === 'selftest') selftest()
+  else if (cmd === 'retro') retro().catch((e) => { console.error(e.message); process.exit(1) })
   else run().then((out) => { if (arg('minutes')) console.log(summarize(load(out))) }, (e) => { console.error(e.message); process.exit(1) })
 }
