@@ -97,6 +97,9 @@ func (s *Server) setupMiddleware() {
 	// must not cross.
 	s.App.Use(platform.RecordUsage)
 
+	// Log slow (>1s) and 5xx /admin requests (SCROLLR-324).
+	s.App.Use("/admin", AdminTiming)
+
 	// Security Headers
 	s.App.Use(func(c *fiber.Ctx) error {
 		c.Set("X-XSS-Protection", "1; mode=block")
