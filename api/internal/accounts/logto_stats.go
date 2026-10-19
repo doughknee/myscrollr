@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
 
@@ -53,45 +55,45 @@ type LogtoStats struct {
 	DauCurve []LogtoDayCount
 }
 
-// FetchLogtoStats reads the three dashboard endpoints.
+// FetchLogtoStats reads the three dashboard endpoints concurrently, so a cold
+// read costs one Logto round trip instead of three (SCROLLR-326).
 //
-// Sequential on purpose: the caller caches the result for minutes, so the
-// three round trips happen once per cache window and concurrency would buy
-// nothing but a fan-out to reason about. Any one failing fails the whole
-// read — a half-filled growth tile is worse than one that says Logto is down.
+// Any one failing fails the whole read — a half-filled growth tile is worse
+// than one that says Logto is down.
 func FetchLogtoStats() (LogtoStats, error) {
-	var s LogtoStats
+	var (
+		total struct {
+			TotalUserCount int `json:"totalUserCount"`
+		}
+		fresh struct {
+			Today     LogtoTrend `json:"today"`
+			Last7Days LogtoTrend `json:"last7Days"`
+		}
+		active struct {
+			DAU      LogtoTrend      `json:"dau"`
+			WAU      LogtoTrend      `json:"wau"`
+			MAU      LogtoTrend      `json:"mau"`
+			DauCurve []LogtoDayCount `json:"dauCurve"`
+		}
+	)
 
-	var total struct {
-		TotalUserCount int `json:"totalUserCount"`
-	}
-	if err := logtoGetJSON("/api/dashboard/users/total", &total); err != nil {
-		return s, err
-	}
-
-	var fresh struct {
-		Today     LogtoTrend `json:"today"`
-		Last7Days LogtoTrend `json:"last7Days"`
-	}
-	if err := logtoGetJSON("/api/dashboard/users/new", &fresh); err != nil {
-		return s, err
-	}
-
-	var active struct {
-		DAU      LogtoTrend      `json:"dau"`
-		WAU      LogtoTrend      `json:"wau"`
-		MAU      LogtoTrend      `json:"mau"`
-		DauCurve []LogtoDayCount `json:"dauCurve"`
-	}
-	if err := logtoGetJSON("/api/dashboard/users/active", &active); err != nil {
-		return s, err
+	var g errgroup.Group
+	g.Go(func() error { return logtoGetJSON("/api/dashboard/users/total", &total) })
+	g.Go(func() error { return logtoGetJSON("/api/dashboard/users/new", &fresh) })
+	g.Go(func() error { return logtoGetJSON("/api/dashboard/users/active", &active) })
+	if err := g.Wait(); err != nil {
+		return LogtoStats{}, err
 	}
 
-	s.Total = total.TotalUserCount
-	s.NewToday, s.New7d = fresh.Today, fresh.Last7Days
-	s.DAU, s.WAU, s.MAU = active.DAU, active.WAU, active.MAU
-	s.DauCurve = active.DauCurve
-	return s, nil
+	return LogtoStats{
+		Total:    total.TotalUserCount,
+		NewToday: fresh.Today,
+		New7d:    fresh.Last7Days,
+		DAU:      active.DAU,
+		WAU:      active.WAU,
+		MAU:      active.MAU,
+		DauCurve: active.DauCurve,
+	}, nil
 }
 
 // logtoGetJSON GETs a Management API path with the M2M token and decodes the

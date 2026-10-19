@@ -12,6 +12,7 @@ import (
 	"github.com/brandon-relentnet/myscrollr/api/internal/githubapp"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/sync/singleflight"
 )
 
 // The Overview is the "everything about Scrollr in one spot" page. Its hard
@@ -30,7 +31,21 @@ var logtoStats = accounts.FetchLogtoStats
 const (
 	logtoStatsCacheKey = "scrollr:admin:logto_stats"
 	logtoStatsCacheTTL = 5 * time.Minute
+	// A read that finds the entry older than this serves it and refreshes in
+	// the background, so the hard TTL is rarely reached in front of a reader.
+	logtoStatsRefreshAfter = 4 * time.Minute
+	logtoStatsRefreshLock  = logtoStatsCacheKey + ":refreshing"
 )
+
+// logtoStatsEntry is the cached value with the moment it was read from Logto.
+// GeneratedAt is the real age: a background refresh replaces the whole entry,
+// so an entry is never presented as fresher than it is.
+type logtoStatsEntry struct {
+	GeneratedAt time.Time           `json:"generated_at"`
+	Stats       accounts.LogtoStats `json:"stats"`
+}
+
+var logtoStatsGroup singleflight.Group
 
 // Measured wraps a number with whether it means what its label says. When
 // Available is false the client renders Note instead of Value.
@@ -230,25 +245,56 @@ func HandleGetOverview(c *fiber.Ctx) error {
 // There is deliberately no stale-copy fallback like the downloads tile's. A
 // download count that is fifteen minutes old is still a download count; "2
 // people were active today" from an hour ago is a different claim than it
-// looks. When Logto is unreachable the tiles say so.
+// looks. Nothing past the hard TTL is ever served (Redis expires it); an entry
+// near the end of its life is served and refreshed in the background.
+// When Logto is unreachable the tiles say so.
 func cachedLogtoStats(ctx context.Context) (accounts.LogtoStats, error) {
-	var s accounts.LogtoStats
 	if platform.Rdb != nil {
 		if raw, err := platform.Rdb.Get(ctx, logtoStatsCacheKey).Result(); err == nil && raw != "" {
-			if json.Unmarshal([]byte(raw), &s) == nil {
-				return s, nil
+			var e logtoStatsEntry
+			// An entry without generated_at is the pre-envelope format: miss.
+			if json.Unmarshal([]byte(raw), &e) == nil && !e.GeneratedAt.IsZero() {
+				if time.Since(e.GeneratedAt) > logtoStatsRefreshAfter {
+					go refreshLogtoStats()
+				}
+				return e.Stats, nil
 			}
 		}
 	}
 
+	v, err, _ := logtoStatsGroup.Do("logto", func() (any, error) { return fetchAndStoreLogtoStats() })
+	if err != nil {
+		return accounts.LogtoStats{}, err
+	}
+	return v.(accounts.LogtoStats), nil
+}
+
+// refreshLogtoStats re-reads Logto off the request path. In-process callers
+// share one flight; the Redis lock keeps other replicas from also refreshing.
+func refreshLogtoStats() {
+	logtoStatsGroup.Do("logto", func() (any, error) {
+		if platform.Rdb != nil {
+			ok, err := platform.Rdb.SetNX(context.Background(), logtoStatsRefreshLock, 1, 30*time.Second).Result()
+			if err != nil || !ok {
+				return nil, nil
+			}
+		}
+		if _, err := fetchAndStoreLogtoStats(); err != nil {
+			log.Printf("[Admin] logto stats background refresh: %v", err)
+		}
+		return nil, nil
+	})
+}
+
+func fetchAndStoreLogtoStats() (accounts.LogtoStats, error) {
 	s, err := logtoStats()
 	if err != nil {
 		return accounts.LogtoStats{}, err
 	}
-
 	if platform.Rdb != nil {
-		if raw, err := json.Marshal(s); err == nil {
-			_ = platform.Rdb.Set(ctx, logtoStatsCacheKey, raw, logtoStatsCacheTTL).Err()
+		e := logtoStatsEntry{GeneratedAt: time.Now().UTC(), Stats: s}
+		if raw, err := json.Marshal(e); err == nil {
+			_ = platform.Rdb.Set(context.Background(), logtoStatsCacheKey, raw, logtoStatsCacheTTL).Err()
 		}
 	}
 	return s, nil
