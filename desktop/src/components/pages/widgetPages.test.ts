@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import type { DashboardResponse, Game, RssItem } from "../../types";
 import { isLive } from "../../utils/gameHelpers";
 import fixture from "../../dev/__fixtures__/dashboard.pages.json";
@@ -19,6 +19,10 @@ import { ALSO_TAB, buildPageWidgets, chip, followPage, newNav, nextTurn, planAll
 
 const dash = fixture as unknown as DashboardResponse;
 const NOW = Date.parse(fixture._captured_at);
+// The sports status chip reads Date.now(); without this the fixture's "next match" drifts into the past.
+// Module level because the widgets are built while the describe blocks are collected.
+vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+afterAll(() => vi.useRealTimers());
 const TABS = (fixture.widgets as { widget_type: string }[]).map((w) => w.widget_type);
 
 describe("buildPageWidgets", () => {
