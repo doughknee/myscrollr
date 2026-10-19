@@ -50,7 +50,13 @@ func withAnalyticsLogto(t *testing.T, pages map[int][]map[string]any, status int
 			}
 			page := 1
 			_, _ = fmt.Sscanf(r.URL.Query().Get("page"), "%d", &page)
-			_ = json.NewEncoder(w).Encode(pages[page])
+			out := []map[string]any{}
+			for _, e := range pages[page] {
+				if k := r.URL.Query().Get("logKey"); k == "" || e["key"] == k {
+					out = append(out, e)
+				}
+			}
+			_ = json.NewEncoder(w).Encode(out)
 		default:
 			t.Fatalf("unexpected Logto path %s", r.URL.Path)
 		}
@@ -308,5 +314,32 @@ func TestFetchSignupAnalyticsStopsWaitingForTokenWhenContextExpires(t *testing.T
 	}
 	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
 		t.Fatalf("analytics token wait took %v, want bounded response", elapsed)
+	}
+}
+
+// TestUserReturnedWeek1QueriesEachExchangeKeyWithLogKey pins the prod fix
+// (SCROLLR-322): the unfiltered per-user audit query timed out, the logKey
+// filtered one does not, so every request must carry a logKey.
+func TestUserReturnedWeek1QueriesEachExchangeKeyWithLogKey(t *testing.T) {
+	signupDay := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	entries := []map[string]any{
+		analyticsLog("login", "ExchangeTokenBy.AuthorizationCode", "Success", "", signupDay.Add(10*time.Hour).UnixMilli()),
+		analyticsLog("noise", "SignIn", "Success", "", signupDay.AddDate(0, 0, 2).UnixMilli()),
+		analyticsLog("relaunch", "ExchangeTokenBy.RefreshToken", "Success", "", signupDay.AddDate(0, 0, 3).UnixMilli()),
+	}
+	queries := withAnalyticsLogto(t, map[int][]map[string]any{1: entries}, http.StatusOK, "")
+
+	returned, err := UserReturnedWeek1(context.Background(), "user-1", signupDay)
+	if err != nil || !returned {
+		t.Fatalf("returned = %v, err = %v, want true", returned, err)
+	}
+	got := queries()
+	if len(got) != 2 {
+		t.Fatalf("queries = %v, want one per exchange key", got)
+	}
+	for _, q := range got {
+		if !strings.Contains(q, "logKey=ExchangeTokenBy.") {
+			t.Fatalf("query %q has no logKey filter", q)
+		}
 	}
 }

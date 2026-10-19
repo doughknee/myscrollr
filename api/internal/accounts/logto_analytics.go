@@ -309,26 +309,27 @@ func UserReturnedWeek1(ctx context.Context, userID string, signupDay time.Time) 
 	return false, nil
 }
 
-// fetchUserExchangeLogs pages one user's audit logs, keeping only the two
-// token-exchange keys the definition names.
+// fetchUserExchangeLogs pages one user's audit logs, one query per exchange
+// key. The logKey filter is what makes this usable: Logto's userId-only query
+// scans every audit row of the user (1.4s idle, past the 10s client timeout
+// under load in prod, SCROLLR-322), while userId+logKey answers in ~85ms.
 func fetchUserExchangeLogs(ctx context.Context, userID string) ([]logtoAnalyticsLog, error) {
 	var logs []logtoAnalyticsLog
-	for page := 1; page <= analyticsMaxPages; page++ {
-		pageLogs, err := fetchLogtoLogsPage(ctx, url.Values{
-			"userId":    {userID},
-			"page":      {strconv.Itoa(page)},
-			"page_size": {strconv.Itoa(analyticsPageSize)},
-		})
-		if err != nil {
-			return nil, err
-		}
-		for _, entry := range pageLogs {
-			if _, ok := week1ExchangeKeys[entry.Key]; ok {
-				logs = append(logs, entry)
+	for key := range week1ExchangeKeys {
+		for page := 1; page <= analyticsMaxPages; page++ {
+			pageLogs, err := fetchLogtoLogsPage(ctx, url.Values{
+				"userId":    {userID},
+				"logKey":    {key},
+				"page":      {strconv.Itoa(page)},
+				"page_size": {strconv.Itoa(analyticsPageSize)},
+			})
+			if err != nil {
+				return nil, err
 			}
-		}
-		if len(pageLogs) < analyticsPageSize {
-			break
+			logs = append(logs, pageLogs...)
+			if len(pageLogs) < analyticsPageSize {
+				break
+			}
 		}
 	}
 	return logs, nil
