@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Loader2, Search } from 'lucide-react'
-import { PageFrame } from './ui'
+import { ErrorPanel, PageFrame } from './ui'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -35,10 +35,12 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
   const getToken = useGetToken()
   const [detail, setDetail] = useState<AccountDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     setDetail(null)
+    setError(null)
     adminApi
       .account(getToken, sub)
       .then((res) => !cancelled && setDetail(res))
@@ -52,7 +54,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
     return () => {
       cancelled = true
     }
-  }, [getToken, sub])
+  }, [getToken, sub, attempt])
 
   return (
     <div className="space-y-6">
@@ -64,9 +66,15 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
         <ChevronLeft size={16} /> All users
       </button>
 
-      {error && <p className="text-sm text-error">{error}</p>}
+      {error && (
+        <ErrorPanel message={error} onRetry={() => setAttempt((n) => n + 1)} />
+      )}
       {!detail && !error && (
-        <Loader2 className="size-5 animate-spin text-base-content/40" />
+        <Loader2
+          role="status"
+          aria-label="Loading user"
+          className="size-5 animate-spin text-base-content/40"
+        />
       )}
 
       {detail && (
@@ -182,9 +190,13 @@ export default function UsersPage() {
   const [data, setData] = useState<AccountsPage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    setError(null)
+    setLoading(true)
     // Debounced so typing does not fire a query per keystroke.
     const timer = setTimeout(() => {
       adminApi
@@ -197,12 +209,13 @@ export default function UsersPage() {
               err instanceof Error ? err.message : 'Could not load users',
             ),
         )
+        .finally(() => !cancelled && setLoading(false))
     }, 250)
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [getToken, query, page])
+  }, [getToken, query, page, attempt])
 
   if (selected) {
     return (
@@ -274,12 +287,21 @@ export default function UsersPage() {
           />
         </div>
 
-        {error && <p className="text-sm text-error">{error}</p>}
-        {!data && !error && (
-          <Loader2 className="size-5 animate-spin text-base-content/40" />
+        {error && (
+          <ErrorPanel
+            message={error}
+            onRetry={() => setAttempt((n) => n + 1)}
+          />
+        )}
+        {loading && (
+          <Loader2
+            role="status"
+            aria-label="Loading users"
+            className="size-5 animate-spin text-base-content/40"
+          />
         )}
 
-        {data && (
+        {data && !error && (
           <>
             <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
               <table className="w-full min-w-[42rem] text-left text-sm">

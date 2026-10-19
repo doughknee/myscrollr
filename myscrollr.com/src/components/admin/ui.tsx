@@ -37,6 +37,8 @@ export interface Report<T> {
   data: T | null
   error: string | null
   loading: boolean
+  /** A reload is in flight and `data` is the previous report. */
+  refreshing?: boolean
   slow?: boolean
   retry?: () => void
   cancel?: () => void
@@ -44,8 +46,9 @@ export interface Report<T> {
 
 /**
  * One bounded load per `load` identity. Changing the period (or the refresh
- * counter) is a new `load`, which aborts the old request and starts over
- * with no stale data on screen.
+ * counter) is a new `load`, which aborts the old request and starts over.
+ * The previous `data` stays until the new report lands (`refreshing`); an
+ * error replaces it, so stale data is never shown as fresh after a failure.
  */
 export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
   const [attempt, setAttempt] = useState(0)
@@ -60,7 +63,13 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
   useEffect(() => {
     const controller = new AbortController()
     request.current = controller
-    setState({ data: null, error: null, loading: true, slow: false })
+    setState((current) => ({
+      data: current.data,
+      error: null,
+      loading: true,
+      refreshing: current.data !== null,
+      slow: false,
+    }))
     const slowTimer = window.setTimeout(() => {
       if (!controller.signal.aborted) {
         setState((current) => ({ ...current, slow: true }))
@@ -70,7 +79,13 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
       (data) => {
         window.clearTimeout(slowTimer)
         if (!controller.signal.aborted) {
-          setState({ data, error: null, loading: false, slow: false })
+          setState({
+            data,
+            error: null,
+            loading: false,
+            refreshing: false,
+            slow: false,
+          })
         }
       },
       (error: unknown) => {
@@ -83,6 +98,7 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
                 ? error.message
                 : 'Could not load this section',
             loading: false,
+            refreshing: false,
             slow: false,
           })
         }
@@ -103,6 +119,7 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
         data: null,
         error: 'Loading canceled. You can retry.',
         loading: false,
+        refreshing: false,
         slow: false,
       })
     },
@@ -119,7 +136,32 @@ export function Loaded<T>({
   label: string
   children: (data: T) => ReactNode
 }) {
-  if (report.data) return <>{children(report.data)}</>
+  if (report.data) {
+    if (!report.refreshing) return <>{children(report.data)}</>
+    return (
+      <div aria-busy="true">
+        <p
+          role="status"
+          className="mb-2 flex items-center gap-2 text-xs text-base-content/60"
+        >
+          <Loader2 className="size-3 animate-spin" aria-hidden /> Updating{' '}
+          {label}
+          {report.slow && report.cancel && (
+            <button
+              type="button"
+              onClick={report.cancel}
+              className="min-h-10 cursor-pointer rounded-lg px-3 font-semibold ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Cancel
+            </button>
+          )}
+        </p>
+        <div className="opacity-50 transition-opacity">
+          {children(report.data)}
+        </div>
+      </div>
+    )
+  }
   if (report.error) {
     return <ErrorPanel message={report.error} onRetry={report.retry} />
   }
