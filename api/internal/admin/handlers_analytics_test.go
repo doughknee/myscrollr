@@ -294,3 +294,47 @@ func TestCachedSignupAnalyticsStopsWaitingWhenCallerCancels(t *testing.T) {
 	case <-time.After(20 * time.Millisecond):
 	}
 }
+
+// TestMatureWeek1CohortKeepsProgressAcrossAFailedScan pins the prod failure
+// (SCROLLR-322): the serial per-member scan blew the request timeout and cached
+// nothing, so it could never finish. A failed scan must keep the members it
+// did answer so the next request only scans the rest.
+func TestMatureWeek1CohortKeepsProgressAcrossAFailedScan(t *testing.T) {
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+	created := time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC).UnixMilli()
+	signups := []accounts.LogtoAccount{
+		{ID: "m-a", CreatedAt: created}, {ID: "m-b", CreatedAt: created}, {ID: "m-c", CreatedAt: created},
+	}
+	week := cohortWeek{Start: time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)}
+
+	var mu sync.Mutex
+	scanned := map[string]int{}
+	failC := true
+	previous := userReturnedWeek1
+	userReturnedWeek1 = func(_ context.Context, id string, _ time.Time) (bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		scanned[id]++
+		if id == "m-c" && failC {
+			return false, errors.New("logto timeout")
+		}
+		return id == "m-a", nil
+	}
+	t.Cleanup(func() { userReturnedWeek1 = previous })
+
+	if _, err := matureWeek1Cohort(context.Background(), week, signups); err == nil {
+		t.Fatal("want the failing member's error")
+	}
+	failC = false
+	cohort, err := matureWeek1Cohort(context.Background(), week, signups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cohort.Signups != 3 || cohort.Returned != 1 {
+		t.Fatalf("cohort = %+v, want 3 signups, 1 returned", cohort)
+	}
+	if scanned["m-a"] != 1 || scanned["m-b"] != 1 || scanned["m-c"] != 2 {
+		t.Fatalf("scans = %v, want answered members scanned once", scanned)
+	}
+}

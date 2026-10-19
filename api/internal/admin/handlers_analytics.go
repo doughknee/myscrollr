@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -125,7 +127,10 @@ func readSignupAnalyticsCache(ctx context.Context, key string) (accounts.SignupA
 // signup count is shown.
 // =============================================================================
 
-const week1ReturnCohortCount = 4
+const (
+	week1ReturnCohortCount = 4
+	week1ReturnConcurrency = 8
+)
 
 var (
 	userReturnedWeek1 = accounts.UserReturnedWeek1
@@ -157,7 +162,7 @@ func HandleGetWeek1Return(c *fiber.Ctx) error {
 	defer cancel()
 	report, err := loadWeek1Return(ctx, week1ReturnNow())
 	if err != nil {
-		log.Print("[Admin] week-1 return unavailable")
+		log.Printf("[Admin] week-1 return unavailable: %v", err)
 		return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{Error: "Week-1 return is unavailable."})
 	}
 	return c.JSON(report)
@@ -253,26 +258,37 @@ func matureWeek1Cohort(ctx context.Context, week cohortWeek, signups []accounts.
 		if cohort, ok := readWeek1CohortCache(ctx, key); ok {
 			return cohort, nil
 		}
-		returned := 0
+		// One Logto audit scan per member is slow (~140 members across the
+		// cohorts, several pages each), so scan in parallel and remember each
+		// member's answer: a request that still times out keeps its progress
+		// and the next one finishes the rest.
+		var returned atomic.Int64
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(week1ReturnConcurrency)
 		for _, a := range signups {
-			signupDay := a.CreatedTime().Truncate(24 * time.Hour)
-			ok, err := userReturnedWeek1(ctx, a.ID, signupDay)
-			if err != nil {
-				return nil, fmt.Errorf("check return for %s: %w", a.ID, err)
-			}
-			if ok {
-				returned++
-			}
+			g.Go(func() error {
+				ok, err := memberReturnedWeek1(gctx, a)
+				if err != nil {
+					return fmt.Errorf("check return for %s: %w", a.ID, err)
+				}
+				if ok {
+					returned.Add(1)
+				}
+				return nil
+			})
+		}
+		if err := g.Wait(); err != nil {
+			return nil, err
 		}
 		cohort := Week1ReturnCohort{
 			WeekStart: week.Start.Format("2006-01-02"),
 			WeekEnd:   week.End.Format("2006-01-02"),
 			Mature:    true,
 			Signups:   len(signups),
-			Returned:  returned,
+			Returned:  int(returned.Load()),
 		}
 		if len(signups) > 0 {
-			rate := float64(returned) / float64(len(signups)) * 100
+			rate := float64(returned.Load()) / float64(len(signups)) * 100
 			cohort.RatePct = &rate
 		}
 		if platform.Rdb != nil {
@@ -307,4 +323,30 @@ func readWeek1CohortCache(ctx context.Context, key string) (Week1ReturnCohort, b
 		return Week1ReturnCohort{}, false
 	}
 	return cohort, true
+}
+
+// memberReturnedWeek1 answers for one account of a matured cohort, reading and
+// writing a permanent per-account cache (a matured member's day-7 window is
+// fixed forever, like the cohort's own cache).
+func memberReturnedWeek1(ctx context.Context, a accounts.LogtoAccount) (bool, error) {
+	key := "scrollr:admin:week1_return:member:v1:" + a.ID
+	if platform.Rdb != nil {
+		if v, err := platform.Rdb.Get(ctx, key).Result(); err == nil {
+			return v == "1", nil
+		}
+	}
+	ok, err := userReturnedWeek1(ctx, a.ID, a.CreatedTime().Truncate(24*time.Hour))
+	if err != nil {
+		return false, err
+	}
+	if platform.Rdb != nil {
+		v := "0"
+		if ok {
+			v = "1"
+		}
+		// Not the group ctx: a sibling's failure cancels it, and a finished
+		// answer must still be kept.
+		_ = platform.Rdb.Set(context.WithoutCancel(ctx), key, v, 0).Err()
+	}
+	return ok, nil
 }
