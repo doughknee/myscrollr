@@ -13,6 +13,7 @@ import { AdminChrome } from './AdminShell'
 import { cases, queue } from './supportFixtures'
 import type { CaseDetail } from '@/api/admin'
 import type { Root } from 'react-dom/client'
+import { parseSupportSearch } from '@/lib/adminSearch'
 
 const roots: Array<Root> = []
 afterEach(async () => {
@@ -99,13 +100,15 @@ function atWidth(px: number) {
   })
 }
 
-async function render(width: number): Promise<HTMLElement> {
+async function render(width: number, query?: string): Promise<HTMLElement> {
   atWidth(width)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const rootRoute = createRootRoute({
     component: () => (
       <AdminChrome email="staff@example.com">
-        <SupportPage />
+        <SupportPage
+          {...(query ? { search: parseSupportSearch({ q: query }) } : {})}
+        />
       </AdminChrome>
     ),
   })
@@ -157,6 +160,41 @@ beforeEach(() => {
 })
 
 describe('the page frame', () => {
+  it.each(['', 'missing-ticket'])(
+    'explains an empty queue for search "%s"',
+    async (query) => {
+      mocks.supportQueue.mockResolvedValue({ ...queue, people: [], rows: [] })
+      const host = await render(320, query)
+      expect(host.textContent).toContain(
+        query ? 'No matching conversations' : 'No conversations yet',
+      )
+      expect(host.textContent).not.toContain(
+        'No tickets linked to a paying account.',
+      )
+      expect(
+        [...host.querySelectorAll('button')].some(
+          (button) => button.textContent === 'Clear search',
+        ),
+      ).toBe(Boolean(query))
+    },
+  )
+
+  it('keeps a failed dismissal open with an accessible explanation', async () => {
+    mocks.dismissCase.mockRejectedValue(
+      new Error('Connection interrupted. Try again.'),
+    )
+    const host = await render(320)
+    await open(host, 'Morgan Ellis')
+    await open(host, 'Dismiss ticket')
+    await open(host, 'Dismiss without replying')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'Ticket not updated',
+    )
+    expect(
+      host.querySelector('[aria-label="Dismiss without replying"]'),
+    ).toBeTruthy()
+    expect(host.textContent).toContain('Connection interrupted. Try again.')
+  })
   it.each([390, 1440])('moves focus into a case at %ipx', async (width) => {
     const host = await render(width)
     await open(host, 'Morgan Ellis')

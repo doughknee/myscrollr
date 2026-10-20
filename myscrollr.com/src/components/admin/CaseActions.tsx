@@ -166,10 +166,13 @@ export default function CaseActions({
       )}
 
       {error && (
-        <p className="mt-2 flex items-baseline gap-2 rounded-lg bg-error/10 px-3 py-2 text-sm text-error ring-1 ring-error/30">
-          <AlertTriangle size={14} className="translate-y-0.5 shrink-0" />
-          {error}
-        </p>
+        <div role="alert" className="admin-support-error mt-3">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <h3>Action not completed</h3>
+            <p>{error}</p>
+          </div>
+        </div>
       )}
       {notice && (
         <p className="mt-2 rounded-lg bg-base-200/60 px-3 py-2 text-sm text-base-content/75 ring-1 ring-base-300/60">
@@ -601,13 +604,18 @@ export function CaseDisposition({
         <div
           role="group"
           aria-label="Dismiss without replying"
-          className="mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60"
+          className="admin-reply-panel mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60"
         >
-          <h3 className="font-semibold">No reply needed?</h3>
+          <h3 className="text-base font-semibold tracking-tight">
+            No reply needed?
+          </h3>
           <p className="text-sm text-base-content/65">
-            Move this ticket to Resolved without emailing anyone. Stop pending
-            and future bot replies until you restore it. The original email and
-            conversation stay in history; osTicket is unchanged.
+            Move this ticket to Resolved without emailing anyone. Bot replies
+            stop until you restore it.
+          </p>
+          <p className="text-xs leading-relaxed text-base-content/65">
+            You can restore it anytime. The original email and conversation stay
+            in history; osTicket is unchanged.
           </p>
           <div className="flex flex-wrap gap-2">
             <ActionButton
@@ -636,9 +644,13 @@ export function CaseDisposition({
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-sm text-error">
-          {error}
-        </p>
+        <div role="alert" className="admin-support-error mt-3">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <h3>Ticket not updated</h3>
+            <p>{error}</p>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -1786,17 +1786,20 @@ export default function SupportPage({
       </div>
 
       {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-3 px-4 py-3 text-sm text-error"
-        >
-          <p>
-            {queue ? 'Showing the last queue update. ' : ''}
-            {error}
-          </p>
+        <div role="alert" className="admin-support-error m-4">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <h2>
+              {queue ? 'Support update failed' : 'Couldn’t load the queue'}
+            </h2>
+            <p>
+              {queue ? 'Showing the last queue update. ' : ''}
+              {error}
+            </p>
+          </div>
           <button
             type="button"
-            className="cursor-pointer font-semibold underline"
+            className="admin-support-retry"
             onClick={() => setQueueKey((n) => n + 1)}
           >
             Retry queue
@@ -1804,12 +1807,9 @@ export default function SupportPage({
         </div>
       )}
       {!queue && !error && (
-        <div className="p-4">
-          <Loader2
-            role="status"
-            aria-label="Loading support queue"
-            className="size-5 animate-spin text-base-content/40"
-          />
+        <div role="status" className="admin-support-loading">
+          <Loader2 aria-hidden className="size-5 animate-spin" />
+          Loading support queue…
         </div>
       )}
 
@@ -1843,111 +1843,143 @@ export default function SupportPage({
             </div>
 
             <div className="px-2 pt-1.5 pb-3">
-              {QUEUE_SECTIONS.map((section) => {
-                const count = queue.sections[section.key] ?? 0
-                const inSection =
-                  rowsMode === 'person'
-                    ? people.filter((p) => p.section === section.key)
-                    : rows.filter((r) => r.section === section.key)
+              {(rowsMode === 'person' ? people : rows).length === 0 ? (
+                <div className="admin-support-empty admin-support-queue-empty">
+                  {debounced.trim() ? (
+                    <Search size={24} aria-hidden />
+                  ) : (
+                    <MessageSquare size={24} aria-hidden />
+                  )}
+                  <h2>
+                    {debounced.trim()
+                      ? 'No matching conversations'
+                      : 'No conversations yet'}
+                  </h2>
+                  <p>
+                    {debounced.trim()
+                      ? 'Try another name, email or ticket number.'
+                      : 'New support conversations will appear here when they arrive.'}
+                  </p>
+                  {debounced.trim() && (
+                    <button
+                      type="button"
+                      className="admin-support-retry"
+                      onClick={() => updateSearch({ q: '' }, true)}
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+              ) : (
+                QUEUE_SECTIONS.map((section) => {
+                  const count = queue.sections[section.key] ?? 0
+                  const inSection =
+                    rowsMode === 'person'
+                      ? people.filter((p) => p.section === section.key)
+                      : rows.filter((r) => r.section === section.key)
 
-                // Resolved is a count that opens. Forty-six closed tickets are
-                // not what anybody came here to read.
-                const collapsed = section.key === 'resolved' && !showResolved
+                  // Resolved is a count that opens. Forty-six closed tickets are
+                  // not what anybody came here to read.
+                  const collapsed = section.key === 'resolved' && !showResolved
 
-                return (
-                  <section key={section.key}>
-                    <div className="flex items-center gap-1.5 px-2 pt-3 pb-1.5">
-                      {section.key === 'paying' && (
-                        <Star size={12} className="shrink-0 text-success" />
-                      )}
-                      <h2
-                        className={`text-[11px] font-bold tracking-[0.08em] uppercase ${SECTION_STYLE[section.key]}`}
-                      >
-                        {section.label}
-                      </h2>
-                      <span className="ml-auto font-mono text-[11px] text-base-content/40">
-                        {section.key === 'paying' && queue.accounts.paying > 0
-                          ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
-                          : rowsMode === 'person'
-                            ? count
-                            : inSection.length}
-                      </span>
-                      {section.key === 'resolved' && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateSearch({ resolved: !showResolved })
-                          }
-                          aria-expanded={showResolved}
-                          aria-label="Show resolved"
-                          className="cursor-pointer text-base-content/40 hover:text-base-content"
+                  return (
+                    <section key={section.key}>
+                      <div className="flex items-center gap-1.5 px-2 pt-3 pb-1.5">
+                        {section.key === 'paying' && (
+                          <Star size={12} className="shrink-0 text-success" />
+                        )}
+                        <h2
+                          className={`text-[11px] font-bold tracking-[0.08em] uppercase ${SECTION_STYLE[section.key]}`}
                         >
-                          <ChevronRight
-                            size={13}
-                            className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
-                          />
-                        </button>
-                      )}
-                    </div>
-
-                    {!collapsed && (
-                      <div className="flex flex-col gap-0.5">
-                        {inSection.length === 0 ? (
-                          /* An empty paying section is a fact about the data,
-                             not a blank box: almost no ticket is joined to an
-                             account, and the server says so in a sentence. */
-                          <div className="px-2 text-xs text-base-content/45">
-                            <p>
-                              {section.key === 'paying'
-                                ? 'No tickets linked to a paying account.'
-                                : section.empty}
-                            </p>
-                            {section.key === 'paying' &&
-                              queue.accounts.note && (
-                                <details className="mt-2">
-                                  <summary className="cursor-pointer">
-                                    How accounts are matched
-                                  </summary>
-                                  <p className="mt-2 leading-relaxed">
-                                    {queue.accounts.note}
-                                  </p>
-                                </details>
-                              )}
-                          </div>
-                        ) : rowsMode === 'person' ? (
-                          (inSection as Array<QueuePerson>).map((p) => (
-                            <PersonCard
-                              key={p.key}
-                              person={p}
-                              active={selectedPerson === p.key}
-                              onSelect={() => {
-                                updateSearch({
-                                  person: p.key,
-                                  ticket: undefined,
-                                })
-                              }}
+                          {section.label}
+                        </h2>
+                        <span className="ml-auto font-mono text-[11px] text-base-content/40">
+                          {section.key === 'paying' && queue.accounts.paying > 0
+                            ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
+                            : rowsMode === 'person'
+                              ? count
+                              : inSection.length}
+                        </span>
+                        {section.key === 'resolved' && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateSearch({ resolved: !showResolved })
+                            }
+                            aria-expanded={showResolved}
+                            aria-label="Show resolved"
+                            className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-base-content/65 hover:bg-base-200 hover:text-base-content"
+                          >
+                            <ChevronRight
+                              size={13}
+                              className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
                             />
-                          ))
-                        ) : (
-                          (inSection as Array<QueueRow>).map((r) => (
-                            <TicketCard
-                              key={r.ticket_number}
-                              row={r}
-                              active={selectedTicket === r.ticket_number}
-                              onSelect={() => {
-                                updateSearch({
-                                  ticket: r.ticket_number,
-                                  person: undefined,
-                                })
-                              }}
-                            />
-                          ))
+                          </button>
                         )}
                       </div>
-                    )}
-                  </section>
-                )
-              })}
+
+                      {!collapsed && (
+                        <div className="flex flex-col gap-0.5">
+                          {inSection.length === 0 ? (
+                            /* An empty paying section is a fact about the data,
+                             not a blank box: almost no ticket is joined to an
+                             account, and the server says so in a sentence. */
+                            <div className="px-2 pb-2 text-xs leading-relaxed text-base-content/65">
+                              <p>
+                                {debounced.trim()
+                                  ? 'No matches in this section.'
+                                  : section.key === 'paying'
+                                    ? 'No tickets linked to a paying account.'
+                                    : section.empty}
+                              </p>
+                              {!debounced.trim() &&
+                                section.key === 'paying' &&
+                                queue.accounts.note && (
+                                  <details className="mt-2">
+                                    <summary className="cursor-pointer">
+                                      How accounts are matched
+                                    </summary>
+                                    <p className="mt-2 leading-relaxed">
+                                      {queue.accounts.note}
+                                    </p>
+                                  </details>
+                                )}
+                            </div>
+                          ) : rowsMode === 'person' ? (
+                            (inSection as Array<QueuePerson>).map((p) => (
+                              <PersonCard
+                                key={p.key}
+                                person={p}
+                                active={selectedPerson === p.key}
+                                onSelect={() => {
+                                  updateSearch({
+                                    person: p.key,
+                                    ticket: undefined,
+                                  })
+                                }}
+                              />
+                            ))
+                          ) : (
+                            (inSection as Array<QueueRow>).map((r) => (
+                              <TicketCard
+                                key={r.ticket_number}
+                                row={r}
+                                active={selectedTicket === r.ticket_number}
+                                onSelect={() => {
+                                  updateSearch({
+                                    ticket: r.ticket_number,
+                                    person: undefined,
+                                  })
+                                }}
+                              />
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  )
+                })
+              )}
             </div>
           </div>
 
@@ -1985,19 +2017,24 @@ export default function SupportPage({
               <div className="admin-support-thread flex flex-col gap-5 px-5 py-5 [overflow-wrap:anywhere] min-[1440px]:px-8">
                 <PersonHeader person={person} rows={mine} detail={detail} />
                 {caseError && (
-                  <div
-                    role="alert"
-                    className="flex items-center gap-3 text-sm text-error"
-                  >
-                    <p>
-                      {detail
-                        ? 'Showing the last case update. Your edits are kept. '
-                        : ''}
-                      {caseError}
-                    </p>
+                  <div role="alert" className="admin-support-error">
+                    <AlertTriangle size={18} aria-hidden />
+                    <div>
+                      <h2>
+                        {detail
+                          ? 'Conversation update failed'
+                          : 'Couldn’t load this conversation'}
+                      </h2>
+                      <p>
+                        {detail
+                          ? 'Showing the last case update. Your edits are kept. '
+                          : ''}
+                        {caseError}
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      className="cursor-pointer font-semibold underline"
+                      className="admin-support-retry"
                       onClick={() => setCaseKey((n) => n + 1)}
                     >
                       Retry case
@@ -2005,11 +2042,10 @@ export default function SupportPage({
                   </div>
                 )}
                 {!detail && !caseError && activeTicket && (
-                  <Loader2
-                    role="status"
-                    aria-label="Loading support case"
-                    className="size-5 animate-spin text-base-content/40"
-                  />
+                  <div role="status" className="admin-support-loading">
+                    <Loader2 aria-hidden className="size-5 animate-spin" />
+                    Loading support case…
+                  </div>
                 )}
                 {detail && (
                   <CaseConversation
