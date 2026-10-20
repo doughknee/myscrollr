@@ -32,6 +32,40 @@ type GateState =
   | { kind: 'signed-out' }
   | { kind: 'error'; message: string }
 
+const MEMO_KEY = 'scrollr:admin-gate'
+
+/**
+ * "This account was allowed earlier this browser session", as `sub|email`.
+ * sessionStorage, never localStorage: it dies with the tab, and it is read
+ * only inside an effect so the first client render matches the shared
+ * _shell.html. It buys speed, not security.
+ */
+function readMemo(sub: string): string | null {
+  try {
+    const raw = sessionStorage.getItem(MEMO_KEY)
+    if (!raw?.startsWith(sub + '|')) return null
+    return raw.slice(sub.length + 1) || null
+  } catch {
+    return null
+  }
+}
+
+function writeMemo(sub: string, email: string) {
+  try {
+    sessionStorage.setItem(MEMO_KEY, `${sub}|${email}`)
+  } catch {
+    // Private mode: the gate just behaves as it did before the memo.
+  }
+}
+
+function clearMemo() {
+  try {
+    sessionStorage.removeItem(MEMO_KEY)
+  } catch {
+    // Nothing to clear.
+  }
+}
+
 function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-24 text-center">
@@ -41,7 +75,8 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminShell() {
-  const { isAuthenticated, isLoading, signIn } = useScrollrAuth()
+  const { isAuthenticated, isLoading, signIn, getIdTokenClaims } =
+    useScrollrAuth()
   const getToken = useGetToken()
   const [gate, setGate] = useState<GateState>({ kind: 'checking' })
   const [attempt, setAttempt] = useState(0)
@@ -53,34 +88,60 @@ export default function AdminShell() {
       return
     }
     let cancelled = false
-    setGate({ kind: 'checking' })
+    let settled = false
+    // Staying 'allowed' while a re-check runs keeps the page mounted, and its
+    // data requests flying, on every navigation after the first.
+    setGate((g) => (g.kind === 'allowed' ? g : { kind: 'checking' }))
+    // The id token is cached locally, so this costs no round trip. It runs
+    // beside /admin/me, not before it; a memo hit only renders the chrome
+    // early, the server still decides every request.
+    const subPromise = getIdTokenClaims()
+      .then((claims) => claims?.sub)
+      .catch(() => undefined)
+    void subPromise.then((sub) => {
+      const email = sub ? readMemo(sub) : null
+      if (!cancelled && !settled && email) setGate({ kind: 'allowed', email })
+    })
     adminApi
       .me(getToken)
-      .then((res) => {
+      .then(async (res) => {
+        settled = true
+        const sub = await subPromise
+        if (sub) writeMemo(sub, res.email)
         if (!cancelled) setGate({ kind: 'allowed', email: res.email })
       })
       .catch((err: unknown) => {
+        settled = true
         if (cancelled) return
         // 403 is not a failure — it is the answer for everyone who is not
         // staff, and it gets the plain page rather than an error page.
         if (err instanceof AdminApiError && err.status === 403) {
+          clearMemo()
           setGate({ kind: 'denied' })
           return
         }
         if (err instanceof AdminApiError && err.status === 401) {
+          clearMemo()
           setGate({ kind: 'signed-out' })
           return
         }
-        setGate({
-          kind: 'error',
-          message:
-            err instanceof Error ? err.message : 'Could not reach the API',
-        })
+        // An unreachable API must not evict a page that is already showing.
+        setGate((g) =>
+          g.kind === 'allowed'
+            ? g
+            : {
+                kind: 'error',
+                message:
+                  err instanceof Error
+                    ? err.message
+                    : 'Could not reach the API',
+              },
+        )
       })
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, isLoading, getToken, attempt])
+  }, [isAuthenticated, isLoading, getToken, getIdTokenClaims, attempt])
 
   if (isLoading || gate.kind === 'checking') {
     return (

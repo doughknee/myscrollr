@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   token: vi.fn(),
   signIn: vi.fn(),
   authenticated: true,
+  sub: 'sub-1',
+  claims: () => Promise.resolve({ sub: mocks.sub }),
 }))
 vi.mock('@/hooks/useScrollrAuth', () => ({
   useScrollrAuth: () => ({
@@ -35,6 +37,7 @@ vi.mock('@/hooks/useScrollrAuth', () => ({
     isLoading: false,
     signIn: mocks.signIn,
     signOut: vi.fn(),
+    getIdTokenClaims: mocks.claims,
   }),
 }))
 vi.mock('@/hooks/useGetToken', () => ({ useGetToken: () => mocks.token }))
@@ -73,6 +76,8 @@ const SECTION_LABELS = [
 beforeEach(() => {
   mocks.authenticated = true
   mocks.me.mockReset()
+  mocks.sub = 'sub-1'
+  sessionStorage.clear()
   document.body.innerHTML = ''
 })
 
@@ -153,5 +158,41 @@ describe('the gate', () => {
     expect(host.textContent).toContain('Could not check access')
     expect(host.textContent).toContain('Could not reach the API')
     expect(host.textContent).toContain('Retry access check')
+  })
+})
+
+describe('the session memo', () => {
+  const never = () => new Promise(() => {})
+
+  it('renders the page at once on a later visit while /admin/me is pending', async () => {
+    sessionStorage.setItem('scrollr:admin-gate', 'sub-1|staff@myscrollr.com')
+    mocks.me.mockImplementation(never)
+    const host = await render(<AdminShell />)
+    expect(host.textContent).toContain('staff@myscrollr.com')
+    expect(host.textContent).toContain('Back to site')
+    expect(mocks.me).toHaveBeenCalled()
+  })
+
+  it('ignores a memo that belongs to another account', async () => {
+    sessionStorage.setItem('scrollr:admin-gate', 'sub-2|other@myscrollr.com')
+    mocks.me.mockImplementation(never)
+    const host = await render(<AdminShell />)
+    expect(host.textContent).not.toContain('Back to site')
+  })
+
+  it('remembers an allowed first visit', async () => {
+    mocks.me.mockResolvedValue({ email: 'staff@myscrollr.com' })
+    await render(<AdminShell />)
+    expect(sessionStorage.getItem('scrollr:admin-gate')).toBe(
+      'sub-1|staff@myscrollr.com',
+    )
+  })
+
+  it('ends denied and clears the memo when re-validation says 403', async () => {
+    sessionStorage.setItem('scrollr:admin-gate', 'sub-1|staff@myscrollr.com')
+    mocks.me.mockRejectedValue(new AdminApiError('forbidden', 403))
+    const host = await render(<AdminShell />)
+    expect(host.textContent).toContain('Staff only')
+    expect(sessionStorage.getItem('scrollr:admin-gate')).toBeNull()
   })
 })
