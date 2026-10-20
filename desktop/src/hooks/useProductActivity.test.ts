@@ -83,7 +83,7 @@ describe("product activity qualification", () => {
   });
 
   it("reports only from the primary, natively visible ticker", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-09-10T12:00:00Z") }); // not the real clock: a run across UTC midnight rolls the qualification day
     const resolve = () => "sports";
     renderHook(() =>
       useProductActivity({ authenticated: true, optedIn: true, widgetIds: ["sports_nfl"], resolveCategory: resolve, production: true }),
@@ -94,7 +94,7 @@ describe("product activity qualification", () => {
   });
 
   it("does not count secondary monitors or native-hidden windows", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-09-10T12:00:00Z") }); // not the real clock: a run across UTC midnight rolls the qualification day
     mocks.isPrimary.mockReturnValue(false);
     const resolve = () => "sports";
     const first = renderHook(() =>
@@ -114,7 +114,7 @@ describe("product activity qualification", () => {
   });
 
   it("does not resume a pending visibility check after cleanup", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-09-10T12:00:00Z") }); // not the real clock: a run across UTC midnight rolls the qualification day
     let resolveVisible!: (visible: boolean) => void;
     mocks.isVisible.mockReturnValue(new Promise((resolve) => { resolveVisible = resolve; }));
     const { unmount } = renderHook(() =>
@@ -128,7 +128,7 @@ describe("product activity qualification", () => {
   });
 
   it("keeps checking eligibility and aborts a pending report", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-09-10T12:00:00Z") }); // not the real clock: a run across UTC midnight rolls the qualification day
     let aborted = false;
     mocks.record.mockImplementation((_categories: string[], signal: AbortSignal) => new Promise((_, reject) => {
       signal.addEventListener("abort", () => {
@@ -147,7 +147,7 @@ describe("product activity qualification", () => {
   });
 
   it("aborts a pending report at UTC rollover", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-09-10T12:00:00Z") }); // not the real clock: a run across UTC midnight rolls the qualification day
     vi.setSystemTime(new Date("2026-09-10T23:59:20Z"));
     let aborted = false;
     mocks.record.mockImplementation((_categories: string[], signal: AbortSignal) => new Promise((_, reject) => {
@@ -167,7 +167,7 @@ describe("product activity qualification", () => {
   });
 
   it("aborts a pending report after a suspend-sized gap", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-09-10T12:00:00Z") }); // not the real clock: a run across UTC midnight rolls the qualification day
     let abortSeen = false;
     let resolveVisible!: (visible: boolean) => void;
     mocks.record.mockImplementation((_categories: string[], signal: AbortSignal) => new Promise((_, reject) => {
