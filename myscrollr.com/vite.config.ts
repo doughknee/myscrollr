@@ -6,6 +6,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { defineConfig } from 'vite'
 import viteReact from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 // Historical note: a `copyShellToIndex` plugin used to backfill
 // `dist/client/index.html` from `_shell.html` when the SPA shell's
@@ -95,6 +96,16 @@ export default defineConfig({
     }),
     viteReact(),
     tailwindcss(),
+    // ANALYZE=1 npm run build writes dist/stats-client.json (dist is git-ignored).
+    process.env.ANALYZE
+      ? {
+          ...visualizer({
+            filename: 'dist/stats-client.json',
+            template: 'raw-data',
+          }),
+          applyToEnvironment: (env: { name: string }) => env.name === 'client',
+        }
+      : null,
     // Sentry plugin MUST be last so it sees the final bundle output.
     // Disabled automatically when SENTRY_AUTH_TOKEN isn't set (local builds).
     sentryVitePlugin({

@@ -1,7 +1,7 @@
 import { ClientOnly, Link, useLocation } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useBar } from '@/hooks/useBar'
@@ -146,7 +146,7 @@ export default function Header({
       <AnimatePresence>
         {isOpen && (
           <>
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -156,7 +156,7 @@ export default function Header({
               aria-hidden="true"
             />
 
-            <motion.aside
+            <m.aside
               ref={drawerRef}
               id="mobile-nav-drawer"
               role="dialog"
@@ -201,7 +201,7 @@ export default function Header({
                   DOWNLOAD ↓
                 </Link>
               </div>
-            </motion.aside>
+            </m.aside>
           </>
         )}
       </AnimatePresence>
@@ -306,7 +306,7 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
       {children}
       {/* Emerald underline slides between links on navigation */}
       {isActive && (
-        <motion.span
+        <m.span
           aria-hidden="true"
           layoutId="nav-underline"
           className="absolute -bottom-1.5 left-0 right-0 h-px bg-primary"

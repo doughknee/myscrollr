@@ -1,5 +1,5 @@
 import { Moon, Sun } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
 import { useTheme } from '@/hooks/useTheme'
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
@@ -7,7 +7,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
   const isDark = theme === 'dark'
 
   return (
-    <motion.button
+    <m.button
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       onClick={toggleTheme}
@@ -17,7 +17,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     >
       <AnimatePresence mode="wait" initial={false}>
         {isDark ? (
-          <motion.span
+          <m.span
             key="sun"
             initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
             animate={{ rotate: 0, opacity: 1, scale: 1 }}
@@ -26,9 +26,9 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
             className="flex items-center justify-center"
           >
             <Sun size={15} />
-          </motion.span>
+          </m.span>
         ) : (
-          <motion.span
+          <m.span
             key="moon"
             initial={{ rotate: 90, opacity: 0, scale: 0.5 }}
             animate={{ rotate: 0, opacity: 1, scale: 1 }}
@@ -37,9 +37,9 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
             className="flex items-center justify-center"
           >
             <Moon size={15} />
-          </motion.span>
+          </m.span>
         )}
       </AnimatePresence>
-    </motion.button>
+    </m.button>
   )
 }

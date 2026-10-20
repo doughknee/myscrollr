@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 
 interface LoadingSpinnerProps {
   /** Text shown below the indicator. Defaults to "Loading..." */
@@ -28,7 +28,7 @@ export default function LoadingSpinner({
 
   return (
     <div className="min-h-dvh flex items-center justify-center">
-      <motion.div
+      <m.div
         animate={{ opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 1.5, repeat: Infinity }}
         className="flex items-center gap-3"
@@ -37,7 +37,7 @@ export default function LoadingSpinner({
         <span className="font-mono text-sm text-base-content/50 uppercase tracking-wider">
           {label}
         </span>
-      </motion.div>
+      </m.div>
     </div>
   )
 }

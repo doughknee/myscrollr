@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { DownloadPage } from '@/routes/download'
+import { DownloadPage } from '@/components/download/DownloadPage'
 import { seo } from '@/lib/seo'
 import { organization, softwareApplication } from '@/lib/structured-data'
 

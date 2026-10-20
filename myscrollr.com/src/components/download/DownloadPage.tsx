@@ -1,0 +1,363 @@
+import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { motion } from 'motion/react'
+import type { DesktopPlatform, LinuxFormat } from '@/lib/getDownloadInfo'
+import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
+import { detectPlatform } from '@/lib/detectPlatform'
+import {
+  FALLBACK_RELEASES_URL,
+  getDownloadInfo,
+  triggerDownload,
+} from '@/lib/getDownloadInfo'
+import {
+  DeparturesRow,
+  PageHeader,
+  SectionRow,
+  StepsGrid,
+  TerminalContainer,
+} from '@/components/terminal'
+import { EASE } from '@/lib/animations'
+// ── Constants ──────────────────────────────────────────────────
+
+const RELEASES_URL = 'https://github.com/doughknee/myscrollr/releases'
+
+const CTA: Record<DesktopPlatform, string> = {
+  macos: 'Download for macOS',
+  windows: 'Download for Windows',
+  linux: 'Download for Linux',
+}
+
+const ARCH_NOTE: Record<DesktopPlatform, string> = {
+  macos: 'APPLE SILICON',
+  windows: 'X64',
+  linux: 'X86_64 · APPIMAGE',
+}
+
+const LINUX_FORMATS: ReadonlyArray<{ format: LinuxFormat; label: string }> = [
+  { format: 'appimage', label: '.APPIMAGE' },
+  { format: 'deb', label: '.DEB' },
+  { format: 'rpm', label: '.RPM' },
+]
+
+const STEPS = [
+  {
+    num: '01',
+    title: 'Install & open',
+    body: 'The download has no account wall or onboarding tour. The bar opens with local starter widgets; sign in when you add live data.',
+  },
+  {
+    num: '02',
+    title: 'Pick your widgets',
+    body: 'Open the catalog, add your leagues, tickers, and feeds. Three run free, each in ten seconds.',
+  },
+  {
+    num: '03',
+    title: "Forget it's there",
+    body: 'It pins above every window on any monitor. From now on, the news finds you.',
+  },
+]
+
+const PLATFORM_GUIDES: Record<
+  DesktopPlatform,
+  { label: string; requirements: string; steps: ReadonlyArray<string> }
+> = {
+  macos: {
+    label: 'macOS',
+    requirements: 'Requires Apple Silicon and macOS 10.15 or later.',
+    steps: [
+      'Open the downloaded .dmg file.',
+      'Drag Scrollr into the Applications folder.',
+      'Open Scrollr from Applications. Release builds are signed and notarized in the project workflow.',
+    ],
+  },
+  windows: {
+    label: 'Windows',
+    requirements: 'Built as an x64 Windows setup executable.',
+    steps: [
+      'Open the downloaded setup .exe file.',
+      'Follow the installer, then launch Scrollr from the Start menu.',
+      'Use Settings inside Scrollr to choose the monitor and pin the ticker to the top or bottom edge.',
+    ],
+  },
+  linux: {
+    label: 'Linux',
+    requirements: 'Choose the package that matches your x86_64 distribution.',
+    steps: [
+      'Use .deb for Debian or Ubuntu, .rpm for Fedora, RHEL, or openSUSE, or AppImage for a portable build.',
+      'For AppImage, mark the file executable before opening it.',
+      'Launch Scrollr, then choose your ticker position and widgets in Settings.',
+    ],
+  },
+}
+
+const CTA_BUTTON_CLASS =
+  'inline-flex cursor-pointer items-center gap-3 rounded-[4px] bg-primary px-[34px] py-[17px] text-[17px] font-bold text-[#101018] shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-colors hover:bg-[#6ee7b7]'
+
+// ── OS detection ───────────────────────────────────────────────
+
+/**
+ * Detected (or forced) platform. `null` = no confident answer — SSR,
+ * pre-hydration, or a mobile visitor — which renders the releases-page
+ * fallback CTA. Per-OS deep links skip detection entirely so the page
+ * is deterministic for crawlers.
+ */
+function useDetectedPlatform(forced?: DesktopPlatform): DesktopPlatform | null {
+  const [detected, setDetected] = useState<DesktopPlatform | null>(
+    forced ?? null,
+  )
+  useEffect(() => {
+    if (forced) {
+      setDetected(forced)
+      return
+    }
+    const info = detectPlatform()
+    setDetected(info.isMobile ? null : info.platform)
+  }, [forced])
+  return detected
+}
+
+// ── Component ──────────────────────────────────────────────────
+
+export function DownloadPage({
+  forcedPlatform,
+}: { forcedPlatform?: DesktopPlatform } = {}) {
+  const detected = useDetectedPlatform(forcedPlatform)
+  const version = LATEST_DESKTOP_VERSION
+  const platformGuide = forcedPlatform ? PLATFORM_GUIDES[forcedPlatform] : null
+
+  return (
+    <div>
+      <PageHeader
+        eyebrowLeft={`DOWNLOAD ／ DESKTOP V${version}`}
+        eyebrowRight="SERVED FROM GITHUB RELEASES · BUILT FROM PUBLIC SOURCE"
+        line1={
+          platformGuide
+            ? `Get Scrollr for ${platformGuide.label}.`
+            : 'Get Scrollr.'
+        }
+        line2="Free. No sign-up."
+        sub="One small native app. No sign-up to download or look around; sign in when you add live data widgets."
+        actions={
+          <div className="flex flex-col items-end gap-3">
+            {detected ? (
+              <button
+                type="button"
+                onClick={() => triggerDownload(detected)}
+                className={CTA_BUTTON_CLASS}
+              >
+                {CTA[detected]} ↓
+              </button>
+            ) : (
+              <a
+                href={FALLBACK_RELEASES_URL}
+                rel="noopener noreferrer"
+                className={CTA_BUTTON_CLASS}
+              >
+                Download Scrollr ↓
+              </a>
+            )}
+            <div className="text-right font-mono text-[11px] tracking-[0.06em] text-base-content/45">
+              {detected
+                ? [
+                    getDownloadInfo(detected).filename,
+                    getDownloadInfo(detected).size,
+                    ARCH_NOTE[detected],
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : `PICK YOUR PLATFORM BELOW · V${version}`}
+            </div>
+          </div>
+        }
+      />
+
+      {/* ── SEC 01 ／ EVERY PLATFORM ─────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow tag="SEC 01 ／ EVERY PLATFORM" />
+          {/* -mt-px collapses the first row's border-t into the
+              SectionRow's border-b so hairlines never double. */}
+          <div className="-mt-px pb-4">
+            {/* Platform rows cascade in */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE }}
+            >
+              <DeparturesRow
+                index="01"
+                label="macOS"
+                tag={detected === 'macos' ? 'YOURS' : undefined}
+                meta={
+                  <span className="font-mono text-xs text-base-content/45">
+                    {['.DMG', getDownloadInfo('macos').size, 'APPLE SILICON']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                }
+                action="DOWNLOAD ↓"
+                onClick={() => triggerDownload('macos')}
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.08 }}
+            >
+              <DeparturesRow
+                index="02"
+                label="Windows"
+                tag={detected === 'windows' ? 'YOURS' : undefined}
+                meta={
+                  <span className="font-mono text-xs text-base-content/45">
+                    {['SETUP .EXE', getDownloadInfo('windows').size, 'X64']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                }
+                action="DOWNLOAD ↓"
+                onClick={() => triggerDownload('windows')}
+              />
+            </motion.div>
+            {/* Linux: three format actions, so not a single DeparturesRow. */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
+              className="flex flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6"
+            >
+              <span className="flex flex-wrap items-baseline gap-5">
+                <span className="font-mono text-xs text-base-content/40">
+                  ↳ 03
+                </span>
+                <span className="font-display text-2xl font-bold uppercase tracking-[0.01em]">
+                  Linux
+                </span>
+                {detected === 'linux' && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+                    className="rounded-[3px] border border-primary/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-primary"
+                  >
+                    YOURS
+                  </motion.span>
+                )}
+                <span className="font-mono text-xs text-base-content/45">
+                  X86_64
+                </span>
+              </span>
+              <span className="flex flex-wrap gap-2">
+                {LINUX_FORMATS.map(({ format, label }) => (
+                  <motion.button
+                    key={format}
+                    type="button"
+                    onClick={() => triggerDownload('linux', format)}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    className="cursor-pointer whitespace-nowrap rounded-[4px] border border-hairline px-4 py-[9px] font-mono text-xs tracking-[0.08em] text-primary transition-colors hover:border-primary max-sm:py-3"
+                  >
+                    {label} ↓
+                  </motion.button>
+                ))}
+              </span>
+            </motion.div>
+          </div>
+        </TerminalContainer>
+      </section>
+
+      {platformGuide && (
+        <section className="border-b border-hairline">
+          <TerminalContainer>
+            <SectionRow tag={`PLATFORM GUIDE ／ ${platformGuide.label}`} />
+            <div className="grid gap-10 py-12 lg:grid-cols-[0.75fr_1.25fr]">
+              <div>
+                <h2 className="type-display text-[clamp(32px,4vw,52px)]">
+                  Install Scrollr
+                  <br />
+                  <span className="text-primary">
+                    on {platformGuide.label}.
+                  </span>
+                </h2>
+                <p className="mt-5 leading-relaxed text-base-content/60">
+                  {platformGuide.requirements}
+                </p>
+              </div>
+              <div>
+                <ol className="m-0 space-y-5 p-0">
+                  {platformGuide.steps.map((step, index) => (
+                    <li
+                      key={step}
+                      className="flex gap-4 border-b border-hairline-minor pb-5"
+                    >
+                      <span className="font-mono text-xs text-primary">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <span className="leading-relaxed text-base-content/70">
+                        {step}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <nav
+                  aria-label="Explore Scrollr use cases"
+                  className="mt-8 flex flex-wrap gap-x-5 gap-y-3 font-mono text-xs"
+                >
+                  <Link to="/sports" className="text-primary">
+                    SPORTS →
+                  </Link>
+                  <Link to="/markets" className="text-primary">
+                    MARKETS →
+                  </Link>
+                  <Link to="/news" className="text-primary">
+                    NEWS & RSS →
+                  </Link>
+                </nav>
+              </div>
+            </div>
+          </TerminalContainer>
+        </section>
+      )}
+
+      {/* ── SEC 02 ／ YOUR FIRST SIXTY SECONDS ───────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow tag="SEC 02 ／ YOUR FIRST SIXTY SECONDS" />
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: EASE }}
+          >
+            <StepsGrid steps={STEPS} />
+          </motion.div>
+        </TerminalContainer>
+      </section>
+
+      {/* ── Release notes ────────────────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: EASE }}
+            className="-mt-px"
+          >
+            <DeparturesRow
+              index="04"
+              label="Release notes & older builds"
+              labelClassName="text-xl"
+              meta="Every build, changelog, and checksum lives on GitHub Releases."
+              action={`DESKTOP-V${version} ↗`}
+              href={RELEASES_URL}
+            />
+          </motion.div>
+        </TerminalContainer>
+      </section>
+    </div>
+  )
+}

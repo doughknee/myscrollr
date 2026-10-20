@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { AccountHub } from '@/routes/account'
+import { AccountHub } from '@/components/account/AccountHub'
 
 const mocks = vi.hoisted(() => ({
   overview: vi.fn(),

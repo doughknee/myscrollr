@@ -57,10 +57,8 @@ const reveal = {
 // `.release-notes` wrapper below. <script> tags are stripped
 // defensively anyway, and tables get an overflow-x wrapper so wide
 // notes scroll inside the row instead of breaking the page on mobile.
-marked.use({ gfm: true, breaks: false })
-
 function renderNotes(markdown: string): string {
-  const raw = marked.parse(markdown, { async: false })
+  const raw = marked.parse(markdown, { gfm: true, breaks: false, async: false })
   // Real sanitizer (ship-review follow-up): the regex only stripped
   // <script> blocks, leaving event-handler attributes and javascript:
   // URLs. DOMPurify needs a DOM; rendering only happens client-side

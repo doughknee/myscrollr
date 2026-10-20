@@ -8,7 +8,7 @@ import {
   useLocation,
 } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
-import { MotionConfig } from 'motion/react'
+import { LazyMotion, MotionConfig } from 'motion/react'
 import type { ReactNode } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -19,6 +19,9 @@ import { useTheme } from '@/hooks/useTheme'
 import { captureWebsitePageview } from '@/lib/posthog'
 import { usesSiteChrome } from '@/lib/siteChrome'
 import appCss from '@/styles.css?url'
+
+const loadMotionFeatures = () =>
+  import('@/lib/motionFeatures').then((mod) => mod.default)
 
 const themeScript = `;(function () {
   var stored = localStorage.getItem('theme')
@@ -218,6 +221,7 @@ function RootLayout() {
   return (
     <RootDocument>
       <MotionConfig reducedMotion="user">
+        <LazyMotion features={loadMotionFeatures}>
         <div
           className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
             hasBar ? 'pb-[88px]' : ''
@@ -277,6 +281,7 @@ function RootLayout() {
             </div>
           )}
         </div>
+      </LazyMotion>
       </MotionConfig>
     </RootDocument>
   )
