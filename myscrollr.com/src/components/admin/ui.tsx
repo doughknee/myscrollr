@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Inbox,
   Loader2,
   RefreshCw,
   UserX,
@@ -223,15 +224,16 @@ export function Loaded<T>({
             </button>
           )}
           {report.error && (
-            <div
-              className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs"
-              role="status"
-            >
-              <strong>Showing the last loaded {label}.</strong> {report.error}{' '}
+            <div className="admin-error admin-report-stale mt-3" role="status">
+              <AlertTriangle size={18} aria-hidden />
+              <div>
+                <h2>Showing the last loaded {label}.</h2>
+                <p>{report.error}</p>
+              </div>
               <button
                 type="button"
                 onClick={report.retry}
-                className="min-h-10 cursor-pointer rounded px-2 font-semibold underline focus-visible:outline-2 focus-visible:outline-primary"
+                className="admin-state-action focus-visible:outline-2 focus-visible:outline-primary"
               >
                 Retry
               </button>
@@ -266,7 +268,13 @@ export function Loaded<T>({
     )
   }
   if (report.error) {
-    return <ErrorPanel message={report.error} onRetry={report.retry} />
+    return (
+      <ErrorPanel
+        title={`Couldn’t load ${label}`}
+        message={report.error}
+        onRetry={report.retry}
+      />
+    )
   }
   return <Loading label={label} slow={report.slow} onCancel={report.cancel} />
 }
@@ -274,25 +282,44 @@ export function Loaded<T>({
 export function ErrorPanel({
   message,
   onRetry,
+  title = 'Request unsuccessful',
 }: {
   message: string
   onRetry?: () => void
+  title?: string
 }) {
   return (
-    <div
-      role="alert"
-      className="rounded-xl bg-error/5 p-4 ring-1 ring-error/25"
-    >
-      <p className="text-sm font-medium text-error">{message}</p>
+    <div role="alert" className="admin-error">
+      <AlertTriangle size={18} aria-hidden />
+      <div>
+        <h2>{title}</h2>
+        <p>{message}</p>
+      </div>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold ring-1 ring-error/30 hover:bg-error/10 focus-visible:outline-2 focus-visible:outline-primary"
+          className="admin-state-action inline-flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-primary"
         >
           <RefreshCw size={14} aria-hidden /> Retry
         </button>
       )}
+    </div>
+  )
+}
+
+export function EmptyState({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="admin-empty">
+      <Inbox size={24} aria-hidden />
+      <h2>{title}</h2>
+      {children}
     </div>
   )
 }
@@ -309,7 +336,8 @@ export function Loading({
   return (
     <div
       role="status"
-      className="rounded-xl bg-base-200/30 p-5 text-sm text-base-content/60 ring-1 ring-base-300/50"
+      className="admin-loading"
+      aria-label={`Loading ${label}`}
     >
       <span className="flex items-center gap-2">
         <Loader2 className="size-4 animate-spin" aria-hidden /> Loading {label}
@@ -318,7 +346,7 @@ export function Loading({
         <button
           type="button"
           onClick={onCancel}
-          className="mt-3 min-h-10 cursor-pointer rounded-lg px-3 font-semibold ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
+          className="admin-state-action focus-visible:outline-2 focus-visible:outline-primary"
         >
           Cancel
         </button>

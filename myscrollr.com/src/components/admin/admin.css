@@ -142,7 +142,8 @@
   color: var(--staff-muted);
   font-size: 14px;
 }
-.admin-support-error {
+.admin-support-error,
+.admin-error {
   display: flex;
   align-items: flex-start;
   flex-wrap: wrap;
@@ -156,25 +157,30 @@
   font-size: 14px;
   line-height: 1.6;
 }
-.admin-support-error > svg {
+.admin-support-error > svg,
+.admin-error > svg {
   flex-shrink: 0;
   margin-top: 3px;
   color: var(--color-error);
 }
-.admin-support-error > div {
-  flex: 1 1 180px;
+.admin-support-error > div,
+.admin-error > div {
+  flex: 1 1 0;
   min-width: 0;
 }
-.admin-support-error :is(h2, h3) {
+.admin-support-error :is(h2, h3),
+.admin-error :is(h2, h3) {
   font-size: 14px;
   font-weight: 650;
   color: var(--color-base-content);
 }
-.admin-support-error p {
+.admin-support-error p,
+.admin-error p {
   margin-top: 4px;
   color: var(--staff-muted);
 }
-.admin-support-retry {
+.admin-support-retry,
+.admin-state-action {
   min-height: 44px;
   padding: 8px 14px;
   border: 1px solid var(--staff-line);
@@ -185,8 +191,112 @@
   font-weight: 600;
   cursor: pointer;
 }
-.admin-support-retry:hover {
+.admin-support-retry:hover,
+.admin-state-action:hover {
   background: var(--color-base-200);
+}
+.admin-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 220px;
+  padding: 28px 20px;
+  border: 1px solid var(--staff-line);
+  border-radius: 12px;
+  background: var(--staff-surface);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.admin-empty > svg {
+  color: var(--staff-muted);
+}
+.admin-empty h2 {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.admin-empty p {
+  max-width: 60ch;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--staff-muted);
+}
+.admin-empty-inline {
+  padding: 24px 16px;
+  color: var(--staff-muted);
+  font-size: 14px;
+}
+.admin-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 160px;
+  padding: 24px;
+  color: var(--staff-muted);
+  font-size: 14px;
+}
+.admin-confirmation {
+  margin: auto;
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  padding: 24px;
+  border: 1px solid var(--staff-line);
+  border-radius: 16px;
+  background: var(--staff-surface);
+  color: var(--color-base-content);
+  box-shadow: 0 24px 80px #0005;
+}
+.admin-confirmation::backdrop {
+  background: #0008;
+}
+.admin-confirmation > h2 {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.admin-confirmation > p {
+  margin-block: 12px 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--staff-muted);
+}
+.admin-confirmation > p strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-base-content);
+  font-weight: 600;
+}
+.admin-report-stale {
+  border-color: color-mix(in srgb, var(--color-warning) 30%, var(--staff-line));
+  background: color-mix(in srgb, var(--color-warning) 5%, var(--staff-surface));
+}
+.admin-report-stale > svg {
+  color: var(--color-warning);
+}
+.admin-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.admin-confirmation-danger {
+  background: #b42318;
+  color: #fff;
+  border-color: transparent;
+}
+.admin-confirmation-danger:hover {
+  background: #b42318;
+  filter: brightness(0.9);
+}
+.admin-state-action:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 .admin-overview-detail {
   padding: 4px 0 32px 148px;
@@ -327,8 +437,15 @@
   }
 }
 @media (max-width: 767px) {
-  .admin-support-error > button {
+  .admin-support-error > button,
+  .admin-error > button {
     width: 100%;
+  }
+  .admin-confirmation {
+    padding: 20px;
+  }
+  .admin-confirmation-actions {
+    flex-direction: column-reverse;
   }
   .admin-support-sort > div {
     display: grid;
@@ -459,6 +576,18 @@
   .admin-overview-row > svg {
     grid-column: 3;
     grid-row: 1;
+  }
+  .admin-overview-row:has(> span:first-child:empty) {
+    grid-template-columns: minmax(0, 1fr) 20px;
+  }
+  .admin-overview-row > span:first-child:empty {
+    display: none;
+  }
+  .admin-overview-row:has(> span:first-child:empty) > span {
+    grid-column: 1;
+  }
+  .admin-overview-row:has(> span:first-child:empty) > svg {
+    grid-column: 2;
   }
   .admin-overview-detail {
     padding: 0 0 24px;

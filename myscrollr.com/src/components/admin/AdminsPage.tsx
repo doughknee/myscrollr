@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Trash2, UserPlus } from 'lucide-react'
-import { Loaded, PageFrame, useReport } from './ui'
+import { EmptyState, ErrorPanel, Loaded, PageFrame, useReport } from './ui'
 import type { AdminRow } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -25,6 +25,21 @@ export default function AdminsPage() {
   const [email, setEmail] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState<AdminRow | null>(null)
+  const [removalBusy, setRemovalBusy] = useState(false)
+  const confirmation = useRef<HTMLDialogElement>(null)
+  const cancelRemoval = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (removing) {
+      confirmation.current?.showModal()
+      cancelRemoval.current?.focus()
+    }
+  }, [removing])
+  const closeConfirmation = () => {
+    confirmation.current?.close()
+    setRemoving(null)
+    setError(null)
+  }
 
   const report = useReport(
     useCallback(
@@ -55,15 +70,19 @@ export default function AdminsPage() {
   }
 
   async function remove(row: AdminRow) {
-    if (!confirm(`Remove ${row.email} from the admin list?`)) return
+    if (removalBusy) return
+    setRemovalBusy(true)
     setError(null)
     try {
       await adminApi.removeAdmin(getToken, row.id)
+      closeConfirmation()
       load()
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not remove that admin',
       )
+    } finally {
+      setRemovalBusy(false)
     }
   }
 
@@ -81,10 +100,49 @@ export default function AdminsPage() {
           </p>
         </header>
 
-        {error && (
-          <p className="rounded-lg bg-error/5 p-3 text-sm text-error ring-1 ring-error/20">
-            {error}
-          </p>
+        {error && !removing && (
+          <ErrorPanel title="Staff access not updated" message={error} />
+        )}
+        {removing && (
+          <dialog
+            ref={confirmation}
+            className="admin-confirmation"
+            aria-labelledby="remove-admin-title"
+            aria-describedby="remove-admin-description"
+            onCancel={(event) => {
+              event.preventDefault()
+              if (!removalBusy) closeConfirmation()
+            }}
+          >
+            <h2 id="remove-admin-title">Remove staff access?</h2>
+            <p id="remove-admin-description">
+              <strong>{removing.email}</strong> This person will no longer be
+              able to open the staff console. Their Scrollr account stays
+              intact.
+            </p>
+            {error && (
+              <ErrorPanel title="Access removal failed" message={error} />
+            )}
+            <div className="admin-confirmation-actions">
+              <button
+                ref={cancelRemoval}
+                type="button"
+                disabled={removalBusy}
+                className="admin-state-action"
+                onClick={closeConfirmation}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={removalBusy}
+                className="admin-state-action admin-confirmation-danger"
+                onClick={() => remove(removing)}
+              >
+                {removalBusy ? 'Removing…' : 'Remove access'}
+              </button>
+            </div>
+          </dialog>
         )}
 
         <form
@@ -133,16 +191,16 @@ export default function AdminsPage() {
         <Loaded report={report} label="admins">
           {(rows) =>
             rows.length === 0 ? (
-              <div className="rounded-xl bg-base-200/30 p-6 text-sm text-base-content/65 ring-1 ring-base-300/60">
+              <EmptyState title="Staff list is empty">
                 <p>No staff accounts were returned.</p>
                 <button
                   type="button"
                   onClick={load}
-                  className="mt-3 min-h-10 cursor-pointer rounded-lg px-3 font-semibold ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
+                  className="admin-state-action focus-visible:outline-2 focus-visible:outline-primary"
                 >
                   Refresh staff list
                 </button>
-              </div>
+              </EmptyState>
             ) : (
               <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
                 <table className="admin-mobile-table admin-access-table w-full min-w-[38rem] text-left text-sm">
@@ -201,7 +259,10 @@ export default function AdminsPage() {
                           {removable(row) ? (
                             <button
                               type="button"
-                              onClick={() => remove(row)}
+                              onClick={() => {
+                                setError(null)
+                                setRemoving(row)
+                              }}
                               aria-label={`Remove ${row.email}`}
                               className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
                             >

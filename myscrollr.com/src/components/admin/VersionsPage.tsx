@@ -1,6 +1,13 @@
 import { useCallback, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { Loaded, PageFrame, VERDICT_TONE, VerdictPill, useReport } from './ui'
+import {
+  EmptyState,
+  Loaded,
+  PageFrame,
+  VERDICT_TONE,
+  VerdictPill,
+  useReport,
+} from './ui'
 import type { ReactNode } from 'react'
 import type { AdminVersions } from '@/api/admin'
 import { adminApi } from '@/api/admin'
@@ -93,35 +100,34 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
 
   return (
     <div className="space-y-8 [overflow-wrap:anywhere]">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <p className="max-w-[900px] text-2xl leading-[1.35] font-semibold tracking-[-0.015em]">
-          {empty ? (
-            'No desktop traffic in this window.'
-          ) : (
-            <>
-              <b className={`font-bold ${tone.number}`}>
-                {pct(data.current_share)} of desktop traffic
-              </b>{' '}
-              is on {data.current_release}, the newest build anyone is running.{' '}
-              {erroring
-                ? `${erroring} is erroring more than usual.`
-                : 'Nothing is erroring more than usual.'}
-            </>
-          )}
-        </p>
-        <VerdictPill verdict={verdict} />
-      </div>
+      {!empty && (
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <p className="max-w-[900px] text-2xl leading-[1.35] font-semibold tracking-[-0.015em]">
+            <b className={`font-bold ${tone.number}`}>
+              {pct(data.current_share)} of desktop traffic
+            </b>{' '}
+            is on {data.current_release}, the newest build anyone is running.{' '}
+            {erroring
+              ? `${erroring} is erroring more than usual.`
+              : 'Nothing is erroring more than usual.'}
+          </p>
+          <VerdictPill verdict={verdict} />
+        </div>
+      )}
 
       {empty && (
-        <p className="rounded-xl bg-base-200/40 p-4 text-sm text-base-content/70 ring-1 ring-base-300/60">
-          No desktop request in the last {data.days} days carried a recognisable
-          Scrollr user agent
-          {data.unrecognized > 0 && (
-            <> (though {num(data.unrecognized)} other requests arrived)</>
-          )}
-          . A build only starts reporting once it sends one — before then this
-          page is correctly empty rather than wrong.
-        </p>
+        <EmptyState title="No desktop traffic in this window.">
+          <p>
+            No desktop request in the last {data.days} days carried a
+            recognisable Scrollr user agent
+            {data.unrecognized > 0 && (
+              <> (though {num(data.unrecognized)} other requests arrived)</>
+            )}
+            . Try a wider window. A build appears here once it sends a
+            recognised user agent.
+          </p>
+          <VerdictPill verdict={verdict} />
+        </EmptyState>
       )}
 
       {!empty && (

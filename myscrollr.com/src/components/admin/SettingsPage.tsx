@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   DefinitionDisclosure,
+  EmptyState,
   ErrorPanel,
   Loaded,
   PageFrame,
@@ -102,7 +103,12 @@ export function SettingsContent({
           same numbers.
         </p>
       </header>
-      {saveError && <ErrorPanel message={saveError} />}
+      {saveError && (
+        <ErrorPanel
+          title="Setting not saved"
+          message={`The previous value has been restored. ${saveError}`}
+        />
+      )}
       <Loaded report={settings} label="settings">
         {(data) => (
           <StaffToggle
@@ -129,11 +135,9 @@ function StaffToggle({
   // it never reported, so it is shown as absent.
   if (!setting) {
     return (
-      <div className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
-        <p className="text-sm text-base-content/70">
-          The server did not report the staff-exclusion setting.
-        </p>
-      </div>
+      <EmptyState title="Setting unavailable">
+        <p>The server did not report the staff-exclusion setting.</p>
+      </EmptyState>
     )
   }
   const on = setting.value

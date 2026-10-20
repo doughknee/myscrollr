@@ -89,6 +89,27 @@ async function search(c: HTMLElement, value: string) {
 }
 
 describe('UsersPage', () => {
+  it('clears an empty search and restores the unfiltered list', async () => {
+    accounts
+      .mockResolvedValueOnce(page)
+      .mockResolvedValueOnce({ ...page, accounts: [], total: 0 })
+      .mockResolvedValue(page)
+    const c = await mount()
+    await search(c, 'missing')
+    await wait(300)
+    expect(c.textContent).toContain('No matching accounts')
+    await act(() => button(c, 'Clear search').click())
+    expect(c.querySelector('input')?.value).toBe('')
+    expect(document.activeElement).toBe(c.querySelector('input'))
+    await wait(300)
+    expect(accounts).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      '',
+      0,
+      expect.any(AbortSignal),
+    )
+    expect(c.textContent).toContain('ada@example.com')
+  })
   it('does not label old rows and totals as a new search, or accept its superseded response', async () => {
     let finishFirst!: (data: AccountsPage) => void
     let finishLatest!: (data: AccountsPage) => void

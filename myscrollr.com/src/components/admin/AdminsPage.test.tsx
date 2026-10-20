@@ -47,10 +47,72 @@ async function mount() {
 beforeEach(() => {
   admins.mockReset()
   addAdmin.mockReset()
+  vi.mocked(adminApi.removeAdmin).mockReset()
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false
+  }
   document.body.innerHTML = ''
 })
 
 describe('AdminsPage', () => {
+  it('requires explicit confirmation and preserves self-access protections', async () => {
+    admins.mockResolvedValue({
+      admins: [row(1, 'me@example.com'), row(2, 'other@example.com')],
+    })
+    const c = await mount()
+    expect(c.querySelector('[aria-label="Remove me@example.com"]')).toBeNull()
+    await act(() =>
+      c
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Remove other@example.com"]',
+        )!
+        .click(),
+    )
+    expect(c.querySelector('dialog')?.open).toBe(true)
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    expect(adminApi.removeAdmin).not.toHaveBeenCalled()
+    await act(() => button(c, 'Cancel').click())
+    expect(c.querySelector('dialog')).toBeNull()
+    expect(adminApi.removeAdmin).not.toHaveBeenCalled()
+  })
+
+  it('keeps failed removal reviewable and prevents repeated submissions', async () => {
+    admins.mockResolvedValue({
+      admins: [row(1, 'me@example.com'), row(2, 'other@example.com')],
+    })
+    let reject!: (reason: Error) => void
+    vi.mocked(adminApi.removeAdmin).mockReturnValueOnce(
+      new Promise((_resolve, fail) => {
+        reject = fail
+      }),
+    )
+    const c = await mount()
+    await act(() =>
+      c
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Remove other@example.com"]',
+        )!
+        .click(),
+    )
+    await act(() => button(c, 'Remove access').click())
+    expect(button(c, 'Removing').disabled).toBe(true)
+    await act(() => reject(new Error('Service unavailable')))
+    expect(c.querySelector('dialog [role="alert"]')?.textContent).toContain(
+      'Access removal failed',
+    )
+    expect(c.querySelector('dialog')?.open).toBe(true)
+    expect(adminApi.removeAdmin).toHaveBeenCalledTimes(1)
+    vi.mocked(adminApi.removeAdmin).mockResolvedValue({ status: 'ok' })
+    await act(() => button(c, 'Remove access').click())
+    expect(c.querySelector('dialog')).toBeNull()
+    expect(adminApi.removeAdmin).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      2,
+    )
+  })
   it('shows Retry on a failed load and Retry refetches', async () => {
     admins
       .mockRejectedValueOnce(new Error('admins down'))

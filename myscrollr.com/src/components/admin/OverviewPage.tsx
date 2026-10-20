@@ -374,6 +374,7 @@ function OverviewRow({
         <div id={panelId} className="admin-overview-detail">
           {row.problem ? (
             <ErrorPanel
+              title="Report unavailable"
               message={row.problem.message}
               onRetry={row.problem.retry}
             />

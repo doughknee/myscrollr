@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Loader2, Search } from 'lucide-react'
-import { ErrorPanel, PageFrame } from './ui'
+import { ChevronLeft, Search } from 'lucide-react'
+import { EmptyState, ErrorPanel, Loading, PageFrame } from './ui'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
 import type { UsersSearch } from '@/lib/adminSearch'
 import { adminApi } from '@/api/admin'
@@ -76,15 +76,13 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
       </button>
 
       {error && (
-        <ErrorPanel message={error} onRetry={() => setAttempt((n) => n + 1)} />
-      )}
-      {!detail && !error && (
-        <Loader2
-          role="status"
-          aria-label="Loading user"
-          className="size-5 animate-spin text-base-content/40"
+        <ErrorPanel
+          title="Couldn’t load this user"
+          message={error}
+          onRetry={() => setAttempt((n) => n + 1)}
         />
       )}
+      {!detail && !error && <Loading label="user" />}
 
       {detail && (
         <>
@@ -134,9 +132,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
               </h2>
               <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
                 {detail.widgets.length === 0 ? (
-                  <p className="p-4 text-sm text-base-content/50">
-                    No widgets configured.
-                  </p>
+                  <p className="admin-empty-inline">No widgets configured.</p>
                 ) : (
                   detail.widgets.map((w) => (
                     <div
@@ -160,9 +156,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
               </h2>
               <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
                 {detail.cases.length === 0 ? (
-                  <p className="p-4 text-sm text-base-content/50">
-                    No tickets opened.
-                  </p>
+                  <p className="admin-empty-inline">No tickets opened.</p>
                 ) : (
                   detail.cases.map((k) => (
                     <div
@@ -343,24 +337,39 @@ export default function UsersPage({
 
         {error && (
           <ErrorPanel
+            title="Couldn’t load users"
             message={error}
             onRetry={() => setAttempt((n) => n + 1)}
           />
         )}
-        {loading && (
-          <Loader2
-            role="status"
-            aria-label="Loading users"
-            className="size-5 animate-spin text-base-content/40"
-          />
-        )}
+        {loading && <Loading label="users" />}
 
         {data && !error && (
           <>
             {data.accounts.length === 0 ? (
-              <div className="rounded-xl bg-base-200/30 p-6 text-sm text-base-content/65 ring-1 ring-base-300/60">
-                No accounts match that search.
-              </div>
+              <EmptyState
+                title={
+                  query ? 'No matching accounts' : 'No accounts on this page'
+                }
+              >
+                <p>
+                  {query
+                    ? 'No accounts match that search. Try another email or username.'
+                    : 'No accounts were returned for this page.'}
+                </p>
+                {(query || page > 0) && (
+                  <button
+                    type="button"
+                    className="admin-state-action"
+                    onClick={() => {
+                      updateSearch({ q: '', page: 0 }, true)
+                      searchInput.current?.focus()
+                    }}
+                  >
+                    {query ? 'Clear search' : 'Back to first page'}
+                  </button>
+                )}
+              </EmptyState>
             ) : (
               <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
                 <table className="admin-mobile-table w-full min-w-[42rem] text-left text-sm">
