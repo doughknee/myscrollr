@@ -1328,6 +1328,8 @@ function useThreePane() {
   return wide
 }
 
+const QUEUE_REFETCH_MS = 400
+
 export default function SupportPage() {
   const getToken = useGetToken()
   const [sort, setSort] = useState<QueueSort>('last_wrote')
@@ -1393,14 +1395,18 @@ export default function SupportPage() {
       : []
 
   useEffect(() => {
-    return subscribeToSupportEvents(
+    // A burst of events is one refetch after it settles: `load`'s cleanup
+    // already discards a superseded fetch, so only the trailing edge needs a timer.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const unsubscribe = subscribeToSupportEvents(
       getToken,
       (event) => {
         // Every event moves the queue: a section, a countdown or a row. The
         // open case is re-read only when the event is about something on
         // screen, or about the pipeline switch, which changes what every
         // countdown means.
-        setQueueKey((n) => n + 1)
+        clearTimeout(timer)
+        timer = setTimeout(() => setQueueKey((n) => n + 1), QUEUE_REFETCH_MS)
         if (
           !event.ticket_number ||
           openRef.current.includes(event.ticket_number)
@@ -1410,6 +1416,10 @@ export default function SupportPage() {
       },
       setLive,
     )
+    return () => {
+      clearTimeout(timer)
+      unsubscribe()
+    }
   }, [getToken])
 
   const toggleAutoSend = async () => {

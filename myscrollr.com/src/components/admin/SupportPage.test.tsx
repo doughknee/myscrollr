@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   supportCase: vi.fn(),
   setAutoSendPaused: vi.fn(),
   unsubscribe: vi.fn(),
+  onEvent: null as null | ((e: { ticket_number?: string }) => void),
 }))
 
 vi.mock('@/hooks/useGetToken', () => ({ useGetToken: () => mocks.token }))
@@ -45,9 +46,10 @@ vi.mock('@/api/admin', async () => {
     // Report the stream as live, the way a connected console does.
     subscribeToSupportEvents: (
       _t: unknown,
-      _on: unknown,
+      on: (e: { ticket_number?: string }) => void,
       setLive: (v: boolean) => void,
     ) => {
+      mocks.onEvent = on
       setLive(true)
       return mocks.unsubscribe
     },
@@ -174,6 +176,32 @@ describe('the page frame', () => {
       'Answered, waiting on them',
       'Resolved',
     ])
+  })
+})
+
+describe('the live stream', () => {
+  it('refetches the queue once per burst of events, and again for a later one', async () => {
+    await render(1440)
+    vi.useFakeTimers()
+    try {
+      mocks.supportQueue.mockClear()
+      for (let i = 0; i < 5; i++) {
+        mocks.onEvent!({ ticket_number: '752473' })
+        await vi.advanceTimersByTimeAsync(40)
+      }
+      expect(mocks.supportQueue).toHaveBeenCalledTimes(0)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500)
+      })
+      expect(mocks.supportQueue).toHaveBeenCalledTimes(1)
+      mocks.onEvent!({})
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500)
+      })
+      expect(mocks.supportQueue).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
