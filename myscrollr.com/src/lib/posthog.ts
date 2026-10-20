@@ -1,5 +1,6 @@
-import posthog from 'posthog-js/dist/module.slim'
 import type { CaptureResult } from 'posthog-js'
+
+type PostHog = (typeof import('posthog-js/dist/module.slim'))['default']
 
 export type WebsiteAnalyticsDecision = 'unknown' | 'enabled' | 'declined'
 export type WebsiteAnalyticsEvent = 'download_selected'
@@ -46,6 +47,18 @@ const ALLOWED_PROPERTIES = new Set([
   '$geoip_disable',
 ])
 let initialized = false
+// The SDK is ~48 KB gzipped and only needed once a user has opted in, so it
+// loads on first use rather than riding in the shared entry chunk. Calls made
+// before it arrives queue on the same promise and run in order.
+let sdk: PostHog | null = null
+let sdkLoad: Promise<PostHog> | null = null
+function withSdk(fn: (posthog: PostHog) => void): void {
+  if (sdk) return fn(sdk)
+  sdkLoad ??= import('posthog-js/dist/module.slim').then(
+    (mod) => (sdk = mod.default),
+  )
+  void sdkLoad.then(fn)
+}
 let suppressed = true
 let analyticsPolicy: WebsiteAnalyticsPolicy = 'unknown'
 let lastPageview = { path: '', at: 0 }
@@ -104,24 +117,26 @@ function configured(): boolean {
 function initialize(): boolean {
   if (!configured()) return false
   if (!initialized) {
-    posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-      api_host: '/ingest',
-      ui_host: 'https://us.posthog.com',
-      advanced_disable_flags: true,
-      autocapture: false,
-      before_send: sanitizeWebsiteCapture,
-      capture_pageview: false,
-      capture_pageleave: false,
-      capture_performance: false,
-      disable_session_recording: true,
-      disable_surveys: true,
-      person_profiles: 'identified_only',
-      opt_out_capturing_by_default: true,
-      opt_out_persistence_by_default: true,
-      persistence: 'localStorage',
-      // Limited service-provider analytics use the regional policy and Scrollr choice below.
-      respect_dnt: false,
-    })
+    withSdk((posthog) =>
+      posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
+        api_host: '/ingest',
+        ui_host: 'https://us.posthog.com',
+        advanced_disable_flags: true,
+        autocapture: false,
+        before_send: sanitizeWebsiteCapture,
+        capture_pageview: false,
+        capture_pageleave: false,
+        capture_performance: false,
+        disable_session_recording: true,
+        disable_surveys: true,
+        person_profiles: 'identified_only',
+        opt_out_capturing_by_default: true,
+        opt_out_persistence_by_default: true,
+        persistence: 'localStorage',
+        // Limited service-provider analytics use the regional policy and Scrollr choice below.
+        respect_dnt: false,
+      }),
+    )
     initialized = true
   }
   return true
@@ -160,14 +175,18 @@ export function setWebsiteAnalyticsDecision(
   localStorage.setItem(STORAGE_KEY, decision)
   if (decision === 'enabled') {
     if (initialize()) {
-      posthog.reset()
-      posthog.opt_in_capturing({ captureEventName: false })
+      withSdk((posthog) => {
+        posthog.reset()
+        posthog.opt_in_capturing({ captureEventName: false })
+      })
     }
   } else {
     sessionStorage.removeItem(SIGNUP_FLOW_KEY)
     if (initialize()) {
-      posthog.reset()
-      posthog.opt_out_capturing()
+      withSdk((posthog) => {
+        posthog.reset()
+        posthog.opt_out_capturing()
+      })
     }
   }
   window.dispatchEvent(new CustomEvent('scrollr:analytics-consent-changed'))
@@ -188,7 +207,7 @@ function ready(): boolean {
   const needsOptIn = !initialized
   if (!initialize()) return false
   if (needsOptIn) {
-    posthog.opt_in_capturing({ captureEventName: false })
+    withSdk((posthog) => posthog.opt_in_capturing({ captureEventName: false }))
   }
   return true
 }
@@ -233,7 +252,7 @@ export function captureWebsitePageview(rawPath: string): void {
       }
     }
   }
-  posthog.capture('$pageview', properties)
+  withSdk((posthog) => posthog.capture('$pageview', properties))
 }
 
 export function captureWebsiteEvent(
@@ -247,7 +266,7 @@ export function captureWebsiteEvent(
   if (properties.platform && ALLOWED_PLATFORMS.has(properties.platform)) {
     safeProperties.platform = properties.platform
   }
-  posthog.capture(event, safeProperties)
+  withSdk((posthog) => posthog.capture(event, safeProperties))
 }
 
 export function beginWebsiteSignupFlow(): void {
@@ -283,24 +302,31 @@ export function applyWebsiteAnalyticsContext(
     context.eligible &&
     /^[0-9a-f]{64}$/i.test(distinctID) &&
     getWebsiteAnalyticsDecision() === 'enabled'
-  const currentID = posthog.get_distinct_id()
-  const hasPriorAccountIdentity = /^[0-9a-f]{64}$/i.test(currentID)
-  if (hasPriorAccountIdentity && (!validContext || currentID !== distinctID)) {
-    posthog.reset()
-  }
-  if (!validContext) return false
-  posthog.opt_in_capturing({ captureEventName: false })
-  posthog.identify(distinctID)
-  if (pending && context.verified) {
-    posthog.capture('signup_completed', { surface: 'website' })
-  }
-  return true
+  withSdk((posthog) => {
+    const currentID = posthog.get_distinct_id()
+    const hasPriorAccountIdentity = /^[0-9a-f]{64}$/i.test(currentID)
+    if (
+      hasPriorAccountIdentity &&
+      (!validContext || currentID !== distinctID)
+    ) {
+      posthog.reset()
+    }
+    if (!validContext) return
+    posthog.opt_in_capturing({ captureEventName: false })
+    posthog.identify(distinctID)
+    if (pending && context.verified) {
+      posthog.capture('signup_completed', { surface: 'website' })
+    }
+  })
+  return validContext
 }
 
 export function resetWebsiteAnalyticsIdentity(): void {
   if (!initialized) return
-  posthog.reset()
-  if (getWebsiteAnalyticsDecision() === 'enabled') {
-    posthog.opt_in_capturing({ captureEventName: false })
-  }
+  withSdk((posthog) => {
+    posthog.reset()
+    if (getWebsiteAnalyticsDecision() === 'enabled') {
+      posthog.opt_in_capturing({ captureEventName: false })
+    }
+  })
 }

@@ -68,9 +68,10 @@ describe('website PostHog privacy boundary', () => {
     setWebsiteAnalyticsSuppressed(false)
   })
 
-  it('defaults unknown and purges durable identity without capturing on decline', () => {
+  it('defaults unknown and purges durable identity without capturing on decline', async () => {
     expect(getWebsiteAnalyticsDecision()).toBe('unknown')
     setWebsiteAnalyticsDecision('declined')
+    await vi.dynamicImportSettled() // the SDK loads on first use
     expect(getWebsiteAnalyticsDecision()).toBe('declined')
     expect(sdk.init).toHaveBeenCalledWith(
       'test-key',

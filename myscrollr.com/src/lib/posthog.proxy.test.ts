@@ -34,6 +34,7 @@ it('sends real SDK events with browser signals through nginx and stops on explic
     setWebsiteAnalyticsPolicy('default-on')
     setWebsiteAnalyticsSuppressed(false)
     captureWebsitePageview('/download')
+    await vi.dynamicImportSettled() // the SDK loads on first use
     await vi.advanceTimersByTimeAsync(4000)
     expect(send).toHaveBeenCalled()
     expect(
