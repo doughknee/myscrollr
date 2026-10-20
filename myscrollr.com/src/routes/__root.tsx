@@ -248,6 +248,15 @@ function RootLayout() {
           <main
             ref={mainRef}
             id="main-content"
+            onFocus={(event) => {
+              // Both the skip link and route focus enter here. The console's
+              // navigation lives inside this shared shell; skip past it.
+              if (isConsole && event.target === event.currentTarget) {
+                event.currentTarget
+                  .querySelector<HTMLElement>('[data-admin-workspace]')
+                  ?.focus({ preventScroll: true })
+              }
+            }}
             className={
               isConsole ? 'relative' : 'relative min-h-[calc(100dvh-60px)]'
             }

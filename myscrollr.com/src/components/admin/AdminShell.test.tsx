@@ -148,9 +148,16 @@ describe('AdminChrome', () => {
         <p>page</p>
       </AdminChrome>,
     )
-    const main = host.querySelector('main')!
-    expect(main.className).toContain('min-h-[calc(100dvh-48px)]')
-    expect(main.className).not.toContain('max-w-')
+    const workspace = host.querySelector<HTMLElement>(
+      '[aria-label="Staff workspace"]',
+    )!
+    expect(workspace.className).toContain('min-h-[calc(100dvh-48px)]')
+    expect(workspace.className).not.toContain('max-w-')
+    // RootLayout owns the single main landmark. This region is focusable
+    // so the shared skip link can bypass the staff navigation.
+    expect(host.querySelector('main')).toBeNull()
+    workspace.focus()
+    expect(document.activeElement).toBe(workspace)
   })
 })
 

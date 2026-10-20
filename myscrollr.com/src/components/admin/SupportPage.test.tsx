@@ -167,7 +167,7 @@ describe('the page frame', () => {
 
     // The two stacked banners are gone: their sentences are now the pills'
     // titles, and nothing renders them in the body of the page.
-    const main = host.querySelector('main')!
+    const main = host.querySelector('[aria-label="Staff workspace"]')!
     expect(main.textContent).not.toContain(
       'Live — holds and replies appear here without a refresh.',
     )
@@ -192,7 +192,9 @@ describe('the page frame', () => {
 
   it('counts what needs you, what waits on them, and what is resolved', async () => {
     const host = await render(1440)
-    const strip = host.querySelector('main > div > div')!
+    const strip = host.querySelector(
+      '[aria-label="Staff workspace"] > div > div',
+    )!
     expect(strip.textContent).toContain('3 need you')
     expect(strip.textContent).toContain('2 waiting on them')
     expect(strip.textContent).toContain('2 resolved')
@@ -498,7 +500,7 @@ describe('the case', () => {
     await open(host, 'Sam Pryor')
     const bar = host.querySelector('header')!
     expect(bar.textContent).not.toContain('Sends in')
-    const conversation = host.querySelector('main')!
+    const conversation = host.querySelector('[aria-label="Staff workspace"]')!
     expect(conversation.textContent).toContain('Sends in')
   })
 
@@ -534,7 +536,9 @@ describe('the case', () => {
   it('lists the person’s other tickets under the open one', async () => {
     const host = await render(1440)
     await open(host, 'Morgan Ellis')
-    const others = host.querySelector('main')!.textContent
+    const others = host.querySelector(
+      '[aria-label="Staff workspace"]',
+    )!.textContent
     expect(others).toContain('Their other tickets')
     expect(others).toContain('#584802')
     expect(others).toContain('#613084')

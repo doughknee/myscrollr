@@ -326,7 +326,10 @@ export function AdminChrome({
 
           {/* From 768 the sections sit in the bar. Below it they get their own
             scrolling row underneath, where a tap target can be 44px tall. */}
-          <nav className="hidden min-w-0 flex-1 overflow-hidden md:block">
+          <nav
+            aria-label="Staff sections"
+            className="hidden min-w-0 flex-1 overflow-hidden md:block"
+          >
             {/* The bar now also carries a page's status pills (SCROLLR-219).
                 Between 768 and the width where everything fits, the sections
                 scroll inside their share of the bar; overflow visible let
@@ -388,7 +391,10 @@ export function AdminChrome({
           </div>
         </header>
 
-        <nav className="shrink-0 border-b border-hairline bg-base-75 md:hidden">
+        <nav
+          aria-label="Staff sections"
+          className="shrink-0 border-b border-hairline bg-base-75 md:hidden"
+        >
           <ul className="flex gap-0.5 overflow-x-auto px-2">
             {links.map(({ to, label, active }) => (
               <li key={to}>
@@ -409,9 +415,21 @@ export function AdminChrome({
         </nav>
 
         {/* Full-bleed. Each page brings its own PageFrame if it wants a cap. */}
-        <main className="min-h-[calc(100dvh-48px)] min-w-0 flex-1">
+        <section
+          data-admin-workspace
+          aria-label="Staff workspace"
+          tabIndex={-1}
+          ref={(node) => {
+            // Access checks can finish after the root's route-focus effect.
+            // Continue its handoff only if focus is still on the wrapper.
+            if (node && document.activeElement === node.closest('main')) {
+              node.focus({ preventScroll: true })
+            }
+          }}
+          className="min-h-[calc(100dvh-48px)] min-w-0 flex-1 outline-none"
+        >
           {children}
-        </main>
+        </section>
       </div>
     </StatusSlot.Provider>
   )
