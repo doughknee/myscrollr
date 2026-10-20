@@ -1157,7 +1157,7 @@ function QueueCard({
       onClick={onSelect}
       aria-current={active ? 'true' : undefined}
       /* A <button> centres its text; the card is three left-aligned lines. */
-      className={`w-full cursor-pointer rounded-lg px-2.5 py-2.5 text-left transition-colors ${
+      className={`admin-support-queue-card w-full cursor-pointer rounded-lg px-2.5 py-2.5 text-left transition-colors ${
         active
           ? 'bg-base-200 ring-1 ring-primary'
           : 'hover:bg-base-200/50 ring-1 ring-transparent'
@@ -1305,7 +1305,7 @@ function SortBar({
   const pill =
     'h-8 cursor-pointer rounded-full bg-base-150 px-3 text-xs font-semibold text-base-content/80 ring-1 ring-hairline outline-none focus:ring-2 focus:ring-primary/50'
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="admin-support-sort flex flex-col gap-2.5">
       <label className="flex h-[38px] items-center gap-2 rounded-lg bg-base-150 px-3 ring-1 ring-hairline focus-within:ring-2 focus-within:ring-primary/50">
         <Search size={15} className="shrink-0 text-base-content/40" />
         <input
@@ -1351,7 +1351,7 @@ function SortBar({
           className="ml-auto inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs whitespace-nowrap text-base-content/45 hover:text-base-content"
         >
           {dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-          {directionLabel(sort, dir).toLowerCase()}
+          <span>{directionLabel(sort, dir).toLowerCase()}</span>
         </button>
       </div>
     </div>

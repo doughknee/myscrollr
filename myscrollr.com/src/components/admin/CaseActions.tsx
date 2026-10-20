@@ -116,14 +116,14 @@ export default function CaseActions({
   const unchanged = isUnchanged(draft?.body ?? '', edited)
 
   return (
-    <section>
+    <section className="admin-reply-controls">
       {/* ── The reply, editable where it is read ────────────────
           The mockup's "Proposed reply · edit it here" is this box. It used to
           sit behind an Edit button, which meant the thing you are here to do
           was one click further away than the thing you are here to read. */}
       {pending && (
         <>
-          <div className="flex flex-wrap items-baseline gap-x-2">
+          <div className="admin-reply-heading flex flex-wrap items-baseline gap-x-2">
             <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
               Proposed reply
             </h2>
@@ -180,7 +180,7 @@ export default function CaseActions({
       {/* The quieter verbs. Above the pinned bar rather than in it: on a
           phone the bar is what a thumb reaches, and it should only hold the
           three things you came to do. */}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="admin-reply-secondary mt-3 flex flex-wrap gap-2">
         {pending && (
           <>
             <ActionButton
@@ -236,7 +236,7 @@ export default function CaseActions({
           scrolling past a reply that can run to forty lines. It rejoins the
           flow at md, where the whole case is on screen anyway. */}
       {pending && (
-        <div className="sticky bottom-0 z-20 mt-3 -mb-4 flex flex-wrap items-center gap-2 border-t border-base-300/60 bg-base-100/95 px-1 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur md:static md:mb-0 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:pb-0 md:backdrop-blur-none">
+        <div className="admin-reply-primary sticky bottom-0 z-20 mt-3 -mb-4 flex flex-wrap items-center gap-2 border-t border-base-300/60 bg-base-100/95 px-1 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur md:static md:mb-0 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:pb-0 md:backdrop-blur-none">
           <ActionButton
             label="Send reply"
             icon={<Send size={14} />}
@@ -289,7 +289,7 @@ export default function CaseActions({
 
       {/* ── Ask one question ───────────────────────────────────── */}
       {panel === 'ask' && pending && (
-        <div className="mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
+        <div className="admin-reply-panel mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
           <label
             htmlFor="ask-body"
             className="text-xs font-semibold tracking-wide text-base-content/50 uppercase"
@@ -343,7 +343,7 @@ export default function CaseActions({
 
       {/* ── Link an existing issue ─────────────────────────────── */}
       {panel === 'link' && (
-        <div className="mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
+        <div className="admin-reply-panel mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
           <label
             htmlFor="issue-key"
             className="text-xs font-semibold tracking-wide text-base-content/50 uppercase"
@@ -421,7 +421,7 @@ function ConfirmSend({
   onCancel: () => void
 }) {
   return (
-    <div className="mt-3 rounded-xl bg-warning/5 px-4 py-3 ring-1 ring-warning/40">
+    <div className="admin-reply-panel mt-3 rounded-xl bg-warning/5 px-4 py-3 ring-1 ring-warning/40">
       <p className="text-sm font-semibold">
         Send this reply to {who ?? 'the reporter'}?
       </p>

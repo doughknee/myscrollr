@@ -203,6 +203,58 @@
 :root:not(.dark) .admin-support-thread :is(a, button).text-primary {
   color: #166b50;
 }
+.admin-support-sort > label {
+  height: 44px;
+}
+.admin-support-sort select {
+  min-height: 40px;
+}
+.admin-support-sort button {
+  min-height: 36px;
+}
+.admin-support-queue-card {
+  padding: 14px 12px;
+}
+.admin-support-queue-card > div:nth-child(2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+.admin-support-queue-card > div:last-child {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 8px;
+  color: var(--staff-muted);
+}
+.admin-support-queue-card > div:last-child > span:first-child {
+  flex-basis: 100%;
+}
+.admin-support-queue-card > div:last-child > span:last-child {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.admin-reply-controls button {
+  border-radius: 8px;
+  min-height: 44px;
+}
+.admin-reply-heading h2 {
+  color: var(--color-base-content);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+.admin-reply-controls textarea {
+  background: var(--staff-surface);
+}
+.admin-reply-panel {
+  background: var(--staff-surface);
+  overflow-wrap: anywhere;
+}
 @media (max-width: 380px) {
   .admin-user-identity h1 {
     font-size: 20px;
@@ -210,6 +262,59 @@
   }
 }
 @media (max-width: 767px) {
+  .admin-support-sort > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+  .admin-support-sort select {
+    width: 100%;
+    min-height: 44px;
+  }
+  .admin-support-sort button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    border: 1px solid var(--staff-line);
+    border-radius: 8px;
+    background: var(--color-base-150);
+    color: var(--staff-muted);
+  }
+  .admin-support-sort button > span {
+    display: none;
+  }
+  .admin-support-sort button > svg {
+    width: 16px;
+    height: 16px;
+  }
+  .admin-support-sort input,
+  .admin-reply-controls textarea,
+  .admin-reply-controls input {
+    font-size: 16px;
+  }
+  .admin-reply-secondary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-reply-secondary > button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .admin-reply-primary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 0;
+  }
+  .admin-reply-primary > button,
+  .admin-reply-secondary > button {
+    justify-content: center;
+  }
+  .admin-reply-panel button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .admin-reply-panel input {
+    width: 100%;
+  }
   .admin-user-sections {
     grid-template-columns: minmax(0, 1fr);
   }
