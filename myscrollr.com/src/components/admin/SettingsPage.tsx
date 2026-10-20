@@ -174,7 +174,7 @@ function StaffToggle({
           />
         </button>
       </div>
-      <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+      <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-base-content/60 [overflow-wrap:anywhere]">
         {saving && <Loader2 size={12} className="animate-spin" aria-hidden />}
         <span>
           {on ? 'On' : 'Off'}

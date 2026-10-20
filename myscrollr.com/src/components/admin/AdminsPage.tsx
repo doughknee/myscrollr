@@ -77,9 +77,7 @@ export default function AdminsPage() {
         <header>
           <h1 className="text-2xl font-bold tracking-tight">Admins</h1>
           <p className="mt-1 text-sm text-base-content/60">
-            Staff access is this list and nothing else — not a subscription
-            tier, not a Stripe plan, not{' '}
-            <code className="text-xs">super_user</code>.
+            Manage who can open the staff console.
           </p>
         </header>
 
@@ -133,76 +131,91 @@ export default function AdminsPage() {
         </form>
 
         <Loaded report={report} label="admins">
-          {(rows) => (
-            <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-              <table className="w-full min-w-[38rem] text-left text-sm">
-                <thead className="text-xs text-base-content/50 uppercase">
-                  <tr className="border-b border-base-300/60">
-                    <th className="p-3 font-semibold">Email</th>
-                    <th className="p-3 font-semibold">Added</th>
-                    <th className="p-3 font-semibold">Last seen</th>
-                    <th className="p-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-base-300/40 last:border-0"
-                    >
-                      <td className="p-3">
-                        <span className="font-medium">{row.email}</span>
-                        {row.self && (
-                          <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-                            you
-                          </span>
-                        )}
-                        {!row.claimed && (
-                          <span className="ml-2 rounded bg-base-300/60 px-1.5 py-0.5 text-xs text-base-content/60">
-                            not signed in yet
-                          </span>
-                        )}
-                        {row.note && (
-                          <span className="block text-xs text-base-content/45">
-                            {row.note}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-base-content/60">
-                        {new Date(row.added_at).toLocaleDateString()}
-                        {row.added_by && (
-                          <span className="block text-xs text-base-content/45">
-                            by {row.added_by}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-base-content/60">
-                        {row.last_seen_at
-                          ? new Date(row.last_seen_at).toLocaleString()
-                          : '—'}
-                      </td>
-                      <td className="p-3 text-right">
-                        {removable(row) ? (
-                          <button
-                            type="button"
-                            onClick={() => remove(row)}
-                            aria-label={`Remove ${row.email}`}
-                            className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        ) : (
-                          <span className="text-xs text-base-content/35">
-                            {row.self ? 'cannot remove yourself' : 'last admin'}
-                          </span>
-                        )}
-                      </td>
+          {(rows) =>
+            rows.length === 0 ? (
+              <div className="rounded-xl bg-base-200/30 p-6 text-sm text-base-content/65 ring-1 ring-base-300/60">
+                <p>No staff accounts were returned.</p>
+                <button
+                  type="button"
+                  onClick={load}
+                  className="mt-3 min-h-10 cursor-pointer rounded-lg px-3 font-semibold ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  Refresh staff list
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+                <table className="w-full min-w-[38rem] text-left text-sm">
+                  <thead className="text-xs text-base-content/50 uppercase">
+                    <tr className="border-b border-base-300/60">
+                      <th className="p-3 font-semibold">Email</th>
+                      <th className="p-3 font-semibold">Added</th>
+                      <th className="p-3 font-semibold">Last seen</th>
+                      <th className="p-3" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b border-base-300/40 last:border-0"
+                      >
+                        <td className="p-3">
+                          <span className="font-medium">{row.email}</span>
+                          {row.self && (
+                            <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+                              you
+                            </span>
+                          )}
+                          {!row.claimed && (
+                            <span className="ml-2 rounded bg-base-300/60 px-1.5 py-0.5 text-xs text-base-content/60">
+                              not signed in yet
+                            </span>
+                          )}
+                          {row.note && (
+                            <span className="block text-xs text-base-content/45">
+                              {row.note}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-base-content/60">
+                          {new Date(row.added_at).toLocaleDateString()}
+                          {row.added_by && (
+                            <span className="block text-xs text-base-content/45">
+                              by {row.added_by}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-base-content/60">
+                          {row.last_seen_at
+                            ? new Date(row.last_seen_at).toLocaleString()
+                            : '—'}
+                        </td>
+                        <td className="p-3 text-right">
+                          {removable(row) ? (
+                            <button
+                              type="button"
+                              onClick={() => remove(row)}
+                              aria-label={`Remove ${row.email}`}
+                              className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          ) : (
+                            <span className="text-xs text-base-content/35">
+                              {row.self
+                                ? 'cannot remove yourself'
+                                : 'last admin'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          }
         </Loaded>
       </div>
     </PageFrame>

@@ -132,6 +132,14 @@ beforeEach(() => {
 })
 
 describe('the page frame', () => {
+  it('does not present a failed queue read as zero outstanding cases', async () => {
+    mocks.supportQueue.mockRejectedValue(new Error('Queue read failed'))
+    const host = await render(390)
+    expect(host.textContent).toContain('Queue unavailable')
+    expect(host.textContent).not.toContain('0 need you')
+    expect(host.textContent).toContain('Retry queue')
+  })
+
   it('puts the live and auto-send pills in the console bar, not above the queue', async () => {
     const host = await render(1440)
     const bar = host.querySelector('header')!

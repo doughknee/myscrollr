@@ -325,81 +325,77 @@ export default function UsersPage({
 
         {data && !error && (
           <>
-            <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-              <table className="w-full min-w-[42rem] text-left text-sm">
-                <thead className="text-xs text-base-content/50 uppercase">
-                  <tr className="border-b border-base-300/60">
-                    <th className="p-3 font-semibold">User</th>
-                    <th className="p-3 font-semibold">Plan</th>
-                    <th className="p-3 font-semibold">Widgets</th>
-                    <th className="p-3 font-semibold">Tickets</th>
-                    <th className="p-3 font-semibold">Signed up</th>
-                    <th className="p-3 font-semibold">Last sign-in</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.accounts.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="p-6 text-center text-base-content/50"
-                      >
-                        No accounts match that search.
-                      </td>
+            {data.accounts.length === 0 ? (
+              <div className="rounded-xl bg-base-200/30 p-6 text-sm text-base-content/65 ring-1 ring-base-300/60">
+                No accounts match that search.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+                <table className="w-full min-w-[42rem] text-left text-sm">
+                  <thead className="text-xs text-base-content/50 uppercase">
+                    <tr className="border-b border-base-300/60">
+                      <th className="p-3 font-semibold">User</th>
+                      <th className="p-3 font-semibold">Plan</th>
+                      <th className="p-3 font-semibold">Widgets</th>
+                      <th className="p-3 font-semibold">Tickets</th>
+                      <th className="p-3 font-semibold">Signed up</th>
+                      <th className="p-3 font-semibold">Last sign-in</th>
                     </tr>
-                  )}
-                  {data.accounts.map((a) => (
-                    <tr
-                      key={a.logto_sub}
-                      onClick={() => setSelected(a.logto_sub)}
-                      className="cursor-pointer border-b border-base-300/40 transition-colors last:border-0 hover:bg-base-200/50"
-                    >
-                      <td className="max-w-[18rem] p-3">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelected(a.logto_sub)
-                          }}
-                          className="block max-w-full cursor-pointer truncate text-left font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-                          aria-label={`View ${a.email ?? a.name ?? a.logto_sub}`}
-                        >
-                          {a.email ?? a.name ?? '—'}
-                        </button>
-                        <span className="block truncate font-mono text-xs text-base-content/45">
-                          {a.logto_sub}
-                          {!a.set_up && (
-                            <span className="text-warning">
+                  </thead>
+                  <tbody>
+                    {data.accounts.map((a) => (
+                      <tr
+                        key={a.logto_sub}
+                        onClick={() => setSelected(a.logto_sub)}
+                        className="cursor-pointer border-b border-base-300/40 transition-colors last:border-0 hover:bg-base-200/50"
+                      >
+                        <td className="max-w-[18rem] p-3">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSelected(a.logto_sub)
+                            }}
+                            className="block max-w-full cursor-pointer truncate text-left font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                            aria-label={`View ${a.email ?? a.name ?? a.logto_sub}`}
+                          >
+                            {a.email ?? a.name ?? '—'}
+                          </button>
+                          <span className="block truncate font-mono text-xs text-base-content/45">
+                            {a.logto_sub}
+                            {!a.set_up && (
+                              <span className="text-warning">
+                                {' '}
+                                · never set up
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="p-3 text-base-content/70">
+                          {planLabel(a)}
+                        </td>
+                        <td className="p-3 tabular-nums">
+                          {a.widgets}
+                          {a.on_ticker > 0 && (
+                            <span className="text-base-content/45">
                               {' '}
-                              · never set up
+                              ({a.on_ticker} on bar)
                             </span>
                           )}
-                        </span>
-                      </td>
-                      <td className="p-3 text-base-content/70">
-                        {planLabel(a)}
-                      </td>
-                      <td className="p-3 tabular-nums">
-                        {a.widgets}
-                        {a.on_ticker > 0 && (
-                          <span className="text-base-content/45">
-                            {' '}
-                            ({a.on_ticker} on bar)
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 tabular-nums">{a.tickets}</td>
-                      <td className="p-3 text-base-content/60">
-                        {day(a.signed_up_at)}
-                      </td>
-                      <td className="p-3 text-base-content/60">
-                        {day(a.last_sign_in_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                        <td className="p-3 tabular-nums">{a.tickets}</td>
+                        <td className="p-3 text-base-content/60">
+                          {day(a.signed_up_at)}
+                        </td>
+                        <td className="p-3 text-base-content/60">
+                          {day(a.last_sign_in_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <p className="text-xs text-base-content/45">
               Ordered by Logto; search matches email and username. Widgets and

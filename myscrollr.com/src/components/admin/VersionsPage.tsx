@@ -92,7 +92,7 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
   const empty = data.desktop_total === 0
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <p className="max-w-[900px] text-2xl leading-[1.35] font-semibold tracking-[-0.015em]">
           {empty ? (
@@ -279,10 +279,8 @@ export default function VersionsPage({
           <h1 className="text-[32px] leading-none font-extrabold tracking-[-0.03em]">
             Versions
           </h1>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-base-content/60">
-              Versions range (its own, not the Period on other pages)
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-base-content/60">Time window</span>
             <div
               role="group"
               aria-label="Versions range"

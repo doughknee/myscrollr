@@ -54,6 +54,29 @@ const newMoney = analyticsRevenueVerdict({
 })
 
 describe('Week1ReturnContent', () => {
+  it('recognizes a measured zero return count omitted by the API', () => {
+    const html = renderToStaticMarkup(
+      <Week1ReturnContent
+        report={loaded({
+          generated_at: '2026-10-20T00:00:00Z',
+          definition: 'Weekly UTC cohorts.',
+          cohorts: [
+            {
+              week_start: '2026-10-05',
+              week_end: '2026-10-11',
+              mature: true,
+              signups: 10,
+              rate_pct: 0,
+            },
+          ],
+        })}
+      />,
+    )
+    expect(html).toContain('0 of 10 returned')
+    expect(html).not.toContain('Unknown')
+    expect(html).not.toContain('Pending')
+  })
+
   it('keeps immature cohorts pending and missing return counts unknown', () => {
     const html = renderToStaticMarkup(
       <Week1ReturnContent
@@ -78,6 +101,7 @@ describe('Week1ReturnContent', () => {
       />,
     )
     expect(html).toContain('Unknown of 29 returned')
+    expect(html).toContain('Unavailable')
     expect(html).not.toContain('0 of 29 returned')
     expect(html).toContain('Pending')
     expect(html).toContain('Not yet available')
@@ -404,6 +428,35 @@ describe('DesktopContent', () => {
       'ran the app in the last 7 days, for 412.5 h between them.',
     )
     expect(html).toContain('The ticker was on screen for 301.3 h of that.')
+  })
+
+  it('keeps active filter values and reset available while loading or failed', async () => {
+    for (const report of [
+      loading<typeof desktop>(),
+      failed<typeof desktop>('Desktop report unavailable'),
+    ]) {
+      const html = await render({
+        desktop: report,
+        filters: { os: 'windows', version: '1.7.1' },
+      })
+      expect(html).toContain('name="os"')
+      expect(html).toContain('name="version"')
+      expect(html).toContain('value="windows" selected')
+      expect(html).toContain('Reset filters')
+    }
+  })
+
+  it('retains filters when the API cannot measure unique users', async () => {
+    const html = await render({
+      desktop: loaded({
+        ...desktop,
+        unique_users: unavailable('No presence data'),
+      }),
+      filters: { os: 'windows' },
+    })
+    expect(html).toContain('No presence data')
+    expect(html).toContain('name="os"')
+    expect(html).toContain('Reset filters')
   })
 
   it('lists its facts from presence, peak, retention and widgets', async () => {

@@ -233,6 +233,11 @@ function AnalyticsWorkspace() {
           view={view}
           period={period}
           verdicts={sectionVerdicts}
+          refreshing={
+            view === 'growth'
+              ? [audience, website, desktop, week1Return].some((r) => r.loading)
+              : { desktop, revenue, support }[view].loading
+          }
           onView={(next) => {
             void setSearch({ view: next })
           }}
@@ -321,7 +326,15 @@ export function Week1ReturnContent({
       </div>
       <Loaded report={report} label="week-1 return">
         {(data) => {
-          const matured = [...data.cohorts].reverse().find((c) => c.mature)
+          // The API's integer omitempty omits a measured zero return count.
+          // Only an explicit zero rate establishes zero; absent data stays unknown.
+          const cohorts = data.cohorts.map((cohort) => ({
+            ...cohort,
+            returned:
+              cohort.returned ??
+              (cohort.mature && cohort.rate_pct === 0 ? 0 : undefined),
+          }))
+          const matured = [...cohorts].reverse().find((c) => c.mature)
           return (
             <div className="analytics-retention-data">
               <div className="analytics-retention-summary">
@@ -349,12 +362,14 @@ export function Week1ReturnContent({
                   className="analytics-cohort-bars"
                   aria-label="Weekly cohort return rates"
                 >
-                  {data.cohorts.map((cohort) => (
+                  {cohorts.map((cohort) => (
                     <div key={cohort.week_start}>
                       <span>
                         {cohort.mature && cohort.rate_pct !== undefined
                           ? `${Math.round(cohort.rate_pct)}%`
-                          : 'Pending'}
+                          : cohort.mature
+                            ? 'Unavailable'
+                            : 'Pending'}
                       </span>
                       <div
                         className="analytics-cohort-track"
@@ -389,7 +404,7 @@ export function Week1ReturnContent({
                       </tr>
                     </thead>
                     <tbody>
-                      {data.cohorts.map((cohort) => (
+                      {cohorts.map((cohort) => (
                         <tr key={cohort.week_start}>
                           <th scope="row">
                             {cohort.week_start} – {cohort.week_end}
@@ -403,7 +418,9 @@ export function Week1ReturnContent({
                           <td>
                             {cohort.mature && cohort.rate_pct !== undefined
                               ? `${Math.round(cohort.rate_pct)}%`
-                              : 'Not yet available'}
+                              : cohort.mature
+                                ? 'Unavailable'
+                                : 'Not yet available'}
                           </td>
                         </tr>
                       ))}
@@ -422,8 +439,8 @@ export function Week1ReturnContent({
 }
 
 /**
- * Compact section navigation and period controls. Every section stays on the
- * page; selecting a section scrolls rather than hiding the other reports.
+ * Compact section navigation and period controls. Inactive sections stay
+ * mounted but hidden, retaining their local investigation state.
  */
 export function SectionNav({
   view,
@@ -432,6 +449,7 @@ export function SectionNav({
   onView,
   onPeriod,
   onRefresh,
+  refreshing = false,
 }: {
   view: AnalyticsView
   period: Period
@@ -439,6 +457,7 @@ export function SectionNav({
   onView: (view: AnalyticsView) => void
   onPeriod: (period: Period) => void
   onRefresh?: () => void
+  refreshing?: boolean
 }) {
   return (
     <nav aria-label="Analytics sections" className="analytics-nav">
@@ -469,7 +488,13 @@ export function SectionNav({
       </div>
       <div className="analytics-nav-controls">
         <PeriodSelector value={period} onChange={onPeriod} />
-        {onRefresh && <RefreshButton onClick={onRefresh} label="Refresh" />}
+        {onRefresh && (
+          <RefreshButton
+            onClick={onRefresh}
+            loading={refreshing}
+            label={refreshing ? 'Updating…' : 'Refresh'}
+          />
+        )}
       </div>
       <details className="analytics-nav-note">
         <summary>Window & population</summary>
@@ -679,6 +704,7 @@ function CannotSay({
   report,
   label,
   note,
+  toolbar,
 }: {
   id: AnalyticsView
   title: string
@@ -687,9 +713,11 @@ function CannotSay({
   report: Report<unknown>
   label: string
   note?: string
+  toolbar?: ReactNode
 }) {
   return (
     <QuestionShell id={id} title={title} question={question} verdict={verdict}>
+      {toolbar}
       {report.data ? (
         <>
           <p className="max-w-[900px] text-2xl leading-[1.3] font-semibold tracking-[-0.015em]">
@@ -1441,6 +1469,9 @@ function FilterSelect({
         className="min-h-10 rounded-lg bg-base-100 px-2 text-sm ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
       >
         <option value="">All</option>
+        {value && !options.some((option) => option.value === value) && (
+          <option value={value}>{value}</option>
+        )}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.value} ({num(option.count)})
@@ -1448,6 +1479,57 @@ function FilterSelect({
         ))}
       </select>
     </label>
+  )
+}
+
+function DesktopFilters({
+  data,
+  filters,
+  onChange,
+}: {
+  data: DesktopUsage | null
+  filters: DesktopFilterQuery
+  onChange: (filters: DesktopFilterQuery) => void
+}) {
+  const active = Boolean(filters.os || filters.version || filters.plan)
+  const fields = [
+    ['os', 'OS'],
+    ['version', 'Version'],
+    ['plan', 'Plan (current)'],
+  ] as const
+  const visible = fields.filter(
+    ([key]) => filters[key] || (data?.filters[key]?.length ?? 0) > 0,
+  )
+  if (!visible.length) return null
+  return (
+    <div className="analytics-filters">
+      <div className="flex flex-wrap items-center gap-4 rounded-xl bg-base-200/30 p-3 ring-1 ring-base-300/60">
+        {visible.map(([key, label]) => (
+          <FilterSelect
+            key={key}
+            label={label}
+            name={key}
+            options={data?.filters[key] ?? []}
+            value={filters[key]}
+            onChange={(value) => onChange({ ...filters, [key]: value })}
+          />
+        ))}
+        {active && (
+          <button
+            type="button"
+            className="min-h-10 rounded-lg px-3 text-sm text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary"
+            onClick={() =>
+              onChange({ os: undefined, version: undefined, plan: undefined })
+            }
+          >
+            Reset filters
+          </button>
+        )}
+        {data?.filters.note && (
+          <p className="text-xs text-base-content/60">{data.filters.note}</p>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1499,6 +1581,9 @@ export function DesktopContent({
 }: DesktopContentProps) {
   const windowLabel = periodLabel(period)
   const d = desktop.data
+  const toolbar = (
+    <DesktopFilters data={d} filters={filters} onChange={onFilterChange} />
+  )
 
   if (!d || !d.unique_users.available) {
     return (
@@ -1510,6 +1595,7 @@ export function DesktopContent({
         report={desktop}
         label="desktop usage"
         note={d?.unique_users.note ?? DESKTOP_NOTE}
+        toolbar={toolbar}
       />
     )
   }
@@ -1581,49 +1667,7 @@ export function DesktopContent({
         />
       }
       facts={facts}
-      toolbar={
-        <div className="analytics-filters">
-          {' '}
-          {((d.filters.os?.length ?? 0) > 0 ||
-            (d.filters.version?.length ?? 0) > 0 ||
-            (d.filters.plan?.length ?? 0) > 0) && (
-            <div className="flex flex-wrap items-center gap-4 rounded-xl bg-base-200/30 p-3 ring-1 ring-base-300/60">
-              {(d.filters.os?.length ?? 0) > 0 && (
-                <FilterSelect
-                  label="OS"
-                  name="os"
-                  options={d.filters.os ?? []}
-                  value={filters.os}
-                  onChange={(os) => onFilterChange({ ...filters, os })}
-                />
-              )}
-              {(d.filters.version?.length ?? 0) > 0 && (
-                <FilterSelect
-                  label="Version"
-                  name="version"
-                  options={d.filters.version ?? []}
-                  value={filters.version}
-                  onChange={(version) =>
-                    onFilterChange({ ...filters, version })
-                  }
-                />
-              )}
-              {(d.filters.plan?.length ?? 0) > 0 && (
-                <FilterSelect
-                  label="Plan (current)"
-                  name="plan"
-                  options={d.filters.plan ?? []}
-                  value={filters.plan}
-                  onChange={(plan) => onFilterChange({ ...filters, plan })}
-                />
-              )}
-              {d.filters.note && (
-                <p className="text-xs text-base-content/60">{d.filters.note}</p>
-              )}
-            </div>
-          )}
-        </div>
-      }
+      toolbar={toolbar}
       visual={<WidgetRanking widgets={d.widgets} />}
       note={[d.coverage.note, DESKTOP_NOTE].filter(Boolean).join(' ')}
     >

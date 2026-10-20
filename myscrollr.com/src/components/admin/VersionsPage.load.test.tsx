@@ -55,11 +55,13 @@ beforeEach(() => {
 })
 
 describe('VersionsPage loading', () => {
-  it('labels its range as its own, not the shared Period', async () => {
+  it('labels its own range without a wide explanatory sentence', async () => {
     versions.mockResolvedValue(data(30))
     const c = await mount()
-    expect(c.textContent).toContain('Versions range')
-    expect(c.textContent).toContain('not the Period')
+    expect(c.textContent).toContain('Time window')
+    expect(
+      c.querySelector('[role="group"][aria-label="Versions range"]'),
+    ).not.toBeNull()
   })
 
   it('shows Retry on a failed load and Retry refetches', async () => {

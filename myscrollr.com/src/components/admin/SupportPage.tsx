@@ -1638,16 +1638,26 @@ export default function SupportPage({
        so the window never scrolls. Below it the mobile nav adds a row of its
        own and the page is an ordinary scrolling column. */
     <div className="flex flex-col md:h-[calc(100dvh-48px)]">
-      <div className="flex h-11 shrink-0 flex-wrap items-baseline gap-x-2.5 overflow-hidden border-b border-hairline px-4">
+      <div className="flex min-h-11 shrink-0 flex-wrap items-baseline gap-x-2.5 border-b border-hairline px-4 py-2">
         <h1 className="self-center text-base font-extrabold tracking-[-0.01em]">
           Support
         </h1>
-        <span className="self-center text-[13px] font-bold text-error">
-          {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
-        </span>
-        <span className="self-center text-[13px] text-base-content/45">
-          · {waiting} waiting on them · {resolved} resolved
-        </span>
+        {queue ? (
+          <>
+            <span
+              className={`self-center text-[13px] font-bold ${needsYou > 0 ? 'text-error' : 'text-base-content/65'}`}
+            >
+              {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
+            </span>
+            <span className="self-center text-[13px] text-base-content/45">
+              · {waiting} waiting on them · {resolved} resolved
+            </span>
+          </>
+        ) : (
+          <span className="self-center text-[13px] text-base-content/45">
+            {error ? 'Queue unavailable' : 'Loading queue…'}
+          </span>
+        )}
       </div>
 
       {error && (
