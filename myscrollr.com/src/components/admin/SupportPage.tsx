@@ -333,7 +333,8 @@ function Conversation({ detail }: { detail: CaseDetail }) {
     return (
       <article
         key={`${m.created_at}-${i}`}
-        className="min-w-0 space-y-2 border-b border-hairline pb-5"
+        className="admin-support-message min-w-0 space-y-2"
+        data-kind={m.kind}
       >
         <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <Eyebrow>{KIND_LABEL[m.kind] ?? m.kind}</Eyebrow>
@@ -794,7 +795,7 @@ function PersonHeader({
   const behind = detail?.context.version_state === 'behind'
 
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-3.5">
+    <header className="admin-support-identity flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-3.5">
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <h1
@@ -957,10 +958,10 @@ function AboutRow({
   tone?: 'warn'
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-t border-hairline py-2 text-[13px]">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-hairline py-2 text-[13px]">
       <span className="text-base-content/65">{label}</span>
       <span
-        className={`font-mono font-medium whitespace-nowrap ${
+        className={`min-w-0 font-medium [overflow-wrap:anywhere] ${
           tone === 'warn' ? 'text-warning' : ''
         }`}
       >
@@ -1029,7 +1030,7 @@ function CaseWorkbench({
   onEdit: (patch: Partial<CaseEdits>) => void
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admin-support-workbench flex flex-col gap-6">
       <CaseActions
         detail={detail}
         onCase={onCase}
@@ -1099,7 +1100,7 @@ function OtherTickets({
           key={r.ticket_number}
           type="button"
           onClick={() => onSelect(r.ticket_number)}
-          className={`flex w-full cursor-pointer items-center gap-3 border-t border-hairline py-2.5 text-left hover:bg-base-200/40 ${
+          className={`admin-support-related flex w-full cursor-pointer items-center gap-3 border-t border-hairline py-2.5 text-left hover:bg-base-200/40 ${
             r.group === 'handled' ? 'opacity-70' : ''
           }`}
         >
@@ -1981,7 +1982,7 @@ export default function SupportPage({
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-5 px-5 py-5 [overflow-wrap:anywhere] min-[1440px]:px-8">
+              <div className="admin-support-thread flex flex-col gap-5 px-5 py-5 [overflow-wrap:anywhere] min-[1440px]:px-8">
                 <PersonHeader person={person} rows={mine} detail={detail} />
                 {caseError && (
                   <div
@@ -2037,7 +2038,7 @@ export default function SupportPage({
 
           {/* The reply and the evidence, from 1440 up. */}
           {wide && selected && (
-            <aside className="w-[520px] shrink-0 overflow-y-auto border-l border-hairline bg-base-100 px-5 py-5">
+            <aside className="w-[380px] shrink-0 overflow-y-auto border-l border-hairline bg-base-100 px-5 py-5">
               {workbench}
             </aside>
           )}

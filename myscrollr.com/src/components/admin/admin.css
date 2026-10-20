@@ -126,6 +126,112 @@
 .admin-overview-detail {
   padding: 4px 0 32px 148px;
 }
+.admin-user-detail {
+  max-width: 1080px;
+  margin-inline: auto;
+}
+.admin-user-identity {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--staff-line);
+}
+.admin-user-identity > .admin-user-dates {
+  margin-top: 24px;
+}
+.admin-user-dates dd {
+  margin-top: 4px;
+  font-weight: 550;
+}
+.admin-user-sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 28px;
+}
+.admin-user-sections > section {
+  min-width: 0;
+}
+.admin-user-sections h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.admin-user-sections h2 > span {
+  color: var(--staff-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.admin-support-thread {
+  max-width: 960px;
+  margin-inline: auto;
+}
+.admin-support-identity {
+  padding-bottom: 20px;
+}
+.admin-support-message {
+  border: 1px solid var(--staff-line);
+  border-radius: 12px;
+  background: var(--staff-surface);
+  padding: 18px;
+}
+.admin-support-message[data-kind='sent'] {
+  border-left: 3px solid var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--staff-surface));
+}
+.admin-support-message > header {
+  margin-bottom: 12px;
+}
+.admin-support-message > header > span {
+  font-size: 11px;
+  letter-spacing: 0.025em;
+}
+.admin-support-message > header > time {
+  font-size: 11px;
+}
+.admin-support-message p {
+  line-height: 1.75;
+}
+.admin-support-thread > .admin-support-workbench {
+  padding-top: 24px;
+  border-top: 1px solid var(--staff-line);
+}
+:root:not(.dark) .admin-user-detail a,
+:root:not(.dark) .admin-support-thread :is(a, button).text-primary {
+  color: #166b50;
+}
+@media (max-width: 380px) {
+  .admin-user-identity h1 {
+    font-size: 20px;
+    line-height: 1.4;
+  }
+}
+@media (max-width: 767px) {
+  .admin-user-sections {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-support-message {
+    padding: 14px;
+  }
+  .admin-support-related {
+    display: grid;
+    grid-template-columns: 1fr auto 14px;
+    gap: 8px;
+    padding-block: 14px;
+  }
+  .admin-support-related > span:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .admin-support-related > span:nth-child(2) > span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.6;
+  }
+}
 @media (max-width: 767px) {
   .admin-chrome-header:has(.admin-chrome-status) {
     height: auto;

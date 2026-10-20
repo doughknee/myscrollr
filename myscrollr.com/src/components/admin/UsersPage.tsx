@@ -65,7 +65,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
   }, [getToken, sub, attempt])
 
   return (
-    <div className="space-y-6">
+    <div className="admin-user-detail space-y-6">
       <button
         ref={backButton}
         type="button"
@@ -88,14 +88,14 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
 
       {detail && (
         <>
-          <header>
-            <h1 className="text-xl font-bold break-all">
+          <header className="admin-user-identity">
+            <h1 className="admin-page-heading [overflow-wrap:anywhere]">
               {detail.account.email ??
                 detail.account.name ??
                 detail.account.logto_sub}
             </h1>
-            <p className="mt-1 font-mono text-xs break-all text-base-content/50">
-              {detail.account.logto_sub}
+            <p className="mt-2 font-mono text-xs break-all text-base-content/50">
+              Account ID · {detail.account.logto_sub}
             </p>
             <p className="mt-2 text-sm text-base-content/60">
               {planLabel(detail.account)}
@@ -127,68 +127,70 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
             )}
           </header>
 
-          <section>
-            <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
-              Widgets ({detail.widgets.length})
-            </h2>
-            <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
-              {detail.widgets.length === 0 ? (
-                <p className="p-4 text-sm text-base-content/50">
-                  No widgets configured.
-                </p>
-              ) : (
-                detail.widgets.map((w) => (
-                  <div
-                    key={w.type}
-                    className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/40 p-3 text-sm [overflow-wrap:anywhere] last:border-0"
-                  >
-                    <span className="font-medium">{w.type}</span>
-                    <span className="text-xs text-base-content/60">
-                      {w.enabled ? 'enabled' : 'disabled'}
-                      {w.ticker_enabled && ' · on the bar'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
-              Support history ({detail.cases.length})
-            </h2>
-            <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
-              {detail.cases.length === 0 ? (
-                <p className="p-4 text-sm text-base-content/50">
-                  No tickets opened.
-                </p>
-              ) : (
-                detail.cases.map((k) => (
-                  <div
-                    key={k.ticket_number}
-                    className="border-b border-base-300/40 p-3 last:border-0"
-                  >
-                    <div className="flex items-baseline justify-between gap-3">
-                      <a
-                        href={`/admin/support?ticket=${encodeURIComponent(k.ticket_number)}&rows=ticket`}
-                        className="truncate text-sm font-medium text-primary hover:underline"
-                      >
-                        {k.subject || '(no subject)'}
-                      </a>
-                      <span className="shrink-0 font-mono text-xs text-base-content/50">
-                        {k.ticket_number}
+          <div className="admin-user-sections">
+            <section>
+              <h2>
+                Widgets <span>({detail.widgets.length})</span>
+              </h2>
+              <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
+                {detail.widgets.length === 0 ? (
+                  <p className="p-4 text-sm text-base-content/50">
+                    No widgets configured.
+                  </p>
+                ) : (
+                  detail.widgets.map((w) => (
+                    <div
+                      key={w.type}
+                      className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/40 p-3 text-sm [overflow-wrap:anywhere] last:border-0"
+                    >
+                      <span className="font-medium">{w.type}</span>
+                      <span className="text-xs text-base-content/60">
+                        {w.enabled ? 'enabled' : 'disabled'}
+                        {w.ticker_enabled && ' · on the bar'}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-base-content/50">
-                      {k.status}
-                      {k.category && ` · ${k.category}`} ·{' '}
-                      {new Date(k.opened_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section>
+              <h2>
+                Support history <span>({detail.cases.length})</span>
+              </h2>
+              <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
+                {detail.cases.length === 0 ? (
+                  <p className="p-4 text-sm text-base-content/50">
+                    No tickets opened.
+                  </p>
+                ) : (
+                  detail.cases.map((k) => (
+                    <div
+                      key={k.ticket_number}
+                      className="border-b border-base-300/40 p-3 last:border-0"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <a
+                          href={`/admin/support?ticket=${encodeURIComponent(k.ticket_number)}&rows=ticket`}
+                          className="min-w-0 text-sm leading-relaxed font-medium text-primary [overflow-wrap:anywhere] hover:underline"
+                        >
+                          {k.subject || '(no subject)'}
+                        </a>
+                        <span className="shrink-0 font-mono text-xs text-base-content/50">
+                          {k.ticket_number}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-base-content/50">
+                        {k.status}
+                        {k.category && ` · ${k.category}`} ·{' '}
+                        {new Date(k.opened_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
         </>
       )}
     </div>
