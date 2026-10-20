@@ -8,6 +8,19 @@ afterEach(() => {
 })
 
 describe('loadSignupAnalytics', () => {
+  it.each([{ body: null }, { body: [] }, { body: 'unexpected' }])(
+    'rejects a successful non-report payload: $body',
+    async ({ body }) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(body))),
+      )
+      await expect(
+        loadSignupAnalytics(() => Promise.resolve(null), 'website', 7),
+      ).rejects.toThrow('unexpected response')
+    },
+  )
+
   it('sends only the selected application and supported time window', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

@@ -87,7 +87,19 @@ export async function loadBoundedAdminReport<T>(
   timeoutError: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  return boundedAdminRequest(getToken, path, fallbackError, timeoutError, {
-    signal,
-  })
+  const data = await boundedAdminRequest<unknown>(
+    getToken,
+    path,
+    fallbackError,
+    timeoutError,
+    { signal },
+  )
+  // Every report endpoint returns an object. A null/primitive success must
+  // become a retryable error rather than an endless "Loading" state.
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error(
+      'This report returned an unexpected response. Please retry.',
+    )
+  }
+  return data as T
 }

@@ -2,6 +2,7 @@ import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { SignupTrend } from './SignupTrend'
 import { AnalyticsTrend } from './AnalyticsTrend'
+import { ReportBoundary } from './ReportBoundary'
 import './analytics.css'
 import {
   Bars,
@@ -213,10 +214,10 @@ function AnalyticsWorkspace() {
   )
 
   const sectionVerdicts: Record<AnalyticsView, Verdict> = {
-    growth: growthVerdict(audience.data),
-    desktop: desktopVerdict(desktop.data),
-    revenue: revenueVerdict(revenue.data),
-    support: supportVerdict(support.data),
+    growth: reportVerdict(() => growthVerdict(audience.data)),
+    desktop: reportVerdict(() => desktopVerdict(desktop.data)),
+    revenue: reportVerdict(() => revenueVerdict(revenue.data)),
+    support: reportVerdict(() => supportVerdict(support.data)),
   }
 
   return (
@@ -256,38 +257,72 @@ function AnalyticsWorkspace() {
         />
         <div className="analytics-sections">
           <div hidden={view !== 'growth'}>
-            <GrowthContent
-              period={period}
-              verdict={sectionVerdicts.growth}
-              audience={audience}
-              website={website}
-              desktop={desktop}
-            />
-            <Week1ReturnContent report={week1Return} />
+            <ReportBoundary
+              label="Growth"
+              resetKeys={[audience.data, website.data, desktop.data]}
+              onRetry={() => {
+                audience.retry()
+                website.retry()
+                desktop.retry()
+              }}
+            >
+              <GrowthContent
+                period={period}
+                verdict={sectionVerdicts.growth}
+                audience={audience}
+                website={website}
+                desktop={desktop}
+              />
+            </ReportBoundary>
+            <ReportBoundary
+              label="Week-1 return"
+              resetKeys={[week1Return.data]}
+              onRetry={week1Return.retry}
+            >
+              <Week1ReturnContent report={week1Return} />
+            </ReportBoundary>
             <SignupDiagnosticsSection period={period} refresh={refresh} />
           </div>
           <div hidden={view !== 'desktop'}>
-            <DesktopContent
-              period={period}
-              verdict={sectionVerdicts.desktop}
-              desktop={desktop}
-              filters={{ os, version, plan }}
-              onFilterChange={(next) => setSearch(next)}
-            />
+            <ReportBoundary
+              label="Desktop usage"
+              resetKeys={[desktop.data]}
+              onRetry={desktop.retry}
+            >
+              <DesktopContent
+                period={period}
+                verdict={sectionVerdicts.desktop}
+                desktop={desktop}
+                filters={{ os, version, plan }}
+                onFilterChange={(next) => setSearch(next)}
+              />
+            </ReportBoundary>
           </div>
           <div hidden={view !== 'revenue'}>
-            <RevenueContent
-              period={period}
-              verdict={sectionVerdicts.revenue}
-              revenue={revenue}
-            />
+            <ReportBoundary
+              label="Revenue"
+              resetKeys={[revenue.data]}
+              onRetry={revenue.retry}
+            >
+              <RevenueContent
+                period={period}
+                verdict={sectionVerdicts.revenue}
+                revenue={revenue}
+              />
+            </ReportBoundary>
           </div>
           <div hidden={view !== 'support'}>
-            <SupportContent
-              period={period}
-              verdict={sectionVerdicts.support}
-              support={support}
-            />
+            <ReportBoundary
+              label="Support"
+              resetKeys={[support.data]}
+              onRetry={support.retry}
+            >
+              <SupportContent
+                period={period}
+                verdict={sectionVerdicts.support}
+                support={support}
+              />
+            </ReportBoundary>
           </div>
         </div>
       </div>
@@ -516,6 +551,16 @@ export function SectionNav({
  * `overviewVerdicts` then returns grey rather than judging a number it does
  * not have.
  */
+
+function reportVerdict(read: () => Verdict): Verdict {
+  try {
+    return read()
+  } catch {
+    // ReportBoundary supplies recovery in that view. A hidden malformed
+    // report must not throw here before its boundary can isolate it.
+    return { tone: 'none', label: 'Unavailable' }
+  }
+}
 
 function trendInput(metric: Metric | undefined) {
   if (!metric || !metric.available) return null
@@ -1121,13 +1166,19 @@ function OpenedSignupDiagnostics({
     ),
   )
   return (
-    <SignupDiagnostics
-      open
-      period={period}
-      signup={signup}
-      application={application}
-      onApplicationChange={onApplicationChange}
-    />
+    <ReportBoundary
+      label="Signup diagnostics"
+      resetKeys={[signup.data]}
+      onRetry={signup.retry}
+    >
+      <SignupDiagnostics
+        open
+        period={period}
+        signup={signup}
+        application={application}
+        onApplicationChange={onApplicationChange}
+      />
+    </ReportBoundary>
   )
 }
 
