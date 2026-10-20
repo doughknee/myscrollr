@@ -2,8 +2,9 @@
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UsersPage from './UsersPage'
+import type { Root } from 'react-dom/client'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 
@@ -46,6 +47,7 @@ const detail: AccountDetail = { account: row, widgets: [], cases: [] }
 
 const accounts = vi.mocked(adminApi.accounts)
 const account = vi.mocked(adminApi.account)
+const roots: Array<Root> = []
 
 const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)))
 const button = (c: HTMLElement, text: string) =>
@@ -56,7 +58,9 @@ const button = (c: HTMLElement, text: string) =>
 async function mount() {
   const container = document.createElement('div')
   document.body.append(container)
-  await act(() => createRoot(container).render(<UsersPage />))
+  const root = createRoot(container)
+  roots.push(root)
+  await act(() => root.render(<UsersPage />))
   await wait(300)
   return container
 }
@@ -67,7 +71,100 @@ beforeEach(() => {
   document.body.innerHTML = ''
 })
 
+afterEach(async () => {
+  await act(() => {
+    for (const root of roots.splice(0)) root.unmount()
+  })
+})
+
+async function search(c: HTMLElement, value: string) {
+  const input = c.querySelector('input')!
+  await act(() => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
 describe('UsersPage', () => {
+  it('does not label old rows and totals as a new search, or accept its superseded response', async () => {
+    let finishFirst!: (data: AccountsPage) => void
+    let finishLatest!: (data: AccountsPage) => void
+    accounts
+      .mockResolvedValueOnce({ ...page, total: 50 })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirst = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishLatest = resolve
+          }),
+      )
+    const c = await mount()
+    expect(c.textContent).toContain('50 accounts')
+    await search(c, 'obsolete')
+    expect(c.textContent).not.toContain('50 accounts match')
+    expect(c.querySelector('[aria-label="View ada@example.com"]')).toBeNull()
+    expect(c.querySelector('[aria-label="Loading users"]')).not.toBeNull()
+    await wait(300)
+    await search(c, 'latest')
+    await wait(300)
+    await act(() =>
+      finishFirst({
+        ...page,
+        accounts: [{ ...row, email: 'obsolete@example.com' }],
+      }),
+    )
+    expect(c.textContent).not.toContain('obsolete@example.com')
+    await act(() =>
+      finishLatest({
+        ...page,
+        accounts: [{ ...row, email: 'latest@example.com' }],
+      }),
+    )
+    expect(c.textContent).toContain('latest@example.com')
+    expect(c.textContent).toContain('1 account matches')
+  })
+
+  it('does not show the previous page of rows beneath the next page state', async () => {
+    let finish!: (data: AccountsPage) => void
+    accounts
+      .mockResolvedValueOnce({ ...page, total: 50 })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+    const c = await mount()
+    await act(() => button(c, 'Next').click())
+    expect(c.querySelector('[aria-label="View ada@example.com"]')).toBeNull()
+    expect(c.textContent).not.toContain('Page 2 of 2')
+    await wait(300)
+    expect(accounts).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      '',
+      1,
+      expect.any(AbortSignal),
+    )
+    await act(() =>
+      finish({
+        ...page,
+        total: 50,
+        page: 1,
+        accounts: [{ ...row, email: 'second@example.com' }],
+      }),
+    )
+    expect(c.textContent).toContain('second@example.com')
+    expect(c.textContent).toContain('Page 2 of 2')
+  })
+
   it('offers a named keyboard-focusable control for account detail', async () => {
     accounts.mockResolvedValue(page)
     account.mockResolvedValue(detail)

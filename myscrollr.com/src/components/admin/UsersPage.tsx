@@ -214,7 +214,15 @@ export default function UsersPage({
   }
   const setSelected = (user: string | null) =>
     updateSearch({ user: user ?? undefined })
-  const [data, setData] = useState<AccountsPage | null>(null)
+  const [result, setResult] = useState<{
+    query: string
+    page: number
+    data: AccountsPage
+  } | null>(null)
+  // A previous page is useful on return from detail, but must not be relabeled
+  // as matches for a new query or page while its request is still pending.
+  const data =
+    result?.query === query && result.page === page ? result.data : null
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -242,7 +250,7 @@ export default function UsersPage({
     const timer = setTimeout(() => {
       adminApi
         .accounts(getToken, query, page, controller.signal)
-        .then((res) => !cancelled && setData(res))
+        .then((res) => !cancelled && setResult({ query, page, data: res }))
         .catch(
           (err: unknown) =>
             !cancelled &&
@@ -288,7 +296,8 @@ export default function UsersPage({
                 <span className="font-semibold text-base-content">
                   {data.total.toLocaleString()}
                 </span>{' '}
-                {query ? 'accounts match' : 'accounts'}
+                {data.total === 1 ? 'account' : 'accounts'}
+                {query && (data.total === 1 ? ' matches' : ' match')}
                 {/* set_up is a count of the whole database, so pairing it with a
                   filtered total would read as a gap within the search. */}
                 {!query && (
