@@ -255,14 +255,18 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
   )
 }
 
-export default function VersionsPage() {
+export default function VersionsPage({
+  days: routeDays,
+  onDaysChange,
+}: { days?: number; onDaysChange?: (days: number) => void } = {}) {
   const getToken = useGetToken()
-  const [days, setDays] = useState<number>(30)
+  const [localDays, setLocalDays] = useState(30)
+  const days = routeDays ?? localDays
+  const setDays = onDaysChange ?? setLocalDays
   const report = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void signal
-        return adminApi.versions(getToken, days)
+        return adminApi.versions(getToken, days, signal)
       },
       [getToken, days],
     ),

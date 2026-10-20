@@ -68,6 +68,20 @@ beforeEach(() => {
 })
 
 describe('UsersPage', () => {
+  it('offers a named keyboard-focusable control for account detail', async () => {
+    accounts.mockResolvedValue(page)
+    account.mockResolvedValue(detail)
+    const c = await mount()
+    const view = c.querySelector<HTMLButtonElement>(
+      'button[aria-label="View ada@example.com"]',
+    )!
+    expect(view).not.toBeNull()
+    view.focus()
+    expect(document.activeElement).toBe(view)
+    await act(() => view.click())
+    await wait(10)
+    expect(c.textContent).toContain('Widgets (0)')
+  })
   it('clears the error on a new search and shows results', async () => {
     accounts.mockRejectedValueOnce(new Error('logto down'))
     const c = await mount()

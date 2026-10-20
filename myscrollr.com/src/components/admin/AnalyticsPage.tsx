@@ -142,10 +142,7 @@ export function signupDays(period: Period): 7 | 30 {
 // ── Page ──────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const { period, os, version, plan } = useSearch({ from: '/admin/analytics' })
-  // Changing a population must not relabel the previous population's numbers
-  // while its replacement request is in flight.
-  return <AnalyticsWorkspace key={`${period}:${os}:${version}:${plan}`} />
+  return <AnalyticsWorkspace />
 }
 
 function AnalyticsWorkspace() {
@@ -164,55 +161,54 @@ function AnalyticsWorkspace() {
   const audience = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
         return loadAudience(getToken, period, signal)
       },
-      [getToken, period, refresh],
+      [getToken, period],
     ),
+    period,
   )
   const website = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
         return loadWebsite(getToken, period, signal)
       },
-      [getToken, period, refresh],
+      [getToken, period],
     ),
+    period,
   )
   const desktop = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
         return loadDesktopUsage(getToken, period, { os, version, plan }, signal)
       },
-      [getToken, os, period, plan, refresh, version],
+      [getToken, os, period, plan, version],
     ),
+    `${period}:${os ?? ''}:${version ?? ''}:${plan ?? ''}`,
   )
   const revenue = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
         return loadRevenue(getToken, period, signal)
       },
-      [getToken, period, refresh],
+      [getToken, period],
     ),
+    period,
   )
   const support = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
         return loadSupportSummary(getToken, period, signal)
       },
-      [getToken, period, refresh],
+      [getToken, period],
     ),
+    period,
   )
   const week1Return = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
         return loadWeek1Return(getToken, signal)
       },
-      [getToken, refresh],
+      [getToken],
     ),
   )
 
@@ -241,7 +237,17 @@ function AnalyticsWorkspace() {
             void setSearch({ view: next })
           }}
           onPeriod={(next) => setSearch({ period: next })}
-          onRefresh={() => setRefresh((n) => n + 1)}
+          onRefresh={() => {
+            if (view === 'growth') {
+              audience.retry()
+              website.retry()
+              desktop.retry()
+              week1Return.retry()
+              setRefresh((n) => n + 1)
+            } else if (view === 'desktop') desktop.retry()
+            else if (view === 'revenue') revenue.retry()
+            else support.retry()
+          }}
         />
         <div className="analytics-sections">
           <div hidden={view !== 'growth'}>
@@ -834,7 +840,7 @@ const GROWTH_QUESTION = 'Are new people showing up, and do they stick?'
  * "unknown", never a zero.
  */
 const GROWTH_NOTE =
-  'Sign-ups are counted from Logto with staff excluded. "Finished setting up" means the account saved at least one widget. "Signed up from the desktop app" is the Logto application the account registered through; accounts with none recorded are neither. Sign-ups on the website are PostHog events on the site, a different count from Logto accounts. "Came back a second day" covers only accounts with usage analytics enabled.'
+  'Sign-ups are counted from Logto. Each report states whether staff are excluded. "Finished setting up" means the account saved at least one widget. "Signed up from the desktop app" is the Logto application the account registered through; accounts with none recorded are neither. Sign-ups on the website are PostHog events on the site, a different count from Logto accounts. "Came back a second day" covers only accounts with usage analytics enabled.'
 
 export function GrowthContent({
   period,

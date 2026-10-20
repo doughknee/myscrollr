@@ -14,6 +14,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Suspense, lazy } from 'react'
 import type { SearchSchemaInput } from '@tanstack/react-router'
 import type { Period } from '@/api/adminDashboard'
+import { AdminRouteLoading } from '@/components/admin/AdminRouteLoading'
 import { parsePeriod } from '@/lib/adminFormat'
 
 const OverviewPage = lazy(() => import('@/components/admin/OverviewPage'))
@@ -27,7 +28,7 @@ export const Route = createFileRoute('/admin/')({
     search: { period?: string } & SearchSchemaInput,
   ): OverviewSearch => ({ period: parsePeriod(search.period) }),
   component: () => (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
+    <Suspense fallback={<AdminRouteLoading page="Overview" />}>
       <OverviewPage />
     </Suspense>
   ),

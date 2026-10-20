@@ -133,9 +133,7 @@ describe('SectionNav', () => {
   })
 
   it('carries the period footnote, and drops the comparison for lifetime', () => {
-    expect(render('growth')).toContain(
-      'This week vs the week before. Staff and test accounts excluded.',
-    )
+    expect(render('growth')).toContain('Last 7 days vs the previous 7 days.')
     const lifetime = renderToStaticMarkup(
       <SectionNav
         view="growth"
@@ -182,15 +180,17 @@ describe('GrowthContent', () => {
     const html = await render()
     expect(html).toContain('Are new people showing up, and do they stick?')
     expect(html).toContain('12 people')
-    expect(html).toContain('signed up this week, up from 8 the week before.')
+    expect(html).toContain(
+      'signed up in the last 7 days, up from 8 the previous 7 days.',
+    )
     expect(html).toContain('100 of 183 accounts have finished setting up.')
     expect(html).toContain('Up from 8')
   })
 
   it('lists its facts, including the previous window when it compares', async () => {
     const html = await render()
-    expect(html).toContain('Signed up this week')
-    expect(html).toContain('The week before')
+    expect(html).toContain('Signed up in the last 7 days')
+    expect(html).toContain('The previous 7 days')
     expect(html).toContain('Accounts in total')
     expect(html).toContain('Never finished setting up')
     expect(html).toContain('>83<')
@@ -294,8 +294,8 @@ describe('GrowthContent', () => {
         new: { ...audience.new, comparison: notComparable },
       }),
     })
-    expect(html).toContain('signed up this week. 100 of 183 accounts')
-    expect(html).not.toMatch(/signed up this week, /)
+    expect(html).toContain('signed up in the last 7 days. 100 of 183 accounts')
+    expect(html).not.toMatch(/signed up in the last 7 days, /)
     expect(html).toContain('Too early to compare')
   })
 
@@ -400,7 +400,9 @@ describe('DesktopContent', () => {
     const html = await render()
     expect(html).toContain('Who is actually using the app, and how much?')
     expect(html).toContain('34 people')
-    expect(html).toContain('ran the app this week, for 412.5 h between them.')
+    expect(html).toContain(
+      'ran the app in the last 7 days, for 412.5 h between them.',
+    )
     expect(html).toContain('The ticker was on screen for 301.3 h of that.')
   })
 
@@ -415,8 +417,8 @@ describe('DesktopContent', () => {
     expect(html).toContain('12 of 20')
     expect(html).toContain('Most-shown widget')
     expect(html).toContain('NFL · 210.5 h')
-    expect(html).toContain('Widgets added this week')
-    expect(html).toContain('Widgets removed this week')
+    expect(html).toContain('Widgets added in the last 7 days')
+    expect(html).toContain('Widgets removed in the last 7 days')
   })
 
   it('shows headline metrics, peak, retention and the widget table with samples', async () => {
@@ -459,7 +461,9 @@ describe('DesktopContent', () => {
     expect(html).toContain('cannot be filtered by computer')
     expect(html).not.toMatch(/\+\d+ \/ −\d+/)
     // The added/removed facts refuse to state a total the filter ignores.
-    expect(html).toMatch(/Widgets added this week[\s\S]{0,200}>unknown</)
+    expect(html).toMatch(
+      /Widgets added in the last 7 days[\s\S]{0,200}>unknown</,
+    )
   })
 
   it('shows a breakdown that could not be read as its note, not as an empty table', async () => {
@@ -556,7 +560,7 @@ describe('RevenueContent', () => {
     expect(html).toContain('Is money coming in?')
     expect(html).toContain('$113.46')
     expect(html).toContain(
-      'came in this week, up from $50.00 USD the week before.',
+      'came in in the last 7 days, up from $50.00 USD the previous 7 days.',
     )
     expect(html).toContain('2 customers pay, 1 on the lifetime plan.')
     expect(html).toContain('$979.02 USD earned ever.')
@@ -564,15 +568,15 @@ describe('RevenueContent', () => {
 
   it('lists its facts in the primary currency only', async () => {
     const html = await render()
-    expect(html).toContain('Earned this week, after Stripe fees')
-    expect(html).toContain('The week before')
+    expect(html).toContain('Earned in the last 7 days, after Stripe fees')
+    expect(html).toContain('The previous 7 days')
     expect(html).toContain('Earned ever')
     expect(html).toContain('Paying customers')
     expect(html).toContain('On the lifetime plan')
     expect(html).toContain('On a free trial')
     expect(html).toContain('Payment failed')
     expect(html).toContain('Cancelling')
-    expect(html).toContain('Refunds this week')
+    expect(html).toContain('Refunds in the last 7 days')
     expect(html).toContain('$9.99')
     // The EUR ledger never joins the USD facts.
     expect(html).not.toContain('$133.46')
@@ -590,8 +594,8 @@ describe('RevenueContent', () => {
       }),
     })
     expect(html).toContain('Nothing')
-    expect(html).toContain('came in this week.')
-    expect(html).not.toContain('the week before.')
+    expect(html).toContain('came in in the last 7 days.')
+    expect(html).not.toContain('the previous 7 days.')
   })
 
   it('shows paying now, the plan mix and per-currency earnings without summing', async () => {
@@ -741,7 +745,7 @@ describe('SupportContent', () => {
     )
     expect(html).toContain('3 people')
     expect(html).toContain('are waiting on us.')
-    expect(html).toContain('4 tickets finished this week.')
+    expect(html).toContain('4 tickets finished in the last 7 days.')
     expect(html).toContain('Needs you')
   })
 
@@ -749,7 +753,7 @@ describe('SupportContent', () => {
     const html = await render()
     expect(html).toContain('Waiting for us')
     expect(html).toContain('Waiting for the customer')
-    expect(html).toContain('Finished this week')
+    expect(html).toContain('Finished in the last 7 days')
     expect(html).toContain('Longest wait')
     expect(html).toContain('2 days')
     expect(html).toContain('Typical first reply')
@@ -793,7 +797,7 @@ describe('SupportContent', () => {
     })
     expect(html).toContain('0 people')
     expect(html).toContain('are waiting on us.')
-    expect(html).not.toContain('tickets finished this week')
+    expect(html).not.toContain('tickets finished in the last 7 days')
     expect(html).toContain('Clear')
   })
 

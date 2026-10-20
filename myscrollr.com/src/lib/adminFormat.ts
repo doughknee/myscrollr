@@ -238,18 +238,17 @@ export function periodLabel(period: Period): string {
 }
 
 /**
- * The period as a sentence says it — "this week", not "Last 7 days".
- * Analytics writes prose around its numbers (SCROLLR-220) and "19 people
- * signed up Last 7 days" is not a sentence.
+ * The rolling interval as a sentence fragment. These are durations ending at
+ * the report time, not calendar days, weeks or months.
  */
 export function periodPhrase(period: Period): string {
   switch (period) {
     case '24h':
-      return 'today'
+      return 'in the last 24 hours'
     case '7d':
-      return 'this week'
+      return 'in the last 7 days'
     case '30d':
-      return 'this month'
+      return 'in the last 30 days'
     case 'lifetime':
       return 'in total'
   }
@@ -259,11 +258,11 @@ export function periodPhrase(period: Period): string {
 export function previousPhrase(period: Period): string | null {
   switch (period) {
     case '24h':
-      return 'yesterday'
+      return 'the previous 24 hours'
     case '7d':
-      return 'the week before'
+      return 'the previous 7 days'
     case '30d':
-      return 'the month before'
+      return 'the previous 30 days'
     case 'lifetime':
       return null
   }
@@ -275,8 +274,8 @@ export function periodFootnote(period: Period): string {
   const head =
     previous === null
       ? 'Everything so far, with nothing to compare against.'
-      : `${periodPhrase(period)[0].toUpperCase()}${periodPhrase(period).slice(1)} vs ${previous}.`
-  return `${head} Staff and test accounts excluded.`
+      : `${periodLabel(period)} vs ${previous}.`
+  return head
 }
 
 /** The selector button text. */

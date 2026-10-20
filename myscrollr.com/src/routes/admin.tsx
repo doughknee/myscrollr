@@ -9,6 +9,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { Suspense, lazy } from 'react'
+import { AdminRouteLoading } from '@/components/admin/AdminRouteLoading'
 import { seo } from '@/lib/seo'
 
 const AdminShell = lazy(() => import('@/components/admin/AdminShell'))
@@ -22,7 +23,7 @@ export const Route = createFileRoute('/admin')({
       noindex: true,
     }),
   component: () => (
-    <Suspense fallback={<div className="min-h-[60vh]" />}>
+    <Suspense fallback={<AdminRouteLoading page="staff console" />}>
       <AdminShell />
     </Suspense>
   ),

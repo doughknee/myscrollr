@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronLeft, Loader2, Search } from 'lucide-react'
 import { ErrorPanel, PageFrame } from './ui'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
+import type { UsersSearch } from '@/lib/adminSearch'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
 
@@ -39,10 +40,11 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
     setDetail(null)
     setError(null)
     adminApi
-      .account(getToken, sub)
+      .account(getToken, sub, controller.signal)
       .then((res) => !cancelled && setDetail(res))
       .catch(
         (err: unknown) =>
@@ -53,6 +55,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
       )
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [getToken, sub, attempt])
 
@@ -160,9 +163,12 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
                     className="border-b border-base-300/40 p-3 last:border-0"
                   >
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-sm font-medium">
+                      <a
+                        href={`/admin/support?ticket=${encodeURIComponent(k.ticket_number)}&rows=ticket`}
+                        className="truncate text-sm font-medium text-primary hover:underline"
+                      >
                         {k.subject || '(no subject)'}
-                      </span>
+                      </a>
                       <span className="shrink-0 font-mono text-xs text-base-content/50">
                         {k.ticket_number}
                       </span>
@@ -183,24 +189,39 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
   )
 }
 
-export default function UsersPage() {
+export default function UsersPage({
+  search,
+  onSearchChange,
+}: {
+  search?: UsersSearch
+  onSearchChange?: (patch: Partial<UsersSearch>, replace?: boolean) => void
+} = {}) {
   const getToken = useGetToken()
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(0)
+  const [localSearch, setLocalSearch] = useState<UsersSearch>({
+    q: '',
+    page: 0,
+  })
+  const { q: query, page, user: selected } = search ?? localSearch
+  const updateSearch = (patch: Partial<UsersSearch>, replace = false) => {
+    if (onSearchChange) onSearchChange(patch, replace)
+    else setLocalSearch((current) => ({ ...current, ...patch }))
+  }
+  const setSelected = (user: string | null) =>
+    updateSearch({ user: user ?? undefined })
   const [data, setData] = useState<AccountsPage | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
     setError(null)
     setLoading(true)
     // Debounced so typing does not fire a query per keystroke.
     const timer = setTimeout(() => {
       adminApi
-        .accounts(getToken, query, page)
+        .accounts(getToken, query, page, controller.signal)
         .then((res) => !cancelled && setData(res))
         .catch(
           (err: unknown) =>
@@ -213,6 +234,7 @@ export default function UsersPage() {
     }, 250)
     return () => {
       cancelled = true
+      controller.abort()
       clearTimeout(timer)
     }
   }, [getToken, query, page, attempt])
@@ -279,10 +301,10 @@ export default function UsersPage() {
             type="search"
             value={query}
             onChange={(e) => {
-              setQuery(e.target.value)
-              setPage(0)
+              updateSearch({ q: e.target.value, page: 0 }, true)
             }}
             placeholder="Search by email or username"
+            aria-label="Search users by email or username"
             className="w-full rounded-lg bg-base-200/50 py-2.5 pr-3 pl-9 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
           />
         </div>
@@ -333,9 +355,17 @@ export default function UsersPage() {
                       className="cursor-pointer border-b border-base-300/40 transition-colors last:border-0 hover:bg-base-200/50"
                     >
                       <td className="max-w-[18rem] p-3">
-                        <span className="block truncate font-medium">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelected(a.logto_sub)
+                          }}
+                          className="block max-w-full cursor-pointer truncate text-left font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                          aria-label={`View ${a.email ?? a.name ?? a.logto_sub}`}
+                        >
                           {a.email ?? a.name ?? '—'}
-                        </span>
+                        </button>
                         <span className="block truncate font-mono text-xs text-base-content/45">
                           {a.logto_sub}
                           {!a.set_up && (
@@ -382,7 +412,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
+                  onClick={() => updateSearch({ page: page - 1 })}
                   className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
                 >
                   Previous
@@ -393,7 +423,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   disabled={page + 1 >= pageCount}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => updateSearch({ page: page + 1 })}
                   className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
                 >
                   Next

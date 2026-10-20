@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   supportCase: vi.fn(),
   setAutoSendPaused: vi.fn(),
   unsubscribe: vi.fn(),
+  holdDraft: vi.fn(),
+  onConnection: null as null | ((connected: boolean) => void),
   onEvent: null as null | ((e: { ticket_number?: string }) => void),
 }))
 
@@ -42,6 +44,7 @@ vi.mock('@/api/admin', async () => {
       supportQueue: mocks.supportQueue,
       supportCase: mocks.supportCase,
       setAutoSendPaused: mocks.setAutoSendPaused,
+      holdDraft: mocks.holdDraft,
     },
     // Report the stream as live, the way a connected console does.
     subscribeToSupportEvents: (
@@ -50,6 +53,7 @@ vi.mock('@/api/admin', async () => {
       setLive: (v: boolean) => void,
     ) => {
       mocks.onEvent = on
+      mocks.onConnection = setLive
       setLive(true)
       return mocks.unsubscribe
     },
@@ -131,7 +135,7 @@ describe('the page frame', () => {
   it('puts the live and auto-send pills in the console bar, not above the queue', async () => {
     const host = await render(1440)
     const bar = host.querySelector('header')!
-    expect(bar.textContent).toContain('live')
+    expect(bar.textContent).toContain('connected')
     expect(bar.textContent).toContain('Auto-send on · 60 min hold')
 
     // The two stacked banners are gone: their sentences are now the pills'
@@ -180,6 +184,25 @@ describe('the page frame', () => {
 })
 
 describe('the live stream', () => {
+  it('reconciles both queue and open case after reconnecting', async () => {
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    mocks.supportQueue.mockClear()
+    mocks.supportCase.mockClear()
+    await act(async () => {
+      mocks.onConnection!(false)
+    })
+    await act(async () => {
+      mocks.onConnection!(true)
+    })
+    expect(mocks.supportQueue).toHaveBeenCalledTimes(1)
+    expect(mocks.supportCase).toHaveBeenCalledWith(
+      mocks.token,
+      '752473',
+      expect.any(AbortSignal),
+    )
+  })
+
   it('refetches the queue once per burst of events, and again for a later one', async () => {
     await render(1440)
     vi.useFakeTimers()
@@ -237,6 +260,132 @@ describe('the three panes', () => {
 })
 
 describe('the case', () => {
+  async function editReply(host: HTMLElement, value: string) {
+    const input = host.querySelector<HTMLTextAreaElement>('#reply-body')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      )!.set!.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  it('retains an unsent reply when opening another ticket and returning', async () => {
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    await editReply(host, 'My unsent reply')
+    await open(host, 'Sam Pryor')
+    expect(
+      host.querySelector<HTMLTextAreaElement>('#reply-body')?.value,
+    ).not.toBe('My unsent reply')
+    await open(host, 'Morgan Ellis')
+    expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
+      'My unsent reply',
+    )
+  })
+
+  it('keeps edits through a failed background refresh and its retry', async () => {
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    await editReply(host, 'Do not lose this')
+    mocks.supportCase.mockRejectedValueOnce(new Error('Connection interrupted'))
+    await act(async () => {
+      mocks.onEvent!({ ticket_number: '752473' })
+    })
+    expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
+      'Do not lose this',
+    )
+    expect(host.textContent).toContain('Your edits are kept')
+    await open(host, 'Retry case')
+    expect(host.textContent).not.toContain('Connection interrupted')
+    expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
+      'Do not lose this',
+    )
+  })
+
+  it('does not replace the selected case with a late action on another ticket', async () => {
+    let finish!: (detail: CaseDetail) => void
+    mocks.holdDraft.mockReturnValue(
+      new Promise<CaseDetail>((resolve) => {
+        finish = resolve
+      }),
+    )
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    const hold = [
+      ...host.querySelectorAll<HTMLButtonElement>('aside button'),
+    ].find((b) => b.textContent === 'Hold')!
+    await act(async () => {
+      hold.click()
+    })
+    await open(host, 'Sam Pryor')
+    const samReply =
+      host.querySelector<HTMLTextAreaElement>('#reply-body')?.value
+    await act(async () => {
+      finish(cases['752473'])
+    })
+    expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
+      samReply,
+    )
+  })
+
+  it('does not replace a newer draft with a delayed action on the previous draft', async () => {
+    let finish!: (detail: CaseDetail) => void
+    mocks.holdDraft.mockReturnValue(
+      new Promise<CaseDetail>((resolve) => {
+        finish = resolve
+      }),
+    )
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    const hold = [
+      ...host.querySelectorAll<HTMLButtonElement>('aside button'),
+    ].find((b) => b.textContent === 'Hold')!
+    await act(() => hold.click())
+    const original = cases['752473']
+    mocks.supportCase.mockResolvedValue({
+      ...original,
+      draft: {
+        ...original.draft!,
+        id: original.draft!.id + 1,
+        body: 'A newer server draft',
+      },
+    })
+    await act(() => mocks.onEvent!({ ticket_number: '752473' }))
+    expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
+      'A newer server draft',
+    )
+    await act(() => finish(original))
+    expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
+      'A newer server draft',
+    )
+  })
+
+  it('does not reopen a draft sent elsewhere while a Hold response was delayed', async () => {
+    let finish!: (detail: CaseDetail) => void
+    mocks.holdDraft.mockReturnValue(
+      new Promise<CaseDetail>((resolve) => {
+        finish = resolve
+      }),
+    )
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    const hold = [
+      ...host.querySelectorAll<HTMLButtonElement>('aside button'),
+    ].find((b) => b.textContent === 'Hold')!
+    await act(() => hold.click())
+    const original = cases['752473']
+    mocks.supportCase.mockResolvedValue({
+      ...original,
+      draft: { ...original.draft!, status: 'sent' },
+    })
+    await act(() => mocks.onEvent!({ ticket_number: '752473' }))
+    await act(() => finish(original))
+    expect(host.querySelector('#reply-body')).toBeNull()
+    expect(host.textContent).toContain('This draft is sent')
+  })
+
   it('still offers every action, by name', async () => {
     const host = await render(1440)
     await open(host, 'Morgan Ellis')

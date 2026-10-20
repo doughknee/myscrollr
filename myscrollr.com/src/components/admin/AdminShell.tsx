@@ -1,10 +1,12 @@
 import { Link, Outlet, useLocation } from '@tanstack/react-router'
 import { createContext, useContext, useEffect, useState } from 'react'
-import { Loader2, Lock } from 'lucide-react'
+import { Loader2, Lock, Moon, Sun } from 'lucide-react'
 import ScrollrSVG from '@/components/ScrollrSVG'
 import { AdminApiError, adminApi } from '@/api/admin'
+import { ADMIN_SESSION_EXPIRED } from '@/api/adminRequest'
 import { useGetToken } from '@/hooks/useGetToken'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
+import { useTheme } from '@/hooks/useTheme'
 
 /**
  * The staff console shell: one gate, one nav, one Outlet.
@@ -75,11 +77,22 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminShell() {
+  const location = useLocation()
   const { isAuthenticated, isLoading, signIn, getIdTokenClaims } =
     useScrollrAuth()
   const getToken = useGetToken()
   const [gate, setGate] = useState<GateState>({ kind: 'checking' })
   const [attempt, setAttempt] = useState(0)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  useEffect(() => {
+    const expired = () => {
+      clearMemo()
+      setSessionExpired(true)
+    }
+    window.addEventListener(ADMIN_SESSION_EXPIRED, expired)
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED, expired)
+  }, [])
 
   useEffect(() => {
     if (isLoading) return
@@ -88,6 +101,7 @@ export default function AdminShell() {
       return
     }
     let cancelled = false
+    const controller = new AbortController()
     let settled = false
     // Staying 'allowed' while a re-check runs keeps the page mounted, and its
     // data requests flying, on every navigation after the first.
@@ -103,12 +117,14 @@ export default function AdminShell() {
       if (!cancelled && !settled && email) setGate({ kind: 'allowed', email })
     })
     adminApi
-      .me(getToken)
-      .then(async (res) => {
+      .me(getToken, controller.signal)
+      .then((res) => {
         settled = true
-        const sub = await subPromise
-        if (sub) writeMemo(sub, res.email)
-        if (!cancelled) setGate({ kind: 'allowed', email: res.email })
+        if (cancelled) return
+        setGate({ kind: 'allowed', email: res.email })
+        void subPromise.then((sub) => {
+          if (!cancelled && sub) writeMemo(sub, res.email)
+        })
       })
       .catch((err: unknown) => {
         settled = true
@@ -140,13 +156,18 @@ export default function AdminShell() {
       })
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [isAuthenticated, isLoading, getToken, getIdTokenClaims, attempt])
 
   if (isLoading || gate.kind === 'checking') {
     return (
       <Centered>
-        <Loader2 className="size-6 animate-spin text-base-content/40" />
+        <Loader2
+          role="status"
+          aria-label="Checking staff access"
+          className="size-6 animate-spin text-base-content/40"
+        />
       </Centered>
     )
   }
@@ -162,7 +183,7 @@ export default function AdminShell() {
         </p>
         <button
           type="button"
-          onClick={() => signIn('/admin')}
+          onClick={() => signIn(location.href)}
           className="mt-6 cursor-pointer rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-content transition-[filter] hover:brightness-110"
         >
           Sign in
@@ -208,7 +229,29 @@ export default function AdminShell() {
     )
   }
 
-  return <AdminChrome email={gate.email}>{<Outlet />}</AdminChrome>
+  return (
+    <AdminChrome email={gate.email}>
+      {sessionExpired && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 border-b border-warning/30 bg-warning/10 px-5 py-3 text-sm"
+        >
+          <p>
+            Your staff session expired. Sign in again to load current data or
+            make changes.
+          </p>
+          <button
+            type="button"
+            className="cursor-pointer rounded-lg bg-primary px-3 py-2 font-semibold text-primary-content"
+            onClick={() => signIn(location.href)}
+          >
+            Sign in again
+          </button>
+        </div>
+      )}
+      <Outlet />
+    </AdminChrome>
+  )
 }
 
 /**
@@ -254,6 +297,7 @@ export function AdminChrome({
   children: React.ReactNode
 }) {
   const location = useLocation()
+  const { theme, toggleTheme } = useTheme()
   const [slot, setSlot] = useState<React.ReactNode>(null)
   const links = SECTIONS.map(({ to, label, ...rest }) => {
     const exact = 'exact' in rest && rest.exact
@@ -292,6 +336,7 @@ export function AdminChrome({
                 <li key={to}>
                   <Link
                     to={to}
+                    aria-current={active ? 'page' : undefined}
                     className={`rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${
                       active
                         ? 'bg-base-200 text-base-content'
@@ -308,6 +353,23 @@ export function AdminChrome({
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
             {status}
             {slot}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === 'dark'
+                  ? 'Switch to light mode'
+                  : 'Switch to dark mode'
+              }
+              title={
+                theme === 'dark'
+                  ? 'Switch to light mode'
+                  : 'Switch to dark mode'
+              }
+              className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-base-content/60 hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
             <span
               /* From lg, not sm: the bar now also carries a page's status
                pills (SCROLLR-219), and who you are signed in as is the
@@ -332,6 +394,7 @@ export function AdminChrome({
               <li key={to}>
                 <Link
                   to={to}
+                  aria-current={active ? 'page' : undefined}
                   className={`flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
                     active
                       ? 'text-base-content'

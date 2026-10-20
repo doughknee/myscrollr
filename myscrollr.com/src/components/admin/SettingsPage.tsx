@@ -20,8 +20,7 @@ export default function SettingsPage() {
   const settings = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void signal
-        return adminApi.settings(getToken)
+        return adminApi.settings(getToken, signal)
       },
       [getToken],
     ),

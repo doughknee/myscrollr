@@ -7,15 +7,45 @@
  * weight and not leaking internal UI, never about access control.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
 import { Suspense, lazy } from 'react'
+import type { SearchSchemaInput } from '@tanstack/react-router'
+import { AdminRouteLoading } from '@/components/admin/AdminRouteLoading'
+import { parseSupportSearch } from '@/lib/adminSearch'
 
 const SupportPage = lazy(() => import('@/components/admin/SupportPage'))
 
 export const Route = createFileRoute('/admin/support')({
-  component: () => (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
-      <SupportPage />
-    </Suspense>
-  ),
+  validateSearch: (search: Record<string, unknown> & SearchSchemaInput) =>
+    parseSupportSearch(search),
+  search: {
+    middlewares: [
+      stripSearchParams({
+        q: '',
+        sort: 'last_wrote',
+        dir: 'desc',
+        rows: 'person',
+        resolved: false,
+      }),
+    ],
+  },
+  component: SupportRoute,
 })
+
+function SupportRoute() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
+  return (
+    <Suspense fallback={<AdminRouteLoading page="Support" />}>
+      <SupportPage
+        search={search}
+        onSearchChange={(patch, replace) => {
+          void navigate({
+            search: (current) => ({ ...current, ...patch }),
+            replace,
+          })
+        }}
+      />
+    </Suspense>
+  )
+}

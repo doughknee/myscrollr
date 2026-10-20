@@ -50,9 +50,13 @@ export interface Report<T> {
  * The previous `data` stays until the new report lands (`refreshing`); an
  * error replaces it, so stale data is never shown as fresh after a failure.
  */
-export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
+export function useReport<T>(
+  load: (signal: AbortSignal) => Promise<T>,
+  population?: string,
+) {
   const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<Report<T>>({
+  const [state, setState] = useState<Report<T> & { population?: string }>({
+    population,
     data: null,
     error: null,
     loading: true,
@@ -64,10 +68,11 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
     const controller = new AbortController()
     request.current = controller
     setState((current) => ({
-      data: current.data,
+      population,
+      data: current.population === population ? current.data : null,
       error: null,
       loading: true,
-      refreshing: current.data !== null,
+      refreshing: current.population === population && current.data !== null,
       slow: false,
     }))
     const slowTimer = window.setTimeout(() => {
@@ -80,6 +85,7 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
         window.clearTimeout(slowTimer)
         if (!controller.signal.aborted) {
           setState({
+            population,
             data,
             error: null,
             loading: false,
@@ -92,6 +98,7 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
         window.clearTimeout(slowTimer)
         if (!controller.signal.aborted) {
           setState({
+            population,
             data: null,
             error:
               error instanceof Error
@@ -108,14 +115,23 @@ export function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
       window.clearTimeout(slowTimer)
       controller.abort()
     }
-  }, [attempt, load])
+  }, [attempt, load, population])
 
   return {
-    ...state,
+    ...(state.population === population
+      ? state
+      : {
+          data: null,
+          error: null,
+          loading: true,
+          refreshing: false,
+          slow: false,
+        }),
     retry: () => setAttempt((value) => value + 1),
     cancel: () => {
       request.current?.abort()
       setState({
+        population,
         data: null,
         error: 'Loading canceled. You can retry.',
         loading: false,

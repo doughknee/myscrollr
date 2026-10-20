@@ -227,7 +227,14 @@ export function OverviewContent({
   onRefresh,
 }: OverviewContentProps) {
   const [open, setOpen] = useState<RowKey | null>(initialOpen ?? null)
-  const rows = buildRows({ presence, desktop, website, revenue, support, service })
+  const rows = buildRows({
+    presence,
+    desktop,
+    website,
+    revenue,
+    support,
+    service,
+  })
   const anyLoading = [
     presence,
     desktop,
@@ -266,7 +273,7 @@ export function OverviewContent({
       </ul>
 
       <p className="mt-6 text-sm text-base-content/45">
-        Now and the last 24 hours. Staff and test accounts are left out.
+        Now and the last 24 hours. Each source keeps its own population.
         Anything over a longer period lives in Analytics.
       </p>
     </div>
@@ -414,9 +421,9 @@ function fact(label: string, value: string | null | undefined): Fact {
 function latestVersion(versions: Record<string, number> | null): string | null {
   const keys = Object.keys(versions ?? {})
   if (keys.length === 0) return null
-  return keys.sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true }),
-  )[keys.length - 1]
+  return keys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[
+    keys.length - 1
+  ]
 }
 
 function count(values: Record<string, number> | null, ...keys: Array<string>) {
@@ -430,6 +437,7 @@ function duration(seconds: number): string {
 }
 
 function problemOf<T>(report: Report<T>) {
+  if (report.error) return { message: report.error, retry: report.retry }
   if (report.data) return undefined
   return {
     message: report.error ?? 'Still reading…',
@@ -456,7 +464,10 @@ function buildRows({
   const everNet = rev?.earnings.lifetime?.[0]
 
   const v = verdicts({
-    presence: p ? { available: p.available, active_users: p.active_users } : null,
+    presence:
+      p && !presence.error
+        ? { available: p.available, active_users: p.active_users }
+        : null,
     support: sup ? { open_cases: sup.needs_attention.total } : null,
     money: rev
       ? {
@@ -514,10 +525,18 @@ function rightNowRow(
     key: 'right_now',
     number: reporting ? num(p.active_users) : null,
     main: reporting
-      ? `${p.active_users === 1 ? 'person has' : 'people have'} Scrollr open right now${ticker ? ',' : '.'}`
+      ? presence.error
+        ? `${p.active_users === 1 ? 'person had' : 'people had'} Scrollr open at the last successful check.`
+        : `${p.active_users === 1 ? 'person has' : 'people have'} Scrollr open right now${ticker ? ',' : '.'}`
       : 'Nobody is reporting yet.',
-    secondary: reporting ? ticker : (p?.note ?? undefined),
-    verdict,
+    secondary: presence.error
+      ? 'The live count could not be refreshed.'
+      : reporting
+        ? ticker
+        : (p?.note ?? undefined),
+    verdict: presence.error
+      ? { label: 'Update failed', tone: 'warn' }
+      : verdict,
     facts: [
       fact('People with the app open', p ? num(p.active_users) : null),
       fact('Ticker visible on their screen', p ? num(p.ticker_users) : null),
@@ -586,7 +605,9 @@ function supportRow(
   const oldest = s?.oldest_needs_attention_hours
   const hold = s?.autosend.hold_minutes ?? 0
   const since =
-    s && waiting > 0 && oldest?.available ? oldestClause(oldest.value) : undefined
+    s && waiting > 0 && oldest?.available
+      ? oldestClause(oldest.value)
+      : undefined
 
   return {
     key: 'support',
@@ -613,7 +634,10 @@ function supportRow(
         'Longest wait',
         oldest?.available ? plural(Math.floor(oldest.value / 24), 'day') : null,
       ),
-      fact('Ticket waiting the longest', s?.oldest_ticket ? `#${s.oldest_ticket}` : null),
+      fact(
+        'Ticket waiting the longest',
+        s?.oldest_ticket ? `#${s.oldest_ticket}` : null,
+      ),
       fact(
         'Auto-replies',
         s
@@ -658,7 +682,9 @@ function moneyRow(
       : 'The customer snapshot could not be read.',
     secondary: snapshot?.available
       ? [
-          netToday > 0 ? `${money(netToday)} came in today.` : 'Nothing came in today.',
+          netToday > 0
+            ? `${money(netToday)} came in today.`
+            : 'Nothing came in today.',
           ever ? `${ever} earned ever.` : null,
         ]
           .filter(Boolean)
@@ -666,7 +692,10 @@ function moneyRow(
       : r?.paying_now_note,
     verdict,
     facts: [
-      fact('Paying customers', snapshot?.available ? num(snapshot.paying) : null),
+      fact(
+        'Paying customers',
+        snapshot?.available ? num(snapshot.paying) : null,
+      ),
       fact(
         'Of those on the one-time lifetime plan',
         snapshot?.available ? num(snapshot.lifetime) : null,
@@ -675,8 +704,14 @@ function moneyRow(
         'Accounts on the free plan',
         snapshot?.available ? num(snapshot.free) : null,
       ),
-      fact('On a free trial', snapshot?.available ? num(snapshot.trialing) : null),
-      fact('Payment failed', snapshot?.available ? num(snapshot.past_due) : null),
+      fact(
+        'On a free trial',
+        snapshot?.available ? num(snapshot.trialing) : null,
+      ),
+      fact(
+        'Payment failed',
+        snapshot?.available ? num(snapshot.past_due) : null,
+      ),
       fact('Cancelling', snapshot?.available ? num(snapshot.canceling) : null),
       fact(
         'Became a customer today',
@@ -690,7 +725,11 @@ function moneyRow(
     ],
     note: `Figures come from Stripe and were last fetched at ${fetched ? new Date(fetched).toLocaleString() : 'an unknown time'}. “Ever” means since the Stripe account was opened.`,
     action: (
-      <Link to="/admin/analytics" search={{ view: 'revenue' }} className={ACTION}>
+      <Link
+        to="/admin/analytics"
+        search={{ view: 'revenue' }}
+        className={ACTION}
+      >
         See revenue over time
       </Link>
     ),
@@ -712,7 +751,9 @@ function growthRow(
   const dau = svc?.active.dau
   const hours = desktop.data?.user_hours
   const visitors = website.data?.visitors
-  const neverSetUp = accounts ? Math.max(0, accounts.total - accounts.set_up) : 0
+  const neverSetUp = accounts
+    ? Math.max(0, accounts.total - accounts.set_up)
+    : 0
 
   return {
     key: 'growth',
@@ -738,7 +779,10 @@ function growthRow(
         newToday?.available ? num(previousDay) : null,
       ),
       fact('Accounts in total', accounts ? num(accounts.total) : null),
-      fact('Finished setting up the app', accounts ? num(accounts.set_up) : null),
+      fact(
+        'Finished setting up the app',
+        accounts ? num(accounts.set_up) : null,
+      ),
       fact(
         'Signed up but never set up the app',
         accounts ? num(neverSetUp) : null,
@@ -802,7 +846,11 @@ function feedsRow(
         const row = reading(feed.table)
         return fact(
           `${feed.name} last updated`,
-          row ? (row.has_data ? formatAgeWords(row.age_seconds) : 'no data yet') : null,
+          row
+            ? row.has_data
+              ? formatAgeWords(row.age_seconds)
+              : 'no data yet'
+            : null,
         )
       }),
       fact(

@@ -1,6 +1,7 @@
 import type { CaptureResult } from 'posthog-js'
+import type posthogSlim from 'posthog-js/dist/module.slim'
 
-type PostHog = (typeof import('posthog-js/dist/module.slim'))['default']
+type PostHog = typeof posthogSlim
 
 export type WebsiteAnalyticsDecision = 'unknown' | 'enabled' | 'declined'
 export type WebsiteAnalyticsEvent = 'download_selected'

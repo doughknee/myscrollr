@@ -12,45 +12,31 @@
  * to visitors, not about security.
  */
 
+import {
+  ADMIN_SESSION_EXPIRED,
+  AdminApiError,
+  boundedAdminRequest,
+} from './adminRequest'
 import type { GitHubHealth } from '@/types/api.generated'
 import { API_BASE } from '@/api/client'
 
-/** An API error that kept its status code, so 403 can be told from 500. */
-export class AdminApiError extends Error {
-  status: number
-  constructor(message: string, status: number) {
-    super(message)
-    this.name = 'AdminApiError'
-    this.status = status
-  }
-}
+export { AdminApiError } from './adminRequest'
 
 async function adminFetch<T>(
   path: string,
   getToken: () => Promise<string | null>,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = await getToken()
-  const headers: Record<string, string> = {
-    ...((options.headers as Record<string, string> | undefined) ?? {}),
-  }
-  if (token) headers.Authorization = `Bearer ${token}`
-  if (options.body) headers['Content-Type'] = 'application/json'
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    const body = await response
-      .json()
-      .catch(() => ({ error: 'Request failed' }))
-    throw new AdminApiError(body.error || 'Request failed', response.status)
-  }
-  // DELETE returns a body, but guard anyway so a 204 never explodes.
-  return response.status === 204 ? (undefined as T) : response.json()
+  const isRead = !options.method || options.method === 'GET'
+  return boundedAdminRequest(
+    getToken,
+    path,
+    'Request failed',
+    isRead
+      ? 'This request took too long. Please retry.'
+      : 'The request timed out. Its outcome is unknown. Refresh this record before trying the action again.',
+    options,
+  )
 }
 
 // ── Overview ──────────────────────────────────────────────────────
@@ -616,25 +602,35 @@ type Token = () => Promise<string | null>
 
 export const adminApi = {
   /** The gate. Resolves with the acting admin's email, or throws 403. */
-  me: (getToken: Token) => adminFetch<{ email: string }>('/admin/me', getToken),
+  me: (getToken: Token, signal?: AbortSignal) =>
+    adminFetch<{ email: string }>('/admin/me', getToken, { signal }),
 
   overview: (getToken: Token) =>
     adminFetch<AdminOverview>('/admin/overview', getToken),
 
   /** Version adoption, platform mix and error rate by version (REL-271). */
-  versions: (getToken: Token, days: number) =>
-    adminFetch<AdminVersions>(`/admin/versions?days=${days}`, getToken),
+  versions: (getToken: Token, days: number, signal?: AbortSignal) =>
+    adminFetch<AdminVersions>(`/admin/versions?days=${days}`, getToken, {
+      signal,
+    }),
 
-  accounts: (getToken: Token, query: string, page: number) =>
+  accounts: (
+    getToken: Token,
+    query: string,
+    page: number,
+    signal?: AbortSignal,
+  ) =>
     adminFetch<AccountsPage>(
       `/admin/accounts?q=${encodeURIComponent(query)}&page=${page}`,
       getToken,
+      { signal },
     ),
 
-  account: (getToken: Token, sub: string) =>
+  account: (getToken: Token, sub: string, signal?: AbortSignal) =>
     adminFetch<AccountDetail>(
       `/admin/accounts/${encodeURIComponent(sub)}`,
       getToken,
+      { signal },
     ),
 
   /**
@@ -644,7 +640,11 @@ export const adminApi = {
    * capped at 500 cases, so a browser reordering whatever arrived would show a
    * sorted page while calling it a sorted queue.
    */
-  supportQueue: (getToken: Token, opts: QueueQuery = {}) => {
+  supportQueue: (
+    getToken: Token,
+    opts: QueueQuery = {},
+    signal?: AbortSignal,
+  ) => {
     const params = new URLSearchParams({
       state: opts.state ?? 'all',
       sort: opts.sort ?? 'last_wrote',
@@ -655,17 +655,21 @@ export const adminApi = {
     return adminFetch<SupportQueue>(
       `/admin/support/queue?${params.toString()}`,
       getToken,
+      { signal },
     )
   },
 
-  supportCase: (getToken: Token, ticket: string) =>
+  supportCase: (getToken: Token, ticket: string, signal?: AbortSignal) =>
     adminFetch<CaseDetail>(
       `/admin/support/case/${encodeURIComponent(ticket)}`,
       getToken,
+      { signal },
     ),
 
-  admins: (getToken: Token) =>
-    adminFetch<{ admins: Array<AdminRow> }>('/admin/admins', getToken),
+  admins: (getToken: Token, signal?: AbortSignal) =>
+    adminFetch<{ admins: Array<AdminRow> }>('/admin/admins', getToken, {
+      signal,
+    }),
 
   addAdmin: (getToken: Token, email: string, note: string) =>
     adminFetch<{ status: string; id: number }>('/admin/admins', getToken, {
@@ -718,8 +722,8 @@ export const adminApi = {
       body: JSON.stringify({ paused }),
     }),
 
-  settings: (getToken: Token) =>
-    adminFetch<AdminSettings>('/admin/settings', getToken),
+  settings: (getToken: Token, signal?: AbortSignal) =>
+    adminFetch<AdminSettings>('/admin/settings', getToken, { signal }),
 
   /** Answers with every setting as it now stands, the same shape as a read. */
   saveSettings: (getToken: Token, body: Record<string, boolean>) =>
@@ -776,11 +780,20 @@ export function subscribeToSupportEvents(
     while (!stopped()) {
       try {
         const token = await getToken()
+        if (stopped()) return
         const response = await fetch(`${API_BASE}/admin/support/stream`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           credentials: 'include',
           signal: controller.signal,
         })
+        if (response.status === 401 || response.status === 403) {
+          if (response.status === 401 && typeof window !== 'undefined') {
+            window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED))
+          }
+          onStatus?.(false)
+          await response.body?.cancel()
+          return
+        }
         if (!response.ok || !response.body) {
           throw new AdminApiError('stream refused', response.status)
         }

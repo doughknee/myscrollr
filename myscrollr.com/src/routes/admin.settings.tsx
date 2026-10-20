@@ -8,12 +8,13 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { Suspense, lazy } from 'react'
+import { AdminRouteLoading } from '@/components/admin/AdminRouteLoading'
 
 const SettingsPage = lazy(() => import('@/components/admin/SettingsPage'))
 
 export const Route = createFileRoute('/admin/settings')({
   component: () => (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
+    <Suspense fallback={<AdminRouteLoading page="Settings" />}>
       <SettingsPage />
     </Suspense>
   ),

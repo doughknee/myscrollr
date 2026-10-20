@@ -74,6 +74,14 @@ const SECTION_LABELS = [
 ]
 
 beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }),
+  })
   mocks.authenticated = true
   mocks.me.mockReset()
   mocks.sub = 'sub-1'
@@ -94,6 +102,17 @@ describe('site chrome', () => {
 })
 
 describe('AdminChrome', () => {
+  it('returns sign-in to the requested staff page and filters', async () => {
+    mocks.authenticated = false
+    const host = await render(
+      <AdminShell />,
+      '/admin/analytics?period=30d&view=revenue',
+    )
+    await act(() => host.querySelector<HTMLButtonElement>('button')!.click())
+    expect(mocks.signIn).toHaveBeenCalledWith(
+      '/admin/analytics?period=30d&view=revenue',
+    )
+  })
   it('offers all seven sections and a way back to the site', async () => {
     const host = await render(
       <AdminChrome email="staff@myscrollr.com">

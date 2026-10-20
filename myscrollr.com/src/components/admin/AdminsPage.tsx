@@ -29,9 +29,8 @@ export default function AdminsPage() {
   const report = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void signal
         void reloads
-        return adminApi.admins(getToken).then((res) => res.admins)
+        return adminApi.admins(getToken, signal).then((res) => res.admins)
       },
       [getToken, reloads],
     ),

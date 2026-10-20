@@ -323,30 +323,28 @@ describe('measuredValue with a formatter', () => {
 
 describe('periodPhrase and previousPhrase', () => {
   it('says the window the way a sentence would', () => {
-    expect(periodPhrase('24h')).toBe('today')
-    expect(periodPhrase('7d')).toBe('this week')
-    expect(periodPhrase('30d')).toBe('this month')
+    expect(periodPhrase('24h')).toBe('in the last 24 hours')
+    expect(periodPhrase('7d')).toBe('in the last 7 days')
+    expect(periodPhrase('30d')).toBe('in the last 30 days')
     expect(periodPhrase('lifetime')).toBe('in total')
   })
 
   it('has no previous window for lifetime, so a clause cannot be written', () => {
-    expect(previousPhrase('24h')).toBe('yesterday')
-    expect(previousPhrase('7d')).toBe('the week before')
-    expect(previousPhrase('30d')).toBe('the month before')
+    expect(previousPhrase('24h')).toBe('the previous 24 hours')
+    expect(previousPhrase('7d')).toBe('the previous 7 days')
+    expect(previousPhrase('30d')).toBe('the previous 30 days')
     expect(previousPhrase('lifetime')).toBeNull()
   })
 })
 
 describe('periodFootnote', () => {
   it('names what is being compared, and says when nothing is', () => {
-    expect(periodFootnote('7d')).toBe(
-      'This week vs the week before. Staff and test accounts excluded.',
-    )
+    expect(periodFootnote('7d')).toBe('Last 7 days vs the previous 7 days.')
     expect(periodFootnote('24h')).toBe(
-      'Today vs yesterday. Staff and test accounts excluded.',
+      'Last 24 hours vs the previous 24 hours.',
     )
     expect(periodFootnote('lifetime')).toBe(
-      'Everything so far, with nothing to compare against. Staff and test accounts excluded.',
+      'Everything so far, with nothing to compare against.',
     )
   })
 })

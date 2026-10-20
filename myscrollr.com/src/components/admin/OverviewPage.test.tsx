@@ -34,6 +34,25 @@ function text(html: string): string {
 }
 
 describe('OverviewContent', () => {
+  it('labels retained presence as stale and offers retry after a poll fails', async () => {
+    const body = text(
+      await render({
+        presence: {
+          ...loaded(presence),
+          error: 'Connection interrupted',
+          retry: () => {},
+        },
+        initialOpen: 'right_now',
+      }),
+    )
+    expect(body).toContain(
+      '12people had Scrollr open at the last successful check.',
+    )
+    expect(body).toContain('Update failed')
+    expect(body).toContain('Connection interrupted')
+    expect(body).toContain('Retry')
+    expect(body).not.toContain('open right now')
+  })
   it('leads with the two headline lines and the five sentences', async () => {
     const body = text(await render())
     expect(body).toContain('Running fine.')

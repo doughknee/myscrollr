@@ -8,6 +8,7 @@ import { userApi } from '@/api/client'
 import { useGetToken } from '@/hooks/useGetToken'
 import SubscriptionStatus from '@/components/billing/SubscriptionStatus'
 import AccountDangerZone from '@/components/account/AccountDangerZone'
+
 export function AccountHub() {
   const { isAuthenticated, isLoading, signIn, signOut } = useScrollrAuth()
   const getToken = useGetToken()

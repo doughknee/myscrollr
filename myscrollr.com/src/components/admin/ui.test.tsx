@@ -17,7 +17,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function setup() {
+function setup(scoped = false) {
   const calls: Array<ReturnType<typeof deferred<string>>> = []
   function Probe({ period }: { period: number }) {
     const load = useCallback(() => {
@@ -25,7 +25,7 @@ function setup() {
       calls.push(d)
       return d.promise
     }, [period])
-    const report = useReport(load)
+    const report = useReport(load, scoped ? String(period) : undefined)
     return (
       <Loaded report={report} label="things">
         {(data) => <p>{data}</p>}
@@ -40,6 +40,19 @@ function setup() {
 }
 
 describe('useReport', () => {
+  it('clears data for a different population while ignoring a superseded result', async () => {
+    const { calls, container, render } = setup(true)
+    await render(1)
+    await act(async () => calls[0].resolve('Windows users'))
+    await render(2)
+    expect(container.textContent).not.toContain('Windows users')
+    expect(container.textContent).toContain('Loading things')
+    await render(3)
+    await act(async () => calls[1].resolve('Mac users'))
+    expect(container.textContent).not.toContain('Mac users')
+    await act(async () => calls[2].resolve('Linux users'))
+    expect(container.textContent).toBe('Linux users')
+  })
   it('keeps the previous data dimmed during a reload, then replaces it', async () => {
     const { calls, container, render } = setup()
     await render(1)

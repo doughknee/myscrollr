@@ -6,15 +6,33 @@
  * real boundary; this split is about bundle weight.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
 import { Suspense, lazy } from 'react'
+import type { SearchSchemaInput } from '@tanstack/react-router'
+import { AdminRouteLoading } from '@/components/admin/AdminRouteLoading'
+import { parseVersionDays } from '@/lib/adminSearch'
 
 const VersionsPage = lazy(() => import('@/components/admin/VersionsPage'))
 
 export const Route = createFileRoute('/admin/versions')({
-  component: () => (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
-      <VersionsPage />
-    </Suspense>
-  ),
+  validateSearch: (search: Record<string, unknown> & SearchSchemaInput) => ({
+    days: parseVersionDays(search.days),
+  }),
+  search: { middlewares: [stripSearchParams({ days: 30 })] },
+  component: VersionsRoute,
 })
+
+function VersionsRoute() {
+  const { days } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  return (
+    <Suspense fallback={<AdminRouteLoading page="Versions" />}>
+      <VersionsPage
+        days={days}
+        onDaysChange={(next) => {
+          void navigate({ search: { days: next } })
+        }}
+      />
+    </Suspense>
+  )
+}

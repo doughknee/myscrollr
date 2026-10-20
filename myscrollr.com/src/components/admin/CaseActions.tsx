@@ -33,12 +33,18 @@ import { useGetToken } from '@/hooks/useGetToken'
 
 type Panel = 'none' | 'confirm-send' | 'ask' | 'link'
 
+export type CaseEdits = { body: string; question: string; issueKey: string }
+
 export default function CaseActions({
   detail,
   onCase,
+  edits,
+  onEdit,
 }: {
   detail: CaseDetail
   onCase: (next: CaseDetail) => void
+  edits: CaseEdits
+  onEdit: (patch: Partial<CaseEdits>) => void
 }) {
   const getToken = useGetToken()
   const draft = detail.draft
@@ -49,20 +55,16 @@ export default function CaseActions({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const [body, setBody] = useState('')
-  const [question, setQuestion] = useState('')
-  const [issueKey, setIssueKey] = useState('')
-
-  // Reset when the case changes underneath — an open editor holding another
-  // ticket's draft is how the wrong reply gets sent to the wrong person.
+  const { body, question, issueKey } = edits
+  // The parent keys this editor by ticket and draft. Local edits live above
+  // the responsive panes, so moving a pane or opening another case keeps them.
+  const mounted = useRef(true)
   useEffect(() => {
-    setPanel('none')
-    setError(null)
-    setNotice(null)
-    setBody(draft?.body ?? '')
-    setQuestion(draft?.ask_user_for ?? '')
-    setIssueKey('')
-  }, [detail.ticket_number, draft?.id, draft?.body, draft?.ask_user_for])
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   /** Runs one verb, keeps whatever case came back, and says what went wrong. */
   const run = async (
@@ -75,7 +77,7 @@ export default function CaseActions({
     setNotice(null)
     try {
       onCase(await call())
-      after?.()
+      if (mounted.current) after?.()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'That did not go through.')
     } finally {
@@ -132,7 +134,7 @@ export default function CaseActions({
             id="reply-body"
             aria-label="Proposed reply"
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => onEdit({ body: e.target.value })}
             onFocus={holdOnFirstTouch}
             rows={12}
             spellCheck
@@ -145,7 +147,8 @@ export default function CaseActions({
           <p className="mt-1 text-xs text-base-content/45">
             {edited.length.toLocaleString()} characters. Plain text — it is
             wrapped into paragraphs on the way out.
-            {!unchanged && ' Sending will send your version.'}
+            {!unchanged &&
+              ' Your edits are kept while you browse this support queue. Sending will send your version.'}
           </p>
           {!unchanged && (
             <div className="mt-2 max-w-[75ch]">
@@ -307,7 +310,7 @@ export default function CaseActions({
           <textarea
             id="ask-body"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(e) => onEdit({ question: e.target.value })}
             rows={4}
             placeholder="Which version are you on, and does it happen on every launch?"
             className="w-full resize-y rounded-lg bg-base-100 px-3 py-2 text-sm ring-1 ring-base-300/60 focus:ring-2 focus:ring-primary/50 focus:outline-none"
@@ -362,7 +365,9 @@ export default function CaseActions({
             <input
               id="issue-key"
               value={issueKey}
-              onChange={(e) => setIssueKey(e.target.value.toUpperCase())}
+              onChange={(e) =>
+                onEdit({ issueKey: e.target.value.toUpperCase() })
+              }
               placeholder="REL-261"
               className="w-40 rounded-lg bg-base-100 px-3 py-1.5 font-mono text-sm ring-1 ring-base-300/60 focus:ring-2 focus:ring-primary/50 focus:outline-none"
             />

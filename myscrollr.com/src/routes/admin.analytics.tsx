@@ -13,6 +13,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import type { SearchSchemaInput } from '@tanstack/react-router'
 import type { Period } from '@/api/adminDashboard'
 import type { AnalyticsView } from '@/lib/adminFormat'
+import { AdminRouteLoading } from '@/components/admin/AdminRouteLoading'
 import { parseFilter, parsePeriod, parseView } from '@/lib/adminFormat'
 
 const AnalyticsPage = lazy(() => import('@/components/admin/AnalyticsPage'))
@@ -42,7 +43,7 @@ export const Route = createFileRoute('/admin/analytics')({
     plan: parseFilter(search.plan),
   }),
   component: () => (
-    <Suspense fallback={<div className="min-h-[40vh]" />}>
+    <Suspense fallback={<AdminRouteLoading page="Analytics" />}>
       <AnalyticsPage />
     </Suspense>
   ),
