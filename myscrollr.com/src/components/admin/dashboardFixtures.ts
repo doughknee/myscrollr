@@ -533,6 +533,7 @@ export const overview: AdminOverview = {
 }
 
 export const signup: SignupAnalytics = {
+  available: true,
   application: 'website',
   window_days: 7,
   generated_at: '2026-09-11T12:00:00Z',

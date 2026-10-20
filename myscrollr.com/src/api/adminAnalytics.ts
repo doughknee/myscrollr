@@ -9,6 +9,9 @@ export interface SignupStageMetrics {
 }
 
 export interface SignupAnalytics {
+  /** false = the scan could not finish; `reason` says why, all else is empty. */
+  available: boolean
+  reason?: string
   application: AnalyticsApplication
   window_days: AnalyticsWindow
   generated_at: string

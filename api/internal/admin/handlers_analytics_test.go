@@ -19,6 +19,7 @@ import (
 
 func analyticsReport(application string, days int) accounts.SignupAnalytics {
 	return accounts.SignupAnalytics{
+		Available:   true,
 		Application: application,
 		WindowDays:  days,
 		GeneratedAt: "2026-09-10T12:00:00Z",
@@ -160,19 +161,33 @@ func TestHandleGetAnalyticsTimesOutStalledColdRead(t *testing.T) {
 	_, cleanup := testsupport.MiniRedis(t)
 	defer cleanup()
 
+	var calls atomic.Int32
+	inner := fetchSignupAnalytics
+	fetchSignupAnalytics = func(ctx context.Context, a string, d int, n time.Time) (accounts.SignupAnalytics, error) {
+		calls.Add(1)
+		return inner(ctx, a, d, n)
+	}
 	app := fiber.New()
 	app.Get("/admin/analytics", HandleGetAnalytics)
-	started := time.Now()
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/admin/analytics?application=website&days=30", nil))
-	if err != nil {
-		t.Fatal(err)
+	for i := range 2 {
+		started := time.Now()
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/admin/analytics?application=website&days=30", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
+			t.Fatalf("handler took %v, want bounded response", elapsed)
+		}
+		var body accounts.SignupAnalytics
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || body.Available || body.Reason == "" {
+			t.Fatalf("call %d: status %d body %+v, want 200 available:false with a reason", i, resp.StatusCode, body)
+		}
 	}
-	defer resp.Body.Close()
-	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
-		t.Fatalf("handler took %v, want bounded response", elapsed)
-	}
-	if resp.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503", resp.StatusCode)
+	// The timeout is remembered, so the second visit does not pay it again.
+	if calls.Load() != 1 {
+		t.Fatalf("scan ran %d times, want 1 (unavailable result cached)", calls.Load())
 	}
 }
 

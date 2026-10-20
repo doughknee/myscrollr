@@ -75,7 +75,7 @@ func TestFetchSignupAnalyticsCountsEventsWithoutInventingAttempts(t *testing.T) 
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
 	stamp := now.Add(-time.Hour).UnixMilli()
 	previousPageSize, previousMaxPages := analyticsPageSize, analyticsMaxPages
-	analyticsPageSize, analyticsMaxPages = 3, 3
+	analyticsPageSize, analyticsMaxPages = 2, 3
 	t.Cleanup(func() { analyticsPageSize, analyticsMaxPages = previousPageSize, previousMaxPages })
 
 	queries := withAnalyticsLogto(t, map[int][]map[string]any{
@@ -83,10 +83,10 @@ func TestFetchSignupAnalyticsCountsEventsWithoutInventingAttempts(t *testing.T) 
 			analyticsLog("start", "Interaction.Register.Create", "Success", "", stamp),
 			analyticsLog("retry-1", "Interaction.Register.Verification.EmailVerificationCode.Submit", "Error", "verification_code_invalid", stamp),
 			analyticsLog("same-ms", "Interaction.Register.Verification.EmailVerificationCode.Submit", "Success", "", stamp),
+			analyticsLog("social", "Interaction.Register.Verification.Social.Submit", "Success", "", stamp),
 		},
 		2: {
 			analyticsLog("retry-1", "Interaction.Register.Verification.EmailVerificationCode.Submit", "Error", "verification_code_invalid", stamp),
-			analyticsLog("social", "Interaction.Register.Verification.Social.Submit", "Success", "", stamp),
 		},
 	}, http.StatusOK, "")
 
@@ -109,8 +109,13 @@ func TestFetchSignupAnalyticsCountsEventsWithoutInventingAttempts(t *testing.T) 
 	if len(report.ErrorReasons) != 1 || report.ErrorReasons[0].Reason != "verification_code" || report.ErrorReasons[0].Count != 1 {
 		t.Fatalf("safe reasons = %+v", report.ErrorReasons)
 	}
-	if len(queries()) != 2 || !strings.Contains(queries()[0], "applicationId=web-app") || !strings.Contains(queries()[0], "page_size=3") {
-		t.Fatalf("queries = %v", queries())
+	for _, q := range queries() {
+		if !strings.Contains(q, "applicationId=web-app") || !strings.Contains(q, "page_size=2") || !strings.Contains(q, "logKey=Interaction.Register") {
+			t.Fatalf("query %q must filter by application and logKey", q)
+		}
+	}
+	if len(queries()) != len(signupStageKeys)+1 { // email-submit fills page 1 and needs page 2
+		t.Fatalf("queries = %d, want one per stage key plus one second page for the full email-submit page", len(queries()))
 	}
 	raw, _ := json.Marshal(report)
 	for _, secret := range []string{"private@example.test", "private-token", "private-session", "203.0.113.10", "private-agent", "private free text", "verification_code_invalid"} {
@@ -123,18 +128,17 @@ func TestFetchSignupAnalyticsCountsEventsWithoutInventingAttempts(t *testing.T) 
 func TestFetchSignupAnalyticsMarksBoundedScanPartial(t *testing.T) {
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
 	previousPageSize, previousMaxPages := analyticsPageSize, analyticsMaxPages
-	analyticsPageSize, analyticsMaxPages = 1, 2
+	analyticsPageSize, analyticsMaxPages = 1, 1
 	t.Cleanup(func() { analyticsPageSize, analyticsMaxPages = previousPageSize, previousMaxPages })
 	withAnalyticsLogto(t, map[int][]map[string]any{
-		1: {analyticsLog("one", "Interaction.Register.Create", "Success", "", now.UnixMilli())},
-		2: {analyticsLog("", "Interaction.Register.Submit", "Success", "", now.UnixMilli())},
+		1: {analyticsLog("one", "Interaction.Register.Create", "Success", "", now.UnixMilli()), analyticsLog("", "Interaction.Register.Submit", "Success", "", now.UnixMilli())},
 	}, http.StatusOK, "")
 
 	report, err := FetchSignupAnalytics(context.Background(), "website", 30, now)
 	if err != nil {
 		t.Fatalf("FetchSignupAnalytics: %v", err)
 	}
-	if report.Coverage.Status != "partial" || report.Coverage.Pages != 2 {
+	if report.Coverage.Status != "partial" {
 		t.Fatalf("coverage = %+v, want bounded partial scan", report.Coverage)
 	}
 	if !strings.Contains(report.Coverage.Note, "page limit") || !strings.Contains(report.Coverage.Note, "Malformed") {
@@ -183,7 +187,7 @@ func TestFetchSignupAnalyticsUsesInclusiveWindowAndDesktopApplication(t *testing
 	if got := report.Stages["submitted"].Events; got != 2 {
 		t.Fatalf("submitted events = %d, want boundary and in-window rows only", got)
 	}
-	if len(queries()) != 1 || !strings.Contains(queries()[0], "applicationId=desktop-app") {
+	if len(queries()) != len(signupStageKeys) || !strings.Contains(queries()[0], "applicationId=desktop-app") {
 		t.Fatalf("desktop query = %v", queries())
 	}
 }

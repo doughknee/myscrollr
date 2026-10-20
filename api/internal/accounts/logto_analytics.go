@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
@@ -48,6 +49,10 @@ type SignupAttemptConversion struct {
 }
 
 type SignupAnalytics struct {
+	// Available is false when the scan could not finish; Reason says why and
+	// every other field is empty. Never present stale data as fresh.
+	Available         bool                          `json:"available"`
+	Reason            string                        `json:"reason,omitempty"`
 	Application       string                        `json:"application"`
 	WindowDays        int                           `json:"window_days"`
 	GeneratedAt       string                        `json:"generated_at"`
@@ -87,6 +92,7 @@ var signupStageKeys = map[string]string{
 
 func FetchSignupAnalytics(ctx context.Context, application string, days int, now time.Time) (SignupAnalytics, error) {
 	report := SignupAnalytics{
+		Available:    true,
 		Application:  application,
 		WindowDays:   days,
 		GeneratedAt:  now.UTC().Format(time.RFC3339),
@@ -113,24 +119,68 @@ func FetchSignupAnalytics(ctx context.Context, application string, days int, now
 	reasons := make(map[string]int)
 	var observedFrom, observedTo int64
 	malformed := false
-	exhausted := false
 	partialNotes := make([]string, 0, 2)
 
-	for page := 1; page <= analyticsMaxPages; page++ {
-		logs, err := fetchSignupAnalyticsPage(ctx, appID, page)
-		if err != nil {
-			if page == 1 {
-				return report, err
+	// One logKey-filtered query chain per stage, run in parallel. Logto's
+	// applicationId-only walk scanned every audit row and took the whole 25s
+	// budget in prod (SCROLLR-329); logKey is what made the week-1 scan 16x
+	// faster (SCROLLR-322).
+	type stageScan struct {
+		logs      []logtoAnalyticsLog
+		pages     int
+		exhausted bool
+		err       error
+	}
+	keys := make([]string, 0, len(signupStageKeys))
+	for key := range signupStageKeys {
+		keys = append(keys, key)
+	}
+	scans := make([]stageScan, len(keys))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 7)
+	for i, key := range keys {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			scan := &scans[i]
+			for page := 1; page <= analyticsMaxPages; page++ {
+				logs, err := fetchSignupAnalyticsPage(ctx, appID, key, page)
+				if err != nil {
+					scan.err = err
+					return
+				}
+				scan.pages = page
+				scan.logs = append(scan.logs, logs...)
+				if len(logs) < analyticsPageSize {
+					scan.exhausted = true
+					return
+				}
 			}
-			report.Coverage.Status = "partial"
-			partialNotes = append(partialNotes, "Logto became unavailable before the bounded scan finished.")
-			break
+		}()
+	}
+	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return report, err
+	}
+
+	exhausted := true
+	failed := 0
+	var firstErr error
+	for _, scan := range scans {
+		if scan.err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = scan.err
+			}
+			continue
 		}
-		report.Coverage.Pages = page
-		if len(logs) < analyticsPageSize {
-			exhausted = true
+		report.Coverage.Pages += scan.pages
+		if !scan.exhausted {
+			exhausted = false
 		}
-		for _, entry := range logs {
+		for _, entry := range scan.logs {
 			if entry.ID == "" || entry.CreatedAt <= 0 {
 				malformed = true
 				continue
@@ -160,9 +210,14 @@ func FetchSignupAnalytics(ctx context.Context, application string, days int, now
 			}
 			report.Stages[stage] = metrics
 		}
-		if exhausted {
-			break
-		}
+	}
+	if failed == len(scans) {
+		return report, firstErr
+	}
+	if failed > 0 {
+		exhausted = false
+		report.Coverage.Status = "partial"
+		partialNotes = append(partialNotes, "Logto became unavailable before some stages finished.")
 	}
 
 	report.Coverage.UniqueLogs = len(seen)
@@ -217,9 +272,10 @@ func signupAnalyticsAppID(application string) (string, error) {
 	return id, nil
 }
 
-func fetchSignupAnalyticsPage(ctx context.Context, appID string, page int) ([]logtoAnalyticsLog, error) {
+func fetchSignupAnalyticsPage(ctx context.Context, appID, logKey string, page int) ([]logtoAnalyticsLog, error) {
 	return fetchLogtoLogsPage(ctx, url.Values{
 		"applicationId": {appID},
+		"logKey":        {logKey},
 		"page":          {strconv.Itoa(page)},
 		"page_size":     {strconv.Itoa(analyticsPageSize)},
 	})

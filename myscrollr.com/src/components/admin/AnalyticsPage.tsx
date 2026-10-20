@@ -144,8 +144,6 @@ export default function AnalyticsPage() {
   const search = useSearch({ from: '/admin/analytics' })
   const navigate = useNavigate({ from: '/admin/analytics' })
   const [refresh, setRefresh] = useState(0)
-  const [application, setApplication] =
-    useState<AnalyticsApplication>('website')
   const { os, period, plan, version, view } = search
 
   const setSearch = (patch: Partial<typeof search>) =>
@@ -197,20 +195,6 @@ export default function AnalyticsPage() {
         return loadSupportSummary(getToken, period, signal)
       },
       [getToken, period, refresh],
-    ),
-  )
-  const signup = useReport(
-    useCallback(
-      (signal: AbortSignal) => {
-        void refresh
-        return loadSignupAnalytics(
-          getToken,
-          application,
-          signupDays(period),
-          signal,
-        )
-      },
-      [application, getToken, period, refresh],
     ),
   )
   const week1Return = useReport(
@@ -279,12 +263,7 @@ export default function AnalyticsPage() {
             verdict={sectionVerdicts.support}
             support={support}
           />
-          <SignupDiagnostics
-            period={period}
-            signup={signup}
-            application={application}
-            onApplicationChange={setApplication}
-          />
+          <SignupDiagnosticsSection period={period} refresh={refresh} />
         </div>
       </div>
     </PageFrame>
@@ -963,20 +942,101 @@ export function GrowthContent({
   )
 }
 
-/** The signup diagnostics, secondary and folded, at the foot of the page. */
+/**
+ * The signup diagnostics, secondary and folded, at the foot of the page. The
+ * report is the slowest on the page and the least visited (SCROLLR-329), so
+ * nothing is requested until the disclosure is opened; once opened, the
+ * report stays mounted and keeps its result for the session.
+ */
+export function SignupDiagnosticsSection({
+  period,
+  refresh = 0,
+}: {
+  period: Period
+  refresh?: number
+}) {
+  const [opened, setOpened] = useState(false)
+  const [application, setApplication] =
+    useState<AnalyticsApplication>('website')
+  return opened ? (
+    <OpenedSignupDiagnostics
+      period={period}
+      refresh={refresh}
+      application={application}
+      onApplicationChange={setApplication}
+    />
+  ) : (
+    <SignupDiagnostics
+      period={period}
+      signup={null}
+      application={application}
+      onApplicationChange={setApplication}
+      onOpen={() => setOpened(true)}
+    />
+  )
+}
+
+function OpenedSignupDiagnostics({
+  period,
+  refresh,
+  application,
+  onApplicationChange,
+}: {
+  period: Period
+  refresh: number
+  application: AnalyticsApplication
+  onApplicationChange: (application: AnalyticsApplication) => void
+}) {
+  const getToken = useGetToken()
+  const signup = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadSignupAnalytics(
+          getToken,
+          application,
+          signupDays(period),
+          signal,
+        )
+      },
+      [application, getToken, period, refresh],
+    ),
+  )
+  return (
+    <SignupDiagnostics
+      open
+      period={period}
+      signup={signup}
+      application={application}
+      onApplicationChange={onApplicationChange}
+    />
+  )
+}
+
 export function SignupDiagnostics({
   period,
   signup,
   application,
   onApplicationChange = () => {},
+  open,
+  onOpen,
 }: {
   period: Period
-  signup: Report<SignupAnalytics>
+  /** null until the disclosure has been opened: nothing is fetched before. */
+  signup: Report<SignupAnalytics> | null
   application: AnalyticsApplication
   onApplicationChange?: (application: AnalyticsApplication) => void
+  open?: boolean
+  onOpen?: () => void
 }) {
   return (
-    <details className="rounded-xl ring-1 ring-base-300/60">
+    <details
+      className="rounded-xl ring-1 ring-base-300/60"
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open) onOpen?.()
+      }}
+    >
       <summary className="cursor-pointer p-4 text-base font-semibold focus-visible:outline-2 focus-visible:outline-primary">
         Signup diagnostics
         <span className="ml-2 text-xs font-normal text-base-content/60">
@@ -995,9 +1055,11 @@ export function SignupDiagnostics({
           value={application}
           onChange={onApplicationChange}
         />
-        <Loaded report={signup} label="signup diagnostics">
-          {(s) => <SignupBlock signup={s} />}
-        </Loaded>
+        {signup && (
+          <Loaded report={signup} label="signup diagnostics">
+            {(s) => <SignupBlock signup={s} />}
+          </Loaded>
+        )}
       </div>
     </details>
   )
@@ -1142,6 +1204,13 @@ function WebsiteBlock({
 }
 
 function SignupBlock({ signup }: { signup: SignupAnalytics }) {
+  if (!signup.available) {
+    return (
+      <Unmeasurable
+        note={`Signup diagnostics are unavailable right now. ${signup.reason ?? ''}`.trim()}
+      />
+    )
+  }
   const eventTotal = Object.values(signup.stages).reduce(
     (sum, stage) => sum + stage.events,
     0,

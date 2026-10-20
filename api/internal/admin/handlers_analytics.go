@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -16,7 +17,12 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const signupAnalyticsCacheTTL = 5 * time.Minute
+const (
+	signupAnalyticsCacheTTL = 5 * time.Minute
+	// A timed-out scan is remembered briefly so a reload does not pay the
+	// whole budget again, and short enough that recovery shows quickly.
+	signupAnalyticsUnavailableTTL = 30 * time.Second
+)
 
 var (
 	fetchSignupAnalytics   = accounts.FetchSignupAnalytics
@@ -39,11 +45,12 @@ func HandleGetAnalytics(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Error: "days must be 7 or 30"})
 	}
 
-	ctx, cancel := context.WithTimeout(c.Context(), signupAnalyticsTimeout)
+	// UserContext, not c.Context(): the latter is cancelled under app.Test.
+	ctx, cancel := context.WithTimeout(c.UserContext(), signupAnalyticsTimeout)
 	defer cancel()
 	report, hit, err := cachedSignupAnalytics(ctx, application, days)
 	if err != nil {
-		log.Print("[Admin] signup analytics unavailable")
+		log.Printf("[Admin] signup analytics unavailable: %v", err)
 		return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{Error: "Signup analytics are unavailable."})
 	}
 	if hit {
@@ -70,18 +77,28 @@ func cachedSignupAnalytics(ctx context.Context, application string, days int) (a
 			return cachedAnalyticsResult{Report: report, Hit: true}, nil
 		}
 		report, err := fetchSignupAnalytics(scanCtx, application, days, time.Now())
+		ttl := signupAnalyticsCacheTTL
+		if errors.Is(err, context.DeadlineExceeded) {
+			report, err, ttl = signupUnavailable(application, days), nil, signupAnalyticsUnavailableTTL
+		}
 		if err != nil {
 			return cachedAnalyticsResult{}, err
 		}
 		if platform.Rdb != nil {
+			// Own context: scanCtx may be the thing that just expired.
+			cacheCtx, cacheCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cacheCancel()
 			if raw, err := json.Marshal(report); err == nil {
-				_ = platform.Rdb.Set(scanCtx, key, raw, signupAnalyticsCacheTTL).Err()
+				_ = platform.Rdb.Set(cacheCtx, key, raw, ttl).Err()
 			}
 		}
 		return cachedAnalyticsResult{Report: report}, nil
 	})
 	select {
 	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return signupUnavailable(application, days), false, nil
+		}
 		return accounts.SignupAnalytics{}, false, ctx.Err()
 	case response := <-result:
 		if response.Err != nil {
@@ -89,6 +106,17 @@ func cachedSignupAnalytics(ctx context.Context, application string, days int) (a
 		}
 		value := response.Val.(cachedAnalyticsResult)
 		return value.Report, value.Hit, nil
+	}
+}
+
+// signupUnavailable is the honest answer to a scan that ran out of budget.
+func signupUnavailable(application string, days int) accounts.SignupAnalytics {
+	return accounts.SignupAnalytics{
+		Available:   false,
+		Reason:      "Logto did not answer in time. Try again in a minute.",
+		Application: application,
+		WindowDays:  days,
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 }
 
