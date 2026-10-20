@@ -749,6 +749,30 @@ function draftAction<T>(
 const FRAME_SEPARATOR = '\n\n'
 const LINE_SEPARATOR = '\n'
 
+function streamRetryAfter(value: string | null): number {
+  if (!value) return 0
+  const delay = /^\d+$/.test(value)
+    ? Number(value) * 1000
+    : Date.parse(value) - Date.now()
+  // Avoid overflowing the browser's signed 32-bit timeout.
+  return Number.isFinite(delay)
+    ? Math.max(0, Math.min(delay, 2_147_483_647))
+    : 0
+}
+
+function waitForStreamRetry(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve()
+    const done = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    signal.addEventListener('abort', done, { once: true })
+  })
+}
+
 /**
  * Subscribe to the console's SSE stream. Returns a function that closes it.
  *
@@ -758,9 +782,8 @@ const LINE_SEPARATOR = '\n'
  * body is the same `data: {json}` frames either way, and the parsing below is
  * the whole cost of not doing that.
  *
- * Reconnects with a fixed delay while the caller still wants it. This is a
- * staff page on a fast network; anything cleverer than "try again in three
- * seconds" would be machinery for a case that does not happen.
+ * Transient failures back off from 3 to 30 seconds; a server Retry-After can
+ * extend that wait. A connection lasting 30 seconds resets the backoff.
  */
 export function subscribeToSupportEvents(
   getToken: Token,
@@ -777,7 +800,10 @@ export function subscribeToSupportEvents(
   const stopped = () => controller.signal.aborted
 
   const run = async () => {
+    let backoff = 3000
     while (!stopped()) {
+      let retryAfter = 0
+      let connectedAt: number | null = null
       try {
         const token = await getToken()
         if (stopped()) return
@@ -791,12 +817,15 @@ export function subscribeToSupportEvents(
             window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED))
           }
           onStatus?.(false)
-          await response.body?.cancel()
+          await response.body?.cancel().catch(() => {})
           return
         }
         if (!response.ok || !response.body) {
+          retryAfter = streamRetryAfter(response.headers.get('Retry-After'))
+          await response.body?.cancel().catch(() => {})
           throw new AdminApiError('stream refused', response.status)
         }
+        connectedAt = Date.now()
         onStatus?.(true)
 
         const reader = response.body.getReader()
@@ -828,7 +857,12 @@ export function subscribeToSupportEvents(
       }
       onStatus?.(false)
       if (stopped()) return
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      if (connectedAt !== null && Date.now() - connectedAt >= 30_000) {
+        backoff = 3000
+      }
+      const delay = Math.max(backoff, retryAfter)
+      backoff = Math.min(backoff * 2, 30_000)
+      await waitForStreamRetry(delay, controller.signal)
     }
   }
   void run()

@@ -172,7 +172,7 @@ function Pill({
   }
   return (
     <span
-      className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${tones[tone]}`}
+      className={`max-w-full shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold [overflow-wrap:anywhere] ${tones[tone]}`}
     >
       {children}
     </span>
@@ -764,7 +764,7 @@ function PersonHeader({
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <h1
-            className={`text-[22px] leading-tight font-extrabold tracking-[-0.02em] ${
+            className={`min-w-0 max-w-full text-[22px] leading-tight font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] ${
               who.known ? '' : 'text-base-content/75 italic'
             }`}
           >
@@ -802,7 +802,7 @@ function PersonHeader({
       </div>
 
       {detail && (
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap gap-2">
           {chips.map((chip, i) => (
             <Pill key={chip} tone={i === 1 && behind ? 'behind' : 'neutral'}>
               {chip}
@@ -827,7 +827,7 @@ function CaseConversation({ detail }: { detail: CaseDetail }) {
   return (
     <section className="flex flex-col gap-3.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-base font-bold">
+        <h2 className="min-w-0 max-w-full text-base font-bold [overflow-wrap:anywhere]">
           {detail.subject || '(no subject)'}
         </h2>
         <span className="font-mono text-xs text-base-content/45">
@@ -1863,7 +1863,7 @@ export default function SupportPage({
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-5 px-5 py-5 min-[1440px]:px-8">
+              <div className="flex flex-col gap-5 px-5 py-5 [overflow-wrap:anywhere] min-[1440px]:px-8">
                 <PersonHeader person={person} rows={mine} detail={detail} />
                 {caseError && (
                   <div
