@@ -81,6 +81,11 @@ describe('UsersPage', () => {
     await act(() => view.click())
     await wait(10)
     expect(c.textContent).toContain('Widgets (0)')
+    expect(document.activeElement).toBe(button(c, 'All users'))
+    await act(() => button(c, 'All users').click())
+    expect(document.activeElement).toBe(
+      c.querySelector('button[aria-label="View ada@example.com"]'),
+    )
   })
   it('clears the error on a new search and shows results', async () => {
     accounts.mockRejectedValueOnce(new Error('logto down'))

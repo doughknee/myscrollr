@@ -63,7 +63,27 @@ describe('OverviewContent', () => {
     expect(body).toContain('2customers pay.')
     expect(body).toContain('1person signed up in the last 24 hours,')
     expect(body).toContain('Scores, prices, markets and news are up to date,')
-    expect(body).toContain('all within the last few minutes.')
+    expect(body).toContain('within their expected update windows.')
+  })
+
+  it('does not give an all-clear when its reports fail', async () => {
+    const body = text(
+      await render({
+        presence: failed('Presence failed'),
+        support: failed('Support failed'),
+        revenue: failed('Revenue failed'),
+        service: failed('Service failed'),
+        initialOpen: 'feeds',
+      }),
+    )
+    expect(body).toContain('Feed health is unknown.')
+    expect(body).toContain('Some checks are unavailable.')
+    expect(body).toContain('The live count is unavailable.')
+    expect(body).toContain('Feed health is not available yet.')
+    expect(body).toContain('Service failed')
+    expect(body).toContain('Retry')
+    expect(body).not.toContain('Nothing needs you.')
+    expect(body).not.toContain('are up to date')
   })
 
   it('shows one verdict per row', async () => {

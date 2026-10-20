@@ -210,8 +210,19 @@ function HoldBanner({
   const [, tick] = useState(0)
   useEffect(() => {
     if (!hold.remaining_seconds.available || hold.expired) return
-    const t = setInterval(() => tick((n) => n + 1), 1000)
-    return () => clearInterval(t)
+    let timer: ReturnType<typeof setInterval> | undefined
+    const resume = () => {
+      clearInterval(timer)
+      if (document.hidden) return
+      tick((n) => n + 1)
+      timer = setInterval(() => tick((n) => n + 1), 1000)
+    }
+    resume()
+    document.addEventListener('visibilitychange', resume)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', resume)
+    }
   }, [hold])
 
   const live = holdCountdown(hold)
@@ -1476,9 +1487,25 @@ export default function SupportPage({
       : []
 
   useEffect(() => {
-    // A burst of events is one refetch after it settles: `load`'s cleanup
-    // already discards a superseded fetch, so only the trailing edge needs a timer.
+    // Keep the stream connected, but batch reads and defer them while hidden.
+    // Returning to the tab reconciles both reports, including missed events.
     let timer: ReturnType<typeof setTimeout> | undefined
+    let queueDirty = false
+    let caseDirty = false
+    const flush = () => {
+      clearTimeout(timer)
+      if (document.hidden) return
+      if (queueDirty) setQueueKey((n) => n + 1)
+      if (caseDirty) setCaseKey((n) => n + 1)
+      queueDirty = false
+      caseDirty = false
+    }
+    const reconcile = () => {
+      queueDirty = true
+      caseDirty = true
+      flush()
+    }
+    document.addEventListener('visibilitychange', reconcile)
     const unsubscribe = subscribeToSupportEvents(
       getToken,
       (event) => {
@@ -1486,25 +1513,24 @@ export default function SupportPage({
         // open case is re-read only when the event is about something on
         // screen, or about the pipeline switch, which changes what every
         // countdown means.
+        queueDirty = true
         clearTimeout(timer)
-        timer = setTimeout(() => setQueueKey((n) => n + 1), QUEUE_REFETCH_MS)
         if (
           !event.ticket_number ||
           openRef.current.includes(event.ticket_number)
         ) {
-          setCaseKey((n) => n + 1)
+          caseDirty = true
         }
+        if (!document.hidden) timer = setTimeout(flush, QUEUE_REFETCH_MS)
       },
       (connected) => {
         setLive(connected)
-        if (connected) {
-          setQueueKey((n) => n + 1)
-          setCaseKey((n) => n + 1)
-        }
+        if (connected) reconcile()
       },
     )
     return () => {
       clearTimeout(timer)
+      document.removeEventListener('visibilitychange', reconcile)
       unsubscribe()
     }
   }, [getToken])

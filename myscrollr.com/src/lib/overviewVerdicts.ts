@@ -174,14 +174,16 @@ export function verdicts(input: VerdictInput): OverviewVerdicts {
     feeds.tone === 'bad'
       ? 'Something is broken.'
       : feeds.tone === 'none'
-        ? 'Nothing to report.'
+        ? 'Feed health is unknown.'
         : 'Running fine.'
   const second =
     support.tone === 'bad'
       ? 'Support needs you.'
       : money.tone === 'bad'
         ? 'A payment failed.'
-        : 'Nothing needs you.'
+        : !input.support || !input.money?.available
+          ? 'Some checks are unavailable.'
+          : 'Nothing needs you.'
 
   return {
     right_now: rightNowVerdict(input.presence),

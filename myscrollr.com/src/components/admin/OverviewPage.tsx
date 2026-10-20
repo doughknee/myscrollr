@@ -528,7 +528,9 @@ function rightNowRow(
       ? presence.error
         ? `${p.active_users === 1 ? 'person had' : 'people had'} Scrollr open at the last successful check.`
         : `${p.active_users === 1 ? 'person has' : 'people have'} Scrollr open right now${ticker ? ',' : '.'}`
-      : 'Nobody is reporting yet.',
+      : presence.error
+        ? 'The live count is unavailable.'
+        : 'Nobody is reporting yet.',
     secondary: presence.error
       ? 'The live count could not be refreshed.'
       : reporting
@@ -834,12 +836,18 @@ function feedsRow(
     key: 'feeds',
     number: null,
     icon: verdict.tone,
-    main: broken
-      ? `${broken.name} are not reporting any data.`
-      : stale
-        ? `${stale.name} have not updated for ${duration(reading(stale.table)?.age_seconds ?? 0)}.`
-        : 'Scores, prices, markets and news are up to date,',
-    secondary: broken || stale ? undefined : 'all within the last few minutes.',
+    main:
+      verdict.tone === 'none'
+        ? 'Feed health is not available yet.'
+        : broken
+          ? `${broken.name} are not reporting any data.`
+          : stale
+            ? `${stale.name} have not updated for ${duration(reading(stale.table)?.age_seconds ?? 0)}.`
+            : 'Scores, prices, markets and news are up to date,',
+    secondary:
+      verdict.tone === 'none' || broken || stale
+        ? undefined
+        : 'within their expected update windows.',
     verdict,
     facts: [
       ...FEEDS.map((feed) => {

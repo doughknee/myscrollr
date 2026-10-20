@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Loader2, Search } from 'lucide-react'
 import { ErrorPanel, PageFrame } from './ui'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
@@ -37,6 +37,11 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
   const [detail, setDetail] = useState<AccountDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const backButton = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    backButton.current?.focus()
+  }, [sub])
 
   useEffect(() => {
     let cancelled = false
@@ -62,6 +67,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
   return (
     <div className="space-y-6">
       <button
+        ref={backButton}
         type="button"
         onClick={onBack}
         className="flex cursor-pointer items-center gap-1 text-sm text-base-content/60 hover:text-base-content"
@@ -212,6 +218,20 @@ export default function UsersPage({
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
+  const previousSelection = useRef(selected)
+  const userButtons = useRef(new Map<string, HTMLButtonElement>())
+  const searchInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const previous = previousSelection.current
+    previousSelection.current = selected
+    if (!selected && previous) {
+      // The list is retained while detail is open. Resume at that account;
+      // a changed search can remove it, in which case search is the safe target.
+      const target = userButtons.current.get(previous) ?? searchInput.current
+      target?.focus()
+    }
+  }, [selected])
 
   useEffect(() => {
     let cancelled = false
@@ -298,6 +318,7 @@ export default function UsersPage({
             className="absolute top-1/2 left-3 -translate-y-1/2 text-base-content/40"
           />
           <input
+            ref={searchInput}
             type="search"
             value={query}
             onChange={(e) => {
@@ -351,6 +372,11 @@ export default function UsersPage({
                       >
                         <td className="max-w-[18rem] p-3">
                           <button
+                            ref={(element) => {
+                              if (element)
+                                userButtons.current.set(a.logto_sub, element)
+                              else userButtons.current.delete(a.logto_sub)
+                            }}
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation()

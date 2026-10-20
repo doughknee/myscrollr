@@ -7,11 +7,28 @@ import {
   createRootRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SupportPage from './SupportPage'
 import { AdminChrome } from './AdminShell'
 import { cases, queue } from './supportFixtures'
 import type { CaseDetail } from '@/api/admin'
+import type { Root } from 'react-dom/client'
+
+const roots: Array<Root> = []
+afterEach(async () => {
+  await act(() => roots.splice(0).forEach((root) => root.unmount()))
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
+
+async function caseEvent() {
+  vi.useFakeTimers()
+  await act(async () => {
+    mocks.onEvent!({ ticket_number: '752473' })
+    await vi.advanceTimersByTimeAsync(450)
+  })
+  vi.useRealTimers()
+}
 
 /**
  * The Support workbench (SCROLLR-219).
@@ -93,8 +110,10 @@ async function render(width: number): Promise<HTMLElement> {
   await router.load()
   const host = document.createElement('div')
   document.body.append(host)
+  const root = createRoot(host)
+  roots.push(root)
   await act(async () => {
-    createRoot(host).render(<RouterProvider router={router} />)
+    root.render(<RouterProvider router={router} />)
   })
   // One more flush for the queue read and the case read it triggers.
   await act(async () => {
@@ -211,28 +230,67 @@ describe('the live stream', () => {
     )
   })
 
-  it('refetches the queue once per burst of events, and again for a later one', async () => {
-    await render(1440)
+  it('refetches queue and selected case once per burst, and again for a later one', async () => {
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
     vi.useFakeTimers()
     try {
       mocks.supportQueue.mockClear()
+      mocks.supportCase.mockClear()
       for (let i = 0; i < 5; i++) {
         mocks.onEvent!({ ticket_number: '752473' })
         await vi.advanceTimersByTimeAsync(40)
       }
       expect(mocks.supportQueue).toHaveBeenCalledTimes(0)
+      expect(mocks.supportCase).toHaveBeenCalledTimes(0)
       await act(async () => {
         await vi.advanceTimersByTimeAsync(500)
       })
       expect(mocks.supportQueue).toHaveBeenCalledTimes(1)
+      expect(mocks.supportCase).toHaveBeenCalledTimes(1)
       mocks.onEvent!({})
       await act(async () => {
         await vi.advanceTimersByTimeAsync(500)
       })
       expect(mocks.supportQueue).toHaveBeenCalledTimes(2)
+      expect(mocks.supportCase).toHaveBeenCalledTimes(2)
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('defers hidden-tab events and reconnects, then catches up once on return', async () => {
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    vi.useFakeTimers()
+    let hidden = false
+    vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden)
+    mocks.supportQueue.mockClear()
+    mocks.supportCase.mockClear()
+    await act(async () => {
+      mocks.onEvent!({ ticket_number: '752473' })
+      hidden = true
+      document.dispatchEvent(new Event('visibilitychange'))
+      for (let n = 0; n < 5; n++) mocks.onEvent!({})
+      mocks.onConnection!(true)
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(mocks.supportQueue).not.toHaveBeenCalled()
+    expect(mocks.supportCase).not.toHaveBeenCalled()
+    await act(() => {
+      hidden = false
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(mocks.supportQueue).toHaveBeenCalledTimes(1)
+    expect(mocks.supportCase).toHaveBeenCalledTimes(1)
+    await act(() => roots.splice(0).forEach((root) => root.unmount()))
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(mocks.supportQueue).toHaveBeenCalledTimes(1)
+    expect(mocks.supportCase).toHaveBeenCalledTimes(1)
+    expect(mocks.unsubscribe).toHaveBeenCalled()
   })
 })
 
@@ -298,9 +356,7 @@ describe('the case', () => {
     await open(host, 'Morgan Ellis')
     await editReply(host, 'Do not lose this')
     mocks.supportCase.mockRejectedValueOnce(new Error('Connection interrupted'))
-    await act(async () => {
-      mocks.onEvent!({ ticket_number: '752473' })
-    })
+    await caseEvent()
     expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
       'Do not lose this',
     )
@@ -360,7 +416,7 @@ describe('the case', () => {
         body: 'A newer server draft',
       },
     })
-    await act(() => mocks.onEvent!({ ticket_number: '752473' }))
+    await caseEvent()
     expect(host.querySelector<HTMLTextAreaElement>('#reply-body')?.value).toBe(
       'A newer server draft',
     )
@@ -388,7 +444,7 @@ describe('the case', () => {
       ...original,
       draft: { ...original.draft!, status: 'sent' },
     })
-    await act(() => mocks.onEvent!({ ticket_number: '752473' }))
+    await caseEvent()
     await act(() => finish(original))
     expect(host.querySelector('#reply-body')).toBeNull()
     expect(host.textContent).toContain('This draft is sent')
@@ -444,6 +500,35 @@ describe('the case', () => {
     expect(bar.textContent).not.toContain('Sends in')
     const conversation = host.querySelector('main')!
     expect(conversation.textContent).toContain('Sends in')
+  })
+
+  it('pauses a hidden hold countdown and resumes from the deadline', async () => {
+    vi.useFakeTimers()
+    const now = Date.now()
+    vi.setSystemTime(now)
+    const heldCase = cases['900112']
+    mocks.supportCase.mockResolvedValue({
+      ...heldCase,
+      hold: {
+        ...heldCase.hold!,
+        until: new Date(now + 120_000).toISOString(),
+      },
+    })
+    const host = await render(1440)
+    await open(host, 'Sam Pryor')
+    expect(host.textContent).toContain('Sends in 2m 00s')
+    let hidden = true
+    vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden)
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(host.textContent).toContain('Sends in 2m 00s')
+    await act(() => {
+      hidden = false
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(host.textContent).toContain('Sends in 1m 30s')
   })
 
   it('lists the person’s other tickets under the open one', async () => {

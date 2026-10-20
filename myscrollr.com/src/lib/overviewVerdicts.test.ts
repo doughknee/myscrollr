@@ -180,7 +180,19 @@ describe('verdicts', () => {
       tone: 'none',
       label: 'No readings',
     })
-    expect(only({ feeds: [] }).headline[0]).toBe('Nothing to report.')
+    expect(only({ feeds: [] }).headline[0]).toBe('Feed health is unknown.')
+  })
+
+  it('does not declare an all-clear when support or billing is unavailable', () => {
+    expect(only({ support: null }).headline[1]).toBe(
+      'Some checks are unavailable.',
+    )
+    expect(only({ money: null }).headline[1]).toBe(
+      'Some checks are unavailable.',
+    )
+    expect(only({ support: { open_cases: 2 }, money: null }).headline[1]).toBe(
+      'Support needs you.',
+    )
   })
 })
 
