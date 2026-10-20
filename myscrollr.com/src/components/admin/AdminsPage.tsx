@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Loader2, Trash2, UserPlus } from 'lucide-react'
-import { PageFrame } from './ui'
+import { Loaded, PageFrame, useReport } from './ui'
 import type { AdminRow } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -20,22 +20,24 @@ import { useGetToken } from '@/hooks/useGetToken'
 
 export default function AdminsPage() {
   const getToken = useGetToken()
-  const [admins, setAdmins] = useState<Array<AdminRow> | null>(null)
+  const [reloads, setReloads] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const load = useCallback(() => {
-    adminApi
-      .admins(getToken)
-      .then((res) => setAdmins(res.admins))
-      .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : 'Could not load admins'),
-      )
-  }, [getToken])
-
-  useEffect(load, [load])
+  const report = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void signal
+        void reloads
+        return adminApi.admins(getToken).then((res) => res.admins)
+      },
+      [getToken, reloads],
+    ),
+  )
+  const admins = report.data
+  const load = () => setReloads((n) => n + 1)
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
@@ -131,78 +133,78 @@ export default function AdminsPage() {
           </button>
         </form>
 
-        {!admins ? (
-          <Loader2 className="size-5 animate-spin text-base-content/40" />
-        ) : (
-          <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-            <table className="w-full min-w-[38rem] text-left text-sm">
-              <thead className="text-xs text-base-content/50 uppercase">
-                <tr className="border-b border-base-300/60">
-                  <th className="p-3 font-semibold">Email</th>
-                  <th className="p-3 font-semibold">Added</th>
-                  <th className="p-3 font-semibold">Last seen</th>
-                  <th className="p-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {admins.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-base-300/40 last:border-0"
-                  >
-                    <td className="p-3">
-                      <span className="font-medium">{row.email}</span>
-                      {row.self && (
-                        <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-                          you
-                        </span>
-                      )}
-                      {!row.claimed && (
-                        <span className="ml-2 rounded bg-base-300/60 px-1.5 py-0.5 text-xs text-base-content/60">
-                          not signed in yet
-                        </span>
-                      )}
-                      {row.note && (
-                        <span className="block text-xs text-base-content/45">
-                          {row.note}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-base-content/60">
-                      {new Date(row.added_at).toLocaleDateString()}
-                      {row.added_by && (
-                        <span className="block text-xs text-base-content/45">
-                          by {row.added_by}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-base-content/60">
-                      {row.last_seen_at
-                        ? new Date(row.last_seen_at).toLocaleString()
-                        : '—'}
-                    </td>
-                    <td className="p-3 text-right">
-                      {removable(row) ? (
-                        <button
-                          type="button"
-                          onClick={() => remove(row)}
-                          aria-label={`Remove ${row.email}`}
-                          className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      ) : (
-                        <span className="text-xs text-base-content/35">
-                          {row.self ? 'cannot remove yourself' : 'last admin'}
-                        </span>
-                      )}
-                    </td>
+        <Loaded report={report} label="admins">
+          {(rows) => (
+            <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+              <table className="w-full min-w-[38rem] text-left text-sm">
+                <thead className="text-xs text-base-content/50 uppercase">
+                  <tr className="border-b border-base-300/60">
+                    <th className="p-3 font-semibold">Email</th>
+                    <th className="p-3 font-semibold">Added</th>
+                    <th className="p-3 font-semibold">Last seen</th>
+                    <th className="p-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="border-b border-base-300/40 last:border-0"
+                    >
+                      <td className="p-3">
+                        <span className="font-medium">{row.email}</span>
+                        {row.self && (
+                          <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+                            you
+                          </span>
+                        )}
+                        {!row.claimed && (
+                          <span className="ml-2 rounded bg-base-300/60 px-1.5 py-0.5 text-xs text-base-content/60">
+                            not signed in yet
+                          </span>
+                        )}
+                        {row.note && (
+                          <span className="block text-xs text-base-content/45">
+                            {row.note}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-base-content/60">
+                        {new Date(row.added_at).toLocaleDateString()}
+                        {row.added_by && (
+                          <span className="block text-xs text-base-content/45">
+                            by {row.added_by}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-base-content/60">
+                        {row.last_seen_at
+                          ? new Date(row.last_seen_at).toLocaleString()
+                          : '—'}
+                      </td>
+                      <td className="p-3 text-right">
+                        {removable(row) ? (
+                          <button
+                            type="button"
+                            onClick={() => remove(row)}
+                            aria-label={`Remove ${row.email}`}
+                            className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-base-content/35">
+                            {row.self ? 'cannot remove yourself' : 'last admin'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Loaded>
       </div>
     </PageFrame>
   )

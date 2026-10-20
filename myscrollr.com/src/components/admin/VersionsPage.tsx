@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
-import { PageFrame, VERDICT_TONE, VerdictPill } from './ui'
+import { useCallback, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { Loaded, PageFrame, VERDICT_TONE, VerdictPill, useReport } from './ui'
 import type { ReactNode } from 'react'
 import type { AdminVersions } from '@/api/admin'
 import { adminApi } from '@/api/admin'
@@ -258,23 +258,15 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
 export default function VersionsPage() {
   const getToken = useGetToken()
   const [days, setDays] = useState<number>(30)
-  const [data, setData] = useState<AdminVersions | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(() => {
-    setData(null)
-    setError(null)
-    adminApi
-      .versions(getToken, days)
-      .then(setData)
-      .catch((err: unknown) =>
-        setError(
-          err instanceof Error ? err.message : 'Could not load the counters',
-        ),
-      )
-  }, [getToken, days])
-
-  useEffect(load, [load])
+  const report = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void signal
+        return adminApi.versions(getToken, days)
+      },
+      [getToken, days],
+    ),
+  )
 
   return (
     <PageFrame>
@@ -283,42 +275,37 @@ export default function VersionsPage() {
           <h1 className="text-[32px] leading-none font-extrabold tracking-[-0.03em]">
             Versions
           </h1>
-          <div
-            role="group"
-            aria-label="Time window"
-            className="flex shrink-0 rounded-lg ring-1 ring-base-300"
-          >
-            {WINDOWS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDays(d)}
-                aria-pressed={days === d}
-                className={`min-h-9 cursor-pointer px-3 text-sm font-medium first:rounded-l-lg last:rounded-r-lg transition-colors ${
-                  days === d
-                    ? 'bg-base-200 text-base-content'
-                    : 'text-base-content/60 hover:bg-base-200/60'
-                }`}
-              >
-                {d}d
-              </button>
-            ))}
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs text-base-content/60">
+              Versions range (its own, not the Period on other pages)
+            </span>
+            <div
+              role="group"
+              aria-label="Versions range"
+              className="flex shrink-0 rounded-lg ring-1 ring-base-300"
+            >
+              {WINDOWS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDays(d)}
+                  aria-pressed={days === d}
+                  className={`min-h-9 cursor-pointer px-3 text-sm font-medium first:rounded-l-lg last:rounded-r-lg transition-colors ${
+                    days === d
+                      ? 'bg-base-200 text-base-content'
+                      : 'text-base-content/60 hover:bg-base-200/60'
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
-        {error && (
-          <p className="rounded-lg bg-error/5 p-3 text-sm text-error ring-1 ring-error/20">
-            {error}
-          </p>
-        )}
-
-        {!data && !error && (
-          <div className="flex min-h-[40vh] items-center justify-center">
-            <Loader2 className="size-6 animate-spin text-base-content/40" />
-          </div>
-        )}
-
-        {data && <VersionsReport data={data} />}
+        <Loaded report={report} label="the counters">
+          {(data) => <VersionsReport data={data} />}
+        </Loaded>
       </div>
     </PageFrame>
   )
