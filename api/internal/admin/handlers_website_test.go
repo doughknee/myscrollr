@@ -2,10 +2,17 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/redis/go-redis/v9"
 )
 
 func stubPostHog(t *testing.T, fn func(query string) ([][]any, error)) *[]string {
@@ -14,9 +21,12 @@ func stubPostHog(t *testing.T, fn func(query string) ([][]any, error)) *[]string
 	t.Setenv("POSTHOG_PROJECT_ID", "1")
 	t.Setenv("POSTHOG_API_HOST", "https://example.test")
 	var queries []string
+	var mu sync.Mutex
 	prev := postHogQuery
 	postHogQuery = func(_ context.Context, query string) ([][]any, error) {
+		mu.Lock()
 		queries = append(queries, query)
+		mu.Unlock()
 		return fn(query)
 	}
 	t.Cleanup(func() { postHogQuery = prev })
@@ -27,9 +37,9 @@ func TestWebsiteReportBoundsEveryQueryAndMapsBuckets(t *testing.T) {
 	now := time.Date(2026, 9, 18, 15, 45, 0, 0, time.UTC)
 	t.Setenv("POSTHOG_COLLECTION_STARTED_AT", "2026-09-11T00:00:00Z")
 	period, _ := ParsePeriod("7d", now)
-	calls := 0
+	var calls int32
 	queries := stubPostHog(t, func(q string) ([][]any, error) {
-		calls++
+		atomic.AddInt32(&calls, 1)
 		switch {
 		case strings.Contains(q, "countIf(event = '$pageview')"):
 			if strings.Contains(q, "toDateTime('2026-09-04 15:45:00', 'UTC')") {
@@ -78,7 +88,7 @@ func TestWebsiteReportBoundsEveryQueryAndMapsBuckets(t *testing.T) {
 	if !out.Coverage.Partial && period.Start.Before(websiteCollectionStart()) {
 		t.Fatalf("coverage = %+v, want partial for a window that starts before collection", out.Coverage)
 	}
-	if calls < 6 {
+	if calls := atomic.LoadInt32(&calls); calls < 6 {
 		t.Fatalf("expected totals ×2, curve and breakdowns, got %d calls", calls)
 	}
 }
@@ -98,5 +108,67 @@ func TestWebsiteReportIsUnavailableWithoutAKeyOrOnError(t *testing.T) {
 	}
 	if out.Curve == nil || out.TopPaths == nil {
 		t.Fatal("unavailable report must still serialise empty arrays")
+	}
+}
+
+// A near-expiry report is served as-is and refreshed exactly once in the
+// background, however many readers arrive at once; the refreshed entry carries
+// a new generated_at.
+func TestCachedWebsiteRefreshesNearExpiryOnce(t *testing.T) {
+	mr := miniredis.RunT(t)
+	prevRdb := platform.Rdb
+	platform.Rdb = redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { platform.Rdb = prevRdb })
+
+	now := time.Now().UTC().Truncate(time.Second)
+	prevNow := websiteNow
+	websiteNow = func() time.Time { return now }
+	t.Cleanup(func() { websiteNow = prevNow })
+
+	var totalsCalls int32
+	stubPostHog(t, func(q string) ([][]any, error) {
+		time.Sleep(50 * time.Millisecond)
+		if strings.Contains(q, "countIf(event = '$pageview')") {
+			atomic.AddInt32(&totalsCalls, 1)
+			return [][]any{{float64(2), float64(1), float64(0), float64(0)}}, nil
+		}
+		return [][]any{}, nil
+	})
+
+	period, _ := ParsePeriod("24h", now)
+	old := websiteUnavailable(period, now.Add(-websiteRefreshAfter-time.Second), "")
+	old.Available = true
+	old.Pageviews = Metric{Value: 1, Available: true}
+	raw, _ := json.Marshal(old)
+	key := websiteCacheKey + string(period.Key)
+	platform.Rdb.Set(context.Background(), key, raw, websiteCacheTTL)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out, cached := cachedWebsite(context.Background(), period, now)
+			if !cached || out.Pageviews.Value != 1 {
+				t.Errorf("reader should get the cached entry at once, got %+v cached=%v", out.Pageviews, cached)
+			}
+		}()
+	}
+	wg.Wait()
+
+	deadline := time.Now().Add(3 * time.Second)
+	var got WebsiteResponse
+	for time.Now().Before(deadline) {
+		b, _ := platform.Rdb.Get(context.Background(), key).Bytes()
+		if json.Unmarshal(b, &got) == nil && got.Pageviews.Value == 2 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := atomic.LoadInt32(&totalsCalls); n != 2 { // current + previous window, one refresh
+		t.Fatalf("want exactly 1 background refresh (2 totals queries), got %d queries", n)
+	}
+	if got.Pageviews.Value != 2 || got.GeneratedAt != now.Format(time.RFC3339) {
+		t.Fatalf("entry not refreshed with a new generated_at: %+v", got.GeneratedAt)
 	}
 }
