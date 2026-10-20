@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation } from '@tanstack/react-router'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Loader2, Lock, Moon, Sun } from 'lucide-react'
 import ScrollrSVG from '@/components/ScrollrSVG'
+import './admin.css'
 import { AdminApiError, adminApi } from '@/api/admin'
 import { ADMIN_SESSION_EXPIRED } from '@/api/adminRequest'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -309,8 +310,8 @@ export function AdminChrome({
 
   return (
     <StatusSlot.Provider value={setSlot}>
-      <div className="flex min-h-dvh flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
+      <div className="admin-workspace flex min-h-dvh flex-col">
+        <header className="admin-chrome-header flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
           <Link
             to="/admin"
             className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
@@ -353,9 +354,13 @@ export function AdminChrome({
             </ul>
           </nav>
 
+          {(status || slot) && (
+            <div className="admin-chrome-status flex items-center gap-4">
+              {status}
+              {slot}
+            </div>
+          )}
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
-            {status}
-            {slot}
             <button
               type="button"
               onClick={toggleTheme}

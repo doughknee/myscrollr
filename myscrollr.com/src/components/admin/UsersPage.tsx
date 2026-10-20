@@ -284,7 +284,7 @@ export default function UsersPage({
     <PageFrame>
       <div className="space-y-5">
         <header>
-          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+          <h1 className="admin-page-heading">Users</h1>
           {data?.source === 'local' ? (
             <p className="mt-1 text-sm text-warning">
               {data.note ?? 'Logto is unreachable.'} Showing{' '}
@@ -361,7 +361,7 @@ export default function UsersPage({
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-                <table className="w-full min-w-[42rem] text-left text-sm">
+                <table className="admin-mobile-table w-full min-w-[42rem] text-left text-sm">
                   <thead className="text-xs text-base-content/50 uppercase">
                     <tr className="border-b border-base-300/60">
                       <th className="p-3 font-semibold">User</th>
@@ -406,10 +406,13 @@ export default function UsersPage({
                             )}
                           </span>
                         </td>
-                        <td className="p-3 text-base-content/70">
+                        <td
+                          data-label="Plan"
+                          className="p-3 text-base-content/70"
+                        >
                           {planLabel(a)}
                         </td>
-                        <td className="p-3 tabular-nums">
+                        <td data-label="Widgets" className="p-3 tabular-nums">
                           {a.widgets}
                           {a.on_ticker > 0 && (
                             <span className="text-base-content/45">
@@ -418,11 +421,19 @@ export default function UsersPage({
                             </span>
                           )}
                         </td>
-                        <td className="p-3 tabular-nums">{a.tickets}</td>
-                        <td className="p-3 text-base-content/60">
+                        <td data-label="Tickets" className="p-3 tabular-nums">
+                          {a.tickets}
+                        </td>
+                        <td
+                          data-label="Signed up"
+                          className="p-3 text-base-content/60"
+                        >
                           {day(a.signed_up_at)}
                         </td>
-                        <td className="p-3 text-base-content/60">
+                        <td
+                          data-label="Last sign-in"
+                          className="p-3 text-base-content/60"
+                        >
                           {day(a.last_sign_in_at)}
                         </td>
                       </tr>

@@ -249,7 +249,7 @@ export function OverviewContent({
     /* Overview brings its own frame rather than PageFrame's: it wants the
        narrower 960 measure, but the same gutters and top margin, now that
        the console's <main> is full-bleed (SCROLLR-218). */
-    <div className="mx-auto w-full max-w-[960px] px-4 py-8 sm:px-6 lg:px-12">
+    <div className="admin-overview mx-auto w-full max-w-[960px] px-4 py-8 sm:px-6 lg:px-12">
       <div className="flex items-start justify-between gap-6">
         <h1 className="text-[48px] leading-[1.05] font-extrabold tracking-[-0.035em]">
           {headline[0]}
@@ -322,7 +322,7 @@ function OverviewRow({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="grid w-full cursor-pointer grid-cols-[120px_1fr_132px_24px] items-center gap-7 py-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
+        className="admin-overview-row grid w-full cursor-pointer grid-cols-[120px_1fr_132px_24px] items-center gap-7 py-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
         style={{ minHeight: '104px' }}
       >
         <span
@@ -371,7 +371,7 @@ function OverviewRow({
         />
       </button>
       {open && (
-        <div id={panelId} style={{ padding: '4px 0 32px 148px' }}>
+        <div id={panelId} className="admin-overview-detail">
           {row.problem ? (
             <ErrorPanel
               message={row.problem.message}

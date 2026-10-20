@@ -75,7 +75,7 @@ export default function AdminsPage() {
     <PageFrame>
       <div className="space-y-6">
         <header>
-          <h1 className="text-2xl font-bold tracking-tight">Admins</h1>
+          <h1 className="admin-page-heading">Admins</h1>
           <p className="mt-1 text-sm text-base-content/60">
             Manage who can open the staff console.
           </p>
@@ -145,7 +145,7 @@ export default function AdminsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-                <table className="w-full min-w-[38rem] text-left text-sm">
+                <table className="admin-mobile-table admin-access-table w-full min-w-[38rem] text-left text-sm">
                   <thead className="text-xs text-base-content/50 uppercase">
                     <tr className="border-b border-base-300/60">
                       <th className="p-3 font-semibold">Email</th>
@@ -178,7 +178,10 @@ export default function AdminsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="p-3 text-base-content/60">
+                        <td
+                          data-label="Added"
+                          className="p-3 text-base-content/60"
+                        >
                           {new Date(row.added_at).toLocaleDateString()}
                           {row.added_by && (
                             <span className="block text-xs text-base-content/45">
@@ -186,7 +189,10 @@ export default function AdminsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="p-3 text-base-content/60">
+                        <td
+                          data-label="Last seen"
+                          className="p-3 text-base-content/60"
+                        >
                           {row.last_seen_at
                             ? new Date(row.last_seen_at).toLocaleString()
                             : '—'}

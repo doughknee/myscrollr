@@ -125,10 +125,10 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
       )}
 
       {!empty && (
-        <>
+        <div className="admin-versions-panels">
           {/* Adoption. The share itself is the sentence's job now, not a
               second headline; these rows are the breakdown behind it. */}
-          <section className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+          <section className="admin-versions-adoption rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
             <ChartHeading note="Share of desktop API requests in the window.">
               Which build desktop traffic comes from
             </ChartHeading>
@@ -150,8 +150,8 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
             </ul>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+          <div className="admin-versions-secondary">
+            <section className="admin-versions-platforms rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
               <ChartHeading>Windows, Mac or Linux</ChartHeading>
               <ul className="mt-4 space-y-3">
                 {data.platforms.map((p) => (
@@ -171,7 +171,7 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
             </section>
 
             {/* Error rate by build — the reason the page exists. */}
-            <section className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+            <section className="admin-versions-errors rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
               <ChartHeading note="4xx + 5xx">
                 How often each build gets an error
               </ChartHeading>
@@ -227,7 +227,7 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
               </p>
             </section>
           </div>
-        </>
+        </div>
       )}
 
       {/* Unrecognized stays visible even at zero. It is the page's canary: a
@@ -276,9 +276,7 @@ export default function VersionsPage({
     <PageFrame>
       <div className="space-y-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
-          <h1 className="text-[32px] leading-none font-extrabold tracking-[-0.03em]">
-            Versions
-          </h1>
+          <h1 className="admin-page-heading">Versions</h1>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-base-content/60">Time window</span>
             <div

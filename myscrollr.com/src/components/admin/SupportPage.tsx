@@ -1972,11 +1972,12 @@ export default function SupportPage({
             )}
 
             {!selected ? (
-              <div className="p-8">
-                <p className="mx-auto max-w-[50ch] text-center text-sm text-base-content/60">
-                  Pick someone. Their identity and history come first, then the
-                  thread that needs an answer — the reply and everything behind
-                  it are on the right.
+              <div className="admin-support-empty">
+                <MessageSquare size={28} aria-hidden />
+                <h2>Select a conversation</h2>
+                <p>
+                  Choose a person or ticket to review the conversation, check
+                  the bot’s work, and decide what needs your attention.
                 </p>
               </div>
             ) : (

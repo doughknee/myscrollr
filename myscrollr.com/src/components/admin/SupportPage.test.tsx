@@ -249,6 +249,7 @@ describe('the page frame', () => {
       'Open',
       'Answered, waiting on them',
       'Resolved',
+      'Select a conversation',
     ])
   })
 })
