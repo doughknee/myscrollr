@@ -98,6 +98,70 @@ async function mount() {
 }
 
 describe('Analytics report isolation', () => {
+  it('clears signup diagnostics when the application changes and ignores superseded responses', async () => {
+    let finishDesktop!: (value: analytics.SignupAnalytics) => void
+    let finishWebsite!: (value: analytics.SignupAnalytics) => void
+    vi.mocked(analytics.loadSignupAnalytics)
+      .mockResolvedValueOnce({
+        ...signup,
+        coverage: { ...signup.coverage, note: 'Original website result' },
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishDesktop = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishWebsite = resolve
+          }),
+      )
+    const host = await mount()
+    expect(analytics.loadSignupAnalytics).not.toHaveBeenCalled()
+    const disclosure = Array.from(host.querySelectorAll('details')).find((el) =>
+      el.querySelector('summary')?.textContent.includes('Signup diagnostics'),
+    )!
+    await act(() => {
+      disclosure.open = true
+      disclosure.dispatchEvent(new Event('toggle'))
+    })
+    expect(host.textContent).toContain('Original website result')
+    const application = host.querySelector('[aria-label="Application"]')!
+    const applicationButton = (label: string) =>
+      Array.from(application.querySelectorAll('button')).find(
+        (button) => button.textContent === label,
+      )!
+    await act(() => applicationButton('Desktop app').click())
+    expect(host.textContent).not.toContain('Original website result')
+    expect(host.textContent).toContain('Loading signup diagnostics')
+    expect(analytics.loadSignupAnalytics).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      'desktop',
+      7,
+      expect.any(AbortSignal),
+    )
+    await act(() => applicationButton('Website').click())
+    await act(() =>
+      finishDesktop({
+        ...signup,
+        application: 'desktop',
+        coverage: { ...signup.coverage, note: 'Superseded desktop result' },
+      }),
+    )
+    expect(host.textContent).not.toContain('Superseded desktop result')
+    expect(host.textContent).toContain('Loading signup diagnostics')
+    await act(() =>
+      finishWebsite({
+        ...signup,
+        coverage: { ...signup.coverage, note: 'Current website result' },
+      }),
+    )
+    expect(host.textContent).toContain('Current website result')
+    expect(reports.loadAudience).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps other views usable when a hidden report and its verdict throw, then retries only that report', async () => {
     vi.mocked(reports.loadRevenue).mockResolvedValueOnce({} as typeof revenue)
     const host = await mount()
@@ -116,6 +180,50 @@ describe('Analytics report isolation', () => {
     expect(host.textContent).toContain('Net earnings over time')
     expect(reports.loadRevenue).toHaveBeenCalledTimes(2)
     expect(reports.loadAudience).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears diagnostics when the effective signup window changes', async () => {
+    let finish!: (value: analytics.SignupAnalytics) => void
+    vi.mocked(analytics.loadSignupAnalytics)
+      .mockResolvedValueOnce({
+        ...signup,
+        coverage: { ...signup.coverage, note: 'Seven-day signup result' },
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+    const host = await mount()
+    const disclosure = Array.from(host.querySelectorAll('details')).find((el) =>
+      el.querySelector('summary')?.textContent.includes('Signup diagnostics'),
+    )!
+    await act(() => {
+      disclosure.open = true
+      disclosure.dispatchEvent(new Event('toggle'))
+    })
+    expect(host.textContent).toContain('Seven-day signup result')
+    const period = Array.from(
+      host.querySelectorAll('[aria-label="Time window"] button'),
+    ).find((button) => button.textContent === '30d') as HTMLButtonElement
+    await act(() => period.click())
+    expect(host.textContent).not.toContain('Seven-day signup result')
+    expect(host.textContent).toContain('Loading signup diagnostics')
+    expect(analytics.loadSignupAnalytics).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      'website',
+      30,
+      expect.any(AbortSignal),
+    )
+    await act(() =>
+      finish({
+        ...signup,
+        window_days: 30,
+        coverage: { ...signup.coverage, note: 'Thirty-day signup result' },
+      }),
+    )
+    expect(host.textContent).toContain('Thirty-day signup result')
   })
 
   it('isolates malformed cohorts from the growth report', async () => {
