@@ -710,13 +710,16 @@ html:has(.analytics-drawer[open]) {
   white-space: nowrap;
 }
 .analytics-support-number {
+  display: flex;
+  flex-direction: column;
   border-top: 1px solid var(--analytics-line);
   padding-top: 16px;
 }
 .analytics-support-number dd {
   font-size: 25px;
   font-weight: 550;
-  margin-top: 8px;
+  margin-top: auto;
+  padding-top: 8px;
 }
 .analytics-support-number .analytics-metric-unit {
   font-size: 0.6em;

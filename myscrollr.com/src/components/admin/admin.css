@@ -238,7 +238,7 @@
     padding: 0;
     font-size: 13px;
   }
-  .admin-mobile-table td:first-child {
+  .admin-page .admin-mobile-table td:first-child {
     grid-column: 1 / -1;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--staff-line);
@@ -261,5 +261,28 @@
   }
   .admin-versions-panels section {
     padding: 18px;
+  }
+  .admin-versions-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-versions-header > div {
+    justify-content: space-between;
+  }
+  .admin-user-dates {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .admin-user-dates > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding-block: 10px;
+    border-bottom: 1px solid var(--staff-line);
+  }
+  .admin-user-dates dd {
+    font-variant-numeric: tabular-nums;
   }
 }

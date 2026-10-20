@@ -275,7 +275,7 @@ export default function VersionsPage({
   return (
     <PageFrame>
       <div className="space-y-8">
-        <header className="flex flex-wrap items-end justify-between gap-4">
+        <header className="admin-versions-header flex flex-wrap items-end justify-between gap-4">
           <h1 className="admin-page-heading">Versions</h1>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-base-content/60">Time window</span>

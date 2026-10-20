@@ -70,7 +70,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
         ref={backButton}
         type="button"
         onClick={onBack}
-        className="flex cursor-pointer items-center gap-1 text-sm text-base-content/60 hover:text-base-content"
+        className="flex min-h-11 cursor-pointer items-center gap-1 text-sm text-base-content/60 hover:text-base-content"
       >
         <ChevronLeft size={16} /> All users
       </button>
@@ -103,7 +103,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
               {detail.account.deletion_state &&
                 ` · deletion ${detail.account.deletion_state}`}
             </p>
-            <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+            <dl className="admin-user-dates mt-3 grid grid-cols-3 gap-3 text-sm">
               <div>
                 <dt className="text-xs text-base-content/50">Signed up</dt>
                 <dd>{day(detail.account.signed_up_at)}</dd>
@@ -140,7 +140,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
                 detail.widgets.map((w) => (
                   <div
                     key={w.type}
-                    className="flex items-center justify-between gap-3 border-b border-base-300/40 p-3 text-sm last:border-0"
+                    className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/40 p-3 text-sm [overflow-wrap:anywhere] last:border-0"
                   >
                     <span className="font-medium">{w.type}</span>
                     <span className="text-xs text-base-content/60">
