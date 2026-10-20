@@ -1080,10 +1080,12 @@ function OtherTickets({
 
 /** The shared shape of a queue card, so a person and a ticket cannot drift. */
 function QueueCard({
+  rowKey,
   active,
   onSelect,
   children,
 }: {
+  rowKey: string
   active: boolean
   onSelect: () => void
   children: React.ReactNode
@@ -1091,6 +1093,7 @@ function QueueCard({
   return (
     <button
       type="button"
+      data-support-row={rowKey}
       onClick={onSelect}
       aria-current={active ? 'true' : undefined}
       /* A <button> centres its text; the card is three left-aligned lines. */
@@ -1117,7 +1120,11 @@ function PersonCard({
   const who = personTitle(person)
   const badge = planBadge(person)
   return (
-    <QueueCard active={active} onSelect={onSelect}>
+    <QueueCard
+      rowKey={`person:${person.key}`}
+      active={active}
+      onSelect={onSelect}
+    >
       <div className="flex items-baseline justify-between gap-2">
         <span
           className={`truncate text-sm font-bold ${who.known ? '' : 'text-base-content/75 italic'}`}
@@ -1171,7 +1178,11 @@ function TicketCard({
   const countdown = holdCountdown(row.hold)
   const badge = fixBadge(row.fix ?? null)
   return (
-    <QueueCard active={active} onSelect={onSelect}>
+    <QueueCard
+      rowKey={`ticket:${row.ticket_number}`}
+      active={active}
+      onSelect={onSelect}
+    >
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-bold">
           {row.name || row.user_email || 'Requester unknown'}
@@ -1604,6 +1615,34 @@ export default function SupportPage({
   const { detail, error: caseError, setDetail } = useCase(activeTicket, caseKey)
 
   const selected = rowsMode === 'person' ? selectedPerson : selectedTicket
+  const selectionKey = selected ? `${rowsMode}:${selected}` : null
+  const previousSelection = useRef<string | null>(null)
+  const queuePane = useRef<HTMLDivElement>(null)
+  const conversationPane = useRef<HTMLDivElement>(null)
+  const backButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!queue || previousSelection.current === selectionKey) return
+    const previous = previousSelection.current
+    previousSelection.current = selectionKey
+    if (selectionKey) {
+      const target = window.matchMedia('(min-width: 768px)').matches
+        ? conversationPane.current
+        : backButton.current
+      target?.focus()
+    } else if (previous) {
+      const origin = Array.from(
+        queuePane.current?.querySelectorAll<HTMLButtonElement>(
+          '[data-support-row]',
+        ) ?? [],
+      ).find((button) => button.dataset.supportRow === previous)
+      const target =
+        origin ??
+        queuePane.current?.querySelector<HTMLInputElement>(
+          'input[type="search"]',
+        )
+      target?.focus()
+    }
+  }, [queue, selectionKey])
   const back = () => {
     updateSearch({ person: undefined, ticket: undefined })
   }
@@ -1659,7 +1698,7 @@ export default function SupportPage({
   ) : null
 
   return (
-    /* The console shell's <main> is full-bleed and 48px below the bar. From
+    /* The console workspace is full-bleed and 48px below the bar. From
        768 up this page is exactly that tall and each pane scrolls on its own,
        so the window never scrolls. Below it the mobile nav adds a row of its
        own and the page is an ordinary scrolling column. */
@@ -1719,6 +1758,7 @@ export default function SupportPage({
           {/* Under 768px the queue IS the page; picking someone pushes their
               view over it and the back control returns. */}
           <div
+            ref={queuePane}
             className={`min-w-0 border-hairline md:w-[320px] md:shrink-0 md:overflow-y-auto md:border-r min-[1440px]:w-[380px] ${
               selected ? 'hidden md:block' : 'block'
             }`}
@@ -1840,12 +1880,17 @@ export default function SupportPage({
 
           {/* The conversation. */}
           <div
-            className={`min-w-0 flex-1 md:overflow-y-auto ${
+            ref={conversationPane}
+            role="region"
+            aria-label="Support conversation"
+            tabIndex={-1}
+            className={`min-w-0 flex-1 outline-none md:overflow-y-auto ${
               selected ? 'block' : 'hidden md:block'
             }`}
           >
             {selected && (
               <button
+                ref={backButton}
                 type="button"
                 onClick={back}
                 className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 px-4 text-sm font-medium text-base-content/70 hover:text-base-content md:hidden"

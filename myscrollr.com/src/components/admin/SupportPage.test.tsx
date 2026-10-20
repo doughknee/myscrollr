@@ -151,6 +151,41 @@ beforeEach(() => {
 })
 
 describe('the page frame', () => {
+  it.each([390, 1440])('moves focus into a case at %ipx', async (width) => {
+    const host = await render(width)
+    await open(host, 'Morgan Ellis')
+    const back = [...host.querySelectorAll('button')].find((b) =>
+      b.textContent.includes('All of support'),
+    )!
+    expect(document.activeElement).toBe(
+      width < 768
+        ? back
+        : host.querySelector('[aria-label="Support conversation"]'),
+    )
+    if (width < 768) {
+      await act(() => back.click())
+      expect(document.activeElement?.textContent).toContain('Morgan Ellis')
+      expect(document.activeElement?.tagName).toBe('BUTTON')
+    }
+  })
+
+  it('returns focus to search if the originating queue row disappears', async () => {
+    const host = await render(390)
+    await open(host, 'Morgan Ellis')
+    mocks.supportQueue.mockResolvedValue({
+      ...queue,
+      people: queue.people?.filter((p) => p.key !== 'morgan'),
+    })
+    await caseEvent()
+    const back = [...host.querySelectorAll('button')].find((b) =>
+      b.textContent.includes('All of support'),
+    )!
+    await act(() => back.click())
+    expect(document.activeElement).toBe(
+      host.querySelector('[aria-label="Search people and tickets"]'),
+    )
+  })
+
   it('does not present a failed queue read as zero outstanding cases', async () => {
     mocks.supportQueue.mockRejectedValue(new Error('Queue read failed'))
     const host = await render(390)
