@@ -7,6 +7,7 @@ import {
   SectionNav,
   SignupDiagnostics,
   SupportContent,
+  Week1ReturnContent,
   signupDays,
 } from './AnalyticsPage'
 import { renderWithRouter } from './testRouter'
@@ -50,6 +51,53 @@ const newMoney = analyticsRevenueVerdict({
   past_due: 0,
   new_paying_today: 1,
   net_today: 900,
+})
+
+describe('Week1ReturnContent', () => {
+  it('keeps immature cohorts pending and missing return counts unknown', () => {
+    const html = renderToStaticMarkup(
+      <Week1ReturnContent
+        report={loaded({
+          generated_at: '2026-10-20T00:00:00Z',
+          definition: 'Weekly UTC cohorts.',
+          cohorts: [
+            {
+              week_start: '2026-10-05',
+              week_end: '2026-10-11',
+              mature: true,
+              signups: 29,
+            },
+            {
+              week_start: '2026-10-12',
+              week_end: '2026-10-18',
+              mature: false,
+              signups: 34,
+            },
+          ],
+        })}
+      />,
+    )
+    expect(html).toContain('Unknown of 29 returned')
+    expect(html).not.toContain('0 of 29 returned')
+    expect(html).toContain('Pending')
+    expect(html).toContain('Not yet available')
+    expect(html).toContain('independent of time window')
+    expect(html).not.toContain('<details open')
+  })
+
+  it('does not invent a rate when no cohort has matured', () => {
+    const html = renderToStaticMarkup(
+      <Week1ReturnContent
+        report={loaded({
+          generated_at: '2026-10-20T00:00:00Z',
+          definition: 'Weekly cohorts',
+          cohorts: [],
+        })}
+      />,
+    )
+    expect(html).toContain('No weekly cohort has matured yet.')
+    expect(html).not.toContain('0%')
+  })
 })
 
 describe('SectionNav', () => {

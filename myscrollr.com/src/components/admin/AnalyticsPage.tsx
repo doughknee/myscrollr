@@ -1,5 +1,7 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { SignupTrend } from './SignupTrend'
+import './analytics.css'
 import {
   Bars,
   Big,
@@ -87,7 +89,7 @@ import {
 /**
  * Analytics (SCROLLR-220): four questions on one long page.
  *
- * Each section answers the question in its eyebrow in one sentence, with the
+ * Each section answers its heading's question in one sentence, with the
  * number that answers it in bold, a chart of the same figure over the period,
  * and the facts that qualify it. Everything the page used to show is still
  * here, one click away under `More detail` — nothing was deleted, it was
@@ -144,6 +146,7 @@ export default function AnalyticsPage() {
   const search = useSearch({ from: '/admin/analytics' })
   const navigate = useNavigate({ from: '/admin/analytics' })
   const [refresh, setRefresh] = useState(0)
+  const initialView = useRef(true)
   const { os, period, plan, version, view } = search
 
   const setSearch = (patch: Partial<typeof search>) =>
@@ -207,10 +210,13 @@ export default function AnalyticsPage() {
     ),
   )
 
-  // `?view=` names a place on the page now rather than a panel to swap in, so
-  // the Overview's deep links keep landing where they always did.
+  // Keep the return summary visible on the default landing. Section switches
+  // and non-growth deep links still scroll to their named section.
   useEffect(() => {
-    document.getElementById(view)?.scrollIntoView({ block: 'start' })
+    if (!initialView.current || view !== 'growth') {
+      document.getElementById(view)?.scrollIntoView({ block: 'start' })
+    }
+    initialView.current = false
   }, [view])
 
   const sectionVerdicts: Record<AnalyticsView, Verdict> = {
@@ -222,22 +228,28 @@ export default function AnalyticsPage() {
 
   return (
     <PageFrame>
-      <div className="flex flex-col gap-10 lg:flex-row lg:gap-12">
+      <div className="analytics-report">
+        <header className="analytics-header">
+          <div>
+            <h1>Analytics</h1>
+            <p>How Scrollr is growing, and how people use it.</p>
+          </div>
+          <span className="analytics-window">{periodLabel(period)}</span>
+        </header>
         <SectionNav
           view={view}
           period={period}
           verdicts={sectionVerdicts}
-          onView={(next) => setSearch({ view: next })}
+          onView={(next) => {
+            if (next === view) {
+              document.getElementById(next)?.scrollIntoView({ block: 'start' })
+            }
+            void setSearch({ view: next })
+          }}
           onPeriod={(next) => setSearch({ period: next })}
           onRefresh={() => setRefresh((n) => n + 1)}
         />
-        <div className="flex min-w-0 grow flex-col gap-14">
-          <header className="flex flex-wrap items-end justify-between gap-4">
-            <h1 className="text-[32px] leading-none font-extrabold tracking-[-0.03em]">
-              Analytics
-            </h1>
-            <PageStamp />
-          </header>
+        <div className="analytics-sections">
           <Week1ReturnContent report={week1Return} />
           <GrowthContent
             period={period}
@@ -270,15 +282,6 @@ export default function AnalyticsPage() {
   )
 }
 
-/** The page's own "as of", which is the moment it was drawn. */
-function PageStamp() {
-  return (
-    <p className="text-sm text-base-content/50">
-      {new Date().toLocaleString()}
-    </p>
-  )
-}
-
 /**
  * Week-1 return (SCROLLR-247): the News + first run phase's exit metric, on
  * its own at the top of the page rather than folded into Growth — it decides
@@ -288,84 +291,132 @@ function PageStamp() {
  * younger than 7 days never renders a rate or a returned count, only its
  * (already known) signup count — "not yet available", never 0.
  */
-function Week1ReturnContent({ report }: { report: Report<Week1ReturnReport> }) {
+export function Week1ReturnContent({
+  report,
+}: {
+  report: Report<Week1ReturnReport>
+}) {
   return (
-    <Section
+    <section
       id="week1-return"
-      title="Week-1 return"
-      lede="Of new desktop signups, how many came back on their own in the week after signing up? The phase's exit metric."
+      className="analytics-retention"
+      aria-labelledby="week1-return-heading"
     >
+      <div className="analytics-retention-intro">
+        <span className="analytics-scope">
+          Weekly signup cohorts · independent of time window
+        </span>
+        <h2 id="week1-return-heading">Do new users come back?</h2>
+        <p>
+          Week-1 return tracks new desktop signups who came back on their own in
+          the following week.
+        </p>
+      </div>
       <Loaded report={report} label="week-1 return">
         {(data) => {
           const matured = [...data.cohorts].reverse().find((c) => c.mature)
           return (
-            <div className="space-y-3">
-              <Card title="Week-1 return" label="Most recently matured cohort">
-                {matured ? (
-                  <>
-                    <Big>
-                      {matured.rate_pct !== undefined
-                        ? `${Math.round(matured.rate_pct)}%`
-                        : '—'}
-                    </Big>
-                    <p className="mt-1 text-sm text-base-content/60">
-                      {num(matured.returned ?? 0)} of {num(matured.signups)}{' '}
-                      returned · week of {matured.week_start}
+            <div className="analytics-retention-data">
+              <div className="analytics-retention-summary">
+                <div>
+                  <p className="analytics-scope">
+                    Most recently matured cohort
+                  </p>
+                  <strong className="analytics-return-rate">
+                    {matured?.rate_pct !== undefined
+                      ? `${Math.round(matured.rate_pct)}%`
+                      : '—'}
+                  </strong>
+                  <p>
+                    {matured
+                      ? `${matured.returned === undefined ? 'Unknown' : num(matured.returned)} of ${num(matured.signups)} returned`
+                      : 'No weekly cohort has matured yet.'}
+                  </p>
+                  {matured && (
+                    <p className="analytics-scope">
+                      Week of {matured.week_start}
                     </p>
-                  </>
-                ) : (
-                  <Unmeasurable note="No weekly cohort has matured yet — check back once the most recent cohort's day 7 has passed." />
-                )}
-              </Card>
-              <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-                <table className="w-full text-sm">
-                  <thead className="bg-base-200/40 text-xs font-semibold tracking-wide text-base-content/60 uppercase">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Week</th>
-                      <th className="px-3 py-2 text-right">Signups</th>
-                      <th className="px-3 py-2 text-right">Returned</th>
-                      <th className="px-3 py-2 text-right">Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.cohorts.map((cohort) => (
-                      <tr
-                        key={cohort.week_start}
-                        className="border-t border-base-300/40"
+                  )}
+                </div>
+                <div
+                  className="analytics-cohort-bars"
+                  aria-label="Weekly cohort return rates"
+                >
+                  {data.cohorts.map((cohort) => (
+                    <div key={cohort.week_start}>
+                      <span>
+                        {cohort.mature && cohort.rate_pct !== undefined
+                          ? `${Math.round(cohort.rate_pct)}%`
+                          : 'Pending'}
+                      </span>
+                      <div
+                        className="analytics-cohort-track"
+                        aria-hidden="true"
                       >
-                        <td className="px-3 py-2">
-                          {cohort.week_start} – {cohort.week_end}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {num(cohort.signups)}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {cohort.mature ? num(cohort.returned ?? 0) : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {cohort.mature && cohort.rate_pct !== undefined
-                            ? `${Math.round(cohort.rate_pct)}%`
-                            : 'Not yet available'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <span
+                          style={{
+                            height:
+                              cohort.mature && cohort.rate_pct !== undefined
+                                ? `${cohort.rate_pct}%`
+                                : '0%',
+                          }}
+                        />
+                      </div>
+                      <span>
+                        {cohort.week_start.slice(5).replace('-', '/')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
+              <details className="analytics-cohort-detail">
+                <summary>Explore weekly cohorts</summary>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th scope="col">Week (UTC)</th>
+                        <th scope="col">Signups</th>
+                        <th scope="col">Returned</th>
+                        <th scope="col">Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.cohorts.map((cohort) => (
+                        <tr key={cohort.week_start}>
+                          <th scope="row">
+                            {cohort.week_start} – {cohort.week_end}
+                          </th>
+                          <td>{num(cohort.signups)}</td>
+                          <td>
+                            {cohort.mature && cohort.returned !== undefined
+                              ? num(cohort.returned)
+                              : '—'}
+                          </td>
+                          <td>
+                            {cohort.mature && cohort.rate_pct !== undefined
+                              ? `${Math.round(cohort.rate_pct)}%`
+                              : 'Not yet available'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <DefinitionDisclosure>{data.definition}</DefinitionDisclosure>
+              </details>
               <Stamp at={data.generated_at} />
-              <DefinitionDisclosure>{data.definition}</DefinitionDisclosure>
             </div>
           )
         }}
       </Loaded>
-    </Section>
+    </section>
   )
 }
 
 /**
- * The left column: the four sections with their verdicts, the period, and
- * what the period means. It replaces the tab strip — every section is on the
- * page now, so this is a table of contents rather than a switch.
+ * Compact section navigation and period controls. Every section stays on the
+ * page; selecting a section scrolls rather than hiding the other reports.
  */
 export function SectionNav({
   view,
@@ -383,42 +434,39 @@ export function SectionNav({
   onRefresh?: () => void
 }) {
   return (
-    <nav
-      aria-label="Analytics sections"
-      className="flex shrink-0 flex-col gap-1 lg:sticky lg:top-16 lg:w-[180px] lg:self-start"
-    >
-      <span className="px-2.5 pb-2 text-[11px] font-bold tracking-[0.08em] text-base-content/45 uppercase">
-        Sections
-      </span>
-      {ANALYTICS_VIEWS.map((section) => {
-        const current = section.value === view
-        const tone = VERDICT_TONE[verdicts[section.value].tone]
-        return (
-          <button
-            key={section.value}
-            type="button"
-            onClick={() => onView(section.value)}
-            aria-current={current ? 'true' : undefined}
-            className={
-              current
-                ? 'flex cursor-pointer items-center justify-between gap-2 rounded-lg bg-base-200 px-2.5 py-2 text-left text-[13px] font-semibold text-base-content focus-visible:outline-2 focus-visible:outline-primary'
-                : 'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-base-content/60 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary'
-            }
-          >
-            <span className="truncate">{section.label}</span>
-            <span
-              className={`size-2 shrink-0 rounded-full ${tone.dot}`}
-              aria-hidden
-            />
-          </button>
-        )
-      })}
-      <div className="mt-4 flex flex-wrap gap-3 px-2.5">
+    <nav aria-label="Analytics sections" className="analytics-nav">
+      <div className="analytics-nav-links">
+        {ANALYTICS_VIEWS.map((section) => {
+          const current = section.value === view
+          const tone = VERDICT_TONE[verdicts[section.value].tone]
+          return (
+            <button
+              key={section.value}
+              type="button"
+              onClick={() => onView(section.value)}
+              aria-current={current ? 'true' : undefined}
+              className={
+                current
+                  ? 'flex cursor-pointer items-center justify-between gap-2 rounded-lg bg-base-200 px-2.5 py-2 text-left text-[13px] font-semibold text-base-content focus-visible:outline-2 focus-visible:outline-primary'
+                  : 'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-base-content/60 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary'
+              }
+            >
+              <span className="truncate">{section.label}</span>
+              <span
+                className={`size-2 shrink-0 rounded-full ${tone.dot}`}
+                aria-hidden
+              />
+            </button>
+          )
+        })}
+      </div>
+      <div className="analytics-nav-controls">
         <PeriodSelector value={period} onChange={onPeriod} />
         {onRefresh && <RefreshButton onClick={onRefresh} label="Refresh" />}
       </div>
-      <p className="px-2.5 pt-3 text-xs text-base-content/45">
-        {periodFootnote(period)}
+      <p className="analytics-nav-note">
+        {periodFootnote(period)} Current totals and weekly cohorts keep their
+        own windows.
       </p>
     </nav>
   )
@@ -503,6 +551,7 @@ function Question({
   facts,
   note,
   children,
+  factGroups,
 }: {
   id: AnalyticsView
   title: string
@@ -511,19 +560,29 @@ function Question({
   sentence: ReactNode
   chart: ReactNode
   facts: Array<Fact>
+  factGroups?: Array<{ title: string; facts: Array<Fact> }>
   note: string
   children?: ReactNode
 }) {
   return (
     <QuestionShell id={id} title={title} question={question} verdict={verdict}>
-      <p className="max-w-[900px] text-2xl leading-[1.3] font-semibold tracking-[-0.015em]">
-        {sentence}
-      </p>
-      <div className="grid items-start gap-10 xl:grid-cols-[480px_1fr]">
-        <div className="min-w-0">{chart}</div>
-        <FactList facts={facts} />
+      <p className="analytics-answer">{sentence}</p>
+      <div className="analytics-evidence">
+        <div className="analytics-chart">{chart}</div>
+        {factGroups ? (
+          <div className="analytics-fact-groups">
+            {factGroups.map((group) => (
+              <div key={group.title}>
+                <h3>{group.title}</h3>
+                <FactList facts={group.facts} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <FactList facts={facts} />
+        )}
       </div>
-      <p className="max-w-[900px] text-[13px] text-base-content/45">{note}</p>
+      <p className="analytics-method">{note}</p>
       {children}
     </QuestionShell>
   )
@@ -547,14 +606,12 @@ function QuestionShell({
     <section
       id={id}
       aria-labelledby={`${id}-heading`}
-      className="flex scroll-mt-16 flex-col gap-[18px]"
+      className="analytics-question"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-        <h2
-          id={`${id}-heading`}
-          className="text-[11px] font-bold tracking-[0.08em] text-base-content/45 uppercase"
-        >
-          {title} · {question}
+        <h2 id={`${id}-heading`} className="analytics-question-heading">
+          {title}
+          <span>{question}</span>
         </h2>
         <VerdictPill verdict={verdict} />
       </div>
@@ -629,7 +686,7 @@ export const CANNOT_SAY = 'We cannot say yet.'
 
 function FactList({ facts }: { facts: Array<Fact> }) {
   return (
-    <dl className="grid min-w-0 gap-x-7 sm:grid-cols-2">
+    <dl className="analytics-facts">
       {facts.map((fact) => (
         <div
           key={fact.label}
@@ -654,7 +711,7 @@ function FactList({ facts }: { facts: Array<Fact> }) {
 /** Everything a section used to show, one click away and closed by default. */
 function MoreDetail({ children }: { children: ReactNode }) {
   return (
-    <details className="rounded-xl ring-1 ring-base-300/60">
+    <details className="analytics-detail rounded-xl ring-1 ring-base-300/60">
       <summary className="cursor-pointer p-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary">
         More detail
       </summary>
@@ -850,18 +907,41 @@ export function GrowthContent({
       question={GROWTH_QUESTION}
       verdict={verdict}
       sentence={sentence}
-      chart={
-        <Figure
-          verdict={verdict}
-          kind="bars"
-          buckets={a.new_curve}
-          step={a.curve_step}
-          label="Sign-ups per bucket"
-        />
-      }
+      chart={<SignupTrend buckets={a.new_curve} step={a.curve_step} />}
       facts={facts}
+      factGroups={[
+        {
+          title: windowLabel,
+          facts: facts.filter(
+            (fact) =>
+              fact.label === `Signed up ${periodPhrase(period)}` ||
+              fact.label === previousFact(period, a.new)[0]?.label ||
+              fact.label === 'Signed up from the desktop app',
+          ),
+        },
+        {
+          title: 'Current account snapshot',
+          facts: facts.filter((fact) =>
+            [
+              'Accounts in total',
+              'Finished setting up',
+              'Never finished setting up',
+              'Deleted their account',
+            ].includes(fact.label),
+          ),
+        },
+        {
+          title: 'Separate measurements · different populations',
+          facts: facts.filter((fact) =>
+            ['Signed up on the website', 'Came back a second day'].includes(
+              fact.label,
+            ),
+          ),
+        },
+      ]}
       note={GROWTH_NOTE}
     >
+      <Stamp at={a.generated_at} />
       <MoreDetail>
         {staffExcluded && <StaffExcludedBadge />}
         <Section
