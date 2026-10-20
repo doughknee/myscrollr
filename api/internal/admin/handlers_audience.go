@@ -299,18 +299,9 @@ func cachedLogtoAccounts(ctx context.Context) (logtoAccountsSnapshot, error) {
 		}
 	}
 	result := logtoAccountsGroup.DoChan(logtoAccountsCacheKey, func() (any, error) {
-		list, total, partial, err := listAllLogtoAccounts()
+		snap, err := fetchAndStoreLogtoAccounts()
 		if err != nil {
 			return nil, err
-		}
-		snap := logtoAccountsSnapshot{Accounts: list, Total: total, Partial: partial, FetchedAt: time.Now().UTC()}
-		if snap.Accounts == nil {
-			snap.Accounts = []accounts.LogtoAccount{}
-		}
-		if platform.Rdb != nil {
-			if raw, err := json.Marshal(snap); err == nil {
-				_ = platform.Rdb.Set(context.Background(), logtoAccountsCacheKey, raw, logtoAccountsCacheTTL).Err()
-			}
 		}
 		return snap, nil
 	})
@@ -323,6 +314,25 @@ func cachedLogtoAccounts(ctx context.Context) (logtoAccountsSnapshot, error) {
 		}
 		return r.Val.(logtoAccountsSnapshot), nil
 	}
+}
+
+// fetchAndStoreLogtoAccounts walks Logto and replaces the cached snapshot.
+// The scheduled warmer calls it directly (SCROLLR-335).
+func fetchAndStoreLogtoAccounts() (logtoAccountsSnapshot, error) {
+	list, total, partial, err := listAllLogtoAccounts()
+	if err != nil {
+		return logtoAccountsSnapshot{}, err
+	}
+	snap := logtoAccountsSnapshot{Accounts: list, Total: total, Partial: partial, FetchedAt: time.Now().UTC()}
+	if snap.Accounts == nil {
+		snap.Accounts = []accounts.LogtoAccount{}
+	}
+	if platform.Rdb != nil {
+		if raw, err := json.Marshal(snap); err == nil {
+			_ = platform.Rdb.Set(context.Background(), logtoAccountsCacheKey, raw, logtoAccountsCacheTTL).Err()
+		}
+	}
+	return snap, nil
 }
 
 // isTestActor is exported through accounts so both exclusion lists agree.

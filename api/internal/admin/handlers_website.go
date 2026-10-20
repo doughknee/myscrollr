@@ -25,10 +25,14 @@ import (
 // the account pseudonym on sign-in — not guaranteed to be one human.
 
 const (
-	websiteCacheTTL = 5 * time.Minute
+	// The scheduled warmer (warmer.go) refreshes every 10 minutes to stay under
+	// PostHog's query-rate limit (documented as low as 120/hour for HogQL; one
+	// cycle is ~21 queries), so the TTL outlives that cadence. generated_at
+	// still carries each report's real age.
+	websiteCacheTTL = 15 * time.Minute
 	// A read that finds the entry older than this serves it and refreshes in
 	// the background; a report takes seconds, so this leaves slack before the TTL.
-	websiteRefreshAfter = 4 * time.Minute
+	websiteRefreshAfter = 12 * time.Minute
 	websiteCacheKey     = "scrollr:admin:website:"
 )
 

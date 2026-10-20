@@ -13,6 +13,7 @@ import (
 
 	"github.com/brandon-relentnet/myscrollr/api/core"
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/admin"
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
@@ -102,6 +103,10 @@ func main() {
 	// RSS auto-cleanup janitor (moved in-process with the rss fold,
 	// ADR-0002 REL-16). Redis-locked so only one replica sweeps.
 	ingestread.StartRSSJanitor(ctx)
+
+	// Keeps the expensive admin reports warm on a schedule, one replica per
+	// cycle (SCROLLR-335). ADMIN_WARMER=off disables it.
+	admin.StartCacheWarmer(ctx)
 
 	// Register Discord slash commands (idempotent on every boot when
 	// configured). No-op if Discord env vars aren't set.
