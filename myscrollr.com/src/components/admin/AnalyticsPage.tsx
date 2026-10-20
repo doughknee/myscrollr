@@ -1,6 +1,7 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { SignupTrend } from './SignupTrend'
+import { AnalyticsTrend } from './AnalyticsTrend'
 import './analytics.css'
 import {
   Bars,
@@ -38,7 +39,6 @@ import type {
 import type {
   Audience,
   BreakdownRow,
-  Bucket,
   DesktopFilterQuery,
   DesktopUsage,
   Earnings,
@@ -87,7 +87,7 @@ import {
 } from '@/lib/overviewVerdicts'
 
 /**
- * Analytics (SCROLLR-220): four questions on one long page.
+ * Analytics: four focused views with their own evidence and controls.
  *
  * Each section answers its heading's question in one sentence, with the
  * number that answers it in bold, a chart of the same figure over the period,
@@ -100,8 +100,8 @@ import {
  * never written when `comparable` is false, and every verdict comes from
  * `overviewVerdicts.ts` and nowhere else.
  *
- * `?view=` used to pick a panel; it now names a section to scroll to, so the
- * Overview's links keep working.
+ * `?view=` selects the visible workspace. Hidden views retain their controls,
+ * while deep links from Overview continue to select the same named view.
  */
 
 const APPLICATIONS = [
@@ -142,11 +142,17 @@ export function signupDays(period: Period): 7 | 30 {
 // ── Page ──────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
+  const { period, os, version, plan } = useSearch({ from: '/admin/analytics' })
+  // Changing a population must not relabel the previous population's numbers
+  // while its replacement request is in flight.
+  return <AnalyticsWorkspace key={`${period}:${os}:${version}:${plan}`} />
+}
+
+function AnalyticsWorkspace() {
   const getToken = useGetToken()
   const search = useSearch({ from: '/admin/analytics' })
   const navigate = useNavigate({ from: '/admin/analytics' })
   const [refresh, setRefresh] = useState(0)
-  const initialView = useRef(true)
   const { os, period, plan, version, view } = search
 
   const setSearch = (patch: Partial<typeof search>) =>
@@ -210,15 +216,6 @@ export default function AnalyticsPage() {
     ),
   )
 
-  // Keep the return summary visible on the default landing. Section switches
-  // and non-growth deep links still scroll to their named section.
-  useEffect(() => {
-    if (!initialView.current || view !== 'growth') {
-      document.getElementById(view)?.scrollIntoView({ block: 'start' })
-    }
-    initialView.current = false
-  }, [view])
-
   const sectionVerdicts: Record<AnalyticsView, Verdict> = {
     growth: growthVerdict(audience.data),
     desktop: desktopVerdict(desktop.data),
@@ -241,41 +238,46 @@ export default function AnalyticsPage() {
           period={period}
           verdicts={sectionVerdicts}
           onView={(next) => {
-            if (next === view) {
-              document.getElementById(next)?.scrollIntoView({ block: 'start' })
-            }
             void setSearch({ view: next })
           }}
           onPeriod={(next) => setSearch({ period: next })}
           onRefresh={() => setRefresh((n) => n + 1)}
         />
         <div className="analytics-sections">
-          <Week1ReturnContent report={week1Return} />
-          <GrowthContent
-            period={period}
-            verdict={sectionVerdicts.growth}
-            audience={audience}
-            website={website}
-            desktop={desktop}
-          />
-          <DesktopContent
-            period={period}
-            verdict={sectionVerdicts.desktop}
-            desktop={desktop}
-            filters={{ os, version, plan }}
-            onFilterChange={(next) => setSearch(next)}
-          />
-          <RevenueContent
-            period={period}
-            verdict={sectionVerdicts.revenue}
-            revenue={revenue}
-          />
-          <SupportContent
-            period={period}
-            verdict={sectionVerdicts.support}
-            support={support}
-          />
-          <SignupDiagnosticsSection period={period} refresh={refresh} />
+          <div hidden={view !== 'growth'}>
+            <GrowthContent
+              period={period}
+              verdict={sectionVerdicts.growth}
+              audience={audience}
+              website={website}
+              desktop={desktop}
+            />
+            <Week1ReturnContent report={week1Return} />
+            <SignupDiagnosticsSection period={period} refresh={refresh} />
+          </div>
+          <div hidden={view !== 'desktop'}>
+            <DesktopContent
+              period={period}
+              verdict={sectionVerdicts.desktop}
+              desktop={desktop}
+              filters={{ os, version, plan }}
+              onFilterChange={(next) => setSearch(next)}
+            />
+          </div>
+          <div hidden={view !== 'revenue'}>
+            <RevenueContent
+              period={period}
+              verdict={sectionVerdicts.revenue}
+              revenue={revenue}
+            />
+          </div>
+          <div hidden={view !== 'support'}>
+            <SupportContent
+              period={period}
+              verdict={sectionVerdicts.support}
+              support={support}
+            />
+          </div>
         </div>
       </div>
     </PageFrame>
@@ -284,8 +286,7 @@ export default function AnalyticsPage() {
 
 /**
  * Week-1 return (SCROLLR-247): the News + first run phase's exit metric, on
- * its own at the top of the page rather than folded into Growth — it decides
- * whether the phase is done, everything else is context.
+ * beside the growth report, with its own time window and data source.
  *
  * No verdict here: `overviewVerdicts.ts` is untouched by design. A cohort
  * younger than 7 days never renders a rate or a returned count, only its
@@ -464,10 +465,13 @@ export function SectionNav({
         <PeriodSelector value={period} onChange={onPeriod} />
         {onRefresh && <RefreshButton onClick={onRefresh} label="Refresh" />}
       </div>
-      <p className="analytics-nav-note">
-        {periodFootnote(period)} Current totals and weekly cohorts keep their
-        own windows.
-      </p>
+      <details className="analytics-nav-note">
+        <summary>Window & population</summary>
+        <p>
+          {periodFootnote(period)} Current totals and weekly cohorts keep their
+          own windows.
+        </p>
+      </details>
     </nav>
   )
 }
@@ -552,6 +556,8 @@ function Question({
   note,
   children,
   factGroups,
+  toolbar,
+  visual,
 }: {
   id: AnalyticsView
   title: string
@@ -562,27 +568,59 @@ function Question({
   facts: Array<Fact>
   factGroups?: Array<{ title: string; facts: Array<Fact> }>
   note: string
+  toolbar?: ReactNode
+  visual?: ReactNode
   children?: ReactNode
 }) {
   return (
     <QuestionShell id={id} title={title} question={question} verdict={verdict}>
-      <p className="analytics-answer">{sentence}</p>
-      <div className="analytics-evidence">
-        <div className="analytics-chart">{chart}</div>
-        {factGroups ? (
-          <div className="analytics-fact-groups">
-            {factGroups.map((group) => (
-              <div key={group.title}>
-                <h3>{group.title}</h3>
-                <FactList facts={group.facts} />
+      {toolbar}
+      <div className="analytics-overview">
+        <div className="analytics-key-numbers">
+          <dl>
+            {facts.slice(0, 3).map((fact, index) => (
+              <div
+                key={fact.label}
+                className={
+                  index === 0
+                    ? 'analytics-primary-number'
+                    : 'analytics-support-number'
+                }
+              >
+                <dt>{fact.label}</dt>
+                <dd>{fact.value ?? 'unknown'}</dd>
               </div>
             ))}
+          </dl>
+          <p className="analytics-answer">{sentence}</p>
+        </div>
+        <div className="analytics-chart">{chart}</div>
+      </div>
+      <div className={visual ? 'analytics-detail-grid' : undefined}>
+        {visual}
+        {factGroups ? (
+          <div className="analytics-fact-groups">
+            {factGroups.map((group) => {
+              const remaining = group.facts.filter(
+                (fact) =>
+                  !facts.slice(0, 3).some((main) => main.label === fact.label),
+              )
+              return remaining.length ? (
+                <div key={group.title}>
+                  <h3>{group.title}</h3>
+                  <FactList facts={remaining} />
+                </div>
+              ) : null
+            })}
           </div>
         ) : (
-          <FactList facts={facts} />
+          <FactList facts={facts.slice(3)} />
         )}
       </div>
-      <p className="analytics-method">{note}</p>
+      <details className="analytics-method-disclosure">
+        <summary>Sources & measurement notes</summary>
+        <p className="analytics-method">{note}</p>
+      </details>
       {children}
     </QuestionShell>
   )
@@ -719,40 +757,6 @@ function MoreDetail({ children }: { children: ReactNode }) {
         {children}
       </div>
     </details>
-  )
-}
-
-/** A chart at the size this page draws them, tinted by the verdict. */
-function Figure({
-  verdict,
-  kind,
-  buckets,
-  step,
-  label,
-}: {
-  verdict: Verdict
-  kind: 'bars' | 'line'
-  buckets: Array<Bucket> | null | undefined
-  step: string
-  label: string
-}) {
-  const tone = VERDICT_TONE[verdict.tone].chart
-  return kind === 'bars' ? (
-    <Bars
-      buckets={buckets}
-      step={step}
-      label={label}
-      tone={tone}
-      className="h-[120px]"
-    />
-  ) : (
-    <Sparkline
-      buckets={buckets}
-      step={step}
-      label={label}
-      tone={tone}
-      className="h-[120px]"
-    />
   )
 }
 
@@ -1562,62 +1566,70 @@ export function DesktopContent({
       verdict={verdict}
       sentence={sentence}
       chart={
-        <Figure
-          verdict={verdict}
+        <AnalyticsTrend
           kind="line"
           buckets={d.users_curve}
           step={d.curve_step}
-          label="App users per bucket"
+          title="People using Scrollr"
+          unit="Distinct app users per bucket"
         />
       }
       facts={facts}
+      toolbar={
+        <div className="analytics-filters">
+          {' '}
+          {((d.filters.os?.length ?? 0) > 0 ||
+            (d.filters.version?.length ?? 0) > 0 ||
+            (d.filters.plan?.length ?? 0) > 0) && (
+            <div className="flex flex-wrap items-center gap-4 rounded-xl bg-base-200/30 p-3 ring-1 ring-base-300/60">
+              {(d.filters.os?.length ?? 0) > 0 && (
+                <FilterSelect
+                  label="OS"
+                  name="os"
+                  options={d.filters.os ?? []}
+                  value={filters.os}
+                  onChange={(os) => onFilterChange({ ...filters, os })}
+                />
+              )}
+              {(d.filters.version?.length ?? 0) > 0 && (
+                <FilterSelect
+                  label="Version"
+                  name="version"
+                  options={d.filters.version ?? []}
+                  value={filters.version}
+                  onChange={(version) =>
+                    onFilterChange({ ...filters, version })
+                  }
+                />
+              )}
+              {(d.filters.plan?.length ?? 0) > 0 && (
+                <FilterSelect
+                  label="Plan (current)"
+                  name="plan"
+                  options={d.filters.plan ?? []}
+                  value={filters.plan}
+                  onChange={(plan) => onFilterChange({ ...filters, plan })}
+                />
+              )}
+              {d.filters.note && (
+                <p className="text-xs text-base-content/60">{d.filters.note}</p>
+              )}
+            </div>
+          )}
+        </div>
+      }
+      visual={<WidgetRanking widgets={d.widgets} />}
       note={[d.coverage.note, DESKTOP_NOTE].filter(Boolean).join(' ')}
     >
+      <Stamp at={d.generated_at} />
       <MoreDetail>
         <div className="flex flex-wrap items-center gap-3">
-          <Stamp at={d.generated_at} />
           {d.staff_excluded && <StaffExcludedBadge />}
           <Link to="/admin/versions" className={LINK}>
             Version adoption and error rates → Versions
           </Link>
         </div>
         <CoverageNote coverage={d.coverage} />
-        {((d.filters.os?.length ?? 0) > 0 ||
-          (d.filters.version?.length ?? 0) > 0 ||
-          (d.filters.plan?.length ?? 0) > 0) && (
-          <div className="flex flex-wrap items-center gap-4 rounded-xl bg-base-200/30 p-3 ring-1 ring-base-300/60">
-            {(d.filters.os?.length ?? 0) > 0 && (
-              <FilterSelect
-                label="OS"
-                name="os"
-                options={d.filters.os ?? []}
-                value={filters.os}
-                onChange={(os) => onFilterChange({ ...filters, os })}
-              />
-            )}
-            {(d.filters.version?.length ?? 0) > 0 && (
-              <FilterSelect
-                label="Version"
-                name="version"
-                options={d.filters.version ?? []}
-                value={filters.version}
-                onChange={(version) => onFilterChange({ ...filters, version })}
-              />
-            )}
-            {(d.filters.plan?.length ?? 0) > 0 && (
-              <FilterSelect
-                label="Plan (current)"
-                name="plan"
-                options={d.filters.plan ?? []}
-                value={filters.plan}
-                onChange={(plan) => onFilterChange({ ...filters, plan })}
-              />
-            )}
-            {d.filters.note && (
-              <p className="text-xs text-base-content/60">{d.filters.note}</p>
-            )}
-          </div>
-        )}
 
         <Section
           id="presence"
@@ -1750,6 +1762,41 @@ export function DesktopContent({
         </Section>
       </MoreDetail>
     </Question>
+  )
+}
+
+function WidgetRanking({ widgets }: { widgets: DesktopUsage['widgets'] }) {
+  const rows = [...(widgets.rows ?? [])]
+    .sort((a, b) => b.user_hours - a.user_hours)
+    .slice(0, 5)
+  const max = Math.max(1, ...rows.map((row) => row.user_hours))
+  return (
+    <section
+      className="analytics-widget-ranking"
+      aria-label="Most watched widgets"
+    >
+      <header>
+        <h3>What stays on screen</h3>
+        <p>Ticker user-hours · top five widgets</p>
+      </header>
+      {rows.length ? (
+        <ol>
+          {rows.map((row) => (
+            <li key={row.widget_type}>
+              <div>
+                <span>{row.name || row.widget_type}</span>
+                <strong>{formatHours(row.user_hours)}</strong>
+              </div>
+              <div className="analytics-widget-track" aria-hidden="true">
+                <span style={{ width: `${(row.user_hours / max) * 100}%` }} />
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p>No widget observations in this window.</p>
+      )}
+    </section>
   )
 }
 
@@ -2060,12 +2107,13 @@ export function RevenueContent({
       verdict={verdict}
       sentence={sentence}
       chart={
-        <Figure
-          verdict={verdict}
+        <AnalyticsTrend
           kind="bars"
           buckets={r.earnings.curve}
           step={r.earnings.curve_step}
-          label={`Net earnings per bucket (${currency.toUpperCase()}, minor units)`}
+          title="Net earnings over time"
+          unit={currency.toUpperCase()}
+          format={money}
         />
       }
       facts={facts}
@@ -2445,12 +2493,12 @@ export function SupportContent({
       verdict={verdict}
       sentence={sentence}
       chart={
-        <Figure
-          verdict={verdict}
+        <AnalyticsTrend
           kind="bars"
           buckets={s.completed_curve}
           step={s.curve_step}
-          label="Tickets finished per bucket"
+          title="Tickets finished over time"
+          unit="Completed tickets per bucket"
         />
       }
       facts={facts}
