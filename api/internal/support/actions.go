@@ -41,8 +41,27 @@ var (
 	// ErrNotLinked is an unlink on a case with no issue on it.
 	ErrNotLinked = errors.New("no issue is linked to this case")
 	// ErrBadIssueKey is a Linear identifier that is not shaped like one.
-	ErrBadIssueKey = errors.New("not a Linear issue key")
+	ErrBadIssueKey  = errors.New("not a Linear issue key")
+	ErrReplyChanged = errors.New("this conversation changed or already has a reply in progress; refresh it before preparing another reply")
 )
+
+// ActionPrepareReply saves a human-written draft without running autonomous disposition or sending email.
+func ActionPrepareReply(ctx context.Context, ticket, body string, expectedDraft int64) (*SupportDraft, error) {
+	if strings.TrimSpace(body) == "" {
+		return nil, ErrEmptyBody
+	}
+	src, err := loadRegenSource(ctx, ticket)
+	if err != nil {
+		return nil, err
+	}
+	return insertSupportDraft(ctx, &SupportDraft{
+		TicketNumber: ticket, UserEmail: src.UserEmail, UserName: src.UserName,
+		OriginalSubject: src.Subject, UserMessageHTML: src.UserMessageHTML,
+		DraftBodyHTML: plainToHTMLParagraphs(strings.TrimSpace(body)),
+		Disposition:   dispositionEscalate, DispositionReason: "Your reply is saved. Review it and choose Send reply when ready.",
+		Intervened: true,
+	}, &expectedDraft)
+}
 
 // ErrAlreadyLinked reports the key that is already on the case, so a caller
 // can say which one rather than only refusing.

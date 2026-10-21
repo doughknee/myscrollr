@@ -729,6 +729,20 @@ export const adminApi = {
       getToken,
       { method: 'POST' },
     ),
+  prepareReply: (
+    getToken: Token,
+    ticket: string,
+    body: string,
+    expectedDraftId: number,
+  ) =>
+    adminFetch<CaseDetail>(
+      `/admin/support/case/${encodeURIComponent(ticket)}/reply`,
+      getToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({ body, expected_draft_id: expectedDraftId }),
+      },
+    ),
   restoreCase: (getToken: Token, ticket: string) =>
     adminFetch<CaseDetail>(
       `/admin/support/case/${encodeURIComponent(ticket)}/restore`,

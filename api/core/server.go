@@ -279,6 +279,7 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/admin/support/draft/:draft/bug", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminFileAsBug)
 	s.App.Post("/admin/support/case/:ticket/dismiss", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminDismissCase)
 	s.App.Post("/admin/support/case/:ticket/restore", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminRestoreCase)
+	s.App.Post("/admin/support/case/:ticket/reply", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminPrepareReply)
 	s.App.Post("/admin/support/case/:ticket/link", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminLinkIssue)
 	s.App.Delete("/admin/support/case/:ticket/link", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminUnlinkIssue)
 	s.App.Post("/admin/support/autosend", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminAutoSend)

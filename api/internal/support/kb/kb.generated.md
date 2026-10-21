@@ -778,8 +778,20 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.7.1 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ admin-v1.0.0 -->
 The last 8 published releases, newest first, as users read them.
+
+### Staff console — full-history search and unified workflows (`admin-v1.0.0`, 2026-10-21)
+
+The staff console now brings users, support and analytics into one consistent workspace.
+
+- Find users and tickets from any admin page with Search or Ctrl/Cmd+K. Ticket search includes all retained history, with older, closed and dismissed cases available in small, fast-loading pages.
+- Work comfortably on a phone: search controls stay visible while results scroll, replies and confirmation panels fit smaller screens, and navigation is easier to reach.
+- Explore growth, desktop usage, revenue and support with consistent filters and focused detail drawers. Signup diagnostics use warmed snapshots to reduce waiting.
+- Keep the support queue focused with reversible Dismiss and Restore controls, readable conversations and clearer attention states.
+- Start from an action-focused Home page, with System health and traffic organized into distinct views.
+
+This release updates the staff website and API. It does not change the desktop app version.
 
 ### Scrollr 1.7.1 — GitHub, rebuilt (`desktop-v1.7.1`, 2026-10-03)
 
@@ -900,13 +912,3 @@ Fixes: none user-facing in this release.
 - Fixed analytics delivery for internal testing without counting that activity as customer usage, and fixed daily usage counting for apps left running overnight.
 
 Your ticker contents, tracked symbols, teams, feeds and other apps' activity remain excluded. Existing settings and widgets are preserved when updating.
-
-### Scrollr 1.6.5 — App analytics, under your control (`desktop-v1.6.5`, 2026-09-11)
-
-#### New
-
-- **App analytics with a simple off switch.** Usage analytics is enabled by default for signed-in accounts and helps us understand app opens and broad feature usage. You can turn it off anytime in **Settings → Data & privacy → Share app analytics**. Ticker contents, tracked symbols, teams and feeds are excluded.
-
-#### Fixes
-
-- Changing an analytics preference no longer undoes another privacy setting you changed while it was saving.

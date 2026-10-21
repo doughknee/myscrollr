@@ -115,7 +115,7 @@ func TestCases_IngestOnEveryEvent(t *testing.T) {
 	}
 
 	// Follow-up via the webhook path. No ANTHROPIC_API_KEY → triage is nil
-	// and the function returns right after the case-DB write.
+	// and each attempt records a failure note after the idempotent user-message write.
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	processReplyTriageAsync(osTicketThreadMessageEvent{
 		Event: "thread.message", TicketNumber: "100", ThreadEntryID: 555,
@@ -150,10 +150,15 @@ func TestCases_IngestOnEveryEvent(t *testing.T) {
 	if c.Status != "closed" || tier != "uplink_pro" || appV != "1.6.2" || osV != "Windows 11" || cat != "bug" || prio != "high" || sum == "" {
 		t.Fatalf("case row wrong: status=%s tier=%s app=%s os=%s cat=%s prio=%s sum=%q", c.Status, tier, appV, osV, cat, prio, sum)
 	}
-	for kind, want := range map[string]int{"user": 2, "ai_draft": 2, "sent": 1, "note": 1} {
+	// Two failed triage attempts plus the deliberately skipped draft are visible in history.
+	for kind, want := range map[string]int{"user": 2, "ai_draft": 2, "sent": 1, "note": 3} {
 		if got := countMessages(t, "100", kind); got != want {
 			t.Errorf("%s messages: got %d want %d", kind, got, want)
 		}
+	}
+	var failures int
+	if err := platform.DBPool.QueryRow(ctx, `SELECT count(*) FROM support_messages WHERE ticket_number='100' AND kind='note' AND body_text='The bot could not prepare a reply to this follow-up. A staff reply is needed.'`).Scan(&failures); err != nil || failures != 2 {
+		t.Fatalf("triage failures were not recorded: count=%d err=%v", failures, err)
 	}
 	var sentEntry int64
 	var sentBody string

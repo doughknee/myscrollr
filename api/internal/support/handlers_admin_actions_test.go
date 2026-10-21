@@ -151,6 +151,7 @@ func registerAdminActionRoutes(app *fiber.App, gate ...fiber.Handler) {
 	post("/admin/support/draft/:draft/hold", HandleAdminHold)
 	post("/admin/support/draft/:draft/bug", HandleAdminFileAsBug)
 	post("/admin/support/case/:ticket/link", HandleAdminLinkIssue)
+	post("/admin/support/case/:ticket/reply", HandleAdminPrepareReply)
 	post("/admin/support/autosend", HandleAdminAutoSend)
 	app.Delete("/admin/support/case/:ticket/link",
 		append(append([]fiber.Handler{}, gate...), HandleAdminUnlinkIssue)...)
@@ -167,6 +168,7 @@ func everyWriteRoute(draftID string) []struct{ method, path string } {
 		{"POST", "/admin/support/draft/" + draftID + "/hold"},
 		{"POST", "/admin/support/draft/" + draftID + "/bug"},
 		{"POST", "/admin/support/case/900100/link"},
+		{"POST", "/admin/support/case/900100/reply"},
 		{"DELETE", "/admin/support/case/900100/link"},
 		{"POST", "/admin/support/autosend"},
 	}
