@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown } from 'lucide-react'
-import { ErrorPanel, RefreshButton, num, useReport } from './ui'
+import { ErrorPanel, PageFrame, RefreshButton, num, useReport } from './ui'
 import type { ReactNode } from 'react'
 import type { AdminOverview } from '@/api/admin'
 import type {
@@ -29,7 +29,11 @@ import {
   formatMinor,
   plural,
 } from '@/lib/adminFormat'
-import { isStale, verdicts } from '@/lib/overviewVerdicts'
+import {
+  MONITORED_FEEDS as FEEDS,
+  isStale,
+  verdicts,
+} from '@/lib/overviewVerdicts'
 
 /**
  * The Overview, at a glance (SCROLLR-215).
@@ -68,14 +72,6 @@ const TONE: Record<
   bad: { dot: 'bg-error', label: 'text-error', number: 'text-error' },
   none: { dot: 'bg-base-400', label: 'text-base-content/45', number: '' },
 }
-
-/** The four content feeds, in the order the sentence names them. */
-const FEEDS: ReadonlyArray<{ table: string; name: string }> = [
-  { table: 'games', name: 'Sports scores' },
-  { table: 'trades', name: 'Stock prices' },
-  { table: 'markets', name: 'Prediction markets' },
-  { table: 'rss_items', name: 'News headlines' },
-]
 
 /**
  * Live presence, re-read every 30 s while the page is visible. A poll error
@@ -244,39 +240,69 @@ export function OverviewContent({
     service,
   ].some((r) => r.loading)
   const headline = rows.headline
+  const needsAttention = (row: RowSpec) =>
+    row.verdict.tone === 'bad' ||
+    row.verdict.tone === 'warn' ||
+    (!!row.problem && !row.loading)
+  const attention = rows.rows.filter(needsAttention)
+  const pulse = rows.rows.filter((row) => !needsAttention(row))
 
   return (
-    /* Overview brings its own frame rather than PageFrame's: it wants the
-       narrower 960 measure, but the same gutters and top margin, now that
-       the console's <main> is full-bleed (SCROLLR-218). */
-    <div className="mx-auto w-full max-w-[960px] px-4 py-8 sm:px-6 lg:px-12">
-      <div className="flex items-start justify-between gap-6">
-        <h1 className="text-[48px] leading-[1.05] font-extrabold tracking-[-0.035em]">
-          {headline[0]}
-          <br />
-          {headline[1]}
-        </h1>
-        <RefreshButton onClick={onRefresh} loading={anyLoading} />
+    <PageFrame>
+      <div className="admin-overview">
+        <header className="flex items-start justify-between gap-6">
+          <div>
+            <h1 className="admin-page-heading">Home</h1>
+            <p className="mt-1 text-sm text-base-content/70">
+              {headline.join(' ')}
+            </p>
+          </div>
+          <RefreshButton onClick={onRefresh} loading={anyLoading} />
+        </header>
+
+        {[
+          { title: 'Needs attention', items: attention, urgent: true },
+          { title: 'At a glance', items: pulse, urgent: false },
+        ]
+          .filter((group) => group.items.length > 0)
+          .map((group) => (
+            <section
+              key={group.title}
+              className="admin-home-section"
+              aria-label={group.title}
+            >
+              <h2>
+                {group.title}
+                <span>
+                  {group.urgent
+                    ? 'Review and take action'
+                    : 'Live and the last 24 hours'}
+                </span>
+              </h2>
+              <ul>
+                {group.items.map((row) => (
+                  <OverviewRow
+                    key={row.key}
+                    row={row}
+                    actionable={group.urgent}
+                    open={open === row.key}
+                    onToggle={() =>
+                      setOpen((current) =>
+                        current === row.key ? null : row.key,
+                      )
+                    }
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+
+        <p className="mt-6 text-sm text-base-content/45">
+          Now and the last 24 hours. Each source keeps its own population.
+          Anything over a longer period lives in Analytics.
+        </p>
       </div>
-
-      <ul className="mt-10 border-t border-base-300/70">
-        {rows.rows.map((row) => (
-          <OverviewRow
-            key={row.key}
-            row={row}
-            open={open === row.key}
-            onToggle={() =>
-              setOpen((current) => (current === row.key ? null : row.key))
-            }
-          />
-        ))}
-      </ul>
-
-      <p className="mt-6 text-sm text-base-content/45">
-        Now and the last 24 hours. Each source keeps its own population.
-        Anything over a longer period lives in Analytics.
-      </p>
-    </div>
+    </PageFrame>
   )
 }
 
@@ -308,72 +334,77 @@ function OverviewRow({
   row,
   open,
   onToggle,
+  actionable,
 }: {
   row: RowSpec
   open: boolean
   onToggle: () => void
+  actionable: boolean
 }) {
   const tone = TONE[row.verdict.tone]
   const panelId = `overview-${row.key}`
   return (
     <li className="border-b border-base-300/70">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="grid w-full cursor-pointer grid-cols-[120px_1fr_132px_24px] items-center gap-7 py-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
-        style={{ minHeight: '104px' }}
-      >
-        <span
-          className={`flex justify-end text-[56px] leading-none font-extrabold tracking-[-0.04em] tabular-nums ${tone.number}`}
+      <div className="admin-home-row-actions">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="admin-overview-row grid w-full cursor-pointer grid-cols-[120px_1fr_132px_24px] items-center gap-7 py-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
         >
-          {row.icon ? (
-            row.icon === 'good' ? (
-              <Check size={44} className="text-primary" aria-hidden />
-            ) : (
-              <AlertTriangle
-                size={44}
-                className={row.icon === 'bad' ? 'text-error' : 'text-warning'}
-                aria-hidden
-              />
-            )
-          ) : (
-            row.number
-          )}
-        </span>
-        <span className="text-[22px] leading-snug font-semibold">
-          {row.main}
-          {row.secondary && (
-            <span className="font-medium text-base-content/50">
-              {' '}
-              {row.secondary}
-            </span>
-          )}
-        </span>
-        <span className="flex items-center justify-end gap-2">
           <span
-            className={`size-2.5 shrink-0 rounded-full ${tone.dot}`}
-            aria-hidden
-          />
-          <span className={`text-[14px] font-bold ${tone.label}`}>
-            {row.verdict.label}
+            className={`flex justify-end text-[56px] leading-none font-extrabold tracking-[-0.04em] tabular-nums ${tone.number}`}
+          >
+            {row.icon ? (
+              row.icon === 'good' ? (
+                <Check size={44} className="text-primary" aria-hidden />
+              ) : (
+                <AlertTriangle
+                  size={44}
+                  className={row.icon === 'bad' ? 'text-error' : 'text-warning'}
+                  aria-hidden
+                />
+              )
+            ) : (
+              row.number
+            )}
           </span>
-        </span>
-        <ChevronDown
-          size={20}
-          aria-hidden
-          className={
-            open
-              ? 'rotate-180 text-base-content transition-transform'
-              : 'text-base-content/35 transition-transform'
-          }
-        />
-      </button>
+          <span className="text-[22px] leading-snug font-semibold">
+            {row.main}
+            {row.secondary && (
+              <span className="font-medium text-base-content/50">
+                {' '}
+                {row.secondary}
+              </span>
+            )}
+          </span>
+          <span className="flex items-center justify-end gap-2">
+            <span
+              className={`size-2.5 shrink-0 rounded-full ${tone.dot}`}
+              aria-hidden
+            />
+            <span className={`text-[14px] font-bold ${tone.label}`}>
+              {row.verdict.label}
+            </span>
+          </span>
+          <ChevronDown
+            size={20}
+            aria-hidden
+            className={
+              open
+                ? 'rotate-180 text-base-content transition-transform'
+                : 'text-base-content/35 transition-transform'
+            }
+          />
+        </button>
+        {actionable && <div className="admin-home-action">{row.action}</div>}
+      </div>
       {open && (
-        <div id={panelId} style={{ padding: '4px 0 32px 148px' }}>
+        <div id={panelId} className="admin-overview-detail">
           {row.problem ? (
             <ErrorPanel
+              title="Report unavailable"
               message={row.problem.message}
               onRetry={row.problem.retry}
             />
@@ -395,7 +426,7 @@ function OverviewRow({
               <p className="mt-6 max-w-[640px] text-sm text-base-content/55">
                 {row.note}
               </p>
-              <div className="mt-5">{row.action}</div>
+              {!actionable && <div className="mt-5">{row.action}</div>}
             </>
           )}
         </div>
@@ -683,14 +714,9 @@ function moneyRow(
         : 'customers pay.'
       : 'The customer snapshot could not be read.',
     secondary: snapshot?.available
-      ? [
-          netToday > 0
-            ? `${money(netToday)} came in today.`
-            : 'Nothing came in today.',
-          ever ? `${ever} earned ever.` : null,
-        ]
-          .filter(Boolean)
-          .join(' ')
+      ? netToday > 0
+        ? `${money(netToday)} came in today.`
+        : 'Nothing came in today.'
       : r?.paying_now_note,
     verdict,
     facts: [
@@ -843,7 +869,7 @@ function feedsRow(
           ? `${broken.name} are not reporting any data.`
           : stale
             ? `${stale.name} have not updated for ${duration(reading(stale.table)?.age_seconds ?? 0)}.`
-            : 'Scores, prices, markets and news are up to date,',
+            : 'Scores, prices and news are up to date,',
     secondary:
       verdict.tone === 'none' || broken || stale
         ? undefined
@@ -871,7 +897,7 @@ function feedsRow(
     note: 'How long since each feed last received new data. Sports scores can sit for hours overnight when no games are being played, and that is normal.',
     action: (
       <Link to="/admin/versions" className={ACTION}>
-        Technical details
+        App and API health
       </Link>
     ),
     problem: problemOf(service),

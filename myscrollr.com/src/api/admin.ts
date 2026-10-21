@@ -193,6 +193,20 @@ export interface AccountRow {
   deletion_state: string | null
 }
 
+export interface TicketSearchPage {
+  rows: Array<{
+    ticket_number: string
+    subject: string
+    name: string
+    user_email: string
+    status: string
+    console_status: string
+    updated_at: string
+    legacy: boolean
+  }>
+  next_cursor?: string
+}
+
 export interface AccountsPage {
   accounts: Array<AccountRow>
   /** Accounts in Logto, or — when source is 'local' — accounts with local data. */
@@ -441,6 +455,7 @@ export interface SimilarCase {
 }
 
 export interface CaseDetail {
+  console_status?: '' | 'dismissed' | 'review'
   ticket_number: string
   subject: string
   user_email?: string
@@ -659,6 +674,21 @@ export const adminApi = {
     )
   },
 
+  searchTickets: (
+    getToken: Token,
+    query: string,
+    cursor = '',
+    signal?: AbortSignal,
+  ) => {
+    const params = new URLSearchParams({ q: query })
+    if (cursor) params.set('cursor', cursor)
+    return adminFetch<TicketSearchPage>(
+      `/admin/support/search?${params}`,
+      getToken,
+      { signal },
+    )
+  },
+
   supportCase: (getToken: Token, ticket: string, signal?: AbortSignal) =>
     adminFetch<CaseDetail>(
       `/admin/support/case/${encodeURIComponent(ticket)}`,
@@ -692,6 +722,19 @@ export const adminApi = {
 
   askUser: (getToken: Token, draftId: number, question: string) =>
     draftAction<CaseDetail>(getToken, draftId, 'ask', { question }),
+
+  dismissCase: (getToken: Token, ticket: string) =>
+    adminFetch<CaseDetail>(
+      `/admin/support/case/${encodeURIComponent(ticket)}/dismiss`,
+      getToken,
+      { method: 'POST' },
+    ),
+  restoreCase: (getToken: Token, ticket: string) =>
+    adminFetch<CaseDetail>(
+      `/admin/support/case/${encodeURIComponent(ticket)}/restore`,
+      getToken,
+      { method: 'POST' },
+    ),
 
   skipDraft: (getToken: Token, draftId: number) =>
     draftAction<CaseDetail>(getToken, draftId, 'skip'),

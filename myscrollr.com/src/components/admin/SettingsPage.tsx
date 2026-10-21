@@ -1,6 +1,13 @@
 import { useCallback, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { ErrorPanel, Loaded, PageFrame, useReport } from './ui'
+import {
+  DefinitionDisclosure,
+  EmptyState,
+  ErrorPanel,
+  Loaded,
+  PageFrame,
+  useReport,
+} from './ui'
 import type { AdminSettings, Setting } from '@/api/admin'
 import type { Report } from './ui'
 import { EXCLUDE_STAFF_SETTING, adminApi } from '@/api/admin'
@@ -90,13 +97,18 @@ export function SettingsContent({
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="admin-page-heading">Settings</h1>
         <p className="mt-1 text-sm text-base-content/70">
           Dashboard-wide switches. Saved on the server, so every admin sees the
           same numbers.
         </p>
       </header>
-      {saveError && <ErrorPanel message={saveError} />}
+      {saveError && (
+        <ErrorPanel
+          title="Setting not saved"
+          message={`The previous value has been restored. ${saveError}`}
+        />
+      )}
       <Loaded report={settings} label="settings">
         {(data) => (
           <StaffToggle
@@ -123,16 +135,14 @@ function StaffToggle({
   // it never reported, so it is shown as absent.
   if (!setting) {
     return (
-      <div className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
-        <p className="text-sm text-base-content/70">
-          The server did not report the staff-exclusion setting.
-        </p>
-      </div>
+      <EmptyState title="Setting unavailable">
+        <p>The server did not report the staff-exclusion setting.</p>
+      </EmptyState>
     )
   }
   const on = setting.value
   return (
-    <div className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+    <div className="admin-setting rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
           <h2
@@ -148,11 +158,13 @@ function StaffToggle({
             anyone's analytics consent. Test and synthetic accounts stay
             excluded regardless.
           </p>
-          <p className="mt-2 text-xs leading-relaxed text-base-content/60">
-            Measurements suppressed before this switch existed — staff daily
-            activity and identified staff website sessions — were never stored
-            and cannot be restored by turning it off.
-          </p>
+          <DefinitionDisclosure summary="Historical data limits">
+            <p>
+              Measurements suppressed before this switch existed — staff daily
+              activity and identified staff website sessions — were never stored
+              and cannot be restored by turning it off.
+            </p>
+          </DefinitionDisclosure>
         </div>
         <button
           type="button"

@@ -1,4 +1,6 @@
+import { populationQuery, verifyPopulation } from './analyticsPopulation'
 import { boundedAdminRequest } from './adminRequest'
+import type { AnalyticsPopulation } from './analyticsPopulation'
 
 export type AnalyticsApplication = 'website' | 'desktop'
 export type AnalyticsWindow = 7 | 30
@@ -11,12 +13,14 @@ export interface SignupStageMetrics {
 export interface SignupAnalytics {
   /** false = the scan could not finish; `reason` says why, all else is empty. */
   available: boolean
+  stale?: boolean
+  refreshing?: boolean
   reason?: string
   application: AnalyticsApplication
   window_days: AnalyticsWindow
   generated_at: string
   measurement: 'events'
-  stages: Record<string, SignupStageMetrics>
+  stages: Partial<Record<string, SignupStageMetrics>>
   error_reasons: Array<{ reason: string; count: number }>
   coverage: {
     status: 'partial' | 'unknown'
@@ -70,14 +74,15 @@ export interface Week1ReturnReport {
 export async function loadWeek1Return(
   getToken: () => Promise<string | null>,
   signal?: AbortSignal,
+  filters: AnalyticsPopulation = {},
 ): Promise<Week1ReturnReport> {
-  return loadBoundedAdminReport(
+  return loadBoundedAdminReport<Week1ReturnReport>(
     getToken,
-    '/admin/week1-return',
+    `/admin/week1-return${populationQuery(filters) ? `?${populationQuery(filters)}` : ''}`,
     'Could not load week-1 return',
     'Week-1 return took too long. Please retry.',
     signal,
-  )
+  ).then((value) => verifyPopulation(value, filters))
 }
 
 export async function loadBoundedAdminReport<T>(

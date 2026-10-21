@@ -508,7 +508,6 @@ export const overview: AdminOverview = {
   ingest: [
     { table: 'games', age_seconds: 90, has_data: true },
     { table: 'trades', age_seconds: 45, has_data: true },
-    { table: 'markets', age_seconds: 120, has_data: true },
     { table: 'rss_items', age_seconds: 200, has_data: true },
   ],
   downloads: {

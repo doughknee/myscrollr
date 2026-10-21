@@ -1,8 +1,20 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { SignupTrend } from './SignupTrend'
 import { AnalyticsTrend } from './AnalyticsTrend'
 import { ReportBoundary } from './ReportBoundary'
+import { AnalyticsDetails } from './AnalyticsDetails'
+import { AnalyticsStage } from './AnalyticsStage'
+import { AnalyticsPanels } from './AnalyticsPanels'
+import { AnalyticsWidgetTable } from './AnalyticsWidgetTable'
 import './analytics.css'
 import {
   Bars,
@@ -11,7 +23,6 @@ import {
   CoverageNote,
   DefinitionDisclosure,
   DeltaBadge,
-  LINK,
   Loaded,
   MetricValue,
   PageFrame,
@@ -50,12 +61,8 @@ import type {
   ScreensBucket,
   SupportSummary,
   Website,
-  WidgetRow,
 } from '@/api/adminDashboard'
-import type {
-  DailyProductCount,
-  RetentionMetric,
-} from '@/api/adminProductAnalytics'
+import type { RetentionMetric } from '@/api/adminProductAnalytics'
 import type { AnalyticsView } from '@/lib/adminFormat'
 import type { Verdict } from '@/lib/overviewVerdicts'
 import type { Report } from './ui'
@@ -68,13 +75,13 @@ import {
   loadWebsite,
 } from '@/api/adminDashboard'
 import { useGetToken } from '@/hooks/useGetToken'
+import { planLabel } from '@/lib/supportConsole'
 import {
   ANALYTICS_VIEWS,
   formatDuration,
   formatHours,
   formatMinor,
   formatWait,
-  periodFootnote,
   periodLabel,
   periodPhrase,
   plural,
@@ -110,6 +117,12 @@ const APPLICATIONS = [
   { value: 'desktop', label: 'Desktop app' },
 ] as const
 
+const RefreshStatusContext = createContext<{
+  view: AnalyticsView
+  message: string
+  retry: () => void
+} | null>(null)
+
 const STAGES = [
   { key: 'started', label: 'Registration started', path: 'Entry' },
   { key: 'identifier_submitted', label: 'Identifier submitted', path: 'Entry' },
@@ -132,7 +145,7 @@ const reasonLabel: Record<string, string> = {
   identifier: 'Identifier',
   password: 'Password',
   provider: 'Social provider',
-  unknown: 'Other safe category',
+  unknown: 'Unclassified errors',
   verification_code: 'Verification code',
 }
 
@@ -152,21 +165,26 @@ function AnalyticsWorkspace() {
   const navigate = useNavigate({ from: '/admin/analytics' })
   const [refresh, setRefresh] = useState(0)
   const { os, period, plan, version, view } = search
+  const populationKey = `${period}:${os ?? ''}:${version ?? ''}:${plan ?? ''}`
+  const filtered = Boolean(os || version || plan)
 
   const setSearch = (patch: Partial<typeof search>) =>
     navigate({
       search: (prev) => ({ ...prev, ...patch }),
       replace: true,
+      resetScroll: false,
     })
 
   const audience = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        return loadAudience(getToken, period, signal)
+        return loadAudience(getToken, period, signal, { os, version, plan })
       },
-      [getToken, period],
+      [getToken, os, period, plan, version],
     ),
-    period,
+    populationKey,
+    60_000,
+    true,
   )
   const website = useReport(
     useCallback(
@@ -176,6 +194,8 @@ function AnalyticsWorkspace() {
       [getToken, period],
     ),
     period,
+    60_000,
+    true,
   )
   const desktop = useReport(
     useCallback(
@@ -185,32 +205,70 @@ function AnalyticsWorkspace() {
       [getToken, os, period, plan, version],
     ),
     `${period}:${os ?? ''}:${version ?? ''}:${plan ?? ''}`,
+    60_000,
+    true,
   )
+  const [filterOptions, setFilterOptions] = useState<DesktopUsage | null>(null)
+  useEffect(() => {
+    if (desktop.data) setFilterOptions(desktop.data)
+  }, [desktop.data])
   const revenue = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        return loadRevenue(getToken, period, signal)
+        return loadRevenue(getToken, period, signal, { os, version, plan })
       },
-      [getToken, period],
+      [getToken, os, period, plan, version],
     ),
-    period,
+    populationKey,
+    60_000,
+    true,
   )
   const support = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        return loadSupportSummary(getToken, period, signal)
+        return loadSupportSummary(getToken, period, signal, {
+          os,
+          version,
+          plan,
+        })
       },
-      [getToken, period],
+      [getToken, os, period, plan, version],
     ),
-    period,
+    populationKey,
+    60_000,
+    true,
   )
   const week1Return = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        return loadWeek1Return(getToken, signal)
+        return loadWeek1Return(getToken, signal, { os, version, plan })
       },
-      [getToken],
+      [getToken, os, version, plan],
     ),
+    `${os ?? ''}:${version ?? ''}:${plan ?? ''}`,
+    60_000,
+    true,
+  )
+
+  const visibleReports =
+    view === 'growth'
+      ? [
+          { label: 'Accounts', report: audience },
+          ...(!filtered ? [{ label: 'Website', report: website }] : []),
+          { label: 'Return visits', report: week1Return },
+        ]
+      : [
+          {
+            label: {
+              desktop: 'Desktop usage',
+              revenue: 'Revenue',
+              support: 'Support',
+            }[view],
+            report: { desktop, revenue, support }[view],
+          },
+        ]
+  const retainedReports = visibleReports.filter(
+    ({ report }) => report.data && report.error,
   )
 
   const sectionVerdicts: Record<AnalyticsView, Verdict> = {
@@ -228,103 +286,178 @@ function AnalyticsWorkspace() {
             <h1>Analytics</h1>
             <p>How Scrollr is growing, and how people use it.</p>
           </div>
-          <span className="analytics-window">{periodLabel(period)}</span>
         </header>
-        <SectionNav
-          view={view}
-          period={period}
-          verdicts={sectionVerdicts}
-          refreshing={
-            view === 'growth'
-              ? [audience, website, desktop, week1Return].some((r) => r.loading)
-              : { desktop, revenue, support }[view].loading
-          }
-          onView={(next) => {
-            void setSearch({ view: next })
-          }}
-          onPeriod={(next) => setSearch({ period: next })}
-          onRefresh={() => {
-            if (view === 'growth') {
-              audience.retry()
-              website.retry()
-              desktop.retry()
-              week1Return.retry()
-              setRefresh((n) => n + 1)
-            } else if (view === 'desktop') desktop.retry()
-            else if (view === 'revenue') revenue.retry()
-            else support.retry()
-          }}
-        />
-        <div className="analytics-sections">
-          <div hidden={view !== 'growth'}>
-            <ReportBoundary
-              label="Growth"
-              resetKeys={[audience.data, website.data, desktop.data]}
-              onRetry={() => {
+        <div className="analytics-command-bar">
+          <SectionNav
+            view={view}
+            period={period}
+            verdicts={sectionVerdicts}
+            populationControls={
+              <div className="analytics-population-controls">
+                <DesktopFilters
+                  data={desktop.data ?? filterOptions}
+                  filters={{ os, version, plan }}
+                  onChange={(next) => void setSearch(next)}
+                />
+              </div>
+            }
+            mobilePopulationControls={
+              <details
+                className="analytics-mobile-filters"
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.currentTarget.open = false
+                    event.currentTarget.querySelector('summary')?.focus()
+                  }
+                }}
+              >
+                <summary>Filters{os || version || plan ? ' •' : ''}</summary>
+                <div className="analytics-mobile-filter-panel">
+                  <DesktopFilters
+                    data={desktop.data ?? filterOptions}
+                    filters={{ os, version, plan }}
+                    onChange={(next) => void setSearch(next)}
+                  />
+                </div>
+              </details>
+            }
+            refreshing={
+              view === 'growth'
+                ? [audience, website, desktop, week1Return].some(
+                    (r) => r.loading,
+                  )
+                : { desktop, revenue, support }[view].loading
+            }
+            onView={(next) => {
+              void setSearch({ view: next })
+            }}
+            onPeriod={(next) => setSearch({ period: next })}
+            onRefresh={() => {
+              if (view === 'growth') {
                 audience.retry()
                 website.retry()
                 desktop.retry()
-              }}
-            >
-              <GrowthContent
-                period={period}
-                verdict={sectionVerdicts.growth}
-                audience={audience}
-                website={website}
-                desktop={desktop}
-              />
-            </ReportBoundary>
-            <ReportBoundary
-              label="Week-1 return"
-              resetKeys={[week1Return.data]}
-              onRetry={week1Return.retry}
-            >
-              <Week1ReturnContent report={week1Return} />
-            </ReportBoundary>
-            <SignupDiagnosticsSection period={period} refresh={refresh} />
-          </div>
-          <div hidden={view !== 'desktop'}>
-            <ReportBoundary
-              label="Desktop usage"
-              resetKeys={[desktop.data]}
-              onRetry={desktop.retry}
-            >
-              <DesktopContent
-                period={period}
-                verdict={sectionVerdicts.desktop}
-                desktop={desktop}
-                filters={{ os, version, plan }}
-                onFilterChange={(next) => setSearch(next)}
-              />
-            </ReportBoundary>
-          </div>
-          <div hidden={view !== 'revenue'}>
-            <ReportBoundary
-              label="Revenue"
-              resetKeys={[revenue.data]}
-              onRetry={revenue.retry}
-            >
-              <RevenueContent
-                period={period}
-                verdict={sectionVerdicts.revenue}
-                revenue={revenue}
-              />
-            </ReportBoundary>
-          </div>
-          <div hidden={view !== 'support'}>
-            <ReportBoundary
-              label="Support"
-              resetKeys={[support.data]}
-              onRetry={support.retry}
-            >
-              <SupportContent
-                period={period}
-                verdict={sectionVerdicts.support}
-                support={support}
-              />
-            </ReportBoundary>
-          </div>
+                week1Return.retry()
+                setRefresh((n) => n + 1)
+              } else if (view === 'desktop') desktop.retry()
+              else if (view === 'revenue') revenue.retry()
+              else support.retry()
+            }}
+          />
         </div>
+        <RefreshStatusContext.Provider
+          value={
+            retainedReports.length
+              ? {
+                  view,
+                  message: `Showing saved results. ${retainedReports.map(({ label }) => label).join(', ')} couldn't refresh.`,
+                  retry: () =>
+                    retainedReports.forEach(({ report }) => report.retry()),
+                }
+              : null
+          }
+        >
+          <AnalyticsStage
+            transitionKey={`${view}:${period}:${os}:${version}:${plan}`}
+          >
+            <div
+              hidden={view !== 'growth'}
+              inert={view !== 'growth'}
+              aria-hidden={view !== 'growth'}
+            >
+              <ReportBoundary
+                label="Growth"
+                resetKeys={[audience.data, website.data, desktop.data]}
+                onRetry={() => {
+                  audience.retry()
+                  website.retry()
+                  desktop.retry()
+                }}
+              >
+                <GrowthContent
+                  period={period}
+                  verdict={sectionVerdicts.growth}
+                  audience={audience}
+                  website={website}
+                  populationFiltered={filtered}
+                  desktop={desktop}
+                  investigations={
+                    <>
+                      <ReportBoundary
+                        label="Week-1 return"
+                        resetKeys={[week1Return.data]}
+                        onRetry={week1Return.retry}
+                      >
+                        <Week1ReturnContent report={week1Return} />
+                      </ReportBoundary>
+                    </>
+                  }
+                  diagnostics={
+                    <SignupDiagnosticsSection
+                      period={period}
+                      refresh={refresh}
+                      expanded
+                    />
+                  }
+                />
+              </ReportBoundary>
+            </div>
+            <div
+              hidden={view !== 'desktop'}
+              inert={view !== 'desktop'}
+              aria-hidden={view !== 'desktop'}
+            >
+              <ReportBoundary
+                label="Desktop usage"
+                resetKeys={[desktop.data]}
+                onRetry={desktop.retry}
+              >
+                <DesktopContent
+                  period={period}
+                  verdict={sectionVerdicts.desktop}
+                  desktop={desktop}
+                  filters={{ os, version, plan }}
+                  onFilterChange={(next) => setSearch(next)}
+                  showFilters={false}
+                />
+              </ReportBoundary>
+            </div>
+            <div
+              hidden={view !== 'revenue'}
+              inert={view !== 'revenue'}
+              aria-hidden={view !== 'revenue'}
+            >
+              <ReportBoundary
+                label="Revenue"
+                resetKeys={[revenue.data]}
+                onRetry={revenue.retry}
+              >
+                <RevenueContent
+                  period={period}
+                  verdict={sectionVerdicts.revenue}
+                  revenue={revenue}
+                />
+              </ReportBoundary>
+            </div>
+            <div
+              hidden={view !== 'support'}
+              inert={view !== 'support'}
+              aria-hidden={view !== 'support'}
+            >
+              <ReportBoundary
+                label="Support"
+                resetKeys={[support.data]}
+                onRetry={support.retry}
+              >
+                <SupportContent
+                  period={period}
+                  verdict={sectionVerdicts.support}
+                  support={support}
+                />
+              </ReportBoundary>
+            </div>
+          </AnalyticsStage>
+        </RefreshStatusContext.Provider>
       </div>
     </PageFrame>
   )
@@ -485,6 +618,8 @@ export function SectionNav({
   onPeriod,
   onRefresh,
   refreshing = false,
+  populationControls,
+  mobilePopulationControls,
 }: {
   view: AnalyticsView
   period: Period
@@ -493,6 +628,8 @@ export function SectionNav({
   onPeriod: (period: Period) => void
   onRefresh?: () => void
   refreshing?: boolean
+  populationControls?: ReactNode
+  mobilePopulationControls?: ReactNode
 }) {
   return (
     <nav aria-label="Analytics sections" className="analytics-nav">
@@ -505,6 +642,7 @@ export function SectionNav({
               key={section.value}
               type="button"
               onClick={() => onView(section.value)}
+              aria-label={section.label}
               aria-current={current ? 'true' : undefined}
               className={
                 current
@@ -512,7 +650,18 @@ export function SectionNav({
                   : 'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-base-content/60 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary'
               }
             >
-              <span className="truncate">{section.label}</span>
+              <span className="truncate">
+                {section.value === 'desktop' ? (
+                  <>
+                    <span className="analytics-tab-long">Desktop usage</span>
+                    <span className="analytics-tab-short" aria-hidden>
+                      Desktop
+                    </span>
+                  </>
+                ) : (
+                  section.label
+                )}
+              </span>
               <span
                 className={`size-2 shrink-0 rounded-full ${tone.dot}`}
                 aria-hidden
@@ -522,22 +671,32 @@ export function SectionNav({
         })}
       </div>
       <div className="analytics-nav-controls">
-        <PeriodSelector value={period} onChange={onPeriod} />
+        <div className="analytics-control-scroll">
+          <div className="analytics-period-buttons">
+            <PeriodSelector value={period} onChange={onPeriod} />
+          </div>
+          <select
+            className="analytics-mobile-period"
+            aria-label="Time window"
+            value={period}
+            onChange={(event) => onPeriod(event.target.value as Period)}
+          >
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="lifetime">Lifetime</option>
+          </select>
+          {populationControls}
+          {mobilePopulationControls}
+        </div>
         {onRefresh && (
           <RefreshButton
             onClick={onRefresh}
             loading={refreshing}
-            label={refreshing ? 'Updating…' : 'Refresh'}
+            label="Refresh"
           />
         )}
       </div>
-      <details className="analytics-nav-note">
-        <summary>Window & population</summary>
-        <p>
-          {periodFootnote(period)} Current totals and weekly cohorts keep their
-          own windows.
-        </p>
-      </details>
     </nav>
   )
 }
@@ -616,6 +775,19 @@ export interface Fact {
   value: string | null
 }
 
+/** Keep the reported value intact while giving its unit a quieter visual weight. */
+function MetricText({ value }: { value: string | null }) {
+  const parts = value?.match(/^(.*) ([A-Z]{3}|h)$/)
+  return parts ? (
+    <>
+      {parts[1]}
+      <span className="analytics-metric-unit"> {parts[2]}</span>
+    </>
+  ) : (
+    <>{value ?? 'unknown'}</>
+  )
+}
+
 /**
  * A section: the question, the verdict, one sentence with the number that
  * answers it, one chart, the facts, and a note about what the numbers do and
@@ -630,10 +802,9 @@ function Question({
   chart,
   facts,
   note,
+  updatedAt,
   children,
-  factGroups,
   toolbar,
-  visual,
 }: {
   id: AnalyticsView
   title: string
@@ -642,14 +813,26 @@ function Question({
   sentence: ReactNode
   chart: ReactNode
   facts: Array<Fact>
-  factGroups?: Array<{ title: string; facts: Array<Fact> }>
   note: string
+  updatedAt?: string
   toolbar?: ReactNode
-  visual?: ReactNode
   children?: ReactNode
 }) {
   return (
-    <QuestionShell id={id} title={title} question={question} verdict={verdict}>
+    <QuestionShell
+      id={id}
+      title={title}
+      question={question}
+      verdict={verdict}
+      info={
+        <AnalyticsDetails compact title={`${title}: measurements`}>
+          <section>
+            <p className="analytics-method">{note}</p>
+            {updatedAt && <Stamp at={updatedAt} />}
+          </section>
+        </AnalyticsDetails>
+      }
+    >
       {toolbar}
       <div className="analytics-overview">
         <div className="analytics-key-numbers">
@@ -664,39 +847,27 @@ function Question({
                 }
               >
                 <dt>{fact.label}</dt>
-                <dd>{fact.value ?? 'unknown'}</dd>
+                <dd>
+                  <MetricText value={fact.value} />
+                </dd>
               </div>
             ))}
           </dl>
-          <p className="analytics-answer">{sentence}</p>
+          <p className="sr-only">{sentence}</p>
         </div>
         <div className="analytics-chart">{chart}</div>
       </div>
-      <div className={visual ? 'analytics-detail-grid' : undefined}>
-        {visual}
-        {factGroups ? (
-          <div className="analytics-fact-groups">
-            {factGroups.map((group) => {
-              const remaining = group.facts.filter(
-                (fact) =>
-                  !facts.slice(0, 3).some((main) => main.label === fact.label),
-              )
-              return remaining.length ? (
-                <div key={group.title}>
-                  <h3>{group.title}</h3>
-                  <FactList facts={remaining} />
-                </div>
-              ) : null
-            })}
-          </div>
-        ) : (
-          <FactList facts={facts.slice(3)} />
-        )}
-      </div>
-      <details className="analytics-method-disclosure">
-        <summary>Sources & measurement notes</summary>
-        <p className="analytics-method">{note}</p>
-      </details>
+
+      {facts.length > 3 && (
+        <dl className="analytics-signals">
+          {facts.slice(3, 6).map((fact) => (
+            <div key={fact.label}>
+              <dt>{fact.label}</dt>
+              <dd>{fact.value ?? 'unknown'}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       {children}
     </QuestionShell>
   )
@@ -709,13 +880,18 @@ function QuestionShell({
   question,
   verdict,
   children,
+  info,
 }: {
   id: AnalyticsView
   title: string
   question: string
   verdict: Verdict
+  info?: ReactNode
   children: ReactNode
 }) {
+  const refreshStatus = useContext(RefreshStatusContext)
+  const saved = refreshStatus?.view === id ? refreshStatus : null
+  const heading = useRef<HTMLHeadingElement>(null)
   return (
     <section
       id={id}
@@ -723,11 +899,38 @@ function QuestionShell({
       className="analytics-question"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-        <h2 id={`${id}-heading`} className="analytics-question-heading">
+        <h2
+          ref={heading}
+          tabIndex={-1}
+          id={`${id}-heading`}
+          className="analytics-question-heading"
+        >
           {title}
           <span>{question}</span>
         </h2>
-        <VerdictPill verdict={verdict} />
+        <div className="analytics-heading-actions">
+          {id === 'desktop' && (
+            <span className="analytics-verdict-context">App hours</span>
+          )}
+          {saved ? (
+            <span role="status" className="analytics-refresh-notice">
+              <button
+                type="button"
+                onClick={() => {
+                  heading.current?.focus({ preventScroll: true })
+                  saved.retry()
+                }}
+                title={saved.message}
+                aria-label={`${saved.message} Retry`}
+              >
+                Saved results · Retry
+              </button>
+            </span>
+          ) : (
+            <VerdictPill verdict={verdict} />
+          )}
+          {info}
+        </div>
       </div>
       {children}
     </section>
@@ -826,17 +1029,14 @@ function FactList({ facts }: { facts: Array<Fact> }) {
 }
 
 /** Everything a section used to show, one click away and closed by default. */
-function MoreDetail({ children }: { children: ReactNode }) {
-  return (
-    <details className="analytics-detail rounded-xl ring-1 ring-base-300/60">
-      <summary className="cursor-pointer p-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary">
-        More detail
-      </summary>
-      <div className="space-y-8 border-t border-base-300/60 p-4">
-        {children}
-      </div>
-    </details>
-  )
+function MoreDetail({
+  children,
+  title,
+}: {
+  children: ReactNode
+  title: string
+}) {
+  return <AnalyticsDetails title={title}>{children}</AnalyticsDetails>
 }
 
 /** A Metric as a fact value: a formatted number, or null when unavailable. */
@@ -901,6 +1101,9 @@ export interface GrowthContentProps {
   audience: Report<Audience>
   website: Report<Website>
   desktop: Report<DesktopUsage>
+  investigations?: ReactNode
+  diagnostics?: ReactNode
+  populationFiltered?: boolean
 }
 
 const GROWTH_QUESTION = 'Are new people showing up, and do they stick?'
@@ -908,28 +1111,137 @@ const GROWTH_QUESTION = 'Are new people showing up, and do they stick?'
 /**
  * "Signed up from the desktop app" reads Logto's own applicationId, so it is a
  * fact about the same population as the total rather than a PostHog count
- * subtracted from a Logto count. "Came back a second day" is the legacy
- * day-one retention series; when it says it is not available the fact reads
- * "unknown", never a zero.
+ * subtracted from a Logto count. Return visits have their own cohort report.
  */
 const GROWTH_NOTE =
-  'Sign-ups are counted from Logto. Each report states whether staff are excluded. "Finished setting up" means the account saved at least one widget. "Signed up from the desktop app" is the Logto application the account registered through; accounts with none recorded are neither. Sign-ups on the website are PostHog events on the site, a different count from Logto accounts. "Came back a second day" covers only accounts with usage analytics enabled.'
+  'Sign-ups are counted from Logto. Each report states whether staff are excluded. "Finished setting up" means the account saved at least one widget. "Signed up from the desktop app" is the Logto application the account registered through; accounts with none recorded are neither. Sign-ups on the website are PostHog events on the site, a different count from Logto accounts.'
 
-export function GrowthContent({
+export function GrowthContent(props: GrowthContentProps) {
+  const { audience, website, period, investigations, diagnostics } = props
+  return (
+    <>
+      <GrowthOverview {...props} />
+      <MoreDetail title="Acquisition details">
+        <AnalyticsPanels
+          panels={[
+            {
+              label: 'Accounts',
+              content: (
+                <Loaded report={audience} label="registered accounts">
+                  {(a) =>
+                    a.available ? (
+                      <Section id="accounts" title="From signup to setup">
+                        <FactList
+                          facts={[
+                            {
+                              label: 'Current accounts',
+                              value: num(a.total),
+                            },
+                            {
+                              label: 'Finished setting up the app',
+                              value: num(a.set_up),
+                            },
+                            {
+                              label: 'Never finished setting up',
+                              value: num(Math.max(a.total - a.set_up, 0)),
+                            },
+                            {
+                              label: `New accounts ${periodPhrase(period)}`,
+                              value: factOf(a.new),
+                            },
+                            {
+                              label: 'Signed up from the desktop app',
+                              value: a.signup_source.available
+                                ? num(a.signup_source.desktop)
+                                : null,
+                            },
+                            {
+                              label: `Signed in ${periodPhrase(period)}`,
+                              value: factOf(a.signed_in_in_period),
+                            },
+                            {
+                              label: 'Lifetime registrations',
+                              value: num(a.lifetime_registrations),
+                            },
+                            {
+                              label: 'Known deleted accounts',
+                              value:
+                                a.population &&
+                                Object.values(a.population).some(Boolean)
+                                  ? null
+                                  : num(a.known_purged),
+                            },
+                          ]}
+                        />
+                        <DefinitionDisclosure summary="Sources and counting rules">
+                          <p>{GROWTH_NOTE}</p>
+                          <p>{a.definition}</p>
+                          <DeltaBadge comparison={a.new.comparison} />
+                          <CoverageNote coverage={a.coverage} />
+                          <p>
+                            Sign-ins measure authentication, not usage. A
+                            running app with a valid token does not need to sign
+                            in again.
+                          </p>
+                          {a.staff_excluded && <StaffExcludedBadge />}
+                        </DefinitionDisclosure>
+                        <Stamp at={a.generated_at} />
+                      </Section>
+                    ) : (
+                      <Unmeasurable note={a.note ?? GROWTH_NOTE} />
+                    )
+                  }
+                </Loaded>
+              ),
+            },
+            {
+              label: 'Website',
+              content: props.populationFiltered ? (
+                <Unmeasurable note="Website visits are anonymous and cannot be linked to this account population. Clear filters to inspect website acquisition." />
+              ) : (
+                <Section id="website" title="Website acquisition">
+                  <FactList
+                    facts={[
+                      {
+                        label: 'Signed up on the website',
+                        value: website.data?.available
+                          ? factOf(website.data.signups)
+                          : null,
+                      },
+                    ]}
+                  />
+                  <Loaded report={website} label="website analytics">
+                    {(w) => (
+                      <WebsiteBlock
+                        website={w}
+                        windowLabel={periodLabel(period)}
+                      />
+                    )}
+                  </Loaded>
+                </Section>
+              ),
+            },
+            ...(investigations
+              ? [{ label: 'Return visits', content: investigations }]
+              : []),
+            ...(diagnostics
+              ? [{ label: 'Signup health', content: diagnostics, lazy: true }]
+              : []),
+          ]}
+        />
+      </MoreDetail>
+    </>
+  )
+}
+
+function GrowthOverview({
   period,
   verdict,
   audience,
   website,
-  desktop,
 }: GrowthContentProps) {
-  const windowLabel = periodLabel(period)
   const a = audience.data
   const w = website.data
-  // Day-one return is the legacy 30-second daily series, the one measurement
-  // that records whether an account came back — not presence retention,
-  // which counts a different population.
-  const d1 = desktop.data?.legacy?.retention.d1
-  const staffExcluded = [audience, website].some((r) => r.data?.staff_excluded)
 
   if (!a || !a.available || !a.new.available) {
     return (
@@ -963,12 +1275,11 @@ export function GrowthContent({
     },
     ...previousFact(period, a.new),
     { label: 'Accounts in total', value: num(a.total) },
-    { label: 'Finished setting up', value: num(a.set_up) },
+    { label: 'Finished setting up · current accounts', value: num(a.set_up) },
     {
-      label: 'Never finished setting up',
+      label: 'Never finished setting up · current accounts',
       value: num(Math.max(a.total - a.set_up, 0)),
     },
-    { label: 'Deleted their account', value: num(a.known_purged) },
     {
       label: 'Signed up from the desktop app',
       value: a.signup_source.available ? num(a.signup_source.desktop) : null,
@@ -978,8 +1289,11 @@ export function GrowthContent({
       value: w && w.available ? factOf(w.signups) : null,
     },
     {
-      label: 'Came back a second day',
-      value: d1?.available ? num(d1.returned) : null,
+      label: 'Deleted their account',
+      value:
+        a.population && Object.values(a.population).some(Boolean)
+          ? null
+          : num(a.known_purged),
     },
   ]
 
@@ -992,116 +1306,9 @@ export function GrowthContent({
       sentence={sentence}
       chart={<SignupTrend buckets={a.new_curve} step={a.curve_step} />}
       facts={facts}
-      factGroups={[
-        {
-          title: windowLabel,
-          facts: facts.filter(
-            (fact) =>
-              fact.label === `Signed up ${periodPhrase(period)}` ||
-              fact.label === previousFact(period, a.new)[0]?.label ||
-              fact.label === 'Signed up from the desktop app',
-          ),
-        },
-        {
-          title: 'Current account snapshot',
-          facts: facts.filter((fact) =>
-            [
-              'Accounts in total',
-              'Finished setting up',
-              'Never finished setting up',
-              'Deleted their account',
-            ].includes(fact.label),
-          ),
-        },
-        {
-          title: 'Separate measurements · different populations',
-          facts: facts.filter((fact) =>
-            ['Signed up on the website', 'Came back a second day'].includes(
-              fact.label,
-            ),
-          ),
-        },
-      ]}
-      note={GROWTH_NOTE}
-    >
-      <Stamp at={a.generated_at} />
-      <MoreDetail>
-        {staffExcluded && <StaffExcludedBadge />}
-        <Section
-          id="accounts"
-          title="Registered users"
-          lede="Logto is the system of record. Authentication is not app usage."
-        >
-          <div className="space-y-3">
-            <Stamp at={a.generated_at} />
-            <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Card title="Registered accounts" label="Current">
-                <Big>{num(a.total)}</Big>
-                <p className="mt-1 text-sm text-base-content/60">
-                  {a.staff_excluded
-                    ? `${num(a.excluded)} staff/test excluded`
-                    : 'staff included'}
-                </p>
-                <div className="mt-3 border-t border-base-300/60 pt-2">
-                  <Row label="Set up the app" value={num(a.set_up)} />
-                </div>
-              </Card>
-              <Card title="New accounts" label={windowLabel}>
-                <MetricValue metric={a.new}>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    <DeltaBadge comparison={a.new.comparison} />
-                  </p>
-                </MetricValue>
-                <div className="mt-3">
-                  <Sparkline
-                    buckets={a.new_curve}
-                    step={a.curve_step}
-                    label="New accounts per bucket"
-                  />
-                </div>
-              </Card>
-              <Card
-                title="Signed in"
-                label={windowLabel}
-                note="Accounts whose last sign-in falls in the window. Someone using the app on a token that never expired is not counted; this is authentication, not usage."
-              >
-                <MetricValue metric={a.signed_in_in_period}>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    <DeltaBadge comparison={a.signed_in_in_period.comparison} />
-                  </p>
-                </MetricValue>
-              </Card>
-              <Card
-                title="Lifetime registrations"
-                label="Current"
-                note="Only accounts that still exist. Purged accounts are known since local deletion tracking began; anything before that is unknown."
-              >
-                <Big>{num(a.lifetime_registrations)}</Big>
-                <div className="mt-3 border-t border-base-300/60 pt-2">
-                  <Row label="Known purged" value={num(a.known_purged)} />
-                </div>
-                <CoverageNote coverage={a.coverage} />
-              </Card>
-            </div>
-            <DefinitionDisclosure>
-              <p>{a.definition}</p>
-            </DefinitionDisclosure>
-          </div>
-        </Section>
-
-        <Section
-          id="website"
-          title="Website"
-          lede="PostHog pageviews. A visitor is a browser profile merged on sign-in, not guaranteed to be one human."
-        >
-          <Loaded report={website} label="website analytics">
-            {(loadedWebsite) => (
-              <WebsiteBlock website={loadedWebsite} windowLabel={windowLabel} />
-            )}
-          </Loaded>
-        </Section>
-      </MoreDetail>
-    </Question>
+      note={[GROWTH_NOTE, a.definition].filter(Boolean).join(' ')}
+      updatedAt={a.generated_at}
+    />
   )
 }
 
@@ -1114,19 +1321,22 @@ export function GrowthContent({
 export function SignupDiagnosticsSection({
   period,
   refresh = 0,
+  expanded = false,
 }: {
   period: Period
   refresh?: number
+  expanded?: boolean
 }) {
-  const [opened, setOpened] = useState(false)
+  const [opened, setOpened] = useState(expanded)
   const [application, setApplication] =
-    useState<AnalyticsApplication>('website')
+    useState<AnalyticsApplication>('desktop')
   return opened ? (
     <OpenedSignupDiagnostics
       period={period}
       refresh={refresh}
       application={application}
       onApplicationChange={setApplication}
+      embedded={expanded}
     />
   ) : (
     <SignupDiagnostics
@@ -1144,28 +1354,50 @@ function OpenedSignupDiagnostics({
   refresh,
   application,
   onApplicationChange,
+  embedded,
 }: {
   period: Period
+  embedded?: boolean
   refresh: number
   application: AnalyticsApplication
   onApplicationChange: (application: AnalyticsApplication) => void
 }) {
   const getToken = useGetToken()
+  const days = signupDays(period)
   const signup = useReport(
     useCallback(
       (signal: AbortSignal) => {
-        void refresh
-        return loadSignupAnalytics(
-          getToken,
-          application,
-          signupDays(period),
-          signal,
-        )
+        return loadSignupAnalytics(getToken, application, days, signal)
       },
-      [application, getToken, period, refresh],
+      [application, getToken, days],
     ),
-    `${application}:${signupDays(period)}`,
+    `${application}:${days}`,
+    5 * 60_000,
+    true,
   )
+  const retryRef = useRef(signup.retry)
+  retryRef.current = signup.retry
+  const lastRefresh = useRef(refresh)
+  useEffect(() => {
+    if (lastRefresh.current === refresh) return
+    lastRefresh.current = refresh
+    retryRef.current()
+  }, [refresh])
+  const pollStarted = useRef(0)
+  const [pollExpired, setPollExpired] = useState(false)
+  useEffect(() => {
+    pollStarted.current = Date.now()
+    setPollExpired(false)
+  }, [application, period, refresh])
+  useEffect(() => {
+    if (!signup.data?.refreshing || signup.loading) return
+    if (Date.now() - pollStarted.current > 45_000) {
+      setPollExpired(true)
+      return
+    }
+    const timer = window.setTimeout(() => retryRef.current(), 2_000)
+    return () => window.clearTimeout(timer)
+  }, [signup.data, signup.loading])
   return (
     <ReportBoundary
       label="Signup diagnostics"
@@ -1175,9 +1407,26 @@ function OpenedSignupDiagnostics({
       <SignupDiagnostics
         open
         period={period}
-        signup={signup}
+        signup={{
+          ...signup,
+          retry: () => {
+            pollStarted.current = Date.now()
+            setPollExpired(false)
+            signup.retry()
+          },
+          data:
+            signup.data && pollExpired
+              ? {
+                  ...signup.data,
+                  refreshing: false,
+                  reason:
+                    'The first scan is still being prepared. Retry to check for its result.',
+                }
+              : signup.data,
+        }}
         application={application}
         onApplicationChange={onApplicationChange}
+        embedded={embedded}
       />
     </ReportBoundary>
   )
@@ -1190,6 +1439,7 @@ export function SignupDiagnostics({
   onApplicationChange = () => {},
   open,
   onOpen,
+  embedded = false,
 }: {
   period: Period
   /** null until the disclosure has been opened: nothing is fetched before. */
@@ -1198,7 +1448,64 @@ export function SignupDiagnostics({
   onApplicationChange?: (application: AnalyticsApplication) => void
   open?: boolean
   onOpen?: () => void
+  embedded?: boolean
 }) {
+  const body = (
+    <div
+      className={
+        embedded
+          ? 'mt-5 space-y-4'
+          : 'space-y-3 border-t border-base-300/60 p-4'
+      }
+    >
+      <p className="analytics-detail-caption">
+        Registration events, not people or completed signups. OS, version and
+        plan filters do not apply to these pre-account logs.
+      </p>
+      <div className="analytics-diagnostic-controls">
+        <Selector
+          label="Application"
+          options={APPLICATIONS}
+          value={application}
+          onChange={onApplicationChange}
+        />
+        {signup?.retry && (
+          <RefreshButton
+            label="Refresh diagnostics"
+            onClick={signup.retry}
+            loading={signup.loading}
+          />
+        )}
+      </div>
+      {signup && (
+        <Loaded report={signup} label="signup diagnostics">
+          {(s) => (
+            <>
+              {s.stale && (
+                <p role="status" className="mb-3 text-xs text-base-content/60">
+                  Showing the last successful read <Stamp at={s.generated_at} />
+                  {s.refreshing
+                    ? ' · Updating in the background'
+                    : ' · Latest refresh unavailable; retry to check again'}
+                </p>
+              )}
+              <SignupBlock signup={s} />
+            </>
+          )}
+        </Loaded>
+      )}
+    </div>
+  )
+  if (embedded)
+    return (
+      <section aria-label="Signup diagnostics">
+        <h3 className="text-lg font-semibold">Signup health</h3>
+        <p className="mt-1 text-xs text-base-content/60">
+          Authentication logs · last {signupDays(period)} days
+        </p>
+        {body}
+      </section>
+    )
   return (
     <details
       className="rounded-xl ring-1 ring-base-300/60"
@@ -1208,29 +1515,12 @@ export function SignupDiagnostics({
       }}
     >
       <summary className="cursor-pointer p-4 text-base font-semibold focus-visible:outline-2 focus-visible:outline-primary">
-        Signup diagnostics
+        Signup diagnostics{' '}
         <span className="ml-2 text-xs font-normal text-base-content/60">
-          secondary · retained Logto registration events, last{' '}
-          {signupDays(period)} days
+          Troubleshoot registration · last {signupDays(period)} days
         </span>
       </summary>
-      <div className="space-y-3 border-t border-base-300/60 p-4">
-        <p className="text-sm text-base-content/60">
-          Troubleshooting data: registration events and safe error categories.
-          Counts are events, not people or completed signups.
-        </p>
-        <Selector
-          label="Application"
-          options={APPLICATIONS}
-          value={application}
-          onChange={onApplicationChange}
-        />
-        {signup && (
-          <Loaded report={signup} label="signup diagnostics">
-            {(s) => <SignupBlock signup={s} />}
-          </Loaded>
-        )}
-      </div>
+      {body}
     </details>
   )
 }
@@ -1256,7 +1546,7 @@ function BreakdownTable({
         <p className="text-sm text-base-content/65">Nothing in this window.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="analytics-breakdown-table w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-base-content/55">
                 <th className="py-1 pr-3 font-medium">{keyLabel}</th>
@@ -1267,7 +1557,7 @@ function BreakdownTable({
             <tbody>
               {list.map((row) => (
                 <tr key={row.key} className="border-t border-base-300/50">
-                  <td className="max-w-[16rem] truncate py-1 pr-3">
+                  <td className="py-1 pr-3" title={row.key || '(none)'}>
                     {row.key || '(none)'}
                   </td>
                   <td className="py-1 pr-3 text-right tabular-nums">
@@ -1305,8 +1595,9 @@ function WebsiteBlock({
       <Stamp at={w.generated_at}>
         {w.cached ? ' · cached PostHog answer' : ''}
       </Stamp>
-      <CoverageNote coverage={w.coverage} />
-      <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {w.coverage.partial && <CoverageNote coverage={w.coverage} />}
+      <p className="analytics-detail-caption">{windowLabel}</p>
+      <div className="analytics-stat-grid">
         {(
           [
             ['Unique visitors', w.visitors],
@@ -1315,15 +1606,49 @@ function WebsiteBlock({
             ['Signups', w.signups],
           ] as const
         ).map(([title, metric]) => (
-          <Card key={title} title={title} label={windowLabel}>
-            <MetricValue metric={metric}>
+          <Card key={title} title={title}>
+            <MetricValue
+              metric={
+                metric.available ? { ...metric, note: undefined } : metric
+              }
+            >
               <p className="mt-1 text-sm text-base-content/60">
-                <DeltaBadge comparison={metric.comparison} />
+                {metric.comparison.comparable ? (
+                  <DeltaBadge comparison={metric.comparison} />
+                ) : (
+                  <span className="text-xs">No comparable period</span>
+                )}
               </p>
             </MetricValue>
           </Card>
         ))}
       </div>
+      <p className="analytics-detail-caption">
+        Downloads count button clicks, not installs. Signups are website events
+        reported to PostHog.
+      </p>
+      <DefinitionDisclosure summary="Metric definitions and coverage">
+        <p>{w.definition}</p>
+        <CoverageNote coverage={w.coverage} />
+        {(
+          [
+            ['Unique visitors', w.visitors],
+            ['Pageviews', w.pageviews],
+            ['Downloads', w.downloads],
+            ['Signups', w.signups],
+          ] as const
+        ).map(
+          ([title, metric]) =>
+            (metric.note || metric.comparison.note) && (
+              <p key={title}>
+                <strong>{title}:</strong>{' '}
+                {[metric.note, metric.comparison.note]
+                  .filter(Boolean)
+                  .join(' ')}
+              </p>
+            ),
+        )}
+      </DefinitionDisclosure>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Pageviews per bucket" label={windowLabel}>
           <Bars buckets={w.curve} step={w.curve_step} label="Pageviews" />
@@ -1366,14 +1691,18 @@ function WebsiteBlock({
           note={w.breakdown_note}
         />
       </div>
-      <DefinitionDisclosure>
-        <p>{w.definition}</p>
-      </DefinitionDisclosure>
     </div>
   )
 }
 
 function SignupBlock({ signup }: { signup: SignupAnalytics }) {
+  if (!signup.available && signup.refreshing)
+    return (
+      <p role="status" className="py-6 text-sm text-base-content/60">
+        Preparing signup health… Results appear here automatically. You can keep
+        using Analytics.
+      </p>
+    )
   if (!signup.available) {
     return (
       <Unmeasurable
@@ -1382,21 +1711,28 @@ function SignupBlock({ signup }: { signup: SignupAnalytics }) {
     )
   }
   const eventTotal = Object.values(signup.stages).reduce(
-    (sum, stage) => sum + stage.events,
+    (sum, stage) => sum + (stage?.events ?? 0),
     0,
   )
   return (
     <>
-      <div className="rounded-xl bg-warning/5 p-4 text-sm ring-1 ring-warning/20">
-        <p className="font-semibold">
-          {signup.coverage.status === 'partial'
-            ? 'Partial coverage'
-            : 'Coverage limits unknown'}
+      <div className="analytics-diagnostic-summary">
+        <h3>
+          {eventTotal === 0
+            ? 'No registration events found'
+            : signup.error_reasons.length ||
+                Object.values(signup.stages).some(
+                  (stage) => (stage?.errors ?? 0) > 0,
+                )
+              ? 'Registration errors need a look'
+              : 'No registration errors found'}
+        </h3>
+        <p className="analytics-diagnostic-total">
+          <strong>{num(eventTotal)}</strong> observed registration events
         </p>
-        <p className="mt-1 text-base-content/65">{signup.coverage.note}</p>
-        <p className="mt-2 text-xs text-base-content/50">
-          {num(signup.coverage.unique_logs)} unique retained logs scanned ·
-          generated {new Date(signup.generated_at).toLocaleString()}
+        <p className="text-sm text-base-content/60">
+          Coverage is limited; missing events do not establish zero signups or a
+          completion rate.
         </p>
       </div>
       {eventTotal === 0 ? (
@@ -1405,46 +1741,55 @@ function SignupBlock({ signup }: { signup: SignupAnalytics }) {
           coverage, this is not proof of zero activity.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-base-200/40 text-left text-xs text-base-content/55">
-                <th className="px-4 py-3 font-medium">Path</th>
-                <th className="px-4 py-3 font-medium">Event</th>
-                <th className="px-4 py-3 text-right font-medium">Count</th>
-                <th className="px-4 py-3 text-right font-medium">Errors</th>
-              </tr>
-            </thead>
-            <tbody>
-              {STAGES.map((stage) => {
-                const metrics = signup.stages[stage.key] ?? {
-                  events: 0,
-                  errors: 0,
-                }
-                return (
-                  <tr key={stage.key} className="border-t border-base-300/50">
-                    <td className="px-4 py-2 text-base-content/55">
-                      {stage.path}
-                    </td>
-                    <td className="px-4 py-2 font-medium">{stage.label}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {num(metrics.events)}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-base-content/60">
-                      {num(metrics.errors)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <details className="analytics-diagnostic-events">
+          <summary>Inspect recorded steps</summary>
+          <div className="overflow-x-auto">
+            <table className="analytics-steps-table w-full text-sm">
+              <thead>
+                <tr className="bg-base-200/40 text-left text-xs text-base-content/55">
+                  <th className="px-4 py-3 font-medium">Event</th>
+                  <th className="px-4 py-3 text-right font-medium">Count</th>
+                  <th className="px-4 py-3 text-right font-medium">Errors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {STAGES.filter(
+                  (stage) =>
+                    (signup.stages[stage.key]?.events ?? 0) > 0 ||
+                    (signup.stages[stage.key]?.errors ?? 0) > 0,
+                ).map((stage) => {
+                  const metrics = signup.stages[stage.key] ?? {
+                    events: 0,
+                    errors: 0,
+                  }
+                  return (
+                    <tr key={stage.key} className="border-t border-base-300/50">
+                      <td className="px-4 py-2 font-medium">
+                        {stage.label}
+                        <span className="analytics-table-secondary">
+                          {stage.path}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {num(metrics.events)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-base-content/60">
+                        {num(metrics.errors)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
       )}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card
-          title="Safe error reasons"
-          note="Raw errors, emails, IP addresses, user agents, parameters, and tokens are discarded before this response is built."
-        >
+      <div className="space-y-4">
+        <Card title="Recorded errors">
+          <p className="mb-3 text-sm text-base-content/60">
+            Counts are error events, not affected people. Repeated attempts can
+            appear more than once.
+          </p>
           {signup.error_reasons.length === 0 ? (
             <p className="text-sm text-base-content/65">
               No recognized registration errors were observed.
@@ -1457,23 +1802,27 @@ function SignupBlock({ signup }: { signup: SignupAnalytics }) {
                   className="flex justify-between gap-4 py-2 text-sm"
                 >
                   <span>
-                    {reasonLabel[reason.reason] ?? 'Other safe category'}
+                    {reasonLabel[reason.reason] ?? 'Unclassified errors'}
                   </span>
-                  <strong className="tabular-nums">{num(reason.count)}</strong>
+                  <strong className="tabular-nums">
+                    {num(reason.count)} events
+                  </strong>
                 </li>
               ))}
             </ul>
           )}
         </Card>
-        <Card
-          title="Attempt conversion"
-          note="A missing later event is not proof of abandonment. Completion and drop-off stay unavailable until correlation and path semantics provide a real denominator."
-        >
-          <p className="text-sm text-base-content/65">
-            {signup.attempt_conversion.note}
-          </p>
-        </Card>
       </div>
+      <DefinitionDisclosure summary="Coverage and counting rules">
+        <p>{signup.coverage.note}</p>
+        <p>{signup.attempt_conversion.note}</p>
+        <p>
+          Unclassified errors have no recognized safe category. Sensitive error
+          details are excluded from this report.
+        </p>
+        <p>{num(signup.coverage.unique_logs)} unique logs scanned.</p>
+      </DefinitionDisclosure>
+      <Stamp at={signup.generated_at} />
     </>
   )
 }
@@ -1486,15 +1835,8 @@ export interface DesktopContentProps {
   desktop: Report<DesktopUsage>
   filters: DesktopFilterQuery
   onFilterChange?: (filters: DesktopFilterQuery) => void
+  showFilters?: boolean
 }
-
-type WidgetSort = 'users' | 'user_hours' | 'screen_hours'
-
-const WIDGET_SORTS: ReadonlyArray<{ value: WidgetSort; label: string }> = [
-  { value: 'users', label: 'Users' },
-  { value: 'user_hours', label: 'User-hours' },
-  { value: 'screen_hours', label: 'Screen-hours' },
-]
 
 function FilterSelect({
   label,
@@ -1509,9 +1851,16 @@ function FilterSelect({
   value: string | undefined
   onChange: (value: string | undefined) => void
 }) {
-  const id = `desktop-filter-${name}`
+  const filterId = useId()
+  const id = `desktop-filter-${name}-${filterId}`
+  const optionLabel = (key: string) =>
+    name === 'plan'
+      ? planLabel(key)
+      : name === 'os'
+        ? ({ windows: 'Windows', macos: 'macOS', linux: 'Linux' }[key] ?? key)
+        : key
   return (
-    <label htmlFor={id} className="flex items-center gap-2 text-sm">
+    <label htmlFor={id} className={`analytics-filter analytics-filter-${name}`}>
       <span className="text-base-content/60">{label}</span>
       <select
         id={id}
@@ -1520,13 +1869,20 @@ function FilterSelect({
         onChange={(event) => onChange(event.target.value || undefined)}
         className="min-h-10 rounded-lg bg-base-100 px-2 text-sm ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <option value="">All</option>
+        <option value="">
+          All{' '}
+          {name === 'os'
+            ? 'systems'
+            : name === 'version'
+              ? 'versions'
+              : 'plans'}
+        </option>
         {value && !options.some((option) => option.value === value) && (
-          <option value={value}>{value}</option>
+          <option value={value}>{optionLabel(value)}</option>
         )}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.value} ({num(option.count)})
+            {optionLabel(option.value)} ({num(option.count)})
           </option>
         ))}
       </select>
@@ -1547,16 +1903,12 @@ function DesktopFilters({
   const fields = [
     ['os', 'OS'],
     ['version', 'Version'],
-    ['plan', 'Plan (current)'],
+    ['plan', 'Plan'],
   ] as const
-  const visible = fields.filter(
-    ([key]) => filters[key] || (data?.filters[key]?.length ?? 0) > 0,
-  )
-  if (!visible.length) return null
   return (
     <div className="analytics-filters">
       <div className="flex flex-wrap items-center gap-4 rounded-xl bg-base-200/30 p-3 ring-1 ring-base-300/60">
-        {visible.map(([key, label]) => (
+        {fields.map(([key, label]) => (
           <FilterSelect
             key={key}
             label={label}
@@ -1566,20 +1918,17 @@ function DesktopFilters({
             onChange={(value) => onChange({ ...filters, [key]: value })}
           />
         ))}
-        {active && (
-          <button
-            type="button"
-            className="min-h-10 rounded-lg px-3 text-sm text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary"
-            onClick={() =>
-              onChange({ os: undefined, version: undefined, plan: undefined })
-            }
-          >
-            Reset filters
-          </button>
-        )}
-        {data?.filters.note && (
-          <p className="text-xs text-base-content/60">{data.filters.note}</p>
-        )}
+        <button
+          type="button"
+          disabled={!active}
+          aria-label="Reset filters"
+          className="min-h-10 rounded-lg px-3 text-sm text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary"
+          onClick={() =>
+            onChange({ os: undefined, version: undefined, plan: undefined })
+          }
+        >
+          Reset
+        </button>
       </div>
     </div>
   )
@@ -1588,17 +1937,7 @@ function DesktopFilters({
 const DESKTOP_QUESTION = 'Who is actually using the app, and how much?'
 
 const DESKTOP_NOTE =
-  'Hours are added across everyone: two people for one hour each is two hours. Legacy 30-second ticker facts from older versions are kept separate and never mixed in.'
-
-/** The widget with the most screen time, as "NFL · 210.5 h". */
-function mostShownWidget(widgets: DesktopUsage['widgets']): string | null {
-  const rows = widgets.rows ?? []
-  if (rows.length === 0) return null
-  const top = rows.reduce((best, row) =>
-    row.user_hours > best.user_hours ? row : best,
-  )
-  return `${top.name} · ${formatHours(top.user_hours)}`
-}
+  'Measured by Scrollr while usage sharing is enabled. Hours are added across everyone: two people for one hour each is two hours. OS and version filters count each computer separately.'
 
 /**
  * Additions and removals carry no OS or version, so under a per-computer
@@ -1630,10 +1969,17 @@ export function DesktopContent({
   desktop,
   filters,
   onFilterChange = () => {},
+  showFilters = true,
 }: DesktopContentProps) {
-  const windowLabel = periodLabel(period)
   const d = desktop.data
-  const toolbar = (
+  const coverage = d && {
+    ...d.coverage,
+    note: d.coverage.note?.replace(
+      'Older builds still count in the legacy recently-seen figure. ',
+      '',
+    ),
+  }
+  const toolbar = showFilters && (
     <DesktopFilters data={d} filters={filters} onChange={onFilterChange} />
   )
 
@@ -1652,7 +1998,6 @@ export function DesktopContent({
     )
   }
 
-  const d1 = d.retention.d1
   const sentence = (
     <>
       <Headline verdict={verdict}>
@@ -1672,33 +2017,20 @@ export function DesktopContent({
   const facts: Array<Fact> = [
     { label: 'People who ran the app', value: factOf(d.unique_users) },
     {
-      label: 'Hours the app was open, everyone added up',
+      label: 'App hours · all users',
       value: factOf(d.user_hours, formatHours),
     },
     {
-      label: 'Hours the ticker was visible',
+      label: 'Ticker hours · all users',
       value: factOf(d.ticker_user_hours, formatHours),
-    },
-    {
-      label: 'Most people online at once',
-      value: d.peak.available ? num(d.peak.users) : null,
     },
     {
       label: 'Using two or more monitors',
       value: multiScreenUsers(d.screens_per_user),
     },
     {
-      label: 'Came back the next day',
-      value: d1.available ? `${num(d1.returned)} of ${num(d1.eligible)}` : null,
-    },
-    { label: 'Most-shown widget', value: mostShownWidget(d.widgets) },
-    {
-      label: `Widgets added ${periodPhrase(period)}`,
-      value: widgetChanges(d.widgets, 'added'),
-    },
-    {
-      label: `Widgets removed ${periodPhrase(period)}`,
-      value: widgetChanges(d.widgets, 'removed'),
+      label: 'Peak simultaneous users',
+      value: d.peak.available ? num(d.peak.users) : null,
     },
   ]
 
@@ -1720,148 +2052,130 @@ export function DesktopContent({
       }
       facts={facts}
       toolbar={toolbar}
-      visual={<WidgetRanking widgets={d.widgets} />}
-      note={[d.coverage.note, DESKTOP_NOTE].filter(Boolean).join(' ')}
+      note={[coverage?.note, DESKTOP_NOTE].filter(Boolean).join(' ')}
+      updatedAt={d.generated_at}
     >
-      <Stamp at={d.generated_at} />
-      <MoreDetail>
+      <MoreDetail title="Usage details">
         <div className="flex flex-wrap items-center gap-3">
           {d.staff_excluded && <StaffExcludedBadge />}
-          <Link to="/admin/versions" className={LINK}>
-            Version adoption and error rates → Versions
+          <Link
+            to="/admin/versions"
+            search={{ view: 'traffic' }}
+            className="analytics-drawer-utility"
+            title="Version adoption and error rates"
+          >
+            System <span aria-hidden>↗</span>
           </Link>
         </div>
-        <CoverageNote coverage={d.coverage} />
-
-        <Section
-          id="presence"
-          title="Presence"
-          lede="App-running and ticker-shown time from the desktop presence reporter (1.6.7+)."
-        >
-          <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card title="Unique app users" label={windowLabel}>
-              <MetricValue metric={d.unique_users}>
-                <p className="mt-1 text-sm text-base-content/60">
-                  <DeltaBadge comparison={d.unique_users.comparison} />
-                </p>
-              </MetricValue>
-            </Card>
-            {(
-              [
-                ['App-running user-hours', d.user_hours],
-                ['Ticker-shown user-hours', d.ticker_user_hours],
-                ['Ticker screen-hours', d.screen_hours],
-              ] as const
-            ).map(([title, metric]) => (
-              <Card key={title} title={title} label={windowLabel}>
-                <MetricValue metric={metric} format={formatHours}>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    <DeltaBadge
-                      comparison={metric.comparison}
-                      format={(v) => `${v > 0 ? '+' : ''}${formatHours(v)}`}
-                    />
-                  </p>
-                </MetricValue>
-              </Card>
-            ))}
-          </div>
-          <div className="grid items-start gap-4 lg:grid-cols-3">
-            <Card
-              title="Peak concurrency"
-              label={windowLabel}
-              note={
-                d.peak.available
-                  ? `${d.peak.resolution_seconds}-second samples of the live index; a spike shorter than that is not seen.`
-                  : undefined
-              }
-            >
-              {d.peak.available ? (
+        <AnalyticsPanels
+          panels={[
+            {
+              label: 'Time & screens',
+              content: (
                 <>
-                  <Big>{num(d.peak.users)}</Big>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    users at once
-                    {d.peak.at
-                      ? ` · ${new Date(d.peak.at).toLocaleString()}`
-                      : ''}
-                  </p>
-                  <div className="mt-3 border-t border-base-300/60 pt-2">
-                    <Row
-                      label="With ticker(s)"
-                      value={num(d.peak.ticker_users)}
-                    />
-                    <Row label="Screens" value={num(d.peak.screens)} />
-                  </div>
+                  {' '}
+                  <Section id="presence" title="Time spent with Scrollr">
+                    <p className="analytics-detail-caption">
+                      {periodLabel(period)} · totals across the selected users
+                    </p>
+                    <div className="analytics-presence-metrics">
+                      <FactList
+                        facts={[
+                          {
+                            label: 'App open - total hours',
+                            value: factOf(d.user_hours, formatHours),
+                          },
+                          {
+                            label: 'Ticker visible - total hours',
+                            value: factOf(d.ticker_user_hours, formatHours),
+                          },
+                          {
+                            label:
+                              'Ticker screen-hours - includes multiple screens',
+                            value: factOf(d.screen_hours, formatHours),
+                          },
+                          {
+                            label: 'Peak simultaneous users',
+                            value: d.peak.available ? num(d.peak.users) : null,
+                          },
+                        ]}
+                      />
+                    </div>
+                    <DefinitionDisclosure>
+                      <p>{d.definition}</p>
+                      <CoverageNote coverage={coverage!} />
+                      <p>
+                        {d.peak.available
+                          ? `Peak uses ${d.peak.resolution_seconds}-second samples.`
+                          : d.peak.note}
+                      </p>
+                      {d.filters.note && <p>{d.filters.note}</p>}
+                    </DefinitionDisclosure>
+                  </Section>
                 </>
-              ) : (
-                <Unmeasurable note={d.peak.note} />
-              )}
-            </Card>
-            <Card
-              title="Screens per session"
-              label={windowLabel}
-              note="Sessions are computers. Two ticker windows on one computer are two screens."
-            >
-              {(d.screens_per_user ?? []).length === 0 ? (
-                <p className="text-sm text-base-content/65">
-                  No sessions in this window.
-                </p>
-              ) : (
-                (d.screens_per_user ?? []).map((b) => (
-                  <Row
-                    key={b.screens}
-                    label={`${b.screens} screen${b.screens === '1' ? '' : 's'}`}
-                    value={`${num(b.sessions)} sessions · ${num(b.users)} users`}
-                  />
-                ))
-              )}
-            </Card>
-            <Card title="Users per bucket" label={windowLabel}>
-              <Sparkline
-                buckets={d.users_curve}
-                step={d.curve_step}
-                label="Distinct app-running users per bucket"
-              />
-            </Card>
-          </div>
-          <DefinitionDisclosure>
-            <p>{d.definition}</p>
-          </DefinitionDisclosure>
-        </Section>
-
-        <Section
-          id="retention"
-          title="Presence retention"
-          lede={d.retention.definition}
-        >
-          <div className="grid gap-4 sm:grid-cols-3">
-            <RetentionCard metric={d.retention.d1} />
-            <RetentionCard metric={d.retention.d7} />
-            <RetentionCard metric={d.retention.d30} />
-          </div>
-        </Section>
-
-        <Section
-          id="widgets"
-          title="Widget types"
-          lede={`Share is of ${num(d.widgets.measured_ticker_users)} measured ticker users in the window.`}
-        >
-          <WidgetTable widgets={d.widgets} />
-          <DefinitionDisclosure>
-            <p>{d.widgets.definition}</p>
-            <p>{d.widgets.repeat_note}</p>
-            <p>{d.widgets.changes_note}</p>
-          </DefinitionDisclosure>
-        </Section>
-
-        <Section id="legacy" title="Legacy measurement" lede={d.legacy_note}>
-          {d.legacy ? (
-            <LegacyBlock legacy={d.legacy} />
-          ) : (
-            <p className="text-sm text-base-content/65">
-              The legacy series is not available for this window.
-            </p>
-          )}
-        </Section>
+              ),
+            },
+            {
+              label: 'Return visits',
+              content: (
+                <>
+                  {' '}
+                  <Section
+                    id="retention"
+                    title="Do people return?"
+                    lede={
+                      d.population
+                        ? 'Mature cohorts in the selected population · independent of the chart time window.'
+                        : 'All mature cohorts · independent of time, OS, version and plan filters.'
+                    }
+                  >
+                    <div className="analytics-return-rates">
+                      <RetentionCard metric={d.retention.d1} />
+                      <RetentionCard metric={d.retention.d7} />
+                      <RetentionCard metric={d.retention.d30} />
+                    </div>
+                    <DefinitionDisclosure>
+                      <p>{d.retention.definition}</p>
+                    </DefinitionDisclosure>
+                  </Section>
+                </>
+              ),
+            },
+            {
+              label: 'Widgets',
+              content: (
+                <>
+                  {' '}
+                  <Section
+                    id="widgets"
+                    title="Widget types"
+                    lede={`Share is of ${num(d.widgets.measured_ticker_users)} measured ticker users in the window.`}
+                  >
+                    <WidgetRanking widgets={d.widgets} />
+                    <FactList
+                      facts={[
+                        {
+                          label: `Widgets added ${periodPhrase(period)}`,
+                          value: widgetChanges(d.widgets, 'added'),
+                        },
+                        {
+                          label: `Widgets removed ${periodPhrase(period)}`,
+                          value: widgetChanges(d.widgets, 'removed'),
+                        },
+                      ]}
+                    />
+                    <AnalyticsWidgetTable widgets={d.widgets} />
+                    <DefinitionDisclosure>
+                      <p>{d.widgets.definition}</p>
+                      <p>{d.widgets.repeat_note}</p>
+                      <p>{d.widgets.changes_note}</p>
+                    </DefinitionDisclosure>
+                  </Section>
+                </>
+              ),
+            },
+          ]}
+        />
       </MoreDetail>
     </Question>
   )
@@ -1904,13 +2218,23 @@ function WidgetRanking({ widgets }: { widgets: DesktopUsage['widgets'] }) {
 
 function RetentionCard({ metric }: { metric: RetentionMetric }) {
   return (
-    <Card title={`Day ${metric.day} retention`}>
+    <section className="analytics-retention-row">
+      <header>
+        <h3>{`Day ${metric.day} retention`}</h3>
+        {metric.available && <strong>{pct(metric.rate)}</strong>}
+      </header>
       {metric.available ? (
         <>
-          <Big>{pct(metric.rate)}</Big>
-          <p className="mt-1 text-sm text-base-content/60">
+          <div className="analytics-return-track" aria-hidden="true">
+            <span
+              style={{
+                width: `${Math.max(0, Math.min(100, metric.rate * 100))}%`,
+              }}
+            />
+          </div>
+          <p>
             {num(metric.returned)} of {num(metric.eligible)} mature accounts
-            returned on exactly day {metric.day}
+            returned on exactly day {metric.day}.
           </p>
         </>
       ) : (
@@ -1918,191 +2242,9 @@ function RetentionCard({ metric }: { metric: RetentionMetric }) {
           {metric.note ?? 'Collecting history.'}
         </p>
       )}
-    </Card>
+    </section>
   )
 }
-
-function WidgetTable({ widgets }: { widgets: DesktopUsage['widgets'] }) {
-  const [sort, setSort] = useState<WidgetSort>('users')
-  const rows = [...(widgets.rows ?? [])].sort((a, b) => b[sort] - a[sort])
-  const categories = widgets.categories ?? []
-  if (rows.length === 0 && categories.length === 0) {
-    return (
-      <p className="rounded-xl p-4 text-sm text-base-content/65 ring-1 ring-base-300/60">
-        No widget was displayed on a measured ticker in this window.
-      </p>
-    )
-  }
-  const th = 'px-3 py-2 text-right font-medium whitespace-nowrap'
-  const td = 'px-3 py-2 text-right tabular-nums'
-  return (
-    <div className="space-y-3">
-      <Selector
-        label="Sort widgets by"
-        options={WIDGET_SORTS}
-        value={sort}
-        onChange={setSort}
-      />
-      <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-base-200/40 text-left text-xs text-base-content/55">
-              <th className="px-3 py-2 font-medium">Widget</th>
-              <th className={th}>Users</th>
-              <th className={th}>Share</th>
-              <th className={th}>User-hours</th>
-              <th className={th}>Screen-hours</th>
-              <th className={th}>Repeat users</th>
-              <th className={th}>Added / removed</th>
-              <th className={th}>Configured / enabled</th>
-              <th className={th}>Trend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categories.map((c) => (
-              <tr
-                key={`category-${c.category}`}
-                className="border-t border-base-300/50 bg-base-200/20 font-semibold"
-              >
-                <td className="px-3 py-2 capitalize">
-                  {c.category}{' '}
-                  <span className="text-xs font-normal text-base-content/55">
-                    {num(c.widgets)} types
-                  </span>
-                </td>
-                <td className={td}>{num(c.users)}</td>
-                <td className={td}>{pct(c.share)}</td>
-                <td className={td}>{formatHours(c.user_hours)}</td>
-                <td className={td}>{formatHours(c.screen_hours)}</td>
-                <td className={td}>—</td>
-                <td className={td}>—</td>
-                <td className={td}>—</td>
-                <td className={td}>—</td>
-              </tr>
-            ))}
-            {rows.map((row) => (
-              <WidgetTableRow
-                key={row.widget_type}
-                row={row}
-                changesAvailable={widgets.changes_available}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-base-content/60">
-        Share: of {num(widgets.measured_ticker_users)} measured ticker users.
-        Repeat users show “—” for windows under 7 days.
-      </p>
-    </div>
-  )
-}
-
-function WidgetTableRow({
-  row,
-  changesAvailable,
-}: {
-  row: WidgetRow
-  changesAvailable: boolean
-}) {
-  const td = 'px-3 py-2 text-right tabular-nums'
-  return (
-    <tr className="border-t border-base-300/50">
-      <td className="px-3 py-2">
-        <span className="font-medium">{row.name || row.widget_type}</span>
-        <span className="ml-2 text-xs text-base-content/55 capitalize">
-          {row.category}
-        </span>
-      </td>
-      <td className={td}>{num(row.users)}</td>
-      <td className={td}>{pct(row.share)}</td>
-      <td className={td}>{formatHours(row.user_hours)}</td>
-      <td className={td}>{formatHours(row.screen_hours)}</td>
-      <td className={td}>
-        {row.repeat_users === null ? '—' : num(row.repeat_users)}
-      </td>
-      <td className={td}>
-        {changesAvailable ? (
-          <>
-            +{num(row.added)} / −{num(row.removed)}
-          </>
-        ) : (
-          '—'
-        )}
-      </td>
-      <td className={td}>
-        {num(row.configured)} / {num(row.enabled)}
-      </td>
-      <td className={td}>
-        <DeltaBadge comparison={row.comparison} />
-      </td>
-    </tr>
-  )
-}
-
-/** The old daily facts, drawn as buckets so the same chart code serves. */
-function dailyBuckets(points: Array<DailyProductCount>) {
-  return points.map((p) => ({ start: p.day, end: p.day, value: p.count }))
-}
-
-function LegacyBlock({
-  legacy,
-}: {
-  legacy: NonNullable<DesktopUsage['legacy']>
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl bg-primary/5 p-4 text-sm ring-1 ring-primary/20">
-        <p>{legacy.population_note}</p>
-        <p className="mt-1 text-xs text-base-content/60">
-          {legacy.collection_started_at
-            ? `Collection began ${new Date(legacy.collection_started_at).toLocaleDateString()}. No history is backfilled.`
-            : 'No participating accounts yet.'}
-        </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card title="Participating accounts">
-          <Big>{num(legacy.enrolled_accounts)}</Big>
-        </Card>
-        <Card title="Measured daily active">
-          <Big>{num(legacy.activity.dau)}</Big>
-        </Card>
-        <Card title="Measured 7-day active">
-          <Big>{num(legacy.activity.wau)}</Big>
-        </Card>
-        <Card title="Measured 30-day active">
-          <Big>{num(legacy.activity.mau)}</Big>
-        </Card>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Measured active accounts by day">
-          <Sparkline
-            buckets={dailyBuckets(legacy.activity.curve)}
-            step="24h0m0s"
-            label="Measured active accounts by day"
-          />
-        </Card>
-        <Card
-          title="First observed ticker use"
-          note={legacy.activation.definition}
-        >
-          <Sparkline
-            buckets={dailyBuckets(legacy.activation.curve)}
-            step="24h0m0s"
-            label="First observed qualifying use by day"
-          />
-        </Card>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <RetentionCard metric={legacy.retention.d1} />
-        <RetentionCard metric={legacy.retention.d7} />
-        <RetentionCard metric={legacy.retention.d30} />
-      </div>
-    </div>
-  )
-}
-
-// ── Revenue ───────────────────────────────────────────────────────
 
 export interface RevenueContentProps {
   period: Period
@@ -2170,7 +2312,7 @@ export function RevenueContent({
 
   const facts: Array<Fact> = [
     {
-      label: `Earned ${periodPhrase(period)}, after Stripe fees`,
+      label: `${r.population && Object.values(r.population).some(Boolean) ? 'Attributed net' : 'Earned'} ${periodPhrase(period)}, after Stripe fees`,
       value: factOf(r.earnings.net, money),
     },
     ...previousFact(period, r.earnings.net, money),
@@ -2214,165 +2356,227 @@ export function RevenueContent({
           buckets={r.earnings.curve}
           step={r.earnings.curve_step}
           title="Net earnings over time"
+          zeroLabel="Net earnings are zero throughout this window."
           unit={currency.toUpperCase()}
           format={money}
         />
       }
       facts={facts}
-      note={REVENUE_NOTE}
+      note={[REVENUE_NOTE, r.account_note, r.earnings.note]
+        .filter(Boolean)
+        .join(' ')}
+      updatedAt={r.generated_at}
     >
-      <MoreDetail>
+      <MoreDetail title="Revenue details">
         <Stamp at={r.generated_at} />
-        <p className="text-sm text-base-content/65">{r.account_note}</p>
-        <Section
-          id="paying"
-          title="Paying customers"
-          lede={r.paying_now.definition}
-        >
-          <div className="grid items-start gap-4 lg:grid-cols-3">
-            <Card
-              title="Paying now"
-              label="Current"
-              note={r.paying_now.available ? r.paying_now_note : undefined}
-            >
-              {r.paying_now.available ? (
+        <AnalyticsPanels
+          panels={[
+            {
+              label: 'Customers & plans',
+              content: (
                 <>
-                  <Big>{num(r.paying_now.paying)}</Big>
-                  <div className="mt-3 border-t border-base-300/60 pt-2">
-                    <Row label="Lifetime" value={num(r.paying_now.lifetime)} />
-                    <Row label="Trialing" value={num(r.paying_now.trialing)} />
-                    <Row label="Past due" value={num(r.paying_now.past_due)} />
-                    <Row
-                      label="Canceling"
-                      value={num(r.paying_now.canceling)}
-                    />
-                    <Row label="Canceled" value={num(r.paying_now.canceled)} />
-                    <Row label="Free" value={num(r.paying_now.free)} />
-                  </div>
+                  <Section id="paying" title="Paying customers">
+                    <div className="analytics-plan-summary">
+                      <Card
+                        title="Paying now"
+                        label="Current"
+                        note={
+                          r.paying_now.available ? r.paying_now_note : undefined
+                        }
+                      >
+                        {r.paying_now.available ? (
+                          <>
+                            <Big>{num(r.paying_now.paying)}</Big>
+                            <div className="mt-3 border-t border-base-300/60 pt-2">
+                              <Row
+                                label="Lifetime"
+                                value={num(r.paying_now.lifetime)}
+                              />
+                              <Row
+                                label="Trialing"
+                                value={num(r.paying_now.trialing)}
+                              />
+                              <Row
+                                label="Payment failed"
+                                value={num(r.paying_now.past_due)}
+                              />
+                              <Row
+                                label="Cancelling"
+                                value={num(r.paying_now.canceling)}
+                              />
+                              <Row
+                                label="Canceled"
+                                value={num(r.paying_now.canceled)}
+                              />
+                              <Row
+                                label="Free"
+                                value={num(r.paying_now.free)}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <Unmeasurable
+                            note={
+                              r.paying_now_note ??
+                              'The customer snapshot could not be read.'
+                            }
+                          />
+                        )}
+                      </Card>
+                      <div className="min-w-0">
+                        <Card title="Plan mix" label="Current">
+                          <PlanMixTable rows={r.paying_now.rows ?? []} />
+                        </Card>
+                      </div>
+                    </div>
+                    <DefinitionDisclosure summary="Customer counting rules">
+                      <p>{r.paying_now.definition}</p>
+                    </DefinitionDisclosure>
+                  </Section>
                 </>
-              ) : (
-                <Unmeasurable
-                  note={
-                    r.paying_now_note ??
-                    'The customer snapshot could not be read.'
-                  }
-                />
-              )}
-            </Card>
-            <div className="lg:col-span-2">
-              <Card title="Plan mix" label="Current">
-                <PlanMixTable rows={r.paying_now.rows ?? []} />
-              </Card>
-            </div>
-          </div>
-        </Section>
-
-        <Section
-          id="new-paying"
-          title="New paying customers"
-          lede={r.new_paying.definition}
-        >
-          <Card title="First payments" label={windowLabel}>
-            {r.new_paying.available ? (
-              <>
-                <MetricValue metric={r.new_paying.in_period}>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    <DeltaBadge
-                      comparison={r.new_paying.in_period.comparison}
-                    />
-                  </p>
-                </MetricValue>
-                <div className="mt-3 border-t border-base-300/60 pt-2">
-                  <Row label="Lifetime" value={num(r.new_paying.lifetime)} />
-                </div>
-              </>
-            ) : (
-              <Unmeasurable note={r.new_paying.note} />
-            )}
-          </Card>
-        </Section>
-
-        <Section
-          id="earnings"
-          title="Net earnings"
-          lede="Stripe balance transactions by created time. Each currency stands alone; nothing is converted or added across currencies."
-        >
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
-              {r.earnings.fetched_at && (
-                <span>
-                  {r.earnings.cached ? 'Cached from' : 'Fetched from'} Stripe at{' '}
-                  {new Date(r.earnings.fetched_at).toLocaleString()}
-                </span>
-              )}
-              {r.earnings.partial && (
-                <span className="font-semibold text-warning">
-                  Stripe returned a partial ledger.
-                </span>
-              )}
-            </div>
-            <CoverageNote coverage={r.earnings.coverage} />
-            <div className="grid items-start gap-4 lg:grid-cols-2">
-              <Card
-                title={`Net (${r.earnings.primary_currency.toUpperCase()})`}
-                label={windowLabel}
-              >
-                <MetricValue
-                  metric={r.earnings.net}
-                  format={(v) => formatMinor(v, r.earnings.primary_currency)}
-                >
-                  <p className="mt-1 text-sm text-base-content/60">
-                    <DeltaBadge
-                      comparison={r.earnings.net.comparison}
-                      format={(v) =>
-                        formatMinor(v, r.earnings.primary_currency)
-                      }
-                    />
-                  </p>
-                </MetricValue>
-              </Card>
-              <Card
-                title={`Per bucket (${r.earnings.primary_currency.toUpperCase()}, minor units)`}
-                label={windowLabel}
-              >
-                <Bars
-                  buckets={r.earnings.curve}
-                  step={r.earnings.curve_step}
-                  label="Net earnings per bucket"
-                />
-              </Card>
-            </div>
-            {(r.earnings.currencies ?? []).map((c) => (
-              <EarningsBlock
-                key={c.currency}
-                earnings={c}
-                label={windowLabel}
-              />
-            ))}
-            {(r.earnings.currencies ?? []).length === 0 && (
-              <p className="text-sm text-base-content/65">
-                No balance transactions in this window.
-              </p>
-            )}
-            <div>
-              <h3 className="text-sm font-semibold text-base-content/70">
-                Lifetime
-              </h3>
-              <div className="mt-2 grid gap-4 lg:grid-cols-2">
-                {(r.earnings.lifetime ?? []).map((c) => (
-                  <EarningsBlock
-                    key={c.currency}
-                    earnings={c}
-                    label="Lifetime"
-                  />
-                ))}
-              </div>
-            </div>
-            <DefinitionDisclosure>
-              <p>{r.earnings.definition}</p>
-            </DefinitionDisclosure>
-          </div>
-        </Section>
+              ),
+            },
+            {
+              label: 'First payments',
+              content: (
+                <>
+                  {' '}
+                  <Section id="new-paying" title="New paying customers">
+                    <Card title="First payments" label={windowLabel}>
+                      {r.new_paying.available ? (
+                        <>
+                          <MetricValue metric={r.new_paying.in_period}>
+                            <p className="mt-1 text-sm text-base-content/60">
+                              <DeltaBadge
+                                comparison={r.new_paying.in_period.comparison}
+                              />
+                            </p>
+                          </MetricValue>
+                          <div className="mt-3 border-t border-base-300/60 pt-2">
+                            <Row
+                              label="Lifetime"
+                              value={num(r.new_paying.lifetime)}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <Unmeasurable note={r.new_paying.note} />
+                      )}
+                    </Card>
+                    <DefinitionDisclosure summary="What counts as a first payment">
+                      <p>{r.new_paying.definition}</p>
+                    </DefinitionDisclosure>
+                  </Section>
+                </>
+              ),
+            },
+            {
+              label: 'Earnings',
+              content: (
+                <>
+                  {' '}
+                  <Section
+                    id="earnings"
+                    title="Net earnings"
+                    lede="After refunds and fees. Currencies are reported separately."
+                  >
+                    <FactList facts={facts.slice(-1)} />
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
+                        {r.earnings.fetched_at && (
+                          <span>
+                            {r.earnings.cached ? 'Cached from' : 'Fetched from'}{' '}
+                            Stripe at{' '}
+                            {new Date(r.earnings.fetched_at).toLocaleString()}
+                          </span>
+                        )}
+                        {r.earnings.partial && (
+                          <span className="font-semibold text-warning">
+                            Stripe returned a partial ledger.
+                          </span>
+                        )}
+                      </div>
+                      {r.earnings.coverage.partial && (
+                        <CoverageNote coverage={r.earnings.coverage} />
+                      )}
+                      <div className="analytics-earnings-summary">
+                        <Card
+                          title={`Net (${r.earnings.primary_currency.toUpperCase()})`}
+                          label={windowLabel}
+                        >
+                          <Big>
+                            <MetricText
+                              value={formatMinor(
+                                r.earnings.net.value,
+                                r.earnings.primary_currency,
+                              )}
+                            />
+                          </Big>
+                          <p className="mt-1 text-sm text-base-content/60">
+                            <DeltaBadge
+                              comparison={r.earnings.net.comparison}
+                              format={(v) =>
+                                formatMinor(v, r.earnings.primary_currency)
+                              }
+                            />
+                          </p>
+                        </Card>
+                        <div className="analytics-detail-chart">
+                          <AnalyticsTrend
+                            buckets={r.earnings.curve}
+                            step={r.earnings.curve_step}
+                            title="Net earnings per bucket"
+                            unit={r.earnings.primary_currency.toUpperCase()}
+                            format={(value) =>
+                              formatMinor(value, r.earnings.primary_currency)
+                            }
+                            zeroLabel="No net earnings in this window."
+                          />
+                        </div>
+                      </div>
+                      {(r.earnings.currencies ?? []).map((c) => (
+                        <EarningsBlock
+                          key={c.currency}
+                          earnings={c}
+                          label={windowLabel}
+                        />
+                      ))}
+                      {(r.earnings.currencies ?? []).length === 0 && (
+                        <p className="text-sm text-base-content/65">
+                          No balance transactions in this window.
+                        </p>
+                      )}
+                      <div>
+                        <h3 className="text-sm font-semibold text-base-content/70">
+                          Lifetime
+                        </h3>
+                        <div className="analytics-currency-grid mt-2">
+                          {(r.earnings.lifetime ?? []).map((c) => (
+                            <EarningsBlock
+                              key={c.currency}
+                              earnings={c}
+                              label="Lifetime"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <DefinitionDisclosure>
+                        <p>{r.earnings.definition}</p>
+                        <p>
+                          Stripe balance transactions by created time. Each
+                          currency stands alone; nothing is converted or added
+                          across currencies.
+                        </p>
+                        <CoverageNote coverage={r.earnings.coverage} />
+                        {r.earnings.net.note && <p>{r.earnings.net.note}</p>}
+                      </DefinitionDisclosure>
+                    </div>
+                  </Section>
+                </>
+              ),
+            },
+          ]}
+        />
       </MoreDetail>
     </Question>
   )
@@ -2384,13 +2588,11 @@ function PlanMixTable({ rows }: { rows: Array<PlanMixRow> }) {
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="analytics-plan-table w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-base-content/55">
-            <th className="py-1 pr-3 font-medium">Tier</th>
-            <th className="py-1 pr-3 font-medium">Interval</th>
+            <th className="py-1 pr-3 font-medium">Plan</th>
             <th className="py-1 pr-3 font-medium">Status</th>
-            <th className="py-1 pr-3 font-medium">Paying</th>
             <th className="py-1 text-right font-medium">Count</th>
           </tr>
         </thead>
@@ -2400,12 +2602,22 @@ function PlanMixTable({ rows }: { rows: Array<PlanMixRow> }) {
               key={`${row.plan}-${row.status}-${row.lifetime}`}
               className="border-t border-base-300/50"
             >
-              <td className="py-1 pr-3 capitalize">{row.tier || row.plan}</td>
               <td className="py-1 pr-3">
-                {row.lifetime ? 'lifetime' : row.interval || '—'}
+                {planLabel(row.tier || row.plan)}
+                <span className="analytics-table-secondary">
+                  {row.lifetime
+                    ? 'Lifetime'
+                    : row.interval
+                      ? planLabel(row.interval)
+                      : '—'}
+                </span>
               </td>
-              <td className="py-1 pr-3">{row.status}</td>
-              <td className="py-1 pr-3">{row.paying ? 'yes' : 'no'}</td>
+              <td className="py-1 pr-3">
+                {planLabel(row.status)}
+                <span className="analytics-table-secondary">
+                  {row.paying ? 'Paying' : 'Not paying'}
+                </span>
+              </td>
               <td className="py-1 text-right tabular-nums">{num(row.count)}</td>
             </tr>
           ))}
@@ -2433,7 +2645,7 @@ function EarningsBlock({
   return (
     <Card title={`Earnings in ${e.currency.toUpperCase()}`} label={label}>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="analytics-ledger-table w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-base-content/55">
               <th className="py-1 pr-3 font-medium">Line</th>
@@ -2449,20 +2661,22 @@ function EarningsBlock({
                   {num(line.count)}
                 </td>
                 <td className="py-1 text-right tabular-nums">
-                  {money(line.net)}
+                  <MetricText value={money(line.net)} />
                 </td>
               </tr>
             ))}
             <tr className="border-t border-base-300/50 font-semibold">
               <td className="py-1 pr-3">Net</td>
               <td className="py-1 pr-3" />
-              <td className="py-1 text-right tabular-nums">{money(e.net)}</td>
+              <td className="py-1 text-right tabular-nums">
+                <MetricText value={money(e.net)} />
+              </td>
             </tr>
             <tr className="border-t border-base-300/50 text-base-content/70">
               <td className="py-1 pr-3">Gross fees (already subtracted)</td>
               <td className="py-1 pr-3" />
               <td className="py-1 text-right tabular-nums">
-                {money(e.gross_fees)}
+                <MetricText value={money(e.gross_fees)} />
               </td>
             </tr>
           </tbody>
@@ -2512,8 +2726,7 @@ function paying(count: number): ReactNode {
   return count > 0 ? `${num(count)} paying` : undefined
 }
 
-const SUPPORT_QUESTION =
-  'How much are we owing people, and how fast do we pay it back?'
+const SUPPORT_QUESTION = 'What needs attention, and how quickly do we respond?'
 
 /**
  * Who answered is the queue's own classification counted up over the window —
@@ -2600,173 +2813,239 @@ export function SupportContent({
           buckets={s.completed_curve}
           step={s.curve_step}
           title="Tickets finished over time"
+          zeroLabel="No tickets completed in this window."
           unit="Completed tickets per bucket"
         />
       }
       facts={facts}
-      note={[s.paying_note, SUPPORT_NOTE].filter(Boolean).join(' ')}
+      note={[s.paying_note, SUPPORT_NOTE, s.definitions?.population]
+        .filter(Boolean)
+        .join(' ')}
+      updatedAt={s.generated_at}
     >
-      <MoreDetail>
-        <div className="flex flex-wrap items-center gap-3">
-          <Stamp at={s.generated_at} />
-          <Link to="/admin/support" className={LINK}>
-            Open support →
-          </Link>
-        </div>
-        <Section
-          id="queue"
-          title="Queue"
-          lede="The whole queue as the pipeline classifies it. Paying counts only tickets with a verified account."
-        >
-          <Card title="Buckets" label="Current" note={s.paying_note}>
-            <div className="grid gap-4 sm:grid-cols-4">
-              <Stat
-                label="Needs attention"
-                value={num(s.needs_attention.total)}
-                sub={paying(s.needs_attention.paying)}
-              />
-              <Stat
-                label="Waiting on customer"
-                value={num(s.waiting_on_customer.total)}
-                sub={paying(s.waiting_on_customer.paying)}
-              />
-              <Stat
-                label="Completed"
-                value={num(s.completed.total)}
-                sub={`${num(s.completed_closed)} closed · ${num(s.completed_dismissed)} dismissed${s.completed.paying > 0 ? ` · ${num(s.completed.paying)} paying` : ''}`}
-              />
-              <Stat
-                label="Total"
-                value={num(s.total.total)}
-                sub={paying(s.total.paying)}
-              />
-            </div>
-            <div className="mt-4 border-t border-base-300/60 pt-2">
-              <Row
-                label="Oldest waiting for us"
-                value={
-                  <MetricValue
-                    metric={s.oldest_needs_attention_hours}
-                    format={(h) => `${num(Math.round(h))} h`}
-                    size="inline"
-                  />
-                }
-              />
-              {s.oldest_ticket && (
-                <p className="text-xs text-base-content/65">
-                  Ticket #{s.oldest_ticket}
-                </p>
-              )}
-              <Row
-                label="Auto-send"
-                value={
-                  s.autosend.armed
-                    ? `armed · ${s.autosend.hold_minutes} min hold`
-                    : s.autosend.paused
-                      ? 'paused'
-                      : 'off'
-                }
-              />
-              <p className="text-xs text-base-content/65">{s.autosend.note}</p>
-            </div>
-            {s.definitions && Object.keys(s.definitions).length > 0 && (
-              <DefinitionDisclosure summary="Bucket definitions">
-                {Object.entries(s.definitions).map(([key, text]) => (
-                  <p key={key}>
-                    <strong>{key.replace(/_/g, ' ')}</strong> — {text}
-                  </p>
-                ))}
-              </DefinitionDisclosure>
-            )}
-          </Card>
-        </Section>
-
-        <Section id="flow" title="Created and completed" lede={s.history_note}>
-          <CoverageNote coverage={s.coverage} />
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            <Card title="Created" label={windowLabel}>
-              <MetricValue metric={s.created}>
-                <p className="mt-1 text-sm text-base-content/60">
-                  <DeltaBadge comparison={s.created.comparison} goodIsDown />
-                  {s.paying_created > 0
-                    ? ` · ${num(s.paying_created)} from paying customers`
-                    : ''}
-                </p>
-              </MetricValue>
-              <div className="mt-3">
-                <Bars
-                  buckets={s.created_curve}
-                  step={s.curve_step}
-                  label="Tickets created per bucket"
-                />
-              </div>
-            </Card>
-            <Card title="Completed" label={windowLabel}>
-              <MetricValue metric={s.completed_in_period}>
-                <p className="mt-1 text-sm text-base-content/60">
-                  <DeltaBadge comparison={s.completed_in_period.comparison} />
-                </p>
-              </MetricValue>
-              <div className="mt-3">
-                <Bars
-                  buckets={s.completed_curve}
-                  step={s.curve_step}
-                  label="Tickets completed per bucket"
-                  tone="text-success"
-                />
-              </div>
-            </Card>
+      <div className="analytics-support-explore">
+        <Link to="/admin/support" className="analytics-queue-link">
+          Manage tickets <span aria-hidden>→</span>
+        </Link>
+        <MoreDetail title="Support performance">
+          <div className="flex flex-wrap items-center gap-3">
+            <Stamp at={s.generated_at} />
+            <Link to="/admin/support" className="analytics-drawer-utility">
+              Tickets <span aria-hidden>↗</span>
+            </Link>
           </div>
-          <Card
-            title="Backlog (estimate)"
-            label={windowLabel}
-            note="Estimated from opened and closed timestamps only; reopenings are not reconstructable, so a past day's backlog is an estimate."
-          >
-            <Sparkline
-              buckets={s.backlog_curve}
-              step={s.curve_step}
-              label="Estimated open tickets per bucket"
-            />
-          </Card>
-        </Section>
-
-        <Section
-          id="speed"
-          title="Response and completion"
-          lede="Medians over tickets in the window, from retained timestamps. The sample size travels with each figure."
-        >
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            <Card title="First response, median" label={windowLabel}>
-              <MetricValue
-                metric={s.first_response_median_hours}
-                format={formatHours}
-              >
-                <p className="mt-1 text-sm text-base-content/60">
-                  <DeltaBadge
-                    comparison={s.first_response_median_hours.comparison}
-                    format={(v) => `${v > 0 ? '+' : ''}${formatHours(v)}`}
-                    goodIsDown
-                  />
-                </p>
-              </MetricValue>
-            </Card>
-            <Card title="Completion, median" label={windowLabel}>
-              <MetricValue
-                metric={s.completion_median_hours}
-                format={formatHours}
-              >
-                <p className="mt-1 text-sm text-base-content/60">
-                  <DeltaBadge
-                    comparison={s.completion_median_hours.comparison}
-                    format={(v) => `${v > 0 ? '+' : ''}${formatHours(v)}`}
-                    goodIsDown
-                  />
-                </p>
-              </MetricValue>
-            </Card>
-          </div>
-        </Section>
-      </MoreDetail>
+          <AnalyticsPanels
+            panels={[
+              {
+                label: 'Queue',
+                content: (
+                  <>
+                    {' '}
+                    <Section
+                      id="queue"
+                      title="Queue"
+                      lede="Current tickets by status."
+                    >
+                      <Card title="Queue status" label="Current">
+                        <div className="analytics-queue-stats">
+                          <Stat
+                            label="Needs attention"
+                            value={num(s.needs_attention.total)}
+                            sub={paying(s.needs_attention.paying)}
+                          />
+                          <Stat
+                            label="Waiting on customer"
+                            value={num(s.waiting_on_customer.total)}
+                            sub={paying(s.waiting_on_customer.paying)}
+                          />
+                          <Stat
+                            label="Completed"
+                            value={num(s.completed.total)}
+                            sub={`${num(s.completed_closed)} closed · ${num(s.completed_dismissed)} dismissed${s.completed.paying > 0 ? ` · ${num(s.completed.paying)} paying` : ''}`}
+                          />
+                          <Stat
+                            label="Total"
+                            value={num(s.total.total)}
+                            sub={paying(s.total.paying)}
+                          />
+                        </div>
+                        <div className="mt-4 border-t border-base-300/60 pt-2">
+                          <Row
+                            label="Oldest waiting for us"
+                            value={
+                              <MetricValue
+                                metric={s.oldest_needs_attention_hours}
+                                format={(h) => `${num(Math.round(h))} h`}
+                                size="inline"
+                              />
+                            }
+                          />
+                          {s.oldest_ticket && (
+                            <p className="text-xs text-base-content/65">
+                              Ticket #{s.oldest_ticket}
+                            </p>
+                          )}
+                          <Row
+                            label="Auto-send"
+                            value={
+                              s.autosend.armed
+                                ? `armed · ${s.autosend.hold_minutes} min hold`
+                                : s.autosend.paused
+                                  ? 'paused'
+                                  : 'off'
+                            }
+                          />
+                          <p className="text-xs text-base-content/65">
+                            {s.autosend.note}
+                          </p>
+                        </div>
+                        <FactList facts={facts.slice(7)} />
+                        {(s.paying_note ||
+                          Object.keys(s.definitions ?? {}).length > 0) && (
+                          <DefinitionDisclosure summary="Bucket definitions">
+                            <p>
+                              The whole queue as the pipeline classifies it.
+                              Paying counts only tickets with a verified
+                              account.
+                            </p>
+                            {s.paying_note && <p>{s.paying_note}</p>}
+                            {Object.entries(s.definitions ?? {}).map(
+                              ([key, text]) => (
+                                <p key={key}>
+                                  <strong>{key.replace(/_/g, ' ')}</strong> —{' '}
+                                  {text}
+                                </p>
+                              ),
+                            )}
+                          </DefinitionDisclosure>
+                        )}
+                      </Card>
+                    </Section>
+                  </>
+                ),
+              },
+              {
+                label: 'Ticket history',
+                content: (
+                  <>
+                    {' '}
+                    <Section id="flow" title="Created and completed">
+                      {s.coverage.partial && (
+                        <CoverageNote coverage={s.coverage} />
+                      )}
+                      <div className="grid items-start gap-4 lg:grid-cols-2">
+                        <Card title="Created" label={windowLabel}>
+                          <MetricValue metric={s.created}>
+                            <p className="mt-1 text-sm text-base-content/60">
+                              <DeltaBadge
+                                comparison={s.created.comparison}
+                                goodIsDown
+                              />
+                              {s.paying_created > 0
+                                ? ` · ${num(s.paying_created)} from paying customers`
+                                : ''}
+                            </p>
+                          </MetricValue>
+                          <div className="mt-3">
+                            <Bars
+                              buckets={s.created_curve}
+                              step={s.curve_step}
+                              label="Tickets created per bucket"
+                            />
+                          </div>
+                        </Card>
+                        <Card title="Completed" label={windowLabel}>
+                          <MetricValue metric={s.completed_in_period}>
+                            <p className="mt-1 text-sm text-base-content/60">
+                              <DeltaBadge
+                                comparison={s.completed_in_period.comparison}
+                              />
+                            </p>
+                          </MetricValue>
+                          <div className="mt-3">
+                            <Bars
+                              buckets={s.completed_curve}
+                              step={s.curve_step}
+                              label="Tickets completed per bucket"
+                              tone="text-success"
+                            />
+                          </div>
+                        </Card>
+                      </div>
+                      <Card
+                        title="Backlog (estimate)"
+                        label={windowLabel}
+                        note="Estimated from opened and closed timestamps only; reopenings are not reconstructable, so a past day's backlog is an estimate."
+                      >
+                        <Sparkline
+                          buckets={s.backlog_curve}
+                          step={s.curve_step}
+                          label="Estimated open tickets per bucket"
+                        />
+                      </Card>
+                      <DefinitionDisclosure summary="History and coverage">
+                        <p>{s.history_note}</p>
+                        <CoverageNote coverage={s.coverage} />
+                      </DefinitionDisclosure>
+                    </Section>
+                  </>
+                ),
+              },
+              {
+                label: 'Response times',
+                content: (
+                  <>
+                    <Section
+                      id="speed"
+                      title="Response and completion"
+                      lede="Median times for tickets in this window, with sample counts."
+                    >
+                      <div className="grid items-start gap-4 lg:grid-cols-2">
+                        <Card title="Typical first reply" label={windowLabel}>
+                          <MetricValue
+                            metric={s.first_response_median_hours}
+                            format={formatDuration}
+                          >
+                            <p className="mt-1 text-sm text-base-content/60">
+                              <DeltaBadge
+                                comparison={
+                                  s.first_response_median_hours.comparison
+                                }
+                                format={(v) =>
+                                  `${v > 0 ? '+' : ''}${formatHours(v)}`
+                                }
+                                goodIsDown
+                              />
+                            </p>
+                          </MetricValue>
+                        </Card>
+                        <Card title="Typical completion" label={windowLabel}>
+                          <MetricValue
+                            metric={s.completion_median_hours}
+                            format={formatDuration}
+                          >
+                            <p className="mt-1 text-sm text-base-content/60">
+                              <DeltaBadge
+                                comparison={
+                                  s.completion_median_hours.comparison
+                                }
+                                format={(v) =>
+                                  `${v > 0 ? '+' : ''}${formatHours(v)}`
+                                }
+                                goodIsDown
+                              />
+                            </p>
+                          </MetricValue>
+                        </Card>
+                      </div>
+                    </Section>
+                  </>
+                ),
+              },
+            ]}
+          />
+        </MoreDetail>
+      </div>
     </Question>
   )
 }

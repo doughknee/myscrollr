@@ -264,6 +264,7 @@ func (s *Server) setupRoutes() {
 	// the disposition vocabulary, the proven-fix walk, the hold clock - is
 	// unexported there.
 	s.App.Get("/admin/support/queue", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminQueue)
+	s.App.Get("/admin/support/search", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminTicketSearch)
 	s.App.Get("/admin/support/case/:ticket", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminCase)
 
 	// The write half (REL-261). Every one of these is the same function the
@@ -276,6 +277,8 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/admin/support/draft/:draft/skip", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminSkip)
 	s.App.Post("/admin/support/draft/:draft/hold", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminHold)
 	s.App.Post("/admin/support/draft/:draft/bug", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminFileAsBug)
+	s.App.Post("/admin/support/case/:ticket/dismiss", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminDismissCase)
+	s.App.Post("/admin/support/case/:ticket/restore", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminRestoreCase)
 	s.App.Post("/admin/support/case/:ticket/link", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminLinkIssue)
 	s.App.Delete("/admin/support/case/:ticket/link", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminUnlinkIssue)
 	s.App.Post("/admin/support/autosend", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminAutoSend)

@@ -13,6 +13,7 @@ import { AdminChrome } from './AdminShell'
 import { cases, queue } from './supportFixtures'
 import type { CaseDetail } from '@/api/admin'
 import type { Root } from 'react-dom/client'
+import { parseSupportSearch } from '@/lib/adminSearch'
 
 const roots: Array<Root> = []
 afterEach(async () => {
@@ -48,6 +49,9 @@ const mocks = vi.hoisted(() => ({
   setAutoSendPaused: vi.fn(),
   unsubscribe: vi.fn(),
   holdDraft: vi.fn(),
+  skipDraft: vi.fn(),
+  dismissCase: vi.fn(),
+  restoreCase: vi.fn(),
   onConnection: null as null | ((connected: boolean) => void),
   onEvent: null as null | ((e: { ticket_number?: string }) => void),
 }))
@@ -62,6 +66,9 @@ vi.mock('@/api/admin', async () => {
       supportCase: mocks.supportCase,
       setAutoSendPaused: mocks.setAutoSendPaused,
       holdDraft: mocks.holdDraft,
+      skipDraft: mocks.skipDraft,
+      dismissCase: mocks.dismissCase,
+      restoreCase: mocks.restoreCase,
     },
     // Report the stream as live, the way a connected console does.
     subscribeToSupportEvents: (
@@ -93,13 +100,15 @@ function atWidth(px: number) {
   })
 }
 
-async function render(width: number): Promise<HTMLElement> {
+async function render(width: number, query?: string): Promise<HTMLElement> {
   atWidth(width)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const rootRoute = createRootRoute({
     component: () => (
       <AdminChrome email="staff@example.com">
-        <SupportPage />
+        <SupportPage
+          {...(query ? { search: parseSupportSearch({ q: query }) } : {})}
+        />
       </AdminChrome>
     ),
   })
@@ -151,11 +160,46 @@ beforeEach(() => {
 })
 
 describe('the page frame', () => {
+  it.each(['', 'missing-ticket'])(
+    'explains an empty queue for search "%s"',
+    async (query) => {
+      mocks.supportQueue.mockResolvedValue({ ...queue, people: [], rows: [] })
+      const host = await render(320, query)
+      expect(host.textContent).toContain(
+        query ? 'No matching conversations' : 'No conversations yet',
+      )
+      expect(host.textContent).not.toContain(
+        'No tickets linked to a paying account.',
+      )
+      expect(
+        [...host.querySelectorAll('button')].some(
+          (button) => button.textContent === 'Clear search',
+        ),
+      ).toBe(Boolean(query))
+    },
+  )
+
+  it('keeps a failed dismissal open with an accessible explanation', async () => {
+    mocks.dismissCase.mockRejectedValue(
+      new Error('Connection interrupted. Try again.'),
+    )
+    const host = await render(320)
+    await open(host, 'Morgan Ellis')
+    await open(host, 'Dismiss ticket')
+    await open(host, 'Dismiss without replying')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'Ticket not updated',
+    )
+    expect(
+      host.querySelector('[aria-label="Dismiss without replying"]'),
+    ).toBeTruthy()
+    expect(host.textContent).toContain('Connection interrupted. Try again.')
+  })
   it.each([390, 1440])('moves focus into a case at %ipx', async (width) => {
     const host = await render(width)
     await open(host, 'Morgan Ellis')
     const back = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('All of support'),
+      b.textContent.includes('Back to queue'),
     )!
     expect(document.activeElement).toBe(
       width < 768
@@ -178,7 +222,7 @@ describe('the page frame', () => {
     })
     await caseEvent()
     const back = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('All of support'),
+      b.textContent.includes('Back to queue'),
     )!
     await act(() => back.click())
     expect(document.activeElement).toBe(
@@ -227,12 +271,10 @@ describe('the page frame', () => {
 
   it('counts what needs you, what waits on them, and what is resolved', async () => {
     const host = await render(1440)
-    const strip = host.querySelector(
-      '[aria-label="Staff workspace"] > div > div',
-    )!
-    expect(strip.textContent).toContain('3 need you')
-    expect(strip.textContent).toContain('2 waiting on them')
-    expect(strip.textContent).toContain('2 resolved')
+    const strip = host.querySelector('[aria-label="Support queue views"]')!
+    expect(strip.textContent).toContain('Needs you3')
+    expect(strip.textContent).toContain('Waiting2')
+    expect(strip.textContent).toContain('Handled2')
   })
 
   it('keeps every section, in order, and never reorders them', async () => {
@@ -243,6 +285,7 @@ describe('the page frame', () => {
       'Open',
       'Answered, waiting on them',
       'Resolved',
+      'Select a conversation',
     ])
   })
 })
@@ -354,7 +397,7 @@ describe('the three panes', () => {
     expect(host.querySelector('aside')).toBeNull()
     await open(host, 'Morgan Ellis')
     const back = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('All of support'),
+      b.textContent.includes('Back to queue'),
     )
     expect(back).toBeTruthy()
     expect(back!.className).toContain('md:hidden')
@@ -490,7 +533,7 @@ describe('the case', () => {
   it('still offers every action, by name', async () => {
     const host = await render(1440)
     await open(host, 'Morgan Ellis')
-    const labels = [...host.querySelectorAll('aside button')].map((b) =>
+    const labels = [...host.querySelectorAll('button')].map((b) =>
       b.textContent.trim(),
     )
     for (const verb of [
@@ -499,10 +542,117 @@ describe('the case', () => {
       'Hold',
       'File as bug',
       'Link an issue',
-      'Skip',
+      'Dismiss ticket',
     ]) {
       expect(labels, `${verb} is missing`).toContain(verb)
     }
+  })
+
+  it('confirms dismissing the selected pending reply without sending', async () => {
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    const findButton = (label: string) =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent.trim() === label,
+      )!
+    await act(() => findButton('Dismiss ticket').click())
+    expect(mocks.dismissCase).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('without emailing anyone')
+    const detail = cases['752473']
+    mocks.dismissCase.mockResolvedValue({
+      ...detail,
+      draft: { ...detail.draft!, status: 'skipped' },
+    })
+    await act(() => findButton('Dismiss without replying').click())
+    expect(mocks.dismissCase).toHaveBeenCalledWith(
+      mocks.token,
+      detail.ticket_number,
+    )
+    expect(host.querySelector('#reply-body')).toBeNull()
+  })
+
+  it('dismisses and restores a ticket with no draft', async () => {
+    const detail = {
+      ...cases['752473'],
+      draft: null,
+      user_email: undefined,
+      user_name: undefined,
+    }
+    mocks.supportCase.mockResolvedValue(detail)
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    const button = (label: string) =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (el) => el.textContent.trim() === label,
+      )!
+    await act(() => button('Dismiss ticket').click())
+    const dismissed = {
+      ...detail,
+      console_status: 'dismissed' as const,
+      group: 'handled',
+      group_reason: 'Dismissed',
+    }
+    mocks.dismissCase.mockResolvedValue(dismissed)
+    await act(() => button('Dismiss without replying').click())
+    expect(mocks.dismissCase).toHaveBeenCalledWith(
+      mocks.token,
+      detail.ticket_number,
+    )
+    expect(button('Restore ticket')).toBeDefined()
+    expect(host.querySelector('#reply-body')).toBeNull()
+    mocks.restoreCase.mockResolvedValue({
+      ...detail,
+      console_status: 'review',
+      group: 'needs_you',
+    })
+    await act(() => button('Restore ticket').click())
+    expect(mocks.restoreCase).toHaveBeenCalledWith(
+      mocks.token,
+      detail.ticket_number,
+    )
+    expect(button('Dismiss ticket')).toBeDefined()
+    expect(host.querySelector('#reply-body')).toBeNull()
+  })
+
+  it('folds diagnostics and internal activity while keeping the customer message readable', async () => {
+    const detail = cases['752473']
+    mocks.supportCase.mockResolvedValue({
+      ...detail,
+      messages: [
+        {
+          kind: 'user',
+          created_at: '2026-10-20T10:00:00Z',
+          body: 'My ticker stopped.\nSystem Diagnostics{"os":"windows"}\nThanks.',
+        },
+        {
+          kind: 'ai_draft',
+          created_at: '2026-10-20T10:01:00Z',
+          body: 'Unsent proposal',
+        },
+        {
+          kind: 'sent',
+          created_at: '2026-10-20T10:02:00Z',
+          body: 'Delivered reply',
+        },
+      ],
+    })
+    const host = await render(1440)
+    await open(host, 'Morgan Ellis')
+    const attachment = [...host.querySelectorAll('details')].find((node) =>
+      node.querySelector('summary')?.textContent.includes('System diagnostics'),
+    )!
+    expect(attachment.open).toBe(false)
+    expect(attachment.textContent).toContain('"os":"windows"')
+    const message = attachment.closest('article')!
+    expect(message.querySelector('p')?.textContent).toBe(
+      'My ticker stopped.\n\nThanks.',
+    )
+    const activity = [...host.querySelectorAll('details')].find((node) =>
+      node.querySelector('summary')?.textContent.includes('Bot activity'),
+    )!
+    expect(activity.open).toBe(false)
+    expect(activity.textContent).toContain('Unsent proposal')
+    expect(activity.textContent).not.toContain('Delivered reply')
   })
 
   it('starts the three disclosures closed, and opens one on a click', async () => {
@@ -580,4 +730,45 @@ describe('the case', () => {
     // The open one is not repeated in its own list.
     expect(others).not.toContain('#752473 ')
   })
+})
+
+it('filters mixed-state people and opens the matching waiting ticket', async () => {
+  const host = await render(390)
+  const waiting = host.querySelectorAll<HTMLButtonElement>(
+    '[aria-label="Support queue views"] button',
+  )[2]
+  await act(() => waiting.click())
+  const cards = Array.from(
+    host.querySelectorAll<HTMLButtonElement>('[data-support-row]'),
+  )
+  expect(cards.map((c) => c.dataset.supportRow)).toEqual([
+    'person:morgan',
+    'person:sam',
+  ])
+  expect(cards[0].textContent).not.toContain('needs you')
+  await act(async () => cards[0].click())
+  expect(mocks.supportCase).toHaveBeenLastCalledWith(
+    mocks.token,
+    '584802',
+    expect.any(AbortSignal),
+  )
+  expect(host.querySelector('a[href*="view=support"]')?.textContent).toContain(
+    'Performance',
+  )
+})
+
+it('shows handled tickets without requiring the resolved disclosure', async () => {
+  const host = await render(1440)
+  await act(() =>
+    host
+      .querySelectorAll<HTMLButtonElement>(
+        '[aria-label="Support queue views"] button',
+      )[3]
+      .click(),
+  )
+  expect(
+    host.querySelector('[data-support-row="person:morgan"]'),
+  ).not.toBeNull()
+  expect(host.querySelector('[data-support-row="person:sam"]')).toBeNull()
+  expect(host.querySelector('[aria-label="Show resolved"]')).toBeNull()
 })

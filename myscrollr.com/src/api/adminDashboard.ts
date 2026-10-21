@@ -13,7 +13,9 @@
  * - a `Comparison` with `comparable: false` renders its note, never a delta.
  */
 
+import { populationQuery, verifyPopulation } from './analyticsPopulation'
 import { loadBoundedAdminReport } from './adminAnalytics'
+import type { AnalyticsPopulation } from './analyticsPopulation'
 import type { AutoSendState, Measured } from './admin'
 import type { ProductAnalytics, RetentionMetric } from './adminProductAnalytics'
 
@@ -169,6 +171,7 @@ export interface WidgetsReport {
 }
 
 export interface DesktopUsage {
+  population?: AnalyticsPopulation
   generated_at: string
   period: Window
   previous: Window | null
@@ -200,6 +203,7 @@ export interface DesktopFilterQuery {
 // ── Audience ──────────────────────────────────────────────────────
 
 export interface Audience {
+  population?: AnalyticsPopulation
   generated_at: string
   period: Window
   previous: Window | null
@@ -343,6 +347,7 @@ export interface EarningsReport {
 }
 
 export interface Revenue {
+  population?: AnalyticsPopulation
   generated_at: string
   period: Window
   previous: Window | null
@@ -361,6 +366,7 @@ export interface BucketCount {
 }
 
 export interface SupportSummary {
+  population?: AnalyticsPopulation
   generated_at: string
   period: Window
   previous: Window | null
@@ -439,11 +445,12 @@ export const loadAudience = (
   getToken: Token,
   period: Period,
   signal?: AbortSignal,
+  filters: DesktopFilterQuery = {},
 ) =>
-  report<Audience>(`/admin/audience?period=${period}`, 'audience')(
-    getToken,
-    signal,
-  )
+  report<Audience>(
+    `/admin/audience?period=${period}&${populationQuery(filters)}`,
+    'audience',
+  )(getToken, signal).then((value) => verifyPopulation(value, filters))
 
 export const loadWebsite = (
   getToken: Token,
@@ -459,18 +466,20 @@ export const loadRevenue = (
   getToken: Token,
   period: Period,
   signal?: AbortSignal,
+  filters: DesktopFilterQuery = {},
 ) =>
-  report<Revenue>(`/admin/revenue?period=${period}`, 'revenue')(
-    getToken,
-    signal,
-  )
+  report<Revenue>(
+    `/admin/revenue?period=${period}&${populationQuery(filters)}`,
+    'revenue',
+  )(getToken, signal).then((value) => verifyPopulation(value, filters))
 
 export const loadSupportSummary = (
   getToken: Token,
   period: Period,
   signal?: AbortSignal,
+  filters: DesktopFilterQuery = {},
 ) =>
   report<SupportSummary>(
-    `/admin/support/summary?period=${period}`,
+    `/admin/support/summary?period=${period}&${populationQuery(filters)}`,
     'support summary',
-  )(getToken, signal)
+  )(getToken, signal).then((value) => verifyPopulation(value, filters))

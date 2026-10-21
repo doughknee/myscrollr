@@ -24,6 +24,36 @@ describe('SignupDiagnosticsSection', () => {
     vi.mocked(loadSignupAnalytics).mockResolvedValue(signup)
   })
 
+  it('automatically replaces a fast pending response with the finished report', async () => {
+    vi.useFakeTimers()
+    vi.mocked(loadSignupAnalytics)
+      .mockResolvedValueOnce({ ...signup, available: false, refreshing: true })
+      .mockResolvedValueOnce(signup)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<SignupDiagnosticsSection period="7d" expanded />)
+      })
+      expect(host.textContent).toContain('Preparing signup health')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      expect(loadSignupAnalytics).toHaveBeenCalledTimes(2)
+      expect(host.textContent).not.toContain('Preparing signup health')
+      expect(host.textContent).toContain('Registration started')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      expect(loadSignupAnalytics).toHaveBeenCalledTimes(2)
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      vi.useRealTimers()
+    }
+  })
+
   it('requests nothing on mount and one report when opened', async () => {
     const host = document.createElement('div')
     document.body.append(host)

@@ -28,9 +28,11 @@ export function SignupTrend({
         <span className="signup-trend-readout" aria-live="polite">
           {active ? (
             <>
-              <strong>{active.value.toLocaleString()}</strong>{' '}
-              {bucketLabel(active.start, step)}
-              {active.partial ? ' · partial' : ''}
+              <strong>{active.value.toLocaleString()}</strong>
+              <span>
+                {bucketLabel(active.start, step)}
+                {active.partial ? ' · partial' : ''}
+              </span>
             </>
           ) : (
             'No observations'

@@ -47,9 +47,10 @@ type NewPayingReport struct {
 }
 
 type RevenueResponse struct {
-	GeneratedAt string  `json:"generated_at"`
-	Period      Window  `json:"period"`
-	Previous    *Window `json:"previous"`
+	Population  platform.AnalyticsPopulation `json:"population"`
+	GeneratedAt string                       `json:"generated_at"`
+	Period      Window                       `json:"period"`
+	Previous    *Window                      `json:"previous"`
 
 	PayingNow     billing.PayingNow `json:"paying_now"`
 	PayingNowNote string            `json:"paying_now_note,omitempty"`
@@ -69,11 +70,17 @@ func HandleGetRevenue(c *fiber.Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
+	ctx, err = platform.WithAnalyticsPopulation(ctx, c.Query("os"), c.Query("version"), c.Query("plan"))
+	if err != nil {
+		return c.Status(400).JSON(platform.ErrorResponse{Error: err.Error()})
+	}
 	return c.JSON(loadRevenue(ctx, period, now))
 }
 
 func loadRevenue(ctx context.Context, period Period, now time.Time) RevenueResponse {
+	population := platform.PopulationFromContext(ctx)
 	out := RevenueResponse{
+		Population:  population,
 		GeneratedAt: now.Format(time.RFC3339), Period: period.Window(),
 		AccountNote: "Figures cover every transaction on the connected Stripe account. If that account ever serves anything besides Scrollr, those transactions are included too.",
 		NewPaying:   NewPayingReport{Definition: "Accounts whose first successful, positive Stripe charge falls in the window. Renewals, upgrades and repeat purchases never count again; a trial or a zero-value invoice is not a payment."},
@@ -101,6 +108,41 @@ func loadRevenue(ctx context.Context, period Period, now time.Time) RevenueRespo
 		out.Earnings.Net = Metric{Note: note}
 		out.NewPaying.InPeriod = Metric{Note: note}
 		return out
+	}
+	if population.Active() {
+		if platform.DBPool == nil {
+			out.Earnings.Note = "The selected account population could not be read."
+			return out
+		}
+		args := []any{}
+		where := population.Predicate("s.logto_sub", &args)
+		rows, err := platform.DBPool.Query(ctx, "SELECT stripe_customer_id FROM stripe_customers s WHERE "+where, args...)
+		if err != nil {
+			out.Earnings.Note = "The selected account population could not be read."
+			return out
+		}
+		customers := map[string]bool{}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				out.Earnings.Note = "Customer attribution could not be read."
+				return out
+			}
+			customers[id] = true
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			out.Earnings.Note = "Customer attribution could not be read."
+			return out
+		}
+		var unattributed int
+		ledger, unattributed = billing.FilterLedger(ledger, customers)
+		out.AccountNote = platform.AnalyticsPopulationNote + " Earnings include only transactions linked to matching Stripe customers. Unattributed fees or adjustments are excluded."
+		if unattributed > 0 {
+			out.Earnings.Note = "Some account-level transactions could not be assigned to a customer and are excluded from this population's net."
+		}
 	}
 	billing.LogLedgerRead(ledger, cached)
 	from := billing.EarliestTransaction(ledger.Transactions)

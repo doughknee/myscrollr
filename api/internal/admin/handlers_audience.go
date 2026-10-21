@@ -37,13 +37,14 @@ type logtoAccountsSnapshot struct {
 }
 
 type AudienceResponse struct {
-	GeneratedAt   string  `json:"generated_at"`
-	Period        Window  `json:"period"`
-	Previous      *Window `json:"previous"`
-	StaffExcluded bool    `json:"staff_excluded"`
-	Available     bool    `json:"available"`
-	Note          string  `json:"note,omitempty"`
-	Source        string  `json:"source"`
+	Population    platform.AnalyticsPopulation `json:"population"`
+	GeneratedAt   string                       `json:"generated_at"`
+	Period        Window                       `json:"period"`
+	Previous      *Window                      `json:"previous"`
+	StaffExcluded bool                         `json:"staff_excluded"`
+	Available     bool                         `json:"available"`
+	Note          string                       `json:"note,omitempty"`
+	Source        string                       `json:"source"`
 
 	// Total is current registered accounts (minus excluded staff/test
 	// accounts when the setting is on). Excluded says how many came out.
@@ -94,6 +95,10 @@ func HandleGetAudience(c *fiber.Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
+	ctx, err = platform.WithAnalyticsPopulation(ctx, c.Query("os"), c.Query("version"), c.Query("plan"))
+	if err != nil {
+		return c.Status(400).JSON(platform.ErrorResponse{Error: err.Error()})
+	}
 	return c.JSON(loadAudience(ctx, period, ExcludeStaff(ctx), now))
 }
 
@@ -132,7 +137,9 @@ func signupSourceSplit(counted []accounts.LogtoAccount, period Period) SignupSou
 }
 
 func loadAudience(ctx context.Context, period Period, excludeStaff bool, now time.Time) AudienceResponse {
+	population := platform.PopulationFromContext(ctx)
 	out := AudienceResponse{
+		Population:  population,
 		GeneratedAt: now.Format(time.RFC3339), Period: period.Window(), StaffExcluded: excludeStaff, Source: "logto",
 		NewCurve:   []Bucket{},
 		Definition: "Total is every registered account in Logto right now. New is accounts created in the selected window. Signed in is accounts whose most recent sign-in falls in the window; it is authentication, not app use.",
@@ -146,7 +153,9 @@ func loadAudience(ctx context.Context, period Period, excludeStaff bool, now tim
 		// Set-up accounts are counted under the same exclusion as the total,
 		// or "never set up" (total − set up) would subtract staff who use
 		// the app from a total that no longer contains them.
-		rows, err := platform.DBPool.Query(ctx, `SELECT logto_sub FROM user_preferences`)
+		args := []any{}
+		where := population.Predicate("u.logto_sub", &args)
+		rows, err := platform.DBPool.Query(ctx, `SELECT u.logto_sub FROM user_preferences u WHERE `+where, args...)
 		if err != nil {
 			log.Printf("[Admin] audience set-up count: %v", err)
 		} else {
@@ -175,6 +184,20 @@ func loadAudience(ctx context.Context, period Period, excludeStaff bool, now tim
 		return out
 	}
 
+	var matches map[string]bool
+	if population.Active() {
+		ids := make([]string, 0, len(snap.Accounts))
+		for _, a := range snap.Accounts {
+			ids = append(ids, a.ID)
+		}
+		matches, err = population.MatchAccounts(ctx, ids)
+		if err != nil {
+			out.Note = "The selected account population could not be read."
+			return out
+		}
+		out.Definition += " " + platform.AnalyticsPopulationNote
+		out.KnownPurged = 0 // Deleted identities cannot be attributed to a current population.
+	}
 	// Test accounts come out regardless of the setting; staff only while it
 	// is on.
 	var counted []accounts.LogtoAccount
@@ -183,9 +206,15 @@ func loadAudience(ctx context.Context, period Period, excludeStaff bool, now tim
 			out.Excluded++
 			continue
 		}
+		if population.Active() && !matches[a.ID] {
+			continue
+		}
 		counted = append(counted, a)
 	}
 	out.Total = snap.Total - out.Excluded
+	if population.Active() {
+		out.Total = len(counted)
+	}
 	out.LifetimeRegistrations = out.Total
 	out.Available = true
 

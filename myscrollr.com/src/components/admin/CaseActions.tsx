@@ -25,10 +25,8 @@ import { useGetToken } from '@/hooks/useGetToken'
  * proven; the server did that before this case ever reached a queue, and the
  * only thing a person adds is responsibility for the click.
  *
- * Send is the one action that cannot be undone, so it is the one action that
- * asks twice. Skip, hold, link, unlink and file go through on the first click
- * on purpose: a tool that makes you confirm everything is a tool you stop
- * using, and every one of those can be put back.
+ * Sending and dismissing a pending reply ask for confirmation. Dismiss keeps
+ * the ticket history but settles the draft without sending an email.
  */
 
 type Panel = 'none' | 'confirm-send' | 'ask' | 'link'
@@ -48,7 +46,8 @@ export default function CaseActions({
 }) {
   const getToken = useGetToken()
   const draft = detail.draft
-  const pending = draft?.status === 'pending'
+  const dismissed = detail.console_status === 'dismissed'
+  const pending = draft?.status === 'pending' && !dismissed
 
   const [panel, setPanel] = useState<Panel>('none')
   const [busy, setBusy] = useState<string | null>(null)
@@ -117,14 +116,14 @@ export default function CaseActions({
   const unchanged = isUnchanged(draft?.body ?? '', edited)
 
   return (
-    <section>
+    <section className="admin-reply-controls">
       {/* ── The reply, editable where it is read ────────────────
           The mockup's "Proposed reply · edit it here" is this box. It used to
           sit behind an Edit button, which meant the thing you are here to do
           was one click further away than the thing you are here to read. */}
       {pending && (
         <>
-          <div className="flex flex-wrap items-baseline gap-x-2">
+          <div className="admin-reply-heading flex flex-wrap items-baseline gap-x-2">
             <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
               Proposed reply
             </h2>
@@ -162,15 +161,18 @@ export default function CaseActions({
         <p className="rounded-xl bg-base-200/40 px-4 py-3 text-sm text-base-content/60 ring-1 ring-base-300/60">
           {draft
             ? `This draft is ${draft.status}, so there is nothing left to send on it. The issue link below is still yours to change.`
-            : 'There is no draft to act on. Link an issue, or answer this one in osTicket.'}
+            : 'No reply is waiting for approval.'}
         </p>
       )}
 
       {error && (
-        <p className="mt-2 flex items-baseline gap-2 rounded-lg bg-error/10 px-3 py-2 text-sm text-error ring-1 ring-error/30">
-          <AlertTriangle size={14} className="translate-y-0.5 shrink-0" />
-          {error}
-        </p>
+        <div role="alert" className="admin-support-error mt-3">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <h3>Action not completed</h3>
+            <p>{error}</p>
+          </div>
+        </div>
       )}
       {notice && (
         <p className="mt-2 rounded-lg bg-base-200/60 px-3 py-2 text-sm text-base-content/75 ring-1 ring-base-300/60">
@@ -181,7 +183,7 @@ export default function CaseActions({
       {/* The quieter verbs. Above the pinned bar rather than in it: on a
           phone the bar is what a thumb reaches, and it should only hold the
           three things you came to do. */}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="admin-reply-secondary mt-3 flex flex-wrap gap-2">
         {pending && (
           <>
             <ActionButton
@@ -237,7 +239,7 @@ export default function CaseActions({
           scrolling past a reply that can run to forty lines. It rejoins the
           flow at md, where the whole case is on screen anyway. */}
       {pending && (
-        <div className="sticky bottom-0 z-20 mt-3 -mb-4 flex flex-wrap items-center gap-2 border-t border-base-300/60 bg-base-100/95 px-1 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur md:static md:mb-0 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:pb-0 md:backdrop-blur-none">
+        <div className="admin-reply-primary sticky bottom-0 z-20 mt-3 -mb-4 flex flex-wrap items-center gap-2 border-t border-base-300/60 bg-base-100/95 px-1 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur md:static md:mb-0 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:pb-0 md:backdrop-blur-none">
           <ActionButton
             label="Send reply"
             icon={<Send size={14} />}
@@ -258,21 +260,11 @@ export default function CaseActions({
               setError(null)
             }}
           />
-          <ActionButton
-            label="Skip"
-            icon={<SkipForward size={14} />}
-            busy={busy === 'skip'}
-            disabled={busy !== null}
-            onClick={() =>
-              run('skip', () => adminApi.skipDraft(getToken, draft.id))
-            }
-          />
         </div>
       )}
 
       {/* ── Send, confirmed ───────────────────────────────────────
-          The one confirmation on the page, in front of the one thing that
-          cannot be undone. Which verb it runs depends on whether the box
+          Review the recipient before sending a message. Which verb it runs depends on whether the box
           above still holds the draft: an untouched reply goes out as the
           draft, an edited one goes out as an edit and is recorded as one. */}
       {panel === 'confirm-send' && pending && (
@@ -300,7 +292,7 @@ export default function CaseActions({
 
       {/* ── Ask one question ───────────────────────────────────── */}
       {panel === 'ask' && pending && (
-        <div className="mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
+        <div className="admin-reply-panel mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
           <label
             htmlFor="ask-body"
             className="text-xs font-semibold tracking-wide text-base-content/50 uppercase"
@@ -354,7 +346,7 @@ export default function CaseActions({
 
       {/* ── Link an existing issue ─────────────────────────────── */}
       {panel === 'link' && (
-        <div className="mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
+        <div className="admin-reply-panel mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60">
           <label
             htmlFor="issue-key"
             className="text-xs font-semibold tracking-wide text-base-content/50 uppercase"
@@ -432,7 +424,7 @@ function ConfirmSend({
   onCancel: () => void
 }) {
   return (
-    <div className="mt-3 rounded-xl bg-warning/5 px-4 py-3 ring-1 ring-warning/40">
+    <div className="admin-reply-panel mt-3 rounded-xl bg-warning/5 px-4 py-3 ring-1 ring-warning/40">
       <p className="text-sm font-semibold">
         Send this reply to {who ?? 'the reporter'}?
       </p>
@@ -552,4 +544,114 @@ function describeFiling(filed: FiledBug): string {
     return `Filed ${filed.issue_key} (${filed.url}), but the link back to this ticket did not save. Filing again would create a duplicate — link ${filed.issue_key} by hand instead.`
   }
   return `Filed as ${filed.issue_key} — ${filed.url}`
+}
+
+/** Ticket-level action stays above the conversation, including cases with no draft. */
+export function CaseDisposition({
+  detail,
+  onCase,
+}: {
+  detail: CaseDetail
+  onCase: (next: CaseDetail) => void
+}) {
+  const getToken = useGetToken()
+  const dismissed = detail.console_status === 'dismissed'
+  const [panel, setPanel] = useState<'none' | 'confirm-dismiss'>('none')
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const run = async (
+    name: string,
+    call: () => Promise<CaseDetail>,
+    after?: () => void,
+  ) => {
+    setBusy(name)
+    setError(null)
+    try {
+      onCase(await call())
+      after?.()
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not update the ticket.',
+      )
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <div className="support-ticket-actions">
+      <div className="mt-3">
+        <ActionButton
+          label={dismissed ? 'Restore ticket' : 'Dismiss ticket'}
+          icon={<SkipForward size={14} />}
+          busy={busy === 'dismiss' || busy === 'restore'}
+          disabled={busy !== null}
+          onClick={() =>
+            dismissed
+              ? run('restore', () =>
+                  adminApi.restoreCase(getToken, detail.ticket_number),
+                )
+              : setPanel('confirm-dismiss')
+          }
+        />
+        {dismissed && (
+          <p className="mt-2 text-sm text-base-content/60">
+            Bot replies are stopped for this ticket, including new messages.
+            Restore it to review again. The original email and history are kept.
+          </p>
+        )}
+      </div>
+      {panel === 'confirm-dismiss' && !dismissed && (
+        <div
+          role="group"
+          aria-label="Dismiss without replying"
+          className="admin-reply-panel mt-3 space-y-3 rounded-xl p-4 ring-1 ring-base-300/60"
+        >
+          <h3 className="text-base font-semibold tracking-tight">
+            No reply needed?
+          </h3>
+          <p className="text-sm text-base-content/65">
+            Move this ticket to Resolved without emailing anyone. Bot replies
+            stop until you restore it.
+          </p>
+          <p className="text-xs leading-relaxed text-base-content/65">
+            You can restore it anytime. The original email and conversation stay
+            in history; osTicket is unchanged.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton
+              label="Dismiss without replying"
+              icon={<SkipForward size={14} />}
+              busy={busy === 'dismiss'}
+              disabled={busy !== null}
+              onClick={() =>
+                run(
+                  'dismiss',
+                  () => adminApi.dismissCase(getToken, detail.ticket_number),
+                  () => setPanel('none'),
+                )
+              }
+            />
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => setPanel('none')}
+              className="min-h-11 cursor-pointer rounded-lg px-3 text-sm hover:bg-base-200/60"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="admin-support-error mt-3">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <h3>Ticket not updated</h3>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

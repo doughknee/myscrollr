@@ -33,7 +33,7 @@ import (
 // exactly once. Payouts are movements of funds and are listed but excluded.
 
 const (
-	stripeLedgerCacheKey = "scrollr:admin:stripe:ledger"
+	stripeLedgerCacheKey = "scrollr:admin:stripe:ledger:v2"
 	stripeLedgerCacheTTL = 10 * time.Minute
 	// stripeLedgerMaxRows bounds one walk. Ten thousand transactions is years
 	// of this account; past it the ledger reports itself partial.
@@ -76,6 +76,8 @@ type BalanceTxn struct {
 	Net               int64     `json:"net"`
 	Created           time.Time `json:"created"`
 	Source            string    `json:"source"`
+	Customer          string    `json:"customer,omitempty"`
+	SourceCharge      string    `json:"source_charge,omitempty"`
 }
 
 // ChargeLite is what first-payment classification needs from a charge.
@@ -155,6 +157,7 @@ func LoadLedger(ctx context.Context) (Ledger, bool, error) {
 
 func fetchBalanceTransactions(ctx context.Context) ([]BalanceTxn, bool, error) {
 	params := &stripe.BalanceTransactionListParams{}
+	params.AddExpand("data.source")
 	params.Context = ctx
 	params.Limit = stripe.Int64(100)
 	it := balancetransaction.List(params)
@@ -168,6 +171,7 @@ func fetchBalanceTransactions(ctx context.Context) ([]BalanceTxn, bool, error) {
 		}
 		if bt.Source != nil {
 			t.Source = bt.Source.ID
+			t.Customer, t.SourceCharge = transactionAccount(bt.Source)
 		}
 		out = append(out, t)
 		if len(out) >= stripeLedgerMaxRows {
@@ -442,8 +446,10 @@ type PayingNow struct {
 func LoadPayingNow(ctx context.Context) (PayingNow, error) {
 	out := PayingNow{Rows: []PlanMixRow{},
 		Definition: "Paying is current paid access backed by a successful payment: lifetime purchases, or a subscription Stripe reports as active. Trials, overdue and cancelling subscriptions still have access and are shown on their own rows; canceled ones have lost it."}
+	args := []any{}
+	where := platform.PopulationFromContext(ctx).Predicate("s.logto_sub", &args)
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT s.plan, s.status, s.lifetime, count(*) FROM stripe_customers s GROUP BY 1, 2, 3 ORDER BY 4 DESC, 1, 2`)
+ SELECT s.plan, s.status, s.lifetime, count(*) FROM stripe_customers s WHERE `+where+` GROUP BY 1, 2, 3 ORDER BY 4 DESC, 1, 2`, args...)
 	if err != nil {
 		return out, err
 	}
@@ -516,4 +522,56 @@ func planTierInterval(plan string, lifetime bool) (tier, interval string) {
 // LogLedgerRead is a small breadcrumb for the ops log, without amounts.
 func LogLedgerRead(l Ledger, cached bool) {
 	log.Printf("[Billing] ledger read: %d transactions, %d charges, partial=%v cached=%v", len(l.Transactions), len(l.Charges), l.Partial, cached)
+}
+
+// Expanded Stripe sources link charges directly and refunds/disputes through
+// their original charge. Unattributed account-level fees are never assigned.
+func transactionAccount(source *stripe.BalanceTransactionSource) (string, string) {
+	if source == nil {
+		return "", ""
+	}
+	if c := source.Charge; c != nil && c.Customer != nil {
+		return c.Customer.ID, c.ID
+	}
+	if r := source.Refund; r != nil && r.Charge != nil {
+		return "", r.Charge.ID
+	}
+	if d := source.Dispute; d != nil && d.Charge != nil {
+		return "", d.Charge.ID
+	}
+	return "", ""
+}
+
+// FilterLedger copies the shared cached ledger; filtering must never mutate it.
+func FilterLedger(l Ledger, customers map[string]bool) (Ledger, int) {
+	out := l
+	out.Transactions = []BalanceTxn{}
+	out.Charges = []ChargeLite{}
+	chargeCustomers := map[string]string{}
+	for _, c := range l.Charges {
+		chargeCustomers[c.ID] = c.Customer
+		if customers[c.Customer] {
+			out.Charges = append(out.Charges, c)
+		}
+	}
+	unattributed := 0
+	for _, t := range l.Transactions {
+		customer := t.Customer
+		if customer == "" {
+			customer = chargeCustomers[t.SourceCharge]
+		}
+		if customer == "" {
+			customer = chargeCustomers[t.Source]
+		}
+		if customer == "" {
+			if classify(t) != "movements" {
+				unattributed++
+			}
+			continue
+		}
+		if customers[customer] {
+			out.Transactions = append(out.Transactions, t)
+		}
+	}
+	return out, unattributed
 }

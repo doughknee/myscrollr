@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Inbox,
   Loader2,
   RefreshCw,
   UserX,
@@ -12,6 +13,7 @@ import type { ReactNode } from 'react'
 import type { Measured } from '@/api/admin'
 import type { Bucket, Comparison, Coverage, Period } from '@/api/adminDashboard'
 import type { Verdict, VerdictTone } from '@/lib/overviewVerdicts'
+import { AdminApiError } from '@/api/adminRequest'
 import {
   PERIODS,
   bucketLabel,
@@ -42,18 +44,30 @@ export interface Report<T> {
   slow?: boolean
   retry?: () => void
   cancel?: () => void
+  /** Read-only snapshots may remain visible, explicitly stale, after a failed refresh. */
+  retainSnapshot?: boolean
 }
 
 /**
  * One bounded load per `load` identity. Changing the period (or the refresh
  * counter) is a new `load`, which aborts the old request and starts over.
  * The previous `data` stays until the new report lands (`refreshing`); an
- * error replaces it, so stale data is never shown as fresh after a failure.
+ * error replaces it by default. Read-only Analytics may opt into retaining
+ * the matching snapshot with an explicit error notice; auth failures still clear it.
  */
 export function useReport<T>(
   load: (signal: AbortSignal) => Promise<T>,
   population?: string,
+  cacheTime = 0,
+  retainSnapshot = false,
 ) {
+  // Page-local only: never survives staff sign-out, route unmount or a new user.
+  const cache = useRef(new Map<string | undefined, { data: T; at: number }>())
+  const cached = cache.current.get(population)
+  const cachedData =
+    cacheTime > 0 && cached && Date.now() - cached.at < cacheTime
+      ? cached.data
+      : null
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<Report<T> & { population?: string }>({
     population,
@@ -63,16 +77,36 @@ export function useReport<T>(
     slow: false,
   })
   const request = useRef<AbortController | null>(null)
+  const lastAttempt = useRef(attempt)
 
   useEffect(() => {
     const controller = new AbortController()
     request.current = controller
+    const entry = cache.current.get(population)
+    const previous =
+      cacheTime > 0 && entry && Date.now() - entry.at < cacheTime
+        ? entry.data
+        : null
+    const explicitRetry = attempt !== lastAttempt.current
+    lastAttempt.current = attempt
+    if (previous !== null && !explicitRetry) {
+      setState({
+        population,
+        data: previous,
+        error: null,
+        loading: false,
+        refreshing: false,
+        slow: false,
+      })
+      return () => controller.abort()
+    }
     setState((current) => ({
       population,
-      data: current.population === population ? current.data : null,
+      data: current.population === population ? current.data : previous,
       error: null,
       loading: true,
-      refreshing: current.population === population && current.data !== null,
+      refreshing:
+        (current.population === population ? current.data : previous) !== null,
       slow: false,
     }))
     const slowTimer = window.setTimeout(() => {
@@ -84,6 +118,12 @@ export function useReport<T>(
       (data) => {
         window.clearTimeout(slowTimer)
         if (!controller.signal.aborted) {
+          if (cacheTime > 0) {
+            cache.current.delete(population)
+            cache.current.set(population, { data, at: Date.now() })
+            if (cache.current.size > 12)
+              cache.current.delete(cache.current.keys().next().value)
+          }
           setState({
             population,
             data,
@@ -97,9 +137,19 @@ export function useReport<T>(
       (error: unknown) => {
         window.clearTimeout(slowTimer)
         if (!controller.signal.aborted) {
-          setState({
+          const accessDenied =
+            error instanceof AdminApiError &&
+            (error.status === 401 || error.status === 403)
+          if (accessDenied) cache.current.clear()
+          cache.current.delete(population)
+          setState((current) => ({
             population,
-            data: null,
+            data:
+              retainSnapshot &&
+              !accessDenied &&
+              current.population === population
+                ? current.data
+                : null,
             error:
               error instanceof Error
                 ? error.message
@@ -107,7 +157,7 @@ export function useReport<T>(
             loading: false,
             refreshing: false,
             slow: false,
-          })
+          }))
         }
       },
     )
@@ -115,29 +165,33 @@ export function useReport<T>(
       window.clearTimeout(slowTimer)
       controller.abort()
     }
-  }, [attempt, load, population])
+  }, [attempt, load, population, cacheTime, retainSnapshot])
 
   return {
+    retainSnapshot,
     ...(state.population === population
       ? state
       : {
-          data: null,
+          data: cachedData,
           error: null,
           loading: true,
-          refreshing: false,
+          refreshing: cachedData !== null,
           slow: false,
         }),
     retry: () => setAttempt((value) => value + 1),
     cancel: () => {
       request.current?.abort()
-      setState({
+      setState((current) => ({
         population,
-        data: null,
+        data:
+          retainSnapshot && current.population === population
+            ? current.data
+            : null,
         error: 'Loading canceled. You can retry.',
         loading: false,
         refreshing: false,
         slow: false,
-      })
+      }))
     },
   }
 }
@@ -153,6 +207,41 @@ export function Loaded<T>({
   children: (data: T) => ReactNode
 }) {
   if (report.data) {
+    if (report.retainSnapshot) {
+      return (
+        <div aria-busy={report.refreshing || undefined}>
+          <span role="status" className="sr-only">
+            {report.refreshing ? `Updating ${label}` : ''}
+          </span>
+          {children(report.data)}
+          {report.refreshing && report.slow && report.cancel && (
+            <button
+              type="button"
+              onClick={report.cancel}
+              className="mt-2 min-h-10 cursor-pointer rounded-lg px-3 text-xs font-semibold ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Cancel update
+            </button>
+          )}
+          {report.error && (
+            <div className="admin-error admin-report-stale mt-3" role="status">
+              <AlertTriangle size={18} aria-hidden />
+              <div>
+                <h2>Showing the last loaded {label}.</h2>
+                <p>{report.error}</p>
+              </div>
+              <button
+                type="button"
+                onClick={report.retry}
+                className="admin-state-action focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      )
+    }
     if (!report.refreshing) return <>{children(report.data)}</>
     return (
       <div aria-busy="true">
@@ -179,7 +268,13 @@ export function Loaded<T>({
     )
   }
   if (report.error) {
-    return <ErrorPanel message={report.error} onRetry={report.retry} />
+    return (
+      <ErrorPanel
+        title={`Couldn’t load ${label}`}
+        message={report.error}
+        onRetry={report.retry}
+      />
+    )
   }
   return <Loading label={label} slow={report.slow} onCancel={report.cancel} />
 }
@@ -187,25 +282,44 @@ export function Loaded<T>({
 export function ErrorPanel({
   message,
   onRetry,
+  title = 'Request unsuccessful',
 }: {
   message: string
   onRetry?: () => void
+  title?: string
 }) {
   return (
-    <div
-      role="alert"
-      className="rounded-xl bg-error/5 p-4 ring-1 ring-error/25"
-    >
-      <p className="text-sm font-medium text-error">{message}</p>
+    <div role="alert" className="admin-error">
+      <AlertTriangle size={18} aria-hidden />
+      <div>
+        <h2>{title}</h2>
+        <p>{message}</p>
+      </div>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold ring-1 ring-error/30 hover:bg-error/10 focus-visible:outline-2 focus-visible:outline-primary"
+          className="admin-state-action inline-flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-primary"
         >
           <RefreshCw size={14} aria-hidden /> Retry
         </button>
       )}
+    </div>
+  )
+}
+
+export function EmptyState({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="admin-empty">
+      <Inbox size={24} aria-hidden />
+      <h2>{title}</h2>
+      {children}
     </div>
   )
 }
@@ -222,7 +336,8 @@ export function Loading({
   return (
     <div
       role="status"
-      className="rounded-xl bg-base-200/30 p-5 text-sm text-base-content/60 ring-1 ring-base-300/50"
+      className="admin-loading"
+      aria-label={`Loading ${label}`}
     >
       <span className="flex items-center gap-2">
         <Loader2 className="size-4 animate-spin" aria-hidden /> Loading {label}
@@ -231,7 +346,7 @@ export function Loading({
         <button
           type="button"
           onClick={onCancel}
-          className="mt-3 min-h-10 cursor-pointer rounded-lg px-3 font-semibold ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
+          className="admin-state-action focus-visible:outline-2 focus-visible:outline-primary"
         >
           Cancel
         </button>
@@ -254,7 +369,7 @@ export const LINK =
  */
 export function PageFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-12">
+    <div className="admin-page mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-8">
       {children}
     </div>
   )
@@ -687,7 +802,7 @@ export function RefreshButton({
       ) : (
         <RefreshCw size={14} aria-hidden />
       )}
-      {label}
+      <span className="refresh-label">{label}</span>
     </button>
   )
 }

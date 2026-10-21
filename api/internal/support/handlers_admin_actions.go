@@ -11,6 +11,7 @@ import (
 	"github.com/brandon-relentnet/myscrollr/api/internal/admin"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 )
 
 // =============================================================================
@@ -90,6 +91,10 @@ func respondWithCase(c *fiber.Ctx, ctx context.Context, ticket, verb string) err
 func actionErrorResponse(c *fiber.Ctx, verb string, err error) error {
 	var linked ErrAlreadyLinked
 	switch {
+	case errors.Is(err, ErrCaseDismissed), errors.Is(err, ErrCaseSending):
+		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
+	case errors.Is(err, pgx.ErrNoRows):
+		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{Status: "error", Error: "That ticket no longer exists."})
 	case errors.Is(err, ErrAlreadyDecided):
 		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
 			Status: "error",
@@ -312,4 +317,32 @@ func badBody(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 		Status: "error", Error: "Malformed request body.",
 	})
+}
+
+// HandleAdminDismissCase moves a ticket to the console's resolved section.
+func HandleAdminDismissCase(c *fiber.Ctx) error {
+	return handleAdminCaseDismissal(c, true)
+}
+
+// HandleAdminRestoreCase returns a dismissed ticket for staff review.
+func HandleAdminRestoreCase(c *fiber.Ctx) error {
+	return handleAdminCaseDismissal(c, false)
+}
+
+func handleAdminCaseDismissal(c *fiber.Ctx, dismiss bool) error {
+	if platform.DBPool == nil {
+		return adminSupportError(c, "The support database is unavailable.")
+	}
+	ticket := strings.TrimSpace(c.Params("ticket"))
+	ctx, cancel := actionContext()
+	defer cancel()
+	verb := "restore ticket"
+	if dismiss {
+		verb = "dismiss ticket"
+	}
+	if err := ActionSetCaseDismissed(ctx, ticket, dismiss); err != nil {
+		return actionErrorResponse(c, verb, err)
+	}
+	log.Printf("[AdminSupport] %s %s by %s", verb, ticket, admin.ActingAdmin(c))
+	return respondWithCase(c, ctx, ticket, verb)
 }

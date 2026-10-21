@@ -17,20 +17,32 @@ const VersionsPage = lazy(() => import('@/components/admin/VersionsPage'))
 export const Route = createFileRoute('/admin/versions')({
   validateSearch: (search: Record<string, unknown> & SearchSchemaInput) => ({
     days: parseVersionDays(search.days),
+    view:
+      search.view === 'traffic' ? ('traffic' as const) : ('health' as const),
   }),
-  search: { middlewares: [stripSearchParams({ days: 30 })] },
+  search: { middlewares: [stripSearchParams({ days: 30, view: 'health' })] },
   component: VersionsRoute,
 })
 
 function VersionsRoute() {
-  const { days } = Route.useSearch()
+  const { days, view } = Route.useSearch()
   const navigate = Route.useNavigate()
   return (
-    <Suspense fallback={<AdminRouteLoading page="Versions" />}>
+    <Suspense fallback={<AdminRouteLoading page="System" />}>
       <VersionsPage
         days={days}
+        view={view}
+        onViewChange={(next) => {
+          void navigate({
+            search: (current) => ({ ...current, view: next }),
+            resetScroll: false,
+          })
+        }}
         onDaysChange={(next) => {
-          void navigate({ search: { days: next } })
+          void navigate({
+            search: (current) => ({ ...current, days: next }),
+            resetScroll: false,
+          })
         }}
       />
     </Suspense>

@@ -49,6 +49,8 @@ type SignupAttemptConversion struct {
 }
 
 type SignupAnalytics struct {
+	Stale      bool `json:"stale,omitempty"`
+	Refreshing bool `json:"refreshing,omitempty"`
 	// Available is false when the scan could not finish; Reason says why and
 	// every other field is empty. Never present stale data as fresh.
 	Available         bool                          `json:"available"`

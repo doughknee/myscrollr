@@ -34,9 +34,10 @@ type BucketCount struct {
 }
 
 type SupportSummaryResponse struct {
-	GeneratedAt string           `json:"generated_at"`
-	Period      platform.Window  `json:"period"`
-	Previous    *platform.Window `json:"previous"`
+	Population  platform.AnalyticsPopulation `json:"population"`
+	GeneratedAt string                       `json:"generated_at"`
+	Period      platform.Window              `json:"period"`
+	Previous    *platform.Window             `json:"previous"`
 
 	// Current status, whole queue.
 	NeedsAttention     BucketCount `json:"needs_attention"`
@@ -98,6 +99,10 @@ func HandleAdminSupportSummary(c *fiber.Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	ctx, err = platform.WithAnalyticsPopulation(ctx, c.Query("os"), c.Query("version"), c.Query("plan"))
+	if err != nil {
+		return c.Status(400).JSON(platform.ErrorResponse{Error: err.Error()})
+	}
 	out, err := loadSupportSummary(ctx, period, now)
 	if err != nil {
 		log.Printf("[AdminSupport] summary: %v", err)
@@ -108,12 +113,13 @@ func HandleAdminSupportSummary(c *fiber.Ctx) error {
 
 func loadSupportSummary(ctx context.Context, period platform.Period, now time.Time) (SupportSummaryResponse, error) {
 	out := SupportSummaryResponse{
+		Population:  platform.PopulationFromContext(ctx),
 		GeneratedAt: now.Format(time.RFC3339), Period: period.Window(),
 		OldestNeedsAttention: platform.Unmeasured("Nothing is waiting on a person."),
 		Definitions: map[string]string{
 			"needs_attention":     "New requests, customer replies nobody has answered, pending or failed drafts: work for a person or the bot.",
 			"waiting_on_customer": "A reply or a question went out and nothing newer has come back.",
-			"completed":           "Closed in osTicket, or dismissed (a draft skipped as needing no reply). Both are shown separately in the queue.",
+			"completed":           "Closed in osTicket, or dismissed in the console or a draft skipped as needing no reply. Both are shown separately in the queue.",
 			"paying":              "Overlay, not a bucket: tickets from a verified signed-in account with a current paid plan (including lifetime). Contacts matched only by email are unknown and never assumed paying.",
 		},
 		CreatedCurve: []platform.Bucket{}, CompletedCurve: []platform.Bucket{}, BacklogCurve: []platform.Bucket{},
@@ -124,6 +130,9 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 		out.Previous = &w
 	}
 
+	if out.Population.Active() {
+		out.Definitions["population"] = platform.AnalyticsPopulationNote + " Support includes only authenticated account links; email-only requesters are excluded."
+	}
 	out.AutoSend = autoSendState(ctx)
 	rows, _, err := loadQueueRows(ctx, 0, out.AutoSend, now)
 	if err != nil {
@@ -137,7 +146,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 			bucket = &out.WaitingOnCustomer
 		case queueHandled:
 			bucket = &out.Completed
-			if r.Status == "closed" {
+			if r.Status == "closed" && r.ConsoleStatus != "dismissed" {
 				out.CompletedClosed++
 			} else {
 				out.CompletedDismissed++
@@ -169,7 +178,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 	}
 	// ── Trends ────────────────────────────────────────────────────────────
 	var coverageFrom *time.Time
-	if err := platform.DBPool.QueryRow(ctx, `SELECT min(opened_at) FROM support_cases WHERE opened_at >= $1`, SupportEpoch).Scan(&coverageFrom); err != nil {
+	if err := summaryQueryRow(ctx, `SELECT min(opened_at) FROM support_cases WHERE opened_at >= $1`, SupportEpoch).Scan(&coverageFrom); err != nil {
 		return out, err
 	}
 	from := time.Time{}
@@ -185,7 +194,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 
 	countBetween := func(column string, s, e time.Time) (float64, error) {
 		var n int
-		err := platform.DBPool.QueryRow(ctx, `SELECT count(*) FROM support_cases WHERE `+column+` >= $1 AND `+column+` < $2`, s, e).Scan(&n)
+		err := summaryQueryRow(ctx, `SELECT count(*) FROM support_cases WHERE `+column+` >= $1 AND `+column+` < $2`, s, e).Scan(&n)
 		return float64(n), err
 	}
 	created, err := countBetween("opened_at", start, end)
@@ -213,7 +222,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 		return out, err
 	}
 
-	if err := platform.DBPool.QueryRow(ctx, `
+	if err := summaryQueryRow(ctx, `
 		SELECT count(*) FROM support_cases c
 		  JOIN stripe_customers s ON s.logto_sub = c.logto_sub AND c.account_source = 'authenticated'
 		 WHERE c.opened_at >= $1 AND c.opened_at < $2
@@ -233,7 +242,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 		if len(curve.buckets) == 0 {
 			continue
 		}
-		rows, err := platform.DBPool.Query(ctx, `
+		rows, err := summaryQuery(ctx, `
 			SELECT floor(extract(epoch FROM (`+curve.column+` - $1)) / $3)::int, count(*)
 			  FROM support_cases WHERE `+curve.column+` >= $1 AND `+curve.column+` < $2 GROUP BY 1`, start, end, step.Seconds())
 		if err != nil {
@@ -259,7 +268,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 			continue
 		}
 		var n int
-		if err := platform.DBPool.QueryRow(ctx, `
+		if err := summaryQueryRow(ctx, `
 			SELECT count(*) FROM support_cases
 			 WHERE opened_at < $1 AND (closed_at IS NULL OR closed_at >= $1) AND status <> 'unknown'`, at).Scan(&n); err != nil {
 			return out, err
@@ -313,7 +322,7 @@ func loadReplyProvenanceCounts(ctx context.Context, out *SupportSummaryResponse,
 		  FROM support_drafts
 		 WHERE coalesce(sent_at, decided_at, created_at) >= $1
 		   AND coalesce(sent_at, decided_at, created_at) <  $2`
-	rows, err := platform.DBPool.Query(ctx, q, start, end)
+	rows, err := summaryQuery(ctx, q, start, end)
 	if err != nil {
 		return err
 	}
@@ -340,7 +349,7 @@ func loadReplyProvenanceCounts(ctx context.Context, out *SupportSummaryResponse,
 // medianHours runs a query returning one float column and reports its
 // median as a Metric with the sample count in the note.
 func medianHours(ctx context.Context, query string, args ...any) (platform.Metric, error) {
-	rows, err := platform.DBPool.Query(ctx, query, args...)
+	rows, err := summaryQuery(ctx, query, args...)
 	if err != nil {
 		return platform.Metric{}, err
 	}

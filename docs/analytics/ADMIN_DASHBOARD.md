@@ -306,3 +306,46 @@ Historical measures use retained timestamps only: created per day
 `sent` message after the first `user` message), completion time
 (`closed_at − opened_at`). Backlog on a past day is estimated from those two
 timestamps and labelled as an estimate; reopenings are not reconstructable.
+
+## Shared account populations (SCROLLR-353)
+
+Growth, Revenue, Support and week-1-return accept `os`, `version` and `plan`
+and echo the applied values in `population`. OS and version must match the
+same desktop session in retained presence history (up to 90 days). The plan
+is the current Stripe snapshot, with lifetime taking precedence and accounts
+without a Stripe row classified as free. This is account membership, not
+the OS or plan at the time of signup, payment or ticket creation. Membership
+does not change with the chart time window. Multi-device accounts may belong
+to multiple populations.
+
+Growth filters registered accounts and setup counts. Revenue filters both
+the customer snapshot and customer-attributed ledger entries, including
+refunds and disputes linked through their charge. Unattributed fees and
+adjustments are excluded from filtered net and disclosed. Support filters
+all buckets, trends, reply provenance and medians to authenticated account
+links; email-only requesters are excluded. Deleted accounts cannot be
+assigned to a current population. Anonymous website visitors and pre-account
+signup-error logs are not assigned to these populations.
+
+Desktop continues to measure the selected devices in the selected window;
+OS/version-filtered hours are per-computer hours. Its mature retention cohorts
+now use the shared account membership, independently of the chart time window.
+Selector options use retained history and current customer plans rather than
+only the currently displayed chart. Filtered week-1 cohort caches include a
+hash of their membership, so they cannot reuse another population's result.
+
+## Signup diagnostic latency (SCROLLR-354)
+
+The leader-elected warmer refreshes website/desktop × 7/30-day aggregates
+every four minutes. Fresh aggregates live for five minutes; successful
+snapshots remain available for 24 hours as explicitly stale fallback.
+An expired snapshot is returned immediately while a coalesced background
+scan refreshes it. A first-ever request waits at most 750 ms for the scan,
+then returns `available: false, refreshing: true`; the UI polls every two
+seconds for up to 45 seconds and allows an explicit retry afterward.
+The scan retains its 25-second budget and existing coverage rules.
+Failed refreshes never overwrite the last successful snapshot or its
+`generated_at`. Short negative caching prevents a failed source from being
+rescanned on every poll. No request claims an unavailable count is zero.
+Without Redis, the same eight app/window snapshots are retained in process
+memory so a completed background scan remains available to subsequent polls.

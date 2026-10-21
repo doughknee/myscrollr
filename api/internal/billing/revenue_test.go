@@ -155,12 +155,12 @@ func TestFetchLedgerPagesThroughStripe(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/v1/balance_transactions"):
 			if strings.Contains(r.URL.RawQuery, "starting_after=txn_1") {
 				_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "has_more": false, "data": []map[string]any{
-					{"id": "txn_2", "object": "balance_transaction", "type": "refund", "reporting_category": "refund", "currency": "usd", "amount": -999, "fee": 0, "net": -999, "created": 1757600000, "source": "re_1"},
+					{"id": "txn_2", "object": "balance_transaction", "type": "refund", "reporting_category": "refund", "currency": "usd", "amount": -999, "fee": 0, "net": -999, "created": 1757600000, "source": map[string]any{"id": "re_1", "object": "refund", "charge": "ch_1"}},
 				}})
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "has_more": true, "data": []map[string]any{
-				{"id": "txn_1", "object": "balance_transaction", "type": "charge", "reporting_category": "charge", "currency": "USD", "amount": 999, "fee": 59, "net": 940, "created": 1757500000, "source": "ch_1"},
+				{"id": "txn_1", "object": "balance_transaction", "type": "charge", "reporting_category": "charge", "currency": "USD", "amount": 999, "fee": 59, "net": 940, "created": 1757500000, "source": map[string]any{"id": "ch_1", "object": "charge", "customer": "cus_1"}},
 			}})
 		case strings.HasPrefix(r.URL.Path, "/v1/charges"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "has_more": false, "data": []map[string]any{
@@ -183,7 +183,7 @@ func TestFetchLedgerPagesThroughStripe(t *testing.T) {
 	if err != nil || partial || len(txns) != 2 {
 		t.Fatalf("txns = %+v partial=%v err=%v", txns, partial, err)
 	}
-	if txns[0].ID != "txn_1" || txns[0].Currency != "usd" || txns[0].Net != 940 || txns[0].Fee != 59 || txns[0].Source != "ch_1" || txns[0].ReportingCategory != "charge" {
+	if txns[0].ID != "txn_1" || txns[0].Currency != "usd" || txns[0].Net != 940 || txns[0].Fee != 59 || txns[0].Source != "ch_1" || txns[0].Customer != "cus_1" || txns[1].SourceCharge != "ch_1" || txns[0].ReportingCategory != "charge" {
 		t.Fatalf("txn mapping = %+v", txns[0])
 	}
 	if txns[1].Net != -999 || txns[1].Created.Year() != 2025 {

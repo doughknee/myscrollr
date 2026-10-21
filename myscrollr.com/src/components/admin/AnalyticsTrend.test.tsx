@@ -61,6 +61,7 @@ describe('AnalyticsTrend', () => {
       ),
     )
     expect(host.textContent).toContain('No observations in this window.')
+    expect(host.querySelector('.analytics-trend-zero')).toBeNull()
     await act(() =>
       root.render(
         <AnalyticsTrend
@@ -73,6 +74,9 @@ describe('AnalyticsTrend', () => {
       ),
     )
     expect(host.textContent).not.toContain('No observations in this window.')
+    expect(host.querySelector('.analytics-trend-zero')?.textContent).toBe(
+      'All reported values are zero.',
+    )
     expect(host.querySelector('[aria-live] strong')?.textContent).toBe('0')
     expect(host.querySelector('circle')).not.toBeNull()
     expect(host.innerHTML).not.toContain('NaN')

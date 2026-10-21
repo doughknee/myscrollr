@@ -98,20 +98,76 @@ async function mount() {
 }
 
 describe('Analytics report isolation', () => {
-  it('clears signup diagnostics when the application changes and ignores superseded responses', async () => {
-    let finishDesktop!: (value: analytics.SignupAnalytics) => void
+  it('keeps a failed refresh readable, announces the saved result and retries only the failed report', async () => {
+    const host = await mount()
+    const chart = host.querySelector('#growth .analytics-chart')
+    vi.mocked(reports.loadAudience).mockRejectedValueOnce(
+      new Error('Connection lost'),
+    )
+    const refresh = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('nav button'),
+    ).find((b) => b.textContent === 'Refresh')!
+    await act(() => refresh.click())
+    expect(host.querySelector('#growth .analytics-chart')).toBe(chart)
+    const notice = host.querySelector('.analytics-refresh-notice')!
+    expect(notice.textContent).toContain('Saved results')
+    expect(
+      notice.querySelector('button')?.getAttribute('aria-label'),
+    ).toContain("Accounts couldn't refresh")
+    await act(() => notice.querySelector('button')!.click())
+    expect(document.activeElement).toBe(host.querySelector('#growth-heading'))
+    expect(host.querySelector('.analytics-refresh-notice')).toBeNull()
+    expect(reports.loadAudience).toHaveBeenCalledTimes(3)
+    expect(reports.loadWebsite).toHaveBeenCalledTimes(2)
+    expect(reports.loadRevenue).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps population controls on every tab and passes all dimensions to account reports', async () => {
+    const host = await mount()
+    const select = host.querySelector<HTMLSelectElement>(
+      '.analytics-population-controls select[name="os"]',
+    )!
+    await act(() => {
+      select.value = 'windows'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    for (const load of [
+      reports.loadAudience,
+      reports.loadRevenue,
+      reports.loadSupportSummary,
+    ]) {
+      expect(load).toHaveBeenLastCalledWith(
+        expect.any(Function),
+        '7d',
+        expect.any(AbortSignal),
+        { os: 'windows', version: undefined, plan: undefined },
+      )
+    }
+    expect(analytics.loadWeek1Return).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      expect.any(AbortSignal),
+      { os: 'windows', version: undefined, plan: undefined },
+    )
+    for (const label of ['Revenue', 'Support', 'Desktop usage', 'Growth']) {
+      const button = Array.from(host.querySelectorAll('nav button')).find(
+        (b) => b.getAttribute('aria-label') === label,
+      ) as HTMLButtonElement
+      await act(() => button.click())
+      expect(select.closest('[hidden]')).toBeNull()
+      expect(select.value).toBe('windows')
+    }
+    // View changes reuse reports for the selected population.
+    expect(reports.loadRevenue).toHaveBeenCalledTimes(2)
+    expect(reports.loadWebsite).toHaveBeenCalledTimes(1)
+  })
+
+  it('defaults to desktop and restores its cached result while ignoring a superseded website scan', async () => {
     let finishWebsite!: (value: analytics.SignupAnalytics) => void
     vi.mocked(analytics.loadSignupAnalytics)
       .mockResolvedValueOnce({
         ...signup,
-        coverage: { ...signup.coverage, note: 'Original website result' },
+        coverage: { ...signup.coverage, note: 'Desktop result' },
       })
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishDesktop = resolve
-          }),
-      )
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
@@ -120,46 +176,36 @@ describe('Analytics report isolation', () => {
       )
     const host = await mount()
     expect(analytics.loadSignupAnalytics).not.toHaveBeenCalled()
-    const disclosure = Array.from(host.querySelectorAll('details')).find((el) =>
-      el.querySelector('summary')?.textContent.includes('Signup diagnostics'),
-    )!
-    await act(() => {
-      disclosure.open = true
-      disclosure.dispatchEvent(new Event('toggle'))
-    })
-    expect(host.textContent).toContain('Original website result')
-    const application = host.querySelector('[aria-label="Application"]')!
-    const applicationButton = (label: string) =>
-      Array.from(application.querySelectorAll('button')).find(
-        (button) => button.textContent === label,
-      )!
-    await act(() => applicationButton('Desktop app').click())
-    expect(host.textContent).not.toContain('Original website result')
-    expect(host.textContent).toContain('Loading signup diagnostics')
+    const health = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((el) => el.textContent === 'Signup health')!
+    await act(() => health.click())
     expect(analytics.loadSignupAnalytics).toHaveBeenLastCalledWith(
       expect.any(Function),
       'desktop',
       7,
       expect.any(AbortSignal),
     )
-    await act(() => applicationButton('Website').click())
-    await act(() =>
-      finishDesktop({
-        ...signup,
-        application: 'desktop',
-        coverage: { ...signup.coverage, note: 'Superseded desktop result' },
-      }),
-    )
-    expect(host.textContent).not.toContain('Superseded desktop result')
+    expect(host.textContent).toContain('Desktop result')
+    const application = host.querySelector('[aria-label="Application"]')!
+    const button = (label: string) =>
+      Array.from(application.querySelectorAll('button')).find(
+        (el) => el.textContent === label,
+      )!
+    await act(() => button('Website').click())
+    expect(host.textContent).not.toContain('Desktop result')
     expect(host.textContent).toContain('Loading signup diagnostics')
+    await act(() => button('Desktop app').click())
+    expect(host.textContent).toContain('Desktop result')
+    expect(analytics.loadSignupAnalytics).toHaveBeenCalledTimes(2)
     await act(() =>
       finishWebsite({
         ...signup,
-        coverage: { ...signup.coverage, note: 'Current website result' },
+        coverage: { ...signup.coverage, note: 'Superseded website result' },
       }),
     )
-    expect(host.textContent).toContain('Current website result')
-    expect(reports.loadAudience).toHaveBeenCalledTimes(1)
+    expect(host.textContent).not.toContain('Superseded website result')
+    expect(host.textContent).toContain('Desktop result')
   })
 
   it('keeps other views usable when a hidden report and its verdict throw, then retries only that report', async () => {
@@ -196,13 +242,10 @@ describe('Analytics report isolation', () => {
           }),
       )
     const host = await mount()
-    const disclosure = Array.from(host.querySelectorAll('details')).find((el) =>
-      el.querySelector('summary')?.textContent.includes('Signup diagnostics'),
-    )!
-    await act(() => {
-      disclosure.open = true
-      disclosure.dispatchEvent(new Event('toggle'))
-    })
+    const health = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((el) => el.textContent === 'Signup health')!
+    await act(() => health.click())
     expect(host.textContent).toContain('Seven-day signup result')
     const period = Array.from(
       host.querySelectorAll('[aria-label="Time window"] button'),
@@ -212,7 +255,7 @@ describe('Analytics report isolation', () => {
     expect(host.textContent).toContain('Loading signup diagnostics')
     expect(analytics.loadSignupAnalytics).toHaveBeenLastCalledWith(
       expect.any(Function),
-      'website',
+      'desktop',
       30,
       expect.any(AbortSignal),
     )
@@ -224,6 +267,41 @@ describe('Analytics report isolation', () => {
       }),
     )
     expect(host.textContent).toContain('Thirty-day signup result')
+  })
+
+  it('preserves the open diagnostic snapshot on toolbar refresh and replaces it in place', async () => {
+    let finish!: (value: analytics.SignupAnalytics) => void
+    vi.mocked(analytics.loadSignupAnalytics)
+      .mockResolvedValueOnce({
+        ...signup,
+        coverage: { ...signup.coverage, note: 'Existing diagnosis' },
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+    const host = await mount()
+    const health = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((el) => el.textContent === 'Signup health')!
+    await act(() => health.click())
+    const refresh = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('nav button'),
+    ).find((el) => el.textContent === 'Refresh')!
+    await act(() => refresh.click())
+    expect(analytics.loadSignupAnalytics).toHaveBeenCalledTimes(2)
+    expect(host.textContent).toContain('Existing diagnosis')
+    expect(host.textContent).not.toContain('Loading signup diagnostics')
+    await act(() =>
+      finish({
+        ...signup,
+        coverage: { ...signup.coverage, note: 'Refreshed diagnosis' },
+      }),
+    )
+    expect(host.textContent).toContain('Refreshed diagnosis')
+    expect(host.textContent).not.toContain('Existing diagnosis')
   })
 
   it('isolates malformed cohorts from the growth report', async () => {

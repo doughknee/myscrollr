@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useBlocker } from '@tanstack/react-router'
+import { Link, useBlocker } from '@tanstack/react-router'
 import {
   AlertTriangle,
   ArrowDown,
@@ -15,6 +15,7 @@ import {
   Pause,
   Play,
   Radio,
+  RefreshCw,
   Search,
   Star,
 } from 'lucide-react'
@@ -35,7 +36,7 @@ import type {
 import type { CaseEdits } from '@/components/admin/CaseActions'
 import type { SupportSearch } from '@/lib/adminSearch'
 import { adminApi, subscribeToSupportEvents } from '@/api/admin'
-import CaseActions from '@/components/admin/CaseActions'
+import CaseActions, { CaseDisposition } from '@/components/admin/CaseActions'
 import {
   QUEUE_SECTIONS,
   SORT_FIELDS,
@@ -53,6 +54,7 @@ import {
 } from '@/lib/supportConsole'
 import { useGetToken } from '@/hooks/useGetToken'
 import { parseSupportSearch } from '@/lib/adminSearch'
+import { splitSupportMessage } from '@/lib/supportMessage'
 
 /**
  * The Support section, rebuilt around people (REL-266).
@@ -315,62 +317,96 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   )
 }
 
-/**
- * The thread, oldest first.
- *
- * Every message is a card except an internal note, which is a left-rule block:
- * a note is us talking to ourselves, and giving it the same card as the words
- * a customer wrote puts them at the same weight.
- */
+/** Customer messages and delivered replies lead; bot work stays inspectable. */
 function Conversation({ detail }: { detail: CaseDetail }) {
   const messages = detail.messages ?? []
-  if (messages.length === 0) {
+  const conversation = messages.filter(
+    (message) => message.kind === 'user' || message.kind === 'sent',
+  )
+  const activity = messages.filter(
+    (message) => message.kind !== 'user' && message.kind !== 'sent',
+  )
+  const renderMessage = (
+    m: NonNullable<CaseDetail['messages']>[number],
+    i: number,
+  ) => {
+    const { text, diagnostics } = splitSupportMessage(m.body || '')
     return (
-      <div className="flex flex-col gap-1.5">
-        <Eyebrow>The conversation</Eyebrow>
-        <p className="text-sm text-base-content/50">
-          Nothing is on record for this ticket. The case database only carries
-          messages the API saw or backfilled from osTicket, so an older ticket
-          answered entirely inside osTicket can look empty here.
-        </p>
-      </div>
+      <article
+        key={`${m.created_at}-${i}`}
+        className="admin-support-message min-w-0 space-y-2"
+        data-kind={m.kind}
+      >
+        <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <Eyebrow>{KIND_LABEL[m.kind] ?? m.kind}</Eyebrow>
+          <time
+            dateTime={m.created_at}
+            className="text-xs text-base-content/45"
+          >
+            {new Date(m.created_at).toLocaleString()}
+            {m.superseded && ' · superseded'}
+          </time>
+        </header>
+        <MessageBody
+          text={
+            text ||
+            (diagnostics ? 'Attached system diagnostics.' : '(empty message)')
+          }
+        />
+        {diagnostics && (
+          <details className="rounded-lg bg-base-200/40 px-3">
+            <summary className="min-h-11 cursor-pointer py-3 text-xs font-medium text-base-content/60">
+              System diagnostics · attachment
+            </summary>
+            <pre className="max-h-80 overflow-auto pb-3 text-xs whitespace-pre-wrap text-base-content/55 [overflow-wrap:anywhere]">
+              {diagnostics}
+            </pre>
+          </details>
+        )}
+      </article>
     )
   }
   return (
-    <div className="flex flex-col gap-4">
-      {messages.map((m, i) => {
-        const note = m.kind === 'note'
-        return (
-          <div key={`${m.created_at}-${i}`} className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <Eyebrow>{KIND_LABEL[m.kind] ?? m.kind}</Eyebrow>
-              <span className="font-mono text-xs text-base-content/45">
-                {new Date(m.created_at).toLocaleString()}
-                {m.superseded && ' · superseded'}
-              </span>
-            </div>
-            {note ? (
-              <p className="border-l-2 border-base-300 pl-4 text-[13px] whitespace-pre-wrap text-base-content/65">
-                {m.body || '(empty)'}
-              </p>
-            ) : (
-              <p
-                className={`rounded-xl bg-base-150 px-4 py-3.5 text-sm leading-[1.55] whitespace-pre-wrap ring-1 ring-hairline ${
-                  m.kind === 'ai_draft'
-                    ? 'text-base-content/55 italic'
-                    : 'text-base-content/85'
-                }`}
-              >
-                {m.body || '(empty)'}
-              </p>
-            )}
-          </div>
-        )
-      })}
-      <p className="text-xs text-base-content/45">
-        Oldest first. Drafts that were never sent are shown too, marked as such
-        — this is the record of what we wrote, not only of what they read.
+    <div className="flex min-w-0 flex-col gap-5">
+      {conversation.length ? (
+        conversation.map(renderMessage)
+      ) : (
+        <p className="text-sm text-base-content/55">
+          No customer messages or delivered replies are recorded here yet. Older
+          conversations may only be in osTicket.
+        </p>
+      )}
+      {activity.length > 0 && (
+        <Disclosure
+          label={`Bot activity & internal notes (${activity.length})`}
+        >
+          <div className="space-y-5">{activity.map(renderMessage)}</div>
+        </Disclosure>
+      )}
+    </div>
+  )
+}
+
+function MessageBody({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const long = text.length > 700
+  return (
+    <div>
+      <p
+        className={`text-sm leading-relaxed whitespace-pre-wrap text-base-content/85 [overflow-wrap:anywhere] ${long && !expanded ? 'line-clamp-6' : ''}`}
+      >
+        {text}
       </p>
+      {long && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+          className="min-h-11 cursor-pointer text-xs font-semibold text-primary hover:underline"
+        >
+          {expanded ? 'Show less' : 'Read full message'}
+        </button>
+      )}
     </div>
   )
 }
@@ -760,7 +796,7 @@ function PersonHeader({
   const behind = detail?.context.version_state === 'behind'
 
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-3.5">
+    <header className="admin-support-identity flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-3.5">
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <h1
@@ -795,9 +831,12 @@ function PersonHeader({
             .join(' · ')}
         </p>
         {subject.plan_note && (
-          <p className="mt-1.5 max-w-[75ch] text-xs text-base-content/50">
-            {subject.plan_note}
-          </p>
+          <details className="mt-1.5 max-w-[75ch] text-xs text-base-content/50">
+            <summary className="cursor-pointer">
+              Identity & plan details
+            </summary>
+            <p className="mt-2">{subject.plan_note}</p>
+          </details>
         )}
       </div>
 
@@ -820,7 +859,13 @@ function PersonHeader({
  * thread. The reply and everything behind it live in the workbench, which is
  * its own pane from 1440 up and sits under this below that.
  */
-function CaseConversation({ detail }: { detail: CaseDetail }) {
+function CaseConversation({
+  detail,
+  onCase,
+}: {
+  detail: CaseDetail
+  onCase: (next: CaseDetail) => void
+}) {
   const tone = dispositionTone(detail.draft?.disposition, detail.draft?.status)
   const stopped = detail.draft?.disposition_reason || detail.group_reason
 
@@ -835,31 +880,47 @@ function CaseConversation({ detail }: { detail: CaseDetail }) {
         </span>
       </div>
 
+      <CaseDisposition
+        key={detail.ticket_number}
+        detail={detail}
+        onCase={onCase}
+      />
+
       {/* Why it stopped, in one sentence, before anything else. The old page
           made you read eight sections to find this out. */}
-      <div className={`rounded-xl px-4 py-3 ring-1 ${TONE_RING[tone]}`}>
-        <div className="flex gap-2.5">
-          {tone === 'stop' ? (
-            <AlertTriangle
-              size={17}
-              className="mt-0.5 shrink-0 text-error"
-              aria-hidden
-            />
-          ) : (
-            <HelpCircle
-              size={17}
-              className="mt-0.5 shrink-0 text-base-content/40"
-              aria-hidden
-            />
-          )}
-          <p className="max-w-[75ch] text-sm leading-relaxed">{stopped}</p>
+      {detail.console_status !== 'dismissed' && stopped && (
+        <div className={`rounded-xl px-4 py-3 ring-1 ${TONE_RING[tone]}`}>
+          <div className="flex gap-2.5">
+            {tone === 'stop' ? (
+              <AlertTriangle
+                size={17}
+                className="mt-0.5 shrink-0 text-error"
+                aria-hidden
+              />
+            ) : (
+              <HelpCircle
+                size={17}
+                className="mt-0.5 shrink-0 text-base-content/40"
+                aria-hidden
+              />
+            )}
+            <p className="max-w-[75ch] text-sm leading-relaxed">{stopped}</p>
+          </div>
         </div>
-      </div>
+      )}
 
-      {detail.hold && (
+      {detail.console_status !== 'dismissed' && detail.hold && (
         <HoldBanner hold={detail.hold} autosend={detail.autosend} />
       )}
 
+      <a
+        href={`https://support.myscrollr.com/scp/tickets.php?number=${encodeURIComponent(detail.ticket_number)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex min-h-11 w-fit items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+      >
+        Open in osTicket <ExternalLink size={12} aria-hidden />
+      </a>
       <Conversation detail={detail} />
     </section>
   )
@@ -898,10 +959,10 @@ function AboutRow({
   tone?: 'warn'
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-t border-hairline py-2 text-[13px]">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-hairline py-2 text-[13px]">
       <span className="text-base-content/65">{label}</span>
       <span
-        className={`font-mono font-medium whitespace-nowrap ${
+        className={`min-w-0 font-medium [overflow-wrap:anywhere] ${
           tone === 'warn' ? 'text-warning' : ''
         }`}
       >
@@ -970,7 +1031,7 @@ function CaseWorkbench({
   onEdit: (patch: Partial<CaseEdits>) => void
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admin-support-workbench flex flex-col gap-6">
       <CaseActions
         detail={detail}
         onCase={onCase}
@@ -1040,7 +1101,7 @@ function OtherTickets({
           key={r.ticket_number}
           type="button"
           onClick={() => onSelect(r.ticket_number)}
-          className={`flex w-full cursor-pointer items-center gap-3 border-t border-hairline py-2.5 text-left hover:bg-base-200/40 ${
+          className={`admin-support-related flex w-full cursor-pointer items-center gap-3 border-t border-hairline py-2.5 text-left hover:bg-base-200/40 ${
             r.group === 'handled' ? 'opacity-70' : ''
           }`}
         >
@@ -1097,7 +1158,7 @@ function QueueCard({
       onClick={onSelect}
       aria-current={active ? 'true' : undefined}
       /* A <button> centres its text; the card is three left-aligned lines. */
-      className={`w-full cursor-pointer rounded-lg px-2.5 py-2.5 text-left transition-colors ${
+      className={`admin-support-queue-card w-full cursor-pointer rounded-lg px-2.5 py-2.5 text-left transition-colors ${
         active
           ? 'bg-base-200 ring-1 ring-primary'
           : 'hover:bg-base-200/50 ring-1 ring-transparent'
@@ -1245,7 +1306,7 @@ function SortBar({
   const pill =
     'h-8 cursor-pointer rounded-full bg-base-150 px-3 text-xs font-semibold text-base-content/80 ring-1 ring-hairline outline-none focus:ring-2 focus:ring-primary/50'
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="admin-support-sort flex flex-col gap-2.5">
       <label className="flex h-[38px] items-center gap-2 rounded-lg bg-base-150 px-3 ring-1 ring-hairline focus-within:ring-2 focus-within:ring-primary/50">
         <Search size={15} className="shrink-0 text-base-content/40" />
         <input
@@ -1291,7 +1352,7 @@ function SortBar({
           className="ml-auto inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs whitespace-nowrap text-base-content/45 hover:text-base-content"
         >
           {dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-          {directionLabel(sort, dir).toLowerCase()}
+          <span>{directionLabel(sort, dir).toLowerCase()}</span>
         </button>
       </div>
     </div>
@@ -1607,10 +1668,13 @@ export default function SupportPage({
       return selectedTicket
     }
     return (
-      mine.find((r) => r.group === 'needs_you')?.ticket_number ??
-      (mine.length > 0 ? mine[0].ticket_number : null)
+      mine.find(
+        (r) =>
+          r.group ===
+          (selection.inbox === 'all' ? 'needs_you' : selection.inbox),
+      )?.ticket_number ?? (mine.length > 0 ? mine[0].ticket_number : null)
     )
-  }, [rowsMode, selectedTicket, person, mine])
+  }, [rowsMode, selectedTicket, person, mine, selection.inbox])
 
   const { detail, error: caseError, setDetail } = useCase(activeTicket, caseKey)
 
@@ -1646,6 +1710,31 @@ export default function SupportPage({
   const back = () => {
     updateSearch({ person: undefined, ticket: undefined })
   }
+  const inbox = selection.inbox
+  const inboxLabels = {
+    all: 'All conversations',
+    needs_you: 'Needs you',
+    waiting: 'Waiting',
+    handled: 'Handled',
+  } as const
+  // Keep server sections and sorting: a person waiting on one ticket may still need us on another.
+  const visiblePeople =
+    inbox === 'all'
+      ? people
+      : people
+          .filter((p) => p[inbox] > 0)
+          .map((p) => ({
+            ...p,
+            headline:
+              rows.find(
+                (row) => row.person_key === p.key && row.group === inbox,
+              )?.subject ?? p.headline,
+            needs_you: inbox === 'needs_you' ? p.needs_you : 0,
+          }))
+  const visibleRows =
+    inbox === 'all' ? rows : rows.filter((r) => r.group === inbox)
+  const visibleCount =
+    rowsMode === 'person' ? visiblePeople.length : visibleRows.length
   const needsYou = queue?.counts.needs_you ?? 0
   const waiting = queue?.counts.waiting ?? 0
   const resolved = queue?.counts.handled ?? 0
@@ -1702,41 +1791,75 @@ export default function SupportPage({
        768 up this page is exactly that tall and each pane scrolls on its own,
        so the window never scrolls. Below it the mobile nav adds a row of its
        own and the page is an ordinary scrolling column. */
-    <div className="flex flex-col md:h-[calc(100dvh-48px)]">
-      <div className="flex min-h-11 shrink-0 flex-wrap items-baseline gap-x-2.5 border-b border-hairline px-4 py-2">
-        <h1 className="self-center text-base font-extrabold tracking-[-0.01em]">
-          Support
-        </h1>
-        {queue ? (
-          <>
-            <span
-              className={`self-center text-[13px] font-bold ${needsYou > 0 ? 'text-error' : 'text-base-content/65'}`}
-            >
-              {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
-            </span>
-            <span className="self-center text-[13px] text-base-content/45">
-              · {waiting} waiting on them · {resolved} resolved
-            </span>
-          </>
-        ) : (
-          <span className="self-center text-[13px] text-base-content/45">
-            {error ? 'Queue unavailable' : 'Loading queue…'}
-          </span>
-        )}
+    <div className="flex flex-col md:h-[calc(100dvh-var(--admin-shell-height))]">
+      <header className="admin-support-header">
+        <div>
+          <h1>Support</h1>
+          <p>Review conversations and manage replies.</p>
+        </div>
+        <div className="admin-support-header-actions">
+          <Link to="/admin/analytics" search={{ view: 'support' }}>
+            Performance <span aria-hidden>↗</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setQueueKey((n) => n + 1)
+              setCaseKey((n) => n + 1)
+            }}
+          >
+            <RefreshCw size={15} aria-hidden />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div
+        className="admin-support-inbox"
+        role="group"
+        aria-label="Support queue views"
+      >
+        {(['all', 'needs_you', 'waiting', 'handled'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={inbox === key}
+            aria-label={key === 'all' ? 'All conversations' : undefined}
+            title={
+              key === 'all'
+                ? 'Every conversation, grouped by priority'
+                : `${inboxLabels[key]} tickets`
+            }
+            onClick={() =>
+              updateSearch({ inbox: key, person: undefined, ticket: undefined })
+            }
+          >
+            {key === 'all' ? 'All' : inboxLabels[key]}
+            {queue && key !== 'all' && (
+              <span>
+                {key === 'needs_you'
+                  ? needsYou
+                  : key === 'waiting'
+                    ? waiting
+                    : resolved}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-3 px-4 py-3 text-sm text-error"
-        >
-          <p>
-            {queue ? 'Showing the last queue update. ' : ''}
-            {error}
-          </p>
+        <div role="alert" className="admin-support-error m-4">
+          <AlertTriangle size={18} aria-hidden />
+          <div>
+            <h2>{queue ? 'Support update failed' : 'Queue unavailable'}</h2>
+            <p>
+              {queue ? 'Showing the last queue update. ' : ''}
+              {error}
+            </p>
+          </div>
           <button
             type="button"
-            className="cursor-pointer font-semibold underline"
+            className="admin-support-retry"
             onClick={() => setQueueKey((n) => n + 1)}
           >
             Retry queue
@@ -1744,12 +1867,9 @@ export default function SupportPage({
         </div>
       )}
       {!queue && !error && (
-        <div className="p-4">
-          <Loader2
-            role="status"
-            aria-label="Loading support queue"
-            className="size-5 animate-spin text-base-content/40"
-          />
+        <div role="status" className="admin-support-loading">
+          <Loader2 aria-hidden className="size-5 animate-spin" />
+          Loading support queue…
         </div>
       )}
 
@@ -1783,98 +1903,167 @@ export default function SupportPage({
             </div>
 
             <div className="px-2 pt-1.5 pb-3">
-              {QUEUE_SECTIONS.map((section) => {
-                const count = queue.sections[section.key] ?? 0
-                const inSection =
-                  rowsMode === 'person'
-                    ? people.filter((p) => p.section === section.key)
-                    : rows.filter((r) => r.section === section.key)
+              {visibleCount === 0 ? (
+                <div className="admin-support-empty admin-support-queue-empty">
+                  {debounced.trim() ? (
+                    <Search size={24} aria-hidden />
+                  ) : (
+                    <MessageSquare size={24} aria-hidden />
+                  )}
+                  <h2>
+                    {debounced.trim()
+                      ? 'No matching conversations'
+                      : inbox === 'all'
+                        ? 'No conversations yet'
+                        : inbox === 'needs_you'
+                          ? 'Nothing needs you'
+                          : inbox === 'waiting'
+                            ? 'No conversations waiting'
+                            : 'No handled conversations'}
+                  </h2>
+                  <p>
+                    {debounced.trim()
+                      ? 'Try another name, email or ticket number.'
+                      : inbox === 'all'
+                        ? 'New support conversations will appear here when they arrive.'
+                        : 'Choose All conversations to see the rest of the queue.'}
+                  </p>
+                  {!debounced.trim() && inbox !== 'all' && (
+                    <button
+                      type="button"
+                      className="admin-support-retry"
+                      onClick={() => updateSearch({ inbox: 'all' })}
+                    >
+                      All conversations
+                    </button>
+                  )}
+                  {debounced.trim() && (
+                    <button
+                      type="button"
+                      className="admin-support-retry"
+                      onClick={() => updateSearch({ q: '' }, true)}
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+              ) : (
+                QUEUE_SECTIONS.map((section) => {
+                  const inSection =
+                    rowsMode === 'person'
+                      ? visiblePeople.filter((p) => p.section === section.key)
+                      : visibleRows.filter((r) => r.section === section.key)
 
-                // Resolved is a count that opens. Forty-six closed tickets are
-                // not what anybody came here to read.
-                const collapsed = section.key === 'resolved' && !showResolved
+                  // Resolved is a count that opens. Forty-six closed tickets are
+                  // not what anybody came here to read.
+                  if (inbox !== 'all' && inSection.length === 0) return null
+                  const count = inSection.length
+                  const collapsed =
+                    inbox === 'all' &&
+                    section.key === 'resolved' &&
+                    !showResolved
 
-                return (
-                  <section key={section.key}>
-                    <div className="flex items-center gap-1.5 px-2 pt-3 pb-1.5">
-                      {section.key === 'paying' && (
-                        <Star size={12} className="shrink-0 text-success" />
-                      )}
-                      <h2
-                        className={`text-[11px] font-bold tracking-[0.08em] uppercase ${SECTION_STYLE[section.key]}`}
-                      >
-                        {section.label}
-                      </h2>
-                      <span className="ml-auto font-mono text-[11px] text-base-content/40">
-                        {section.key === 'paying' && queue.accounts.paying > 0
-                          ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
-                          : rowsMode === 'person'
-                            ? count
-                            : inSection.length}
-                      </span>
-                      {section.key === 'resolved' && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateSearch({ resolved: !showResolved })
-                          }
-                          aria-expanded={showResolved}
-                          aria-label="Show resolved"
-                          className="cursor-pointer text-base-content/40 hover:text-base-content"
+                  return (
+                    <section key={section.key}>
+                      <div className="flex items-center gap-1.5 px-2 pt-3 pb-1.5">
+                        {section.key === 'paying' && (
+                          <Star size={12} className="shrink-0 text-success" />
+                        )}
+                        <h2
+                          className={`text-[11px] font-bold tracking-[0.08em] uppercase ${SECTION_STYLE[section.key]}`}
                         >
-                          <ChevronRight
-                            size={13}
-                            className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
-                          />
-                        </button>
-                      )}
-                    </div>
-
-                    {!collapsed && (
-                      <div className="flex flex-col gap-0.5">
-                        {inSection.length === 0 ? (
-                          /* An empty paying section is a fact about the data,
-                             not a blank box: almost no ticket is joined to an
-                             account, and the server says so in a sentence. */
-                          <p className="px-2 text-xs text-base-content/45">
-                            {section.key === 'paying'
-                              ? queue.accounts.note || section.empty
-                              : section.empty}
-                          </p>
-                        ) : rowsMode === 'person' ? (
-                          (inSection as Array<QueuePerson>).map((p) => (
-                            <PersonCard
-                              key={p.key}
-                              person={p}
-                              active={selectedPerson === p.key}
-                              onSelect={() => {
-                                updateSearch({
-                                  person: p.key,
-                                  ticket: undefined,
-                                })
-                              }}
+                          {section.key === 'open' &&
+                          (inbox === 'waiting' || inbox === 'handled')
+                            ? 'Also needs attention'
+                            : section.label}
+                        </h2>
+                        <span className="ml-auto font-mono text-[11px] text-base-content/40">
+                          {section.key === 'paying' && queue.accounts.paying > 0
+                            ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
+                            : rowsMode === 'person'
+                              ? count
+                              : inSection.length}
+                        </span>
+                        {section.key === 'resolved' && inbox === 'all' && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateSearch({ resolved: !showResolved })
+                            }
+                            aria-expanded={showResolved}
+                            aria-label="Show resolved"
+                            className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-base-content/65 hover:bg-base-200 hover:text-base-content"
+                          >
+                            <ChevronRight
+                              size={13}
+                              className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
                             />
-                          ))
-                        ) : (
-                          (inSection as Array<QueueRow>).map((r) => (
-                            <TicketCard
-                              key={r.ticket_number}
-                              row={r}
-                              active={selectedTicket === r.ticket_number}
-                              onSelect={() => {
-                                updateSearch({
-                                  ticket: r.ticket_number,
-                                  person: undefined,
-                                })
-                              }}
-                            />
-                          ))
+                          </button>
                         )}
                       </div>
-                    )}
-                  </section>
-                )
-              })}
+
+                      {!collapsed && (
+                        <div className="flex flex-col gap-0.5">
+                          {inSection.length === 0 ? (
+                            /* An empty paying section is a fact about the data,
+                             not a blank box: almost no ticket is joined to an
+                             account, and the server says so in a sentence. */
+                            <div className="px-2 pb-2 text-xs leading-relaxed text-base-content/65">
+                              <p>
+                                {debounced.trim()
+                                  ? 'No matches in this section.'
+                                  : section.key === 'paying'
+                                    ? 'No tickets linked to a paying account.'
+                                    : section.empty}
+                              </p>
+                              {!debounced.trim() &&
+                                section.key === 'paying' &&
+                                queue.accounts.note && (
+                                  <details className="mt-2">
+                                    <summary className="cursor-pointer">
+                                      How accounts are matched
+                                    </summary>
+                                    <p className="mt-2 leading-relaxed">
+                                      {queue.accounts.note}
+                                    </p>
+                                  </details>
+                                )}
+                            </div>
+                          ) : rowsMode === 'person' ? (
+                            (inSection as Array<QueuePerson>).map((p) => (
+                              <PersonCard
+                                key={p.key}
+                                person={p}
+                                active={selectedPerson === p.key}
+                                onSelect={() => {
+                                  updateSearch({
+                                    person: p.key,
+                                    ticket: undefined,
+                                  })
+                                }}
+                              />
+                            ))
+                          ) : (
+                            (inSection as Array<QueueRow>).map((r) => (
+                              <TicketCard
+                                key={r.ticket_number}
+                                row={r}
+                                active={selectedTicket === r.ticket_number}
+                                onSelect={() => {
+                                  updateSearch({
+                                    ticket: r.ticket_number,
+                                    person: undefined,
+                                  })
+                                }}
+                              />
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  )
+                })
+              )}
             </div>
           </div>
 
@@ -1895,35 +2084,41 @@ export default function SupportPage({
                 onClick={back}
                 className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 px-4 text-sm font-medium text-base-content/70 hover:text-base-content md:hidden"
               >
-                <ArrowLeft size={16} /> All of support
+                <ArrowLeft size={16} /> Back to queue
               </button>
             )}
 
             {!selected ? (
-              <div className="p-8">
-                <p className="mx-auto max-w-[50ch] text-center text-sm text-base-content/60">
-                  Pick someone. Their identity and history come first, then the
-                  thread that needs an answer — the reply and everything behind
-                  it are on the right.
+              <div className="admin-support-empty">
+                <MessageSquare size={28} aria-hidden />
+                <h2>Select a conversation</h2>
+                <p>
+                  Choose a person or ticket to review the conversation, check
+                  the bot’s work, and decide what needs your attention.
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-5 px-5 py-5 [overflow-wrap:anywhere] min-[1440px]:px-8">
+              <div className="admin-support-thread flex flex-col gap-5 px-5 py-5 [overflow-wrap:anywhere] min-[1440px]:px-8">
                 <PersonHeader person={person} rows={mine} detail={detail} />
                 {caseError && (
-                  <div
-                    role="alert"
-                    className="flex items-center gap-3 text-sm text-error"
-                  >
-                    <p>
-                      {detail
-                        ? 'Showing the last case update. Your edits are kept. '
-                        : ''}
-                      {caseError}
-                    </p>
+                  <div role="alert" className="admin-support-error">
+                    <AlertTriangle size={18} aria-hidden />
+                    <div>
+                      <h2>
+                        {detail
+                          ? 'Conversation update failed'
+                          : 'Couldn’t load this conversation'}
+                      </h2>
+                      <p>
+                        {detail
+                          ? 'Showing the last case update. Your edits are kept. '
+                          : ''}
+                        {caseError}
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      className="cursor-pointer font-semibold underline"
+                      className="admin-support-retry"
                       onClick={() => setCaseKey((n) => n + 1)}
                     >
                       Retry case
@@ -1931,13 +2126,25 @@ export default function SupportPage({
                   </div>
                 )}
                 {!detail && !caseError && activeTicket && (
-                  <Loader2
-                    role="status"
-                    aria-label="Loading support case"
-                    className="size-5 animate-spin text-base-content/40"
+                  <div role="status" className="admin-support-loading">
+                    <Loader2 aria-hidden className="size-5 animate-spin" />
+                    Loading support case…
+                  </div>
+                )}
+                {detail && (
+                  <CaseConversation
+                    detail={detail}
+                    onCase={(next) => {
+                      setDetail(next, detail.draft?.id)
+                      if (next.console_status === 'dismissed')
+                        setEdits((current) => {
+                          const remaining = { ...current }
+                          delete remaining[editKey]
+                          return remaining
+                        })
+                    }}
                   />
                 )}
-                {detail && <CaseConversation detail={detail} />}
                 <OtherTickets
                   rows={mine}
                   active={activeTicket}
@@ -1951,7 +2158,7 @@ export default function SupportPage({
 
           {/* The reply and the evidence, from 1440 up. */}
           {wide && selected && (
-            <aside className="w-[520px] shrink-0 overflow-y-auto border-l border-hairline bg-base-100 px-5 py-5">
+            <aside className="w-[380px] shrink-0 overflow-y-auto border-l border-hairline bg-base-100 px-5 py-5">
               {workbench}
             </aside>
           )}

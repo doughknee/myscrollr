@@ -1,7 +1,9 @@
 import { Link, Outlet, useLocation } from '@tanstack/react-router'
-import { createContext, useContext, useEffect, useState } from 'react'
-import { Loader2, Lock, Moon, Sun } from 'lucide-react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { ChevronDown, Loader2, Lock, Moon, Sun } from 'lucide-react'
+import { AdminQuickSearch } from './AdminQuickSearch'
 import ScrollrSVG from '@/components/ScrollrSVG'
+import './admin.css'
 import { AdminApiError, adminApi } from '@/api/admin'
 import { ADMIN_SESSION_EXPIRED } from '@/api/adminRequest'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -18,12 +20,11 @@ import { useTheme } from '@/hooks/useTheme'
  */
 
 const SECTIONS = [
-  { to: '/admin', label: 'Overview', exact: true },
-  { to: '/admin/analytics', label: 'Analytics' },
+  { to: '/admin', label: 'Home', exact: true },
   { to: '/admin/support', label: 'Support' },
-  { to: '/admin/versions', label: 'Versions' },
   { to: '/admin/users', label: 'Users' },
-  { to: '/admin/admins', label: 'Admins' },
+  { to: '/admin/analytics', label: 'Analytics' },
+  { to: '/admin/versions', label: 'System' },
   { to: '/admin/settings', label: 'Settings' },
 ] as const
 
@@ -299,46 +300,60 @@ export function AdminChrome({
   const location = useLocation()
   const { theme, toggleTheme } = useTheme()
   const [slot, setSlot] = useState<React.ReactNode>(null)
+  const menu = useRef<HTMLDetailsElement>(null)
+  const settingsSection = ['/admin/settings', '/admin/admins'].includes(
+    location.pathname,
+  )
+  useEffect(() => {
+    if (menu.current) menu.current.open = false
+  }, [location.pathname, location.searchStr])
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (menu.current && !menu.current.contains(event.target as Node))
+        menu.current.open = false
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [])
   const links = SECTIONS.map(({ to, label, ...rest }) => {
     const exact = 'exact' in rest && rest.exact
     const active = exact
       ? location.pathname === '/admin' || location.pathname === '/admin/'
-      : location.pathname.startsWith(to)
+      : to === '/admin/settings'
+        ? settingsSection
+        : location.pathname.startsWith(to)
     return { to, label, active }
   })
 
   return (
     <StatusSlot.Provider value={setSlot}>
-      <div className="flex min-h-dvh flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
+      <div className="admin-workspace flex min-h-dvh flex-col">
+        <header className="admin-chrome-header flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
           <Link
             to="/admin"
+            activeOptions={{ exact: true }}
             className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
           >
             <ScrollrSVG width={20} height={20} />
             <span className="flex items-baseline">
               scrollr<span className="text-primary">.</span>
             </span>
-            <span className="ml-1 text-[13px] font-medium text-base-content/45">
+            <span className="admin-brand-suffix ml-1 text-[13px] font-medium text-base-content/45">
               / admin
             </span>
           </Link>
 
-          {/* From 768 the sections sit in the bar. Below it they get their own
-            scrolling row underneath, where a tap target can be 44px tall. */}
+          {/* The menu below leaves room for page status indicators on tablets. */}
           <nav
             aria-label="Staff sections"
-            className="hidden min-w-0 flex-1 overflow-hidden md:block"
+            className="admin-desktop-nav hidden min-w-0 flex-1 md:block"
           >
-            {/* The bar now also carries a page's status pills (SCROLLR-219).
-                Between 768 and the width where everything fits, the sections
-                scroll inside their share of the bar; overflow visible let
-                them run under the pills instead. */}
             <ul className="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
               {links.map(({ to, label, active }) => (
                 <li key={to}>
                   <Link
                     to={to}
+                    activeOptions={{ exact: true }}
                     aria-current={active ? 'page' : undefined}
                     className={`rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${
                       active
@@ -353,9 +368,14 @@ export function AdminChrome({
             </ul>
           </nav>
 
+          {(status || slot) && (
+            <div className="admin-chrome-status flex items-center gap-4">
+              {status}
+              {slot}
+            </div>
+          )}
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
-            {status}
-            {slot}
+            <AdminQuickSearch />
             <button
               type="button"
               onClick={toggleTheme}
@@ -391,28 +411,57 @@ export function AdminChrome({
           </div>
         </header>
 
-        <nav
-          aria-label="Staff sections"
-          className="shrink-0 border-b border-hairline bg-base-75 md:hidden"
+        <details
+          ref={menu}
+          className="admin-mobile-menu"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && menu.current?.open) {
+              menu.current.open = false
+              menu.current.querySelector('summary')?.focus()
+            }
+          }}
         >
-          <ul className="flex gap-0.5 overflow-x-auto px-2">
-            {links.map(({ to, label, active }) => (
-              <li key={to}>
-                <Link
-                  to={to}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
-                    active
-                      ? 'text-base-content'
-                      : 'text-base-content/60 hover:text-base-content'
-                  }`}
-                >
-                  {label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+          <summary>
+            <span>
+              {links.find((link) => link.active)?.label ?? 'Staff console'}
+            </span>
+            <span>
+              Menu <ChevronDown size={16} aria-hidden />
+            </span>
+          </summary>
+          <nav aria-label="Staff sections">
+            <ul>
+              {links.map(({ to, label, active }) => (
+                <li key={to}>
+                  <Link
+                    to={to}
+                    activeOptions={{ exact: true }}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => {
+                      if (menu.current) menu.current.open = false
+                    }}
+                    className={`flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                      active
+                        ? 'text-base-content'
+                        : 'text-base-content/60 hover:text-base-content'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </details>
+
+        {settingsSection && (
+          <nav className="admin-settings-nav" aria-label="Settings sections">
+            <Link to="/admin/settings" activeOptions={{ exact: true }}>
+              Analytics preferences
+            </Link>
+            <Link to="/admin/admins">Staff access</Link>
+          </nav>
+        )}
 
         {/* Full-bleed. Each page brings its own PageFrame if it wants a cap. */}
         <section
@@ -426,7 +475,7 @@ export function AdminChrome({
               node.focus({ preventScroll: true })
             }
           }}
-          className="min-h-[calc(100dvh-48px)] min-w-0 flex-1 outline-none"
+          className="min-h-0 min-w-0 flex-1 outline-none"
         >
           {children}
         </section>

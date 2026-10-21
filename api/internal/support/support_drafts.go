@@ -93,6 +93,18 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		return nil, ErrNoDraftBody
 	}
 
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := lockCase(ctx, tx, draft.TicketNumber); err != nil {
+		return nil, err
+	}
+	if err := caseAllowsDraft(ctx, tx, draft.TicketNumber); err != nil {
+		return nil, err
+	}
+
 	const q = `
 		INSERT INTO support_drafts
 			(ticket_number, user_email, user_name, original_subject,
@@ -121,7 +133,7 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	if draft.UserMessageHTML != "" {
 		userMsg = &draft.UserMessageHTML
 	}
-	err := platform.DBPool.QueryRow(ctx, q,
+	err = tx.QueryRow(ctx, q,
 		draft.TicketNumber,
 		draft.UserEmail,
 		draft.UserName,
@@ -146,6 +158,12 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE support_cases SET console_status = '' WHERE ticket_number = $1 AND console_status = 'review'`, draft.TicketNumber); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
 	}
 	draft.Status = "pending"
 
@@ -309,17 +327,36 @@ func holdDraft(ctx context.Context, id int64) error {
 // empty string for other transitions. Empty editedBody is stored as
 // NULL via NULLIF($3,”).
 func markDraftDecided(ctx context.Context, id int64, newStatus string, editedBody string) error {
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var ticket string
+	if err := tx.QueryRow(ctx, `SELECT ticket_number FROM support_drafts WHERE id = $1`, id).Scan(&ticket); err != nil {
+		return err
+	}
+	if err := lockCase(ctx, tx, ticket); err != nil {
+		return err
+	}
+	if err := caseAllowsDraft(ctx, tx, ticket); err != nil {
+		return err
+	}
+
 	const q = `
 		UPDATE support_drafts
 		SET status = $2, edited_body_html = NULLIF($3,''), decided_at = NOW()
 		WHERE id = $1 AND status = 'pending'
 	`
-	tag, err := platform.DBPool.Exec(ctx, q, id, newStatus, editedBody)
+	tag, err := tx.Exec(ctx, q, id, newStatus, editedBody)
 	if err != nil {
 		return fmt.Errorf("markDraftDecided: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrAlreadyDecided
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
 	}
 	// A skip is the one decision with no send behind it, so it leaves its
 	// mark here; approve/edit are recorded by doSendApprovedReply with

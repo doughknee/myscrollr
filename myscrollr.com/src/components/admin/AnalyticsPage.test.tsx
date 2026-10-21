@@ -156,8 +156,9 @@ describe('SectionNav', () => {
     expect(html).toContain('bg-base-400')
   })
 
-  it('carries the period footnote, and drops the comparison for lifetime', () => {
-    expect(render('growth')).toContain('Last 7 days vs the previous 7 days.')
+  it('keeps the time controls without the redundant population disclosure', () => {
+    expect(render('growth')).not.toContain('Window &amp; population')
+    expect(render('growth')).toContain('aria-label="Time window"')
     const lifetime = renderToStaticMarkup(
       <SectionNav
         view="growth"
@@ -172,7 +173,7 @@ describe('SectionNav', () => {
         onPeriod={() => {}}
       />,
     )
-    expect(lifetime).toContain('Everything so far, with nothing to compare')
+    expect(lifetime).toMatch(/aria-pressed="true"[^>]*>Lifetime</)
   })
 })
 
@@ -218,21 +219,20 @@ describe('GrowthContent', () => {
     expect(html).toContain('Accounts in total')
     expect(html).toContain('Never finished setting up')
     expect(html).toContain('>83<')
-    expect(html).toContain('Deleted their account')
+    expect(html).toContain('Known deleted accounts')
   })
 
-  it('reads sign-up source from applicationId and day-one return from the legacy series', async () => {
+  it('reads sign-up source from applicationId without duplicating legacy retention', async () => {
     const html = await render()
     expect(html).toContain('Signed up from the desktop app')
     expect(html).toContain('>7<') // audience.signup_source.desktop
-    expect(html).toContain('Came back a second day')
-    expect(html).toContain('>6<') // desktop.legacy.retention.d1.returned
+    expect(html).not.toContain('Came back a second day')
     // Neither is inferred from the other: unknown is its own bucket and is
     // not added to either side.
     expect(html).not.toContain('>11<')
   })
 
-  it('keeps both facts "unknown" rather than zero when the source says it cannot measure them', async () => {
+  it('keeps signup source unknown when the source cannot measure it', async () => {
     const html = await render({
       audience: loaded({
         ...audience,
@@ -263,24 +263,25 @@ describe('GrowthContent', () => {
       }),
     })
     expect(html).toContain('Signed up from the desktop app')
-    expect(html).toContain('Came back a second day')
-    expect(html.match(/>unknown</g)?.length).toBeGreaterThanOrEqual(2)
+    expect(html).not.toContain('Came back a second day')
+    expect(html.match(/>unknown</g)?.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('says "unknown" for day-one return when the legacy series is absent entirely', async () => {
+  it('omits day-one return when the legacy series is absent entirely', async () => {
     const html = await render({ desktop: loaded({ ...desktop, legacy: null }) })
-    expect(html).toContain('Came back a second day')
-    expect(html).toContain('>unknown<')
+    expect(html).not.toContain('Came back a second day')
   })
 
-  it('folds everything it used to show into a closed More detail', async () => {
+  it('keeps acquisition detail in a closed dialog', async () => {
     const html = await render()
-    expect(html).toContain('More detail')
+    expect(html).toContain('Acquisition details')
+    expect(html).toContain('<dialog')
+    expect(html).not.toContain('<dialog open')
     expect(html).not.toContain('<details open')
-    expect(html).toContain('Registered users')
+    expect(html).toContain('From signup to setup')
     expect(html).toContain('>183<')
     expect(html).toContain('Lifetime registrations')
-    expect(html).toContain('Known purged')
+    expect(html).toContain('Known deleted accounts')
     expect(html).toContain('Staff excluded')
     expect(html).toContain('Top referrers')
     expect(html).toContain('google.com')
@@ -462,14 +463,19 @@ describe('DesktopContent', () => {
   it('lists its facts from presence, peak, retention and widgets', async () => {
     const html = await render()
     expect(html).toContain('People who ran the app')
-    expect(html).toContain('Hours the app was open, everyone added up')
-    expect(html).toContain('Most people online at once')
+    expect(html).toContain('App hours · all users')
+    expect(html).toContain('Peak simultaneous users')
     // 2+ screens bucket, day-1 retention, and the widget with most hours.
     expect(html).toContain('Using two or more monitors')
-    expect(html).toContain('Came back the next day')
+    expect(html).toContain('Day 1 retention')
+    expect(html).toContain(
+      'All mature cohorts · independent of time, OS, version and plan filters.',
+    )
+    expect(html.split('Usage details')[0]).not.toContain('Day 1 retention')
     expect(html).toContain('12 of 20')
-    expect(html).toContain('Most-shown widget')
-    expect(html).toContain('NFL · 210.5 h')
+    expect(html).toContain('What stays on screen')
+    expect(html).toContain('NFL')
+    expect(html).toContain('210.5 h')
     expect(html).toContain('Widgets added in the last 7 days')
     expect(html).toContain('Widgets removed in the last 7 days')
   })
@@ -483,15 +489,20 @@ describe('DesktopContent', () => {
     expect(html).toContain('>19<')
     expect(html).toContain('Day 1 retention')
     expect(html).toContain('60%')
+    expect(html).toContain(
+      '12 of 20 mature accounts returned on exactly day 1.',
+    )
+    expect(html).not.toContain('>0%</strong>')
     expect(
       html.match(/No cohort is old enough\./g)?.length,
     ).toBeGreaterThanOrEqual(2)
     expect(html).toContain('of 27 measured ticker users')
     expect(html).toContain('NFL')
     expect(html).toContain('74%')
-    expect(html).toContain('+3 / −1')
-    expect(html).toContain('25 / 22')
-    expect(html).toContain('href="/admin/versions"')
+    // Configuration figures are available in their focused metric view.
+    expect(html).toContain('Configuration')
+    expect(html).toContain('Find a widget')
+    expect(html).toContain('href="/admin/versions?view=traffic"')
   })
 
   it('shows additions and removals as a dash under a per-computer filter', async () => {
@@ -548,7 +559,9 @@ describe('DesktopContent', () => {
   it('builds filters only from the options the API listed', async () => {
     const html = await render({ filters: { os: 'windows' } })
     expect(html).toContain('name="os"')
-    expect(html).toContain('windows (30)')
+    expect(html).toContain('Windows (30)')
+    expect(html).toContain('value="windows" selected=""')
+    expect(html).toContain('macOS (4)')
     expect(html).toContain('name="plan"')
     const none = await render({
       desktop: loaded({
@@ -556,15 +569,17 @@ describe('DesktopContent', () => {
         filters: { os: [], version: null, plan: [], applied: {} },
       }),
     })
-    expect(none).not.toContain('name="os"')
+    expect(none).toContain('name="os"')
+    expect(none).toContain('name="version"')
+    expect(none).toContain('name="plan"')
   })
 
-  it('keeps the legacy series in its own labelled section', async () => {
+  it('shows one usage source without the legacy duplicate', async () => {
     const html = await render()
-    expect(html).toContain('Legacy measurement')
-    expect(html).toContain('never merged with presence')
-    expect(html).toContain('Participating accounts')
-    expect(html).toContain('Opted-in signed-in accounts only.')
+    expect(html).not.toContain('Legacy measurement')
+    expect(html).not.toContain('Participating accounts')
+    expect(html).toContain('Measured by Scrollr')
+    expect(html).toContain('Do people return?')
   })
 
   it('renders unavailable metrics as notes and partial coverage', async () => {
@@ -657,14 +672,15 @@ describe('RevenueContent', () => {
     expect(html).toContain('>2<')
     expect(html).toContain('Plan mix')
     expect(html).toContain('lifetime')
-    expect(html).toContain('monthly')
+    expect(html).toContain('Monthly')
     expect(html).toContain('Earnings in USD')
     expect(html).toContain('Earnings in EUR')
-    expect(html).toContain('$123.45 USD')
-    expect(html).toContain('-$9.99 USD')
-    expect(html).toContain('$113.46 USD')
-    expect(html).toContain('€20.00 EUR')
-    expect(html).toContain('$4.12 USD')
+    const text = html.replace(/<[^>]*>/g, '')
+    expect(text).toContain('$123.45 USD')
+    expect(text).toContain('-$9.99 USD')
+    expect(text).toContain('$113.46 USD')
+    expect(text).toContain('€20.00 EUR')
+    expect(text).toContain('$4.12 USD')
     expect(html).not.toContain('13346')
     expect(html).not.toContain('$133.46')
   })
@@ -794,7 +810,7 @@ describe('SupportContent', () => {
   it('asks its question and answers it in one sentence', async () => {
     const html = await render()
     expect(html).toContain(
-      'How much are we owing people, and how fast do we pay it back?',
+      'What needs attention, and how quickly do we respond?',
     )
     expect(html).toContain('3 people')
     expect(html).toContain('are waiting on us.')
@@ -870,7 +886,7 @@ describe('SupportContent', () => {
 
   it('carries sample counts with medians and renders an unavailable median as its note', async () => {
     const html = await render()
-    expect(html).toContain('2.5 h')
+    expect(html).toContain('2 h 30 m')
     expect(html).toContain('n=4')
     expect(html).toContain('No ticket completed in this window.')
     expect(html).not.toContain('>0 h<')

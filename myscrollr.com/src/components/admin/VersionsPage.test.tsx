@@ -118,3 +118,9 @@ describe('VersionsReport', () => {
     }
   })
 })
+
+it('does not round a measured small error rate to zero', () => {
+  expect(
+    text({ ...healthy, versions: [version('1.6.7', 1, 0.00001)] }),
+  ).toContain('&lt;0.1%')
+})

@@ -1,8 +1,18 @@
 import { useCallback, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { Loaded, PageFrame, VERDICT_TONE, VerdictPill, useReport } from './ui'
+import {
+  EmptyState,
+  Loaded,
+  PageFrame,
+  RefreshButton,
+  VERDICT_TONE,
+  VerdictPill,
+  useReport,
+} from './ui'
+import { SystemHealth } from './SystemHealth'
 import type { ReactNode } from 'react'
-import type { AdminVersions } from '@/api/admin'
+import type { AdminOverview, AdminVersions } from '@/api/admin'
+import { loadBoundedAdminReport } from '@/api/adminAnalytics'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
 import { versionsVerdict } from '@/lib/overviewVerdicts'
@@ -29,7 +39,10 @@ const WINDOWS = [7, 30, 90] as const
 
 // A decimal only below 1%, so a real-but-tiny share never rounds to a flat
 // "0%" that reads as "nobody".
-const pct = (n: number) => `${(n * 100).toFixed(n === 0 || n >= 0.01 ? 0 : 1)}%`
+const pct = (n: number) =>
+  n > 0 && n < 0.0005
+    ? '<0.1%'
+    : `${(n * 100).toFixed(n === 0 || n >= 0.01 ? 0 : 1)}%`
 const num = (n: number) => n.toLocaleString()
 
 /** Anything at or above this is worth a second look rather than a shrug. */
@@ -92,43 +105,42 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
   const empty = data.desktop_total === 0
 
   return (
-    <div className="space-y-8 [overflow-wrap:anywhere]">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <p className="max-w-[900px] text-2xl leading-[1.35] font-semibold tracking-[-0.015em]">
-          {empty ? (
-            'No desktop traffic in this window.'
-          ) : (
-            <>
-              <b className={`font-bold ${tone.number}`}>
-                {pct(data.current_share)} of desktop traffic
-              </b>{' '}
-              is on {data.current_release}, the newest build anyone is running.{' '}
-              {erroring
-                ? `${erroring} is erroring more than usual.`
-                : 'Nothing is erroring more than usual.'}
-            </>
-          )}
-        </p>
-        <VerdictPill verdict={verdict} />
-      </div>
+    <div className="admin-system-traffic space-y-6 [overflow-wrap:anywhere]">
+      {!empty && (
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <p className="max-w-[900px] text-2xl leading-[1.35] font-semibold tracking-[-0.015em]">
+            <b className={`font-bold ${tone.number}`}>
+              {pct(data.current_share)} of desktop traffic
+            </b>{' '}
+            is on {data.current_release}, the newest build anyone is running.{' '}
+            {erroring
+              ? `${erroring} is erroring more than usual.`
+              : 'Nothing is erroring more than usual.'}
+          </p>
+          <VerdictPill verdict={verdict} />
+        </div>
+      )}
 
       {empty && (
-        <p className="rounded-xl bg-base-200/40 p-4 text-sm text-base-content/70 ring-1 ring-base-300/60">
-          No desktop request in the last {data.days} days carried a recognisable
-          Scrollr user agent
-          {data.unrecognized > 0 && (
-            <> (though {num(data.unrecognized)} other requests arrived)</>
-          )}
-          . A build only starts reporting once it sends one — before then this
-          page is correctly empty rather than wrong.
-        </p>
+        <EmptyState title="No desktop traffic in this window.">
+          <p>
+            No desktop request in the last {data.days} days carried a
+            recognisable Scrollr user agent
+            {data.unrecognized > 0 && (
+              <> (though {num(data.unrecognized)} other requests arrived)</>
+            )}
+            . Try a wider window. A build appears here once it sends a
+            recognised user agent.
+          </p>
+          <VerdictPill verdict={verdict} />
+        </EmptyState>
       )}
 
       {!empty && (
-        <>
+        <div className="admin-versions-panels">
           {/* Adoption. The share itself is the sentence's job now, not a
               second headline; these rows are the breakdown behind it. */}
-          <section className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+          <section className="admin-versions-adoption rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
             <ChartHeading note="Share of desktop API requests in the window.">
               Which build desktop traffic comes from
             </ChartHeading>
@@ -150,8 +162,8 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
             </ul>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+          <div className="admin-versions-secondary">
+            <section className="admin-versions-platforms rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
               <ChartHeading>Windows, Mac or Linux</ChartHeading>
               <ul className="mt-4 space-y-3">
                 {data.platforms.map((p) => (
@@ -171,7 +183,7 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
             </section>
 
             {/* Error rate by build — the reason the page exists. */}
-            <section className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+            <section className="admin-versions-errors rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
               <ChartHeading note="4xx + 5xx">
                 How often each build gets an error
               </ChartHeading>
@@ -221,19 +233,22 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
                 </tbody>
               </table>
               <p className="mt-3 text-xs text-base-content/50">
-                A build erroring well above the others is a build to reproduce
-                on — this is what scopes "some reports of X" to a version and an
-                OS.
+                Compare builds with elevated error rates. 4xx are rejected
+                requests; 5xx are server failures. These counters do not measure
+                app crashes.
               </p>
             </section>
           </div>
-        </>
+        </div>
       )}
 
       {/* Unrecognized stays visible even at zero. It is the page's canary: a
           silently empty adoption chart is the failure this page exists to
           catch. */}
-      <div className="space-y-2 border-t border-base-300/60 pt-4 text-xs text-base-content/50">
+      <details className="admin-system-notes">
+        <summary>
+          Sources and request coverage · {num(data.unrecognized)} unrecognized
+        </summary>
         <p>
           <span className="font-medium text-base-content/70">
             Unrecognized:
@@ -250,7 +265,7 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
           count of people. Downloads are on the Releases page and are not
           installs.
         </p>
-      </div>
+      </details>
     </div>
   )
 }
@@ -258,8 +273,31 @@ export function VersionsReport({ data }: { data: AdminVersions }) {
 export default function VersionsPage({
   days: routeDays,
   onDaysChange,
-}: { days?: number; onDaysChange?: (days: number) => void } = {}) {
+  view: routeView,
+  onViewChange,
+}: {
+  days?: number
+  onDaysChange?: (days: number) => void
+  view?: 'health' | 'traffic'
+  onViewChange?: (view: 'health' | 'traffic') => void
+} = {}) {
   const getToken = useGetToken()
+  const [localView, setLocalView] = useState<'health' | 'traffic'>('health')
+  const view = routeView ?? localView
+  const setView = onViewChange ?? setLocalView
+  const health = useReport(
+    useCallback(
+      (signal: AbortSignal) =>
+        loadBoundedAdminReport<AdminOverview>(
+          getToken,
+          '/admin/overview',
+          'Could not load service readings',
+          'Service readings took too long. Please retry.',
+          signal,
+        ),
+      [getToken],
+    ),
+  )
   const [localDays, setLocalDays] = useState(30)
   const days = routeDays ?? localDays
   const setDays = onDaysChange ?? setLocalDays
@@ -275,39 +313,80 @@ export default function VersionsPage({
   return (
     <PageFrame>
       <div className="space-y-8">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <h1 className="text-[32px] leading-none font-extrabold tracking-[-0.03em]">
-            Versions
-          </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-base-content/60">Time window</span>
-            <div
-              role="group"
-              aria-label="Versions range"
-              className="flex shrink-0 rounded-lg ring-1 ring-base-300"
-            >
-              {WINDOWS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDays(d)}
-                  aria-pressed={days === d}
-                  className={`min-h-9 cursor-pointer px-3 text-sm font-medium first:rounded-l-lg last:rounded-r-lg transition-colors ${
-                    days === d
-                      ? 'bg-base-200 text-base-content'
-                      : 'text-base-content/60 hover:bg-base-200/60'
-                  }`}
-                >
-                  {d}d
-                </button>
-              ))}
-            </div>
+        <header className="admin-versions-header flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="admin-page-heading">System</h1>
+            <p className="mt-1 text-sm text-base-content/60">
+              Check feed freshness, connections and desktop API errors.
+            </p>
           </div>
+          <RefreshButton
+            onClick={view === 'health' ? health.retry : report.retry}
+            loading={view === 'health' ? health.loading : report.loading}
+          />
         </header>
 
-        <Loaded report={report} label="the counters">
-          {(data) => <VersionsReport data={data} />}
-        </Loaded>
+        <nav className="admin-section-tabs" aria-label="System views">
+          <button
+            type="button"
+            aria-current={view === 'health' ? 'page' : undefined}
+            onClick={() => setView('health')}
+          >
+            Service health
+          </button>
+          <button
+            type="button"
+            aria-current={view === 'traffic' ? 'page' : undefined}
+            onClick={() => setView('traffic')}
+          >
+            Desktop API
+          </button>
+        </nav>
+        {view === 'health' ? (
+          <Loaded report={health} label="service health">
+            {(data) => <SystemHealth data={data} />}
+          </Loaded>
+        ) : (
+          <section className="space-y-6" aria-label="Desktop API traffic">
+            <div className="admin-system-section-heading">
+              <div>
+                <h2>Desktop API traffic</h2>
+                <p>
+                  Request health by build. Product usage lives in Analytics.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-base-content/60">
+                  Time window
+                </span>
+                <div
+                  role="group"
+                  aria-label="Versions range"
+                  className="flex shrink-0 rounded-lg ring-1 ring-base-300"
+                >
+                  {WINDOWS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDays(d)}
+                      aria-pressed={days === d}
+                      className={`min-h-11 cursor-pointer px-3 text-sm font-medium first:rounded-l-lg last:rounded-r-lg transition-colors ${
+                        days === d
+                          ? 'bg-base-200 text-base-content'
+                          : 'text-base-content/60 hover:bg-base-200/60'
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <Loaded report={report} label="desktop API counters">
+              {(data) => <VersionsReport data={data} />}
+            </Loaded>
+          </section>
+        )}
       </div>
     </PageFrame>
   )

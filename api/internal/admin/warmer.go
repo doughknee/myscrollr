@@ -55,6 +55,7 @@ func StartCacheWarmer(ctx context.Context) {
 func defaultWarmJobs() []warmJob {
 	return []warmJob{
 		{"logto", warmerLogtoEvery, refreshLogtoNow},
+		{"signup", warmerLogtoEvery, refreshSignupNow},
 		{"website", warmerWebsiteEvery, refreshWebsiteNow},
 	}
 }
@@ -130,3 +131,22 @@ func refreshWebsiteNow(ctx context.Context) error {
 type warmErr struct{ key, note string }
 
 func (e *warmErr) Error() string { return "website " + e.key + ": " + e.note }
+
+// Warm the four small aggregate responses separately from account/cohort scans.
+// Serial scans keep the existing per-scan Logto concurrency ceiling.
+func refreshSignupNow(ctx context.Context) error {
+	var first error
+	for _, app := range []string{"desktop", "website"} {
+		for _, days := range []int{7, 30} {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case result := <-refreshSignupAnalytics(app, days, true):
+				if result.Err != nil && first == nil {
+					first = result.Err
+				}
+			}
+		}
+	}
+	return first
+}

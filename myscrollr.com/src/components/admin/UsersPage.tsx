@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Loader2, Search } from 'lucide-react'
-import { ErrorPanel, PageFrame } from './ui'
+import { ChevronLeft, Search } from 'lucide-react'
+import { EmptyState, ErrorPanel, Loading, PageFrame } from './ui'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
 import type { UsersSearch } from '@/lib/adminSearch'
 import { adminApi } from '@/api/admin'
@@ -65,37 +65,35 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
   }, [getToken, sub, attempt])
 
   return (
-    <div className="space-y-6">
+    <div className="admin-user-detail space-y-6">
       <button
         ref={backButton}
         type="button"
         onClick={onBack}
-        className="flex cursor-pointer items-center gap-1 text-sm text-base-content/60 hover:text-base-content"
+        className="flex min-h-11 cursor-pointer items-center gap-1 text-sm text-base-content/60 hover:text-base-content"
       >
         <ChevronLeft size={16} /> All users
       </button>
 
       {error && (
-        <ErrorPanel message={error} onRetry={() => setAttempt((n) => n + 1)} />
-      )}
-      {!detail && !error && (
-        <Loader2
-          role="status"
-          aria-label="Loading user"
-          className="size-5 animate-spin text-base-content/40"
+        <ErrorPanel
+          title="Couldn’t load this user"
+          message={error}
+          onRetry={() => setAttempt((n) => n + 1)}
         />
       )}
+      {!detail && !error && <Loading label="user" />}
 
       {detail && (
         <>
-          <header>
-            <h1 className="text-xl font-bold break-all">
+          <header className="admin-user-identity">
+            <h1 className="admin-page-heading [overflow-wrap:anywhere]">
               {detail.account.email ??
                 detail.account.name ??
                 detail.account.logto_sub}
             </h1>
-            <p className="mt-1 font-mono text-xs break-all text-base-content/50">
-              {detail.account.logto_sub}
+            <p className="mt-2 font-mono text-xs break-all text-base-content/50">
+              Account ID · {detail.account.logto_sub}
             </p>
             <p className="mt-2 text-sm text-base-content/60">
               {planLabel(detail.account)}
@@ -103,7 +101,7 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
               {detail.account.deletion_state &&
                 ` · deletion ${detail.account.deletion_state}`}
             </p>
-            <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+            <dl className="admin-user-dates mt-3 grid grid-cols-3 gap-3 text-sm">
               <div>
                 <dt className="text-xs text-base-content/50">Signed up</dt>
                 <dd>{day(detail.account.signed_up_at)}</dd>
@@ -127,68 +125,66 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
             )}
           </header>
 
-          <section>
-            <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
-              Widgets ({detail.widgets.length})
-            </h2>
-            <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
-              {detail.widgets.length === 0 ? (
-                <p className="p-4 text-sm text-base-content/50">
-                  No widgets configured.
-                </p>
-              ) : (
-                detail.widgets.map((w) => (
-                  <div
-                    key={w.type}
-                    className="flex items-center justify-between gap-3 border-b border-base-300/40 p-3 text-sm last:border-0"
-                  >
-                    <span className="font-medium">{w.type}</span>
-                    <span className="text-xs text-base-content/60">
-                      {w.enabled ? 'enabled' : 'disabled'}
-                      {w.ticker_enabled && ' · on the bar'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
-              Support history ({detail.cases.length})
-            </h2>
-            <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
-              {detail.cases.length === 0 ? (
-                <p className="p-4 text-sm text-base-content/50">
-                  No tickets opened.
-                </p>
-              ) : (
-                detail.cases.map((k) => (
-                  <div
-                    key={k.ticket_number}
-                    className="border-b border-base-300/40 p-3 last:border-0"
-                  >
-                    <div className="flex items-baseline justify-between gap-3">
-                      <a
-                        href={`/admin/support?ticket=${encodeURIComponent(k.ticket_number)}&rows=ticket`}
-                        className="truncate text-sm font-medium text-primary hover:underline"
-                      >
-                        {k.subject || '(no subject)'}
-                      </a>
-                      <span className="shrink-0 font-mono text-xs text-base-content/50">
-                        {k.ticket_number}
+          <div className="admin-user-sections">
+            <section>
+              <h2>
+                Widgets <span>({detail.widgets.length})</span>
+              </h2>
+              <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
+                {detail.widgets.length === 0 ? (
+                  <p className="admin-empty-inline">No widgets configured.</p>
+                ) : (
+                  detail.widgets.map((w) => (
+                    <div
+                      key={w.type}
+                      className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/40 p-3 text-sm [overflow-wrap:anywhere] last:border-0"
+                    >
+                      <span className="font-medium">{w.type}</span>
+                      <span className="text-xs text-base-content/60">
+                        {w.enabled ? 'enabled' : 'disabled'}
+                        {w.ticker_enabled && ' · on the bar'}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-base-content/50">
-                      {k.status}
-                      {k.category && ` · ${k.category}`} ·{' '}
-                      {new Date(k.opened_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section>
+              <h2>
+                Support history <span>({detail.cases.length})</span>
+              </h2>
+              <div className="mt-2 rounded-xl ring-1 ring-base-300/60">
+                {detail.cases.length === 0 ? (
+                  <p className="admin-empty-inline">No tickets opened.</p>
+                ) : (
+                  detail.cases.map((k) => (
+                    <div
+                      key={k.ticket_number}
+                      className="border-b border-base-300/40 p-3 last:border-0"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <a
+                          href={`/admin/support?ticket=${encodeURIComponent(k.ticket_number)}&rows=ticket`}
+                          className="min-w-0 text-sm leading-relaxed font-medium text-primary [overflow-wrap:anywhere] hover:underline"
+                        >
+                          {k.subject || '(no subject)'}
+                        </a>
+                        <span className="shrink-0 font-mono text-xs text-base-content/50">
+                          {k.ticket_number}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-base-content/50">
+                        {k.status}
+                        {k.category && ` · ${k.category}`} ·{' '}
+                        {new Date(k.opened_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
         </>
       )}
     </div>
@@ -212,8 +208,11 @@ export default function UsersPage({
     if (onSearchChange) onSearchChange(patch, replace)
     else setLocalSearch((current) => ({ ...current, ...patch }))
   }
-  const setSelected = (user: string | null) =>
+  const listScroll = useRef(0)
+  const setSelected = (user: string | null) => {
+    if (user) listScroll.current = window.scrollY
     updateSearch({ user: user ?? undefined })
+  }
   const [result, setResult] = useState<{
     query: string
     page: number
@@ -237,7 +236,8 @@ export default function UsersPage({
       // The list is retained while detail is open. Resume at that account;
       // a changed search can remove it, in which case search is the safe target.
       const target = userButtons.current.get(previous) ?? searchInput.current
-      target?.focus()
+      target?.focus({ preventScroll: true })
+      window.scrollTo({ top: listScroll.current, behavior: 'instant' })
     }
   }, [selected])
 
@@ -279,12 +279,39 @@ export default function UsersPage({
   // The gap REL-265 uncovered: accounts that exist but never saved a
   // preference. Global counts, so they are only honest with no search term.
   const neverSetUp = data ? Math.max(0, data.total - data.set_up) : 0
+  const pagination = pageCount > 1 && (
+    <div className="admin-users-pagination">
+      <button
+        type="button"
+        disabled={loading || page === 0}
+        onClick={() => {
+          updateSearch({ page: page - 1 })
+          searchInput.current?.focus()
+        }}
+      >
+        Previous
+      </button>
+      <span>
+        Page {page + 1} of {pageCount}
+      </span>
+      <button
+        type="button"
+        disabled={loading || page + 1 >= pageCount}
+        onClick={() => {
+          updateSearch({ page: page + 1 })
+          searchInput.current?.focus()
+        }}
+      >
+        Next
+      </button>
+    </div>
+  )
 
   return (
     <PageFrame>
-      <div className="space-y-5">
+      <div className="admin-users space-y-5">
         <header>
-          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+          <h1 className="admin-page-heading">Users</h1>
           {data?.source === 'local' ? (
             <p className="mt-1 text-sm text-warning">
               {data.note ?? 'Logto is unreachable.'} Showing{' '}
@@ -316,9 +343,6 @@ export default function UsersPage({
               </p>
             )
           )}
-          <p className="mt-1 text-sm text-base-content/60">
-            Read-only — this console does not edit anyone&apos;s account.
-          </p>
         </header>
 
         <div className="relative">
@@ -338,30 +362,46 @@ export default function UsersPage({
             className="w-full rounded-lg bg-base-200/50 py-2.5 pr-3 pl-9 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
           />
         </div>
+        {data && !error && pagination}
 
         {error && (
           <ErrorPanel
+            title="Couldn’t load users"
             message={error}
             onRetry={() => setAttempt((n) => n + 1)}
           />
         )}
-        {loading && (
-          <Loader2
-            role="status"
-            aria-label="Loading users"
-            className="size-5 animate-spin text-base-content/40"
-          />
-        )}
+        {loading && <Loading label="users" />}
 
         {data && !error && (
           <>
             {data.accounts.length === 0 ? (
-              <div className="rounded-xl bg-base-200/30 p-6 text-sm text-base-content/65 ring-1 ring-base-300/60">
-                No accounts match that search.
-              </div>
+              <EmptyState
+                title={
+                  query ? 'No matching accounts' : 'No accounts on this page'
+                }
+              >
+                <p>
+                  {query
+                    ? 'No accounts match that search. Try another email or username.'
+                    : 'No accounts were returned for this page.'}
+                </p>
+                {(query || page > 0) && (
+                  <button
+                    type="button"
+                    className="admin-state-action"
+                    onClick={() => {
+                      updateSearch({ q: '', page: 0 }, true)
+                      searchInput.current?.focus()
+                    }}
+                  >
+                    {query ? 'Clear search' : 'Back to first page'}
+                  </button>
+                )}
+              </EmptyState>
             ) : (
               <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-                <table className="w-full min-w-[42rem] text-left text-sm">
+                <table className="admin-users-table admin-mobile-table w-full min-w-[42rem] text-left text-sm">
                   <thead className="text-xs text-base-content/50 uppercase">
                     <tr className="border-b border-base-300/60">
                       <th className="p-3 font-semibold">User</th>
@@ -396,7 +436,7 @@ export default function UsersPage({
                           >
                             {a.email ?? a.name ?? '—'}
                           </button>
-                          <span className="block truncate font-mono text-xs text-base-content/45">
+                          <span className="admin-user-id block truncate font-mono text-xs text-base-content/45">
                             {a.logto_sub}
                             {!a.set_up && (
                               <span className="text-warning">
@@ -405,11 +445,30 @@ export default function UsersPage({
                               </span>
                             )}
                           </span>
+                          <span className="admin-user-mobile-summary">
+                            <span>{planLabel(a)}</span>
+                            <span>
+                              {!a.set_up
+                                ? 'Not set up'
+                                : a.last_used_app
+                                  ? `App used ${day(a.last_used_app)}`
+                                  : 'App activity unknown'}
+                            </span>
+                            {a.tickets > 0 && (
+                              <span>
+                                {a.tickets}{' '}
+                                {a.tickets === 1 ? 'ticket' : 'tickets'}
+                              </span>
+                            )}
+                          </span>
                         </td>
-                        <td className="p-3 text-base-content/70">
+                        <td
+                          data-label="Plan"
+                          className="p-3 text-base-content/70"
+                        >
                           {planLabel(a)}
                         </td>
-                        <td className="p-3 tabular-nums">
+                        <td data-label="Widgets" className="p-3 tabular-nums">
                           {a.widgets}
                           {a.on_ticker > 0 && (
                             <span className="text-base-content/45">
@@ -418,11 +477,19 @@ export default function UsersPage({
                             </span>
                           )}
                         </td>
-                        <td className="p-3 tabular-nums">{a.tickets}</td>
-                        <td className="p-3 text-base-content/60">
+                        <td data-label="Tickets" className="p-3 tabular-nums">
+                          {a.tickets}
+                        </td>
+                        <td
+                          data-label="Signed up"
+                          className="p-3 text-base-content/60"
+                        >
                           {day(a.signed_up_at)}
                         </td>
-                        <td className="p-3 text-base-content/60">
+                        <td
+                          data-label="Last sign-in"
+                          className="p-3 text-base-content/60"
+                        >
                           {day(a.last_sign_in_at)}
                         </td>
                       </tr>
@@ -433,34 +500,13 @@ export default function UsersPage({
             )}
 
             <p className="text-xs text-base-content/45">
-              Ordered by Logto; search matches email and username. Widgets and
-              tickets come from this database and cannot be sorted or searched
-              across the whole set — those columns describe only this page.
+              Accounts are read-only. Search matches email and username. Widgets
+              and tickets come from this database and cannot be sorted or
+              searched across the whole set — those columns describe only this
+              page.
             </p>
 
-            {pageCount > 1 && (
-              <div className="flex items-center justify-between text-sm">
-                <button
-                  type="button"
-                  disabled={page === 0}
-                  onClick={() => updateSearch({ page: page - 1 })}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span className="text-base-content/60">
-                  Page {page + 1} of {pageCount}
-                </span>
-                <button
-                  type="button"
-                  disabled={page + 1 >= pageCount}
-                  onClick={() => updateSearch({ page: page + 1 })}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            {pagination}
           </>
         )}
       </div>

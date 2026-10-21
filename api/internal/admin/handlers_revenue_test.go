@@ -20,14 +20,14 @@ func seedLedger(t *testing.T, l billing.Ledger) {
 		t.Skip("redis unavailable")
 	}
 	raw, _ := json.Marshal(l)
-	if err := platform.Rdb.Set(context.Background(), "scrollr:admin:stripe:ledger", raw, time.Minute).Err(); err != nil {
+	if err := platform.Rdb.Set(context.Background(), "scrollr:admin:stripe:ledger:v2", raw, time.Minute).Err(); err != nil {
 		t.Fatal(err)
 	}
 	prev := stripe.Key
 	stripe.Key = "sk_test_seeded"
 	t.Cleanup(func() {
 		stripe.Key = prev
-		_ = platform.Rdb.Del(context.Background(), "scrollr:admin:stripe:ledger").Err()
+		_ = platform.Rdb.Del(context.Background(), "scrollr:admin:stripe:ledger:v2").Err()
 	})
 }
 
@@ -110,7 +110,7 @@ func TestRevenueReportKeepsTheSnapshotWhenStripeIsDown(t *testing.T) {
 	testsupport.MustExec(t, `DELETE FROM stripe_customers`)
 	testsupport.MustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime) VALUES ('p1', 'cus_1', 'monthly', 'active', false)`)
 	if platform.Rdb != nil {
-		_ = platform.Rdb.Del(context.Background(), "scrollr:admin:stripe:ledger").Err()
+		_ = platform.Rdb.Del(context.Background(), "scrollr:admin:stripe:ledger:v2").Err()
 	}
 	prev := stripe.Key
 	stripe.Key = ""

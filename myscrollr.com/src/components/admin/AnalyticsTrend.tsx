@@ -9,6 +9,7 @@ export function AnalyticsTrend({
   title,
   unit,
   kind = 'bars',
+  zeroLabel = 'All reported values are zero.',
   format = (value: number) => value.toLocaleString(),
 }: {
   buckets: Array<Bucket> | null | undefined
@@ -16,6 +17,7 @@ export function AnalyticsTrend({
   title: string
   unit: string
   kind?: 'bars' | 'line'
+  zeroLabel?: string
   format?: (value: number) => string
 }) {
   const [selected, setSelected] = useState<string | null>(null)
@@ -62,6 +64,7 @@ export function AnalyticsTrend({
               <span>{format(min)}</span>
             </div>
             <div className="analytics-trend-drawing">
+              {allZero && <p className="analytics-trend-zero">{zeroLabel}</p>}
               <svg
                 viewBox="0 0 600 220"
                 preserveAspectRatio="none"

@@ -167,12 +167,13 @@ type WidgetsReport struct {
 }
 
 type DesktopUsageResponse struct {
-	GeneratedAt   string         `json:"generated_at"`
-	Period        Window         `json:"period"`
-	Previous      *Window        `json:"previous"`
-	StaffExcluded bool           `json:"staff_excluded"`
-	Coverage      Coverage       `json:"coverage"`
-	Filters       DesktopFilters `json:"filters"`
+	Population    platform.AnalyticsPopulation `json:"population"`
+	GeneratedAt   string                       `json:"generated_at"`
+	Period        Window                       `json:"period"`
+	Previous      *Window                      `json:"previous"`
+	StaffExcluded bool                         `json:"staff_excluded"`
+	Coverage      Coverage                     `json:"coverage"`
+	Filters       DesktopFilters               `json:"filters"`
 
 	UniqueUsers     Metric            `json:"unique_users"`
 	UserHours       Metric            `json:"user_hours"`
@@ -253,6 +254,7 @@ func HandleGetDesktopUsage(c *fiber.Ctx) error {
 
 func loadDesktopUsage(ctx context.Context, period Period, f desktopFilter, now time.Time) (DesktopUsageResponse, error) {
 	out := DesktopUsageResponse{
+		Population:  platform.AnalyticsPopulation{OS: f.os, Version: f.version, Plan: f.plan},
 		GeneratedAt: now.Format(time.RFC3339), Period: period.Window(), StaffExcluded: f.excludeStaff,
 		Definition:     presenceDefinition + " " + tickerDefinition,
 		LegacyNote:     "Legacy series: an account counted on a UTC day once a ticker was visible with an enabled widget for 30 continuous seconds. It is a different measurement from presence and is shown separately.",
@@ -417,6 +419,7 @@ func desktopTotals(ctx context.Context, f desktopFilter, start, end time.Time) (
 
 func loadDesktopFilterOptions(ctx context.Context, filters *DesktopFilters, f desktopFilter, start, end time.Time) error {
 	filters.OS, filters.Version, filters.Plan = []FilterOption{}, []FilterOption{}, []FilterOption{}
+	start = end.AddDate(0, 0, -90) // Shared selectors use retained observations, not the chart window.
 	base := desktopFilter{excludeStaff: f.excludeStaff}
 	for _, dim := range []struct {
 		col  string
@@ -440,12 +443,16 @@ func loadDesktopFilterOptions(ctx context.Context, filters *DesktopFilters, f de
 		}
 		rows.Close()
 	}
-	var args []any
-	where := base.where(start, end, &args, false)
+	args := []any{start, end}
+	where := "true"
+	if f.excludeStaff {
+		where = "NOT EXISTS (SELECT 1 FROM admin_users a WHERE a.logto_sub = t.logto_sub) AND NOT EXISTS (SELECT 1 FROM presence_accounts a WHERE a.logto_sub = t.logto_sub AND a.internal)"
+	}
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT coalesce((SELECT CASE WHEN s.lifetime THEN 'lifetime' ELSE s.plan END FROM stripe_customers s WHERE s.logto_sub = t.logto_sub), 'free'),
-		       count(DISTINCT t.logto_sub)
-		  FROM presence_account_hourly t WHERE `+where+` GROUP BY 1 ORDER BY 2 DESC, 1`, args...)
+ SELECT coalesce((SELECT CASE WHEN s.lifetime THEN 'lifetime' ELSE s.plan END FROM stripe_customers s WHERE s.logto_sub = t.logto_sub), 'free'), count(*)
+ FROM (SELECT logto_sub FROM presence_account_hourly WHERE hour >= $1 AND hour < $2 UNION SELECT logto_sub FROM stripe_customers WHERE logto_sub NOT LIKE 'deleted-%') t
+ WHERE `+where+` GROUP BY 1 ORDER BY 2 DESC, 1`, args...)
+
 	if err != nil {
 		return err
 	}
@@ -538,7 +545,7 @@ func fillUsersCurve(ctx context.Context, buckets []Bucket, f desktopFilter, star
 // The prune cuts at an hour boundary 90 days back, so the day it lands on can
 // be half gone; the first day guaranteed whole is 89 days back.
 func loadPresenceRetention(ctx context.Context, r *PresenceRetention, f desktopFilter, now time.Time) error {
-	r.Definition = "Cohort = first day an account reported presence (not signup). Returned = reported presence on exactly that day + N. Immature cohorts are unavailable, not zero."
+	r.Definition = "Cohort = first day an account reported presence (not signup). Returned = reported presence on exactly that day + N. Immature cohorts are unavailable, not zero. " + platform.AnalyticsPopulationNote
 	today := now.Truncate(24 * time.Hour)
 	oldest := today.AddDate(0, 0, -89)
 	for _, m := range []struct {
@@ -550,6 +557,9 @@ func loadPresenceRetention(ctx context.Context, r *PresenceRetention, f desktopF
 		if f.excludeStaff {
 			staff = " AND a.internal = false"
 		}
+		args := []any{m.n, today, oldest}
+		population := platform.AnalyticsPopulation{OS: f.os, Version: f.version, Plan: f.plan}
+		where := population.PredicateAt("a.logto_sub", &args, now)
 		if err := platform.DBPool.QueryRow(ctx, `
 			SELECT count(*),
 			       count(*) FILTER (WHERE EXISTS (
@@ -559,7 +569,7 @@ func loadPresenceRetention(ctx context.Context, r *PresenceRetention, f desktopF
 			              AND h.hour <  ((a.first_seen_day + $1::int + 1)::timestamp AT TIME ZONE 'UTC')))
 			  FROM presence_accounts a
 			 WHERE a.first_seen_day + $1::int <= $2::date - 1
-			   AND a.first_seen_day + $1::int >= $3::date`+staff, m.n, today, oldest).
+			   AND a.first_seen_day + $1::int >= $3::date`+staff+" AND "+where, args...).
 			Scan(&m.into.Eligible, &m.into.Returned); err != nil {
 			return err
 		}

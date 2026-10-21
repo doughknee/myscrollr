@@ -2,11 +2,15 @@ package admin
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,13 +26,21 @@ const (
 	// A timed-out scan is remembered briefly so a reload does not pay the
 	// whole budget again, and short enough that recovery shows quickly.
 	signupAnalyticsUnavailableTTL = 30 * time.Second
+	signupAnalyticsRetainedTTL    = 24 * time.Hour
 )
 
 var (
 	fetchSignupAnalytics   = accounts.FetchSignupAnalytics
 	signupAnalyticsGroup   singleflight.Group
 	signupAnalyticsTimeout = 25 * time.Second
+	signupInteractiveWait  = 750 * time.Millisecond
+	signupLocalCache       sync.Map
 )
+
+type signupLocalSnapshot struct {
+	report  accounts.SignupAnalytics
+	expires time.Time
+}
 
 type cachedAnalyticsResult struct {
 	Report accounts.SignupAnalytics
@@ -36,7 +48,8 @@ type cachedAnalyticsResult struct {
 }
 
 func HandleGetAnalytics(c *fiber.Ctx) error {
-	application := c.Query("application", "website")
+	// The scan may outlive this request; Fiber query strings alias its buffer.
+	application := strings.Clone(c.Query("application", "website"))
 	if application != "website" && application != "desktop" {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Error: "application must be website or desktop"})
 	}
@@ -46,7 +59,7 @@ func HandleGetAnalytics(c *fiber.Ctx) error {
 	}
 
 	// UserContext, not c.Context(): the latter is cancelled under app.Test.
-	ctx, cancel := context.WithTimeout(c.UserContext(), signupAnalyticsTimeout)
+	ctx, cancel := context.WithTimeout(c.UserContext(), signupInteractiveWait)
 	defer cancel()
 	report, hit, err := cachedSignupAnalytics(ctx, application, days)
 	if err != nil {
@@ -64,40 +77,34 @@ func HandleGetAnalytics(c *fiber.Ctx) error {
 func cachedSignupAnalytics(ctx context.Context, application string, days int) (accounts.SignupAnalytics, bool, error) {
 	key := "scrollr:admin:signup_analytics:" + application + ":" + strconv.Itoa(days)
 	if report, ok := readSignupAnalyticsCache(ctx, key); ok {
+		if !report.Available {
+			if retained, found := readSignupAnalyticsCache(ctx, key+":retained"); found && retained.Available {
+				retained.Stale = true
+				return retained, true, nil
+			}
+		}
 		return report, true, nil
 	}
 	if err := ctx.Err(); err != nil {
 		return accounts.SignupAnalytics{}, false, err
 	}
 
-	result := signupAnalyticsGroup.DoChan(key, func() (any, error) {
-		scanCtx, cancel := context.WithTimeout(context.Background(), signupAnalyticsTimeout)
-		defer cancel()
-		if report, ok := readSignupAnalyticsCache(scanCtx, key); ok {
-			return cachedAnalyticsResult{Report: report, Hit: true}, nil
-		}
-		report, err := fetchSignupAnalytics(scanCtx, application, days, time.Now())
-		ttl := signupAnalyticsCacheTTL
-		if errors.Is(err, context.DeadlineExceeded) {
-			report, err, ttl = signupUnavailable(application, days), nil, signupAnalyticsUnavailableTTL
-		}
-		if err != nil {
-			return cachedAnalyticsResult{}, err
-		}
-		if platform.Rdb != nil {
-			// Own context: scanCtx may be the thing that just expired.
-			cacheCtx, cacheCancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cacheCancel()
-			if raw, err := json.Marshal(report); err == nil {
-				_ = platform.Rdb.Set(cacheCtx, key, raw, ttl).Err()
-			}
-		}
-		return cachedAnalyticsResult{Report: report}, nil
-	})
+	if report, ok := readSignupAnalyticsCache(ctx, key+":retained"); ok && report.Available {
+		refreshSignupAnalytics(application, days, false)
+		report.Stale, report.Refreshing = true, true
+		return report, true, nil
+	}
+	result := refreshSignupAnalytics(application, days, false)
+
 	select {
 	case <-ctx.Done():
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return signupUnavailable(application, days), false, nil
+			report := signupUnavailable(application, days)
+			if signupInteractiveWait < signupAnalyticsTimeout {
+				report.Reason = "Preparing signup diagnostics in the background. This view updates automatically."
+				report.Refreshing = true
+			}
+			return report, false, nil
 		}
 		return accounts.SignupAnalytics{}, false, ctx.Err()
 	case response := <-result:
@@ -107,6 +114,31 @@ func cachedSignupAnalytics(ctx context.Context, application string, days int) (a
 		value := response.Val.(cachedAnalyticsResult)
 		return value.Report, value.Hit, nil
 	}
+}
+
+func refreshSignupAnalytics(application string, days int, force bool) <-chan singleflight.Result {
+	key := "scrollr:admin:signup_analytics:" + application + ":" + strconv.Itoa(days)
+	return signupAnalyticsGroup.DoChan(key, func() (any, error) {
+		scanCtx, cancel := context.WithTimeout(context.Background(), signupAnalyticsTimeout)
+		defer cancel()
+		if report, ok := readSignupAnalyticsCache(scanCtx, key); ok && !force {
+			return cachedAnalyticsResult{Report: report, Hit: true}, nil
+		}
+		report, err := fetchSignupAnalytics(scanCtx, application, days, time.Now())
+		ttl := signupAnalyticsCacheTTL
+		if errors.Is(err, context.DeadlineExceeded) {
+			report, err, ttl = signupUnavailable(application, days), nil, signupAnalyticsUnavailableTTL
+		}
+		if err != nil {
+			storeSignupAnalyticsCache(key, signupUnavailable(application, days), signupAnalyticsUnavailableTTL)
+			return cachedAnalyticsResult{}, err
+		}
+		storeSignupAnalyticsCache(key, report, ttl)
+		if report.Available {
+			storeSignupAnalyticsCache(key+":retained", report, signupAnalyticsRetainedTTL)
+		}
+		return cachedAnalyticsResult{Report: report}, nil
+	})
 }
 
 // signupUnavailable is the honest answer to a scan that ran out of budget.
@@ -120,8 +152,29 @@ func signupUnavailable(application string, days int) accounts.SignupAnalytics {
 	}
 }
 
+// Without Redis, retain the eight possible app/window snapshots locally so a
+// completed background read is still available to the next poll.
+func storeSignupAnalyticsCache(key string, report accounts.SignupAnalytics, ttl time.Duration) {
+	if platform.Rdb == nil {
+		signupLocalCache.Store(key, signupLocalSnapshot{report, time.Now().Add(ttl)})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if raw, err := json.Marshal(report); err == nil {
+		_ = platform.Rdb.Set(ctx, key, raw, ttl).Err()
+	}
+}
+
 func readSignupAnalyticsCache(ctx context.Context, key string) (accounts.SignupAnalytics, bool) {
 	if platform.Rdb == nil {
+		if value, ok := signupLocalCache.Load(key); ok {
+			snapshot := value.(signupLocalSnapshot)
+			if time.Now().Before(snapshot.expires) {
+				return snapshot.report, true
+			}
+			signupLocalCache.Delete(key)
+		}
 		return accounts.SignupAnalytics{}, false
 	}
 	raw, err := platform.Rdb.Get(ctx, key).Bytes()
@@ -177,9 +230,10 @@ type Week1ReturnCohort struct {
 }
 
 type Week1ReturnReport struct {
-	GeneratedAt string              `json:"generated_at"`
-	Definition  string              `json:"definition"`
-	Cohorts     []Week1ReturnCohort `json:"cohorts"`
+	Population  platform.AnalyticsPopulation `json:"population"`
+	GeneratedAt string                       `json:"generated_at"`
+	Definition  string                       `json:"definition"`
+	Cohorts     []Week1ReturnCohort          `json:"cohorts"`
 }
 
 const week1ReturnDefinition = "Signup = a Logto account with applicationId = Scrollr Desktop, excluding admin_users subs and POSTHOG_EXCLUDED_LOGTO_SUBS. Return = a desktop token exchange (ExchangeTokenBy.RefreshToken or ExchangeTokenBy.AuthorizationCode) that starts a session — at least 3 hours since that account's previous exchange — on UTC day 1 through 7 after the signup day. Reported per Monday-Sunday UTC weekly cohort; a cohort is shown once its day 7 has passed for every member, never before."
@@ -188,6 +242,10 @@ const week1ReturnDefinition = "Signup = a Logto account with applicationId = Scr
 func HandleGetWeek1Return(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), signupAnalyticsTimeout)
 	defer cancel()
+	ctx, err := platform.WithAnalyticsPopulation(ctx, c.Query("os"), c.Query("version"), c.Query("plan"))
+	if err != nil {
+		return c.Status(400).JSON(platform.ErrorResponse{Error: err.Error()})
+	}
 	report, err := loadWeek1Return(ctx, week1ReturnNow())
 	if err != nil {
 		log.Printf("[Admin] week-1 return unavailable: %v", err)
@@ -197,7 +255,9 @@ func HandleGetWeek1Return(c *fiber.Ctx) error {
 }
 
 func loadWeek1Return(ctx context.Context, now time.Time) (Week1ReturnReport, error) {
+	population := platform.PopulationFromContext(ctx)
 	report := Week1ReturnReport{
+		Population:  population,
 		GeneratedAt: now.UTC().Format(time.RFC3339),
 		Definition:  week1ReturnDefinition,
 	}
@@ -210,13 +270,25 @@ func loadWeek1Return(ctx context.Context, now time.Time) (Week1ReturnReport, err
 		return report, err
 	}
 	excluded := excludedSubs(ctx, true)
+	var matches map[string]bool
+	if population.Active() {
+		ids := make([]string, 0, len(snap.Accounts))
+		for _, a := range snap.Accounts {
+			ids = append(ids, a.ID)
+		}
+		matches, err = population.MatchAccounts(ctx, ids)
+		if err != nil {
+			return report, err
+		}
+		report.Definition += " " + platform.AnalyticsPopulationNote
+	}
 
 	weeks := recentCompleteWeeks(now, week1ReturnCohortCount)
 	cohorts := make([]Week1ReturnCohort, len(weeks))
 	for i, week := range weeks {
 		var inWeek []accounts.LogtoAccount
 		for _, a := range snap.Accounts {
-			if a.ApplicationID != desktopAppID {
+			if a.ApplicationID != desktopAppID || (population.Active() && !matches[a.ID]) {
 				continue
 			}
 			if _, skip := excluded[a.ID]; skip || isTestActor(a.ID) {
@@ -279,6 +351,14 @@ func recentCompleteWeeks(now time.Time, n int) []cohortWeek {
 // Logto scan.
 func matureWeek1Cohort(ctx context.Context, week cohortWeek, signups []accounts.LogtoAccount) (Week1ReturnCohort, error) {
 	key := week1ReturnCacheKey(week.Start)
+	if platform.PopulationFromContext(ctx).Active() {
+		ids := make([]string, 0, len(signups))
+		for _, a := range signups {
+			ids = append(ids, a.ID)
+		}
+		sort.Strings(ids)
+		key += fmt.Sprintf(":population:%x", sha256.Sum256([]byte(strings.Join(ids, "\x00"))))
+	}
 	if cohort, ok := readWeek1CohortCache(ctx, key); ok {
 		return cohort, nil
 	}

@@ -219,6 +219,7 @@ func adminSupportApp(sub string, roles ...string) *fiber.App {
 		return c.Next()
 	})
 	app.Get("/admin/support/queue", admin.RequireAdmin, HandleAdminQueue)
+	app.Get("/admin/support/search", admin.RequireAdmin, HandleAdminTicketSearch)
 	app.Get("/admin/support/case/:ticket", admin.RequireAdmin, HandleAdminCase)
 	return app
 }
@@ -261,7 +262,7 @@ func TestAdminSupportEndpointsRejectASignedInNonAdmin(t *testing.T) {
 	// A product tier is not staff. super_user exists on real accounts.
 	app := adminSupportApp("sub-someone-else", "super_user", "uplink_ultimate")
 
-	for _, path := range []string{"/admin/support/queue", "/admin/support/case/900001"} {
+	for _, path := range []string{"/admin/support/queue", "/admin/support/case/900001", "/admin/support/search?q=hello"} {
 		status, body := getJSON(t, app, path)
 		if status != fiber.StatusForbidden {
 			t.Errorf("%s: got %d, want 403 (body: %s)", path, status, body)
