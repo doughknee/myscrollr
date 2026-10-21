@@ -224,10 +224,10 @@ func (q queueState) group() (string, string) {
 	}
 	if q.LastUser != nil && (q.LastSent == nil || q.LastUser.After(*q.LastSent)) &&
 		(q.DraftCreated == nil || q.LastUser.After(*q.DraftCreated)) {
-		return queueNeedsYou, "The user wrote after the latest reply or draft, so this needs a new answer."
+		return queueNeedsYou, "The user wrote after the latest reply or draft, so this needs a new answer. Review their latest message and write a reply."
 	}
 	if !q.HasDraft {
-		return queueNeedsYou, "No draft was ever written for this ticket, so nothing is going to answer it on its own."
+		return queueNeedsYou, "No draft was ever written for this ticket. Write a reply, or dismiss the ticket if no reply is needed."
 	}
 
 	switch q.DraftStatus {
@@ -249,9 +249,9 @@ func (q queueState) group() (string, string) {
 func (q queueState) pendingReason() string {
 	switch q.Disposition {
 	case "":
-		return "No disposition was recorded, so nothing will send this on its own."
+		return "This reply has not been approved for automatic sending. Review it and choose Send reply when ready."
 	case dispositionEscalate:
-		return "Escalated. No timer is running and nothing will send it."
+		return "The bot paused for staff review. No timer is running. Review and send the reply, or dismiss the ticket if no reply is needed."
 	case dispositionAutoAsk:
 		return "Queued to ask the user. An ask has no hold, so if it is still here the send did not go through."
 	case dispositionAutoSend, dispositionAutoClose:
