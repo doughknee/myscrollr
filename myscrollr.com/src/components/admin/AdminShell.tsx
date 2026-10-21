@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from '@tanstack/react-router'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { ChevronDown, Loader2, Lock, Moon, Sun } from 'lucide-react'
+import { AdminQuickSearch } from './AdminQuickSearch'
 import ScrollrSVG from '@/components/ScrollrSVG'
 import './admin.css'
 import { AdminApiError, adminApi } from '@/api/admin'
@@ -337,7 +338,7 @@ export function AdminChrome({
             <span className="flex items-baseline">
               scrollr<span className="text-primary">.</span>
             </span>
-            <span className="ml-1 text-[13px] font-medium text-base-content/45">
+            <span className="admin-brand-suffix ml-1 text-[13px] font-medium text-base-content/45">
               / admin
             </span>
           </Link>
@@ -374,6 +375,7 @@ export function AdminChrome({
             </div>
           )}
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
+            <AdminQuickSearch />
             <button
               type="button"
               onClick={toggleTheme}
