@@ -112,7 +112,7 @@ class ScrollrReplyNotify {
             'user_name'       => self::extractName($ticket),
             'subject'         => self::safeStringCall($ticket, 'getSubject'),
             'message_html'    => self::extractBody($entry),
-            'created'         => self::safeStringCall($entry, 'getCreated'),
+            'created'         => self::createdAt($entry),
         );
 
         $url = getenv('SCROLLR_WEBHOOK_URL');
@@ -164,6 +164,22 @@ class ScrollrReplyNotify {
 
         // If we can't tell, fire the webhook (don't lose follow-ups).
         return false;
+    }
+
+    private static function createdAt($entry) {
+        // ThreadEntry exposes getCreateDate; older adapters may expose getCreated.
+        foreach (array('getCreateDate', 'getCreated') as $method) {
+            $value = self::safeStringCall($entry, $method);
+            if ($value === '') continue;
+            try {
+                $utc = new DateTimeZone('UTC');
+                $date = new DateTimeImmutable($value, $utc);
+                return $date->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+            } catch (Exception $e) {
+                continue;
+            }
+        }
+        return '';
     }
 
     private static function safeStringCall($obj, $method) {

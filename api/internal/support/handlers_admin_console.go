@@ -251,7 +251,7 @@ func (q queueState) pendingReason() string {
 	case "":
 		return "This reply has not been approved for automatic sending. Review it and choose Send reply when ready."
 	case dispositionEscalate:
-		return "The bot paused for staff review. No timer is running. Review and send the reply, or dismiss the ticket if no reply is needed."
+		return "This reply needs staff review. No timer is running. Review and send the reply, or dismiss the ticket if no reply is needed."
 	case dispositionAutoAsk:
 		return "Queued to ask the user. An ask has no hold, so if it is still here the send did not go through."
 	case dispositionAutoSend, dispositionAutoClose:

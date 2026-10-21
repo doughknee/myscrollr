@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "api/**"
+      - "scripts/osticket-plugin/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
       # The desktop app's native half (REL-62). It is Rust, so its gate
@@ -36,6 +37,7 @@ on:
     branches: [main]
     paths:
       - "api/**"
+      - "scripts/osticket-plugin/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
       # The desktop app's native half (REL-62). It is Rust, so its gate
@@ -176,6 +178,9 @@ jobs:
       # without -v a fully-skipped suite is indistinguishable from a
       # passing one — which is exactly how a missing service goes
       # unnoticed.
+      - name: Check osTicket follow-up webhook timestamps
+        run: php ../scripts/osticket-plugin/notify.message.test.php
+
       - run: go test -v ./...
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable

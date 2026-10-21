@@ -592,8 +592,43 @@ describe('the case', () => {
       ).toBe(saved.draft.body)
       expect(host.querySelector('#new-reply-body')).toBeNull()
       expect(host.textContent).toContain('Send reply')
+      const leaving = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(leaving)
+      expect(leaving.defaultPrevented).toBe(false)
     },
   )
+
+  it('keeps a new reply when saving fails', async () => {
+    const original = cases['752473']
+    mocks.supportCase.mockResolvedValue({
+      ...original,
+      draft: { ...original.draft!, status: 'sent' },
+    })
+    mocks.prepareReply.mockRejectedValue(
+      new Error('Conversation changed. Refresh before saving.'),
+    )
+    const host = await render(390)
+    await open(host, 'Morgan Ellis')
+    const input = host.querySelector<HTMLTextAreaElement>('#new-reply-body')!
+    await act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      )!.set!.call(input, 'Keep my answer')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const save = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent === 'Save reply for review',
+    )!
+    await act(async () => {
+      save.click()
+    })
+    expect(input.value).toBe('Keep my answer')
+    expect(input.disabled).toBe(false)
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'Conversation changed',
+    )
+  })
 
   it('still offers every action, by name', async () => {
     const host = await render(1440)

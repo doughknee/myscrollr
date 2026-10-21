@@ -181,6 +181,7 @@ export default function CaseActions({
           <textarea
             id="new-reply-body"
             value={body}
+            disabled={busy !== null}
             onChange={(e) => onEdit({ body: e.target.value })}
             rows={8}
             className="w-full resize-y rounded-xl bg-base-100 px-4 py-3 text-sm leading-relaxed ring-1 ring-base-300/60 focus:ring-2 focus:ring-primary/50 focus:outline-none"

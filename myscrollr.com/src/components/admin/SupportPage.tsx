@@ -1789,6 +1789,9 @@ export default function SupportPage({
         const key = `${next.ticket_number}:${next.draft?.id ?? 'none'}`
         setEdits((current) => {
           const remaining = { ...current }
+          if (key !== editKey && detail.draft?.status !== 'pending') {
+            delete remaining[editKey]
+          }
           if (next.draft?.status !== 'pending') {
             delete remaining[key]
           } else if (
@@ -1806,7 +1809,11 @@ export default function SupportPage({
       onEdit={(patch) =>
         setEdits((current) => {
           const changed = { ...current[editKey], ...patch }
-          if (changed.body === detail.draft?.body) delete changed.body
+          if (
+            changed.body ===
+            (detail.draft?.status === 'pending' ? detail.draft.body : '')
+          )
+            delete changed.body
           if (changed.question === detail.draft?.ask_user_for)
             delete changed.question
           if (changed.issueKey === '') delete changed.issueKey
