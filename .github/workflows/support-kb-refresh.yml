@@ -11,8 +11,14 @@
 # It also fixes a second bug. deploy.yml already runs on `release: published`,
 # so publishing deploys core-api carrying the *stale* KB and the support bot
 # serves a knowledge base that does not know about the release that just
-# shipped. The last step below redeploys core-api once the fresh KB has landed.
+# shipped. The commit below redeploys core-api once the fresh KB has landed:
+# it is pushed with the KB_DEPLOY_KEY deploy key, so, unlike a GITHUB_TOKEN
+# push, it starts deploy.yml (api/**) and backend-tests on its own.
 # SCROLLR-216.
+#
+# Why a deploy key: `main` has a ruleset (PR required + repo-shape check) that
+# only repository admins and deploy keys may bypass. GitHub Actions cannot be a
+# bypass actor on a personal-account repo, so a GITHUB_TOKEN push is refused.
 name: Refresh Support Knowledge Base
 
 on:
@@ -27,11 +33,8 @@ on:
         required: true
 
 permissions:
-  contents: write
-  # Pushes made with the default GITHUB_TOKEN do not trigger workflow runs, so
-  # the commit below cannot set deploy.yml off by itself; the final step
-  # dispatches it explicitly.
-  actions: write
+  # The push uses the deploy key; the token only reads releases for kbgen.
+  contents: read
 
 # Two releases published back to back must not race each other's push.
 concurrency:
@@ -50,6 +53,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          ssh-key: ${{ secrets.KB_DEPLOY_KEY }}
 
       - uses: actions/setup-go@v6
         with:
@@ -84,9 +88,3 @@ jobs:
             git push origin HEAD:main
           fi
           echo "committed=true" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy core-api with the fresh knowledge base
-        if: steps.push.outputs.committed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy.yml --ref main -f services=core-api
