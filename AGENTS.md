@@ -23,6 +23,37 @@ Standalone bugs and ideas belong to the Scrollr team without a project until the
 
 MyScrollr aggregates financial market data, sports scores, and RSS feeds. Tauri desktop app (primary product), React marketing website, Go gateway API, and independent channel services. Infrastructure: PostgreSQL, Redis, Logto (auth), Sequin (CDC), Stripe (billing). Deployed on DigitalOcean Kubernetes (DOKS) with images stored in DigitalOcean Container Registry (DOCR). See `k8s/` for manifests and `.github/workflows/deploy.yml` for the build-and-deploy pipeline.
 
+## Before building anything new
+
+Scrollr is one product with several hosts. The ticker in `desktop/src` is shared;
+each host is a small adapter around it:
+
+- desktop app: Tauri (`desktop/src-tauri`)
+- website live bar: `desktop/embed.html` + `desktop/src/embed/boot.ts` (`vite build --mode embed`, see `desktop/vite.config.ts`)
+- web mode: `desktop/web.html` + `desktop/src/dev/web.ts`
+- data: every source is served by core (`api/internal/ingestread`), see `api/CHANNELS.md`
+
+Before proposing a new app, service, server, package or top-level folder:
+
+1. Find what already does something similar and name the files.
+2. Propose the change as an extension of it: a new host adapter, a new widget,
+   a new ingestread source, a new admin route.
+3. Only if nothing fits, say why in one paragraph and ask before building.
+
+Never copy ticker, chip, layout or data code into a new place. If a change
+touches a chip, page, layout or data fetch, it goes in the shared code for every host.
+CI (`scripts/ci/check-repo-shape.sh`) fails a PR that adds a top-level folder, or a new
+`package.json` / `go.mod` / `Cargo.toml`, that is not named in Repository Layout below.
+
+| Where does it go? | Read first | Files |
+|---|---|---|
+| A new widget / data source | `api/CHANNELS.md` | `api/internal/ingestread/` + catalog entry in `api/internal/widgets/catalog.go`; client in `desktop/src/datawidgets/<name>/`; usually a Rust ingester in `channels/<name>/service/` |
+| A new place the ticker shows up (overlay, TV, kiosk, embed) | the existing hosts above | a new adapter beside `desktop/embed.html` + `desktop/src/embed/boot.ts` that mounts the shared ticker; no copy of ticker code |
+| A chip or page change | `docs/CHIP_SPEC.md` | `desktop/src/components/chips/`, `desktop/src/components/pages/`, `desktop/src/datawidgets/*/ticker.tsx` |
+| An admin console page | Code Style, Website | route `myscrollr.com/src/routes/admin.<page>.tsx` + handlers in `api/internal/admin/` |
+| A backend route | Architecture Rules | `api/internal/<package>/`, wired in `api/core/server.go` |
+| A schema change | Database Migrations | `api/migrations/000NNN_*.up.sql` + `.down.sql` |
+
 ## Ticker chips
 
 Before building or changing anything on the ticker (a page cell, the edge zone or the page

@@ -1,0 +1,20 @@
+name: Repo shape
+
+# Fails a PR that adds a top-level folder or a new package.json / go.mod /
+# Cargo.toml without naming it in AGENTS.md > Repository Layout.
+on:
+  pull_request:
+
+jobs:
+  repo-shape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fixture test
+        run: bash scripts/ci/check-repo-shape.test.sh
+      - name: Check repo shape against the base
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          bash scripts/ci/check-repo-shape.sh "origin/${{ github.base_ref }}"
