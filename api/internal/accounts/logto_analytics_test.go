@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -37,12 +38,15 @@ func analyticsLog(id, key, result, code string, createdAt int64) map[string]any 
 func withAnalyticsLogto(t *testing.T, pages map[int][]map[string]any, status int, responseBody string) func() []string {
 	t.Helper()
 	var queries []string
+	var queriesMu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/oidc/token":
 			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "test-token", "expires_in": 3600})
 		case "/api/logs":
+			queriesMu.Lock()
 			queries = append(queries, r.URL.RawQuery)
+			queriesMu.Unlock()
 			if status != http.StatusOK {
 				w.WriteHeader(status)
 				_, _ = w.Write([]byte(responseBody))
@@ -68,7 +72,11 @@ func withAnalyticsLogto(t *testing.T, pages map[int][]map[string]any, status int
 	t.Setenv("LOGTO_WEB_APP_ID", "web-app")
 	ResetM2MTokenCache()
 	t.Cleanup(ResetM2MTokenCache)
-	return func() []string { return queries }
+	return func() []string {
+		queriesMu.Lock()
+		defer queriesMu.Unlock()
+		return append([]string(nil), queries...)
+	}
 }
 
 func TestFetchSignupAnalyticsCountsEventsWithoutInventingAttempts(t *testing.T) {
