@@ -173,6 +173,8 @@ TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disab
 
 ### CI
 
+**`main` is protected by a repository ruleset** (set 21 Oct 2026, id 25516065): changes land through a pull request, the `repo-shape` check must pass, force-pushes and deletion are blocked. Only repository admins and deploy keys bypass it. Work on a branch and open a PR; never ask for the ruleset to be loosened to get a change in. The one automated writer, `support-kb-refresh.yml`, pushes with the `KB_DEPLOY_KEY` deploy key for exactly this reason (GitHub Actions cannot be a bypass actor on a personal-account repo); a deploy-key push starts workflows, unlike a `GITHUB_TOKEN` push.
+
 - `.github/workflows/backend-tests.yml` — three job groups: `go-tests` (`api` — the only Go module since SCROLLR-239 deleted the last other one), `rust-tests` (the three channel service crates), and `desktop-rust-tests` (`desktop/src-tauri`, added 2026-07-24 — that crate was in no matrix and its 18 tests ran nowhere). Triggers on `api/**`, `channels/**/*.{go,rs}`, and `desktop/src-tauri/**`. The Go and channel jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the integration tests run for real. `desktop-rust-tests` needs no database but does need the webkit dev headers to link, which is why it's its own job.
 - `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
 - `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
