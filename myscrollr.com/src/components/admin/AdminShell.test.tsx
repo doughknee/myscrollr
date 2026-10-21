@@ -64,12 +64,11 @@ async function render(node: ReactNode, path = '/admin'): Promise<HTMLElement> {
 }
 
 const SECTION_LABELS = [
-  'Overview',
+  'Home',
   'Analytics',
   'Support',
-  'Versions',
+  'System',
   'Users',
-  'Admins',
   'Settings',
 ]
 
@@ -113,7 +112,7 @@ describe('AdminChrome', () => {
       '/admin/analytics?period=30d&view=revenue',
     )
   })
-  it('offers all seven sections and a way back to the site', async () => {
+  it('offers the main sections and a way back to the site', async () => {
     const host = await render(
       <AdminChrome email="staff@myscrollr.com">
         <p>page</p>
@@ -131,6 +130,35 @@ describe('AdminChrome', () => {
     // No site chrome came along for the ride.
     expect(host.textContent).not.toContain('SIGN IN')
     expect(host.querySelector('footer')).toBeNull()
+  })
+
+  it('groups staff access under Settings without marking Home as current', async () => {
+    const host = await render(
+      <AdminChrome email="staff@example.com">
+        <p>Staff access</p>
+      </AdminChrome>,
+      '/admin/admins',
+    )
+    const current = host.querySelectorAll(
+      '.admin-desktop-nav a[aria-current="page"]',
+    )
+    expect(current).toHaveLength(1)
+    expect(current[0].textContent).toBe('Settings')
+    expect(
+      host.querySelector(
+        '[aria-label="Settings sections"] a[href="/admin/admins"]',
+      ),
+    ).not.toBeNull()
+    const menu = host.querySelector<HTMLDetailsElement>('.admin-mobile-menu')!
+    menu.open = true
+    const summary = menu.querySelector('summary')!
+    await act(() =>
+      summary.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    )
+    expect(menu.open).toBe(false)
+    expect(document.activeElement).toBe(summary)
   })
 
   it('renders the optional status slot', async () => {
@@ -151,7 +179,7 @@ describe('AdminChrome', () => {
     const workspace = host.querySelector<HTMLElement>(
       '[aria-label="Staff workspace"]',
     )!
-    expect(workspace.className).toContain('min-h-[calc(100dvh-48px)]')
+    expect(workspace.className).toContain('flex-1')
     expect(workspace.className).not.toContain('max-w-')
     // RootLayout owns the single main landmark. This region is focusable
     // so the shared skip link can bypass the staff navigation.

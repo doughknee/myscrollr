@@ -62,7 +62,8 @@ describe('OverviewContent', () => {
     expect(body).toContain('3people are waiting for a reply from us,')
     expect(body).toContain('2customers pay.')
     expect(body).toContain('1person signed up in the last 24 hours,')
-    expect(body).toContain('Scores, prices, markets and news are up to date,')
+    expect(body).toContain('Scores, prices and news are up to date,')
+    expect(body).not.toContain('Prediction markets')
     expect(body).toContain('within their expected update windows.')
   })
 
@@ -145,13 +146,17 @@ describe('OverviewContent', () => {
     expect(html).toContain('href="/admin/support"')
   })
 
-  it('makes the support action the only filled button', async () => {
-    const supportPanel = await render({ initialOpen: 'support' })
-    expect(supportPanel).toContain('bg-error')
-    for (const row of ['right_now', 'money', 'growth', 'feeds'] as const) {
-      const html = await render({ initialOpen: row })
-      expect(html).not.toContain('bg-error px-4')
-    }
+  it('puts problems before the pulse and exposes the queue action without opening details', async () => {
+    const html = await render()
+    expect(html.indexOf('people are waiting')).toBeLessThan(
+      html.indexOf('people have Scrollr'),
+    )
+    expect(html).toContain('href="/admin/support"')
+    expect(text(html)).toContain('Open the queue')
+    expect(text(html)).not.toContain('All tickets ever')
+    expect(text(await render({ initialOpen: 'feeds' }))).not.toContain(
+      'Prediction markets',
+    )
   })
 
   it('never renders a number a row cannot back', async () => {
@@ -190,7 +195,6 @@ describe('OverviewContent', () => {
           ingest: [
             { table: 'games', age_seconds: 90, has_data: true },
             { table: 'trades', age_seconds: 7200, has_data: true },
-            { table: 'markets', age_seconds: 120, has_data: true },
             { table: 'rss_items', age_seconds: 200, has_data: true },
           ],
         }),
@@ -232,7 +236,7 @@ describe('OverviewContent', () => {
   it('formats money from minor units and never sums currencies', async () => {
     const body = text(await render({ initialOpen: 'money' }))
     expect(body).toContain('$113.46 USD came in today.')
-    expect(body).toContain('$979.02 USD earned ever.')
+    expect(body).toContain('Earned ever after Stripe fees$979.02 USD')
     expect(body).toContain('Earned today after Stripe fees')
     expect(body).not.toContain('$133.46')
   })

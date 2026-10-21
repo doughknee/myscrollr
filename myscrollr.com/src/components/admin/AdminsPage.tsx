@@ -94,7 +94,7 @@ export default function AdminsPage() {
     <PageFrame>
       <div className="space-y-6">
         <header>
-          <h1 className="admin-page-heading">Admins</h1>
+          <h1 className="admin-page-heading">Staff access</h1>
           <p className="mt-1 text-sm text-base-content/60">
             Manage who can open the staff console.
           </p>

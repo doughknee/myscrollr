@@ -66,6 +66,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   accounts.mockReset()
   account.mockReset()
   document.body.innerHTML = ''
@@ -89,6 +90,29 @@ async function search(c: HTMLElement, value: string) {
 }
 
 describe('UsersPage', () => {
+  it('offers pagination above the list and preserves the query when paging', async () => {
+    accounts.mockResolvedValue({ ...page, total: 100 })
+    const c = await mount()
+    const next = button(c, 'Next')
+    expect(
+      next.compareDocumentPosition(c.querySelector('table')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    await search(c, 'ada')
+    await wait(300)
+    await act(() => button(c, 'Next').click())
+    await wait(300)
+    expect(accounts).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      'ada',
+      1,
+      expect.any(AbortSignal),
+    )
+    expect(c.textContent).toContain('Page 2 of 4')
+    expect(
+      c.querySelector('.admin-user-mobile-summary')?.textContent,
+    ).toContain('App activity unknown')
+  })
   it('clears an empty search and restores the unfiltered list', async () => {
     accounts
       .mockResolvedValueOnce(page)
@@ -196,11 +220,19 @@ describe('UsersPage', () => {
     expect(view).not.toBeNull()
     view.focus()
     expect(document.activeElement).toBe(view)
+    Object.defineProperty(window, 'scrollY', {
+      value: 1200,
+      configurable: true,
+    })
     await act(() => view.click())
     await wait(10)
     expect(c.textContent).toContain('Widgets (0)')
     expect(document.activeElement).toBe(button(c, 'All users'))
     await act(() => button(c, 'All users').click())
+    expect(window.scrollTo).toHaveBeenLastCalledWith({
+      top: 1200,
+      behavior: 'instant',
+    })
     expect(document.activeElement).toBe(
       c.querySelector('button[aria-label="View ada@example.com"]'),
     )

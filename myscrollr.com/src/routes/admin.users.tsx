@@ -33,6 +33,7 @@ function UsersRoute() {
           void navigate({
             search: (current) => ({ ...current, ...patch }),
             replace,
+            resetScroll: false,
           })
         }}
       />

@@ -1134,7 +1134,7 @@ export function GrowthContent(props: GrowthContentProps) {
                         <FactList
                           facts={[
                             {
-                              label: 'Registered accounts today',
+                              label: 'Current accounts',
                               value: num(a.total),
                             },
                             {

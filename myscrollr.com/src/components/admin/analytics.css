@@ -275,13 +275,13 @@ html:has(.analytics-drawer[open]) {
 }
 .analytics-header h1 {
   font-family: var(--font-display);
-  font-size: clamp(28px, 3vw, 36px);
+  font-size: 32px;
   font-weight: 750;
-  line-height: 1.1;
+  line-height: 1.2;
   letter-spacing: -0.035em;
 }
 .analytics-header p {
-  margin-top: 10px;
+  margin-top: 4px;
   color: var(--analytics-muted);
   font-size: 14px;
 }

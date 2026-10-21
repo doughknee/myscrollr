@@ -282,7 +282,12 @@ export default function VersionsPage({
     <PageFrame>
       <div className="space-y-8">
         <header className="admin-versions-header flex flex-wrap items-end justify-between gap-4">
-          <h1 className="admin-page-heading">Versions</h1>
+          <div>
+            <h1 className="admin-page-heading">System</h1>
+            <p className="mt-1 text-sm text-base-content/60">
+              Desktop API traffic and errors by build.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-base-content/60">Time window</span>
             <div

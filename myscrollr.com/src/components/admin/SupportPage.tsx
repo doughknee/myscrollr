@@ -1762,7 +1762,7 @@ export default function SupportPage({
        768 up this page is exactly that tall and each pane scrolls on its own,
        so the window never scrolls. Below it the mobile nav adds a row of its
        own and the page is an ordinary scrolling column. */
-    <div className="flex flex-col md:h-[calc(100dvh-48px)]">
+    <div className="flex flex-col md:h-[calc(100dvh-var(--admin-shell-height))]">
       <div className="flex min-h-11 shrink-0 flex-wrap items-baseline gap-x-2.5 border-b border-hairline px-4 py-2">
         <h1 className="self-center text-base font-extrabold tracking-[-0.01em]">
           Support

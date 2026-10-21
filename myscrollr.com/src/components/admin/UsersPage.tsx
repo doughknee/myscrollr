@@ -208,8 +208,11 @@ export default function UsersPage({
     if (onSearchChange) onSearchChange(patch, replace)
     else setLocalSearch((current) => ({ ...current, ...patch }))
   }
-  const setSelected = (user: string | null) =>
+  const listScroll = useRef(0)
+  const setSelected = (user: string | null) => {
+    if (user) listScroll.current = window.scrollY
     updateSearch({ user: user ?? undefined })
+  }
   const [result, setResult] = useState<{
     query: string
     page: number
@@ -233,7 +236,8 @@ export default function UsersPage({
       // The list is retained while detail is open. Resume at that account;
       // a changed search can remove it, in which case search is the safe target.
       const target = userButtons.current.get(previous) ?? searchInput.current
-      target?.focus()
+      target?.focus({ preventScroll: true })
+      window.scrollTo({ top: listScroll.current, behavior: 'instant' })
     }
   }, [selected])
 
@@ -275,10 +279,37 @@ export default function UsersPage({
   // The gap REL-265 uncovered: accounts that exist but never saved a
   // preference. Global counts, so they are only honest with no search term.
   const neverSetUp = data ? Math.max(0, data.total - data.set_up) : 0
+  const pagination = pageCount > 1 && (
+    <div className="admin-users-pagination">
+      <button
+        type="button"
+        disabled={loading || page === 0}
+        onClick={() => {
+          updateSearch({ page: page - 1 })
+          searchInput.current?.focus()
+        }}
+      >
+        Previous
+      </button>
+      <span>
+        Page {page + 1} of {pageCount}
+      </span>
+      <button
+        type="button"
+        disabled={loading || page + 1 >= pageCount}
+        onClick={() => {
+          updateSearch({ page: page + 1 })
+          searchInput.current?.focus()
+        }}
+      >
+        Next
+      </button>
+    </div>
+  )
 
   return (
     <PageFrame>
-      <div className="space-y-5">
+      <div className="admin-users space-y-5">
         <header>
           <h1 className="admin-page-heading">Users</h1>
           {data?.source === 'local' ? (
@@ -312,9 +343,6 @@ export default function UsersPage({
               </p>
             )
           )}
-          <p className="mt-1 text-sm text-base-content/60">
-            Read-only — this console does not edit anyone&apos;s account.
-          </p>
         </header>
 
         <div className="relative">
@@ -334,6 +362,7 @@ export default function UsersPage({
             className="w-full rounded-lg bg-base-200/50 py-2.5 pr-3 pl-9 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
           />
         </div>
+        {data && !error && pagination}
 
         {error && (
           <ErrorPanel
@@ -372,7 +401,7 @@ export default function UsersPage({
               </EmptyState>
             ) : (
               <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-                <table className="admin-mobile-table w-full min-w-[42rem] text-left text-sm">
+                <table className="admin-users-table admin-mobile-table w-full min-w-[42rem] text-left text-sm">
                   <thead className="text-xs text-base-content/50 uppercase">
                     <tr className="border-b border-base-300/60">
                       <th className="p-3 font-semibold">User</th>
@@ -407,12 +436,28 @@ export default function UsersPage({
                           >
                             {a.email ?? a.name ?? '—'}
                           </button>
-                          <span className="block truncate font-mono text-xs text-base-content/45">
+                          <span className="admin-user-id block truncate font-mono text-xs text-base-content/45">
                             {a.logto_sub}
                             {!a.set_up && (
                               <span className="text-warning">
                                 {' '}
                                 · never set up
+                              </span>
+                            )}
+                          </span>
+                          <span className="admin-user-mobile-summary">
+                            <span>{planLabel(a)}</span>
+                            <span>
+                              {!a.set_up
+                                ? 'Not set up'
+                                : a.last_used_app
+                                  ? `App used ${day(a.last_used_app)}`
+                                  : 'App activity unknown'}
+                            </span>
+                            {a.tickets > 0 && (
+                              <span>
+                                {a.tickets}{' '}
+                                {a.tickets === 1 ? 'ticket' : 'tickets'}
                               </span>
                             )}
                           </span>
@@ -455,34 +500,13 @@ export default function UsersPage({
             )}
 
             <p className="text-xs text-base-content/45">
-              Ordered by Logto; search matches email and username. Widgets and
-              tickets come from this database and cannot be sorted or searched
-              across the whole set — those columns describe only this page.
+              Accounts are read-only. Search matches email and username. Widgets
+              and tickets come from this database and cannot be sorted or
+              searched across the whole set — those columns describe only this
+              page.
             </p>
 
-            {pageCount > 1 && (
-              <div className="flex items-center justify-between text-sm">
-                <button
-                  type="button"
-                  disabled={page === 0}
-                  onClick={() => updateSearch({ page: page - 1 })}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span className="text-base-content/60">
-                  Page {page + 1} of {pageCount}
-                </span>
-                <button
-                  type="button"
-                  disabled={page + 1 >= pageCount}
-                  onClick={() => updateSearch({ page: page + 1 })}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            {pagination}
           </>
         )}
       </div>

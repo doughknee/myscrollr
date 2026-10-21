@@ -369,7 +369,7 @@ export const LINK =
  */
 export function PageFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="admin-page mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-12">
+    <div className="admin-page mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-8">
       {children}
     </div>
   )
