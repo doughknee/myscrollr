@@ -29,7 +29,8 @@ count.txt
 .tanstack
 .wrangler
 .opencode/
-.claude/
+.claude/*
+!.claude/skills/
 __pycache__/
 *.pyc
 .venv/

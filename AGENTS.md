@@ -40,6 +40,7 @@ Before proposing a new app, service, server, package or top-level folder:
    a new ingestread source, a new admin route.
 3. Only if nothing fits, say why in one paragraph and ask before building.
 
+Repo skills for these paths are in `.claude/skills/`; `CONTRIBUTING.md` is the human start.
 Never copy ticker, chip, layout or data code into a new place. If a change
 touches a chip, page, layout or data fetch, it goes in the shared code for every host.
 CI (`scripts/ci/check-repo-shape.sh`) fails a PR that adds a top-level folder, or a new
@@ -71,6 +72,7 @@ version (and feeds the support KB, so a change to it needs `kbgen`).
 
 Monorepo — each component is independently deployable with its own dependencies:
 
+- `.claude/skills/` — project skills for AI assistants: routers to the extension points above (`scripts/ci/check-doc-paths.sh` keeps their paths real)
 - `api/` — Core API (Go 1.25, Fiber v2). Internal packages under `api/internal/`; `api/core` wires them into one binary
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**

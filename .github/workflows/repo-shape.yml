@@ -14,6 +14,10 @@ jobs:
           fetch-depth: 0
       - name: Fixture test
         run: bash scripts/ci/check-repo-shape.test.sh
+      - name: Doc paths still exist
+        run: |
+          bash scripts/ci/check-doc-paths.test.sh
+          bash scripts/ci/check-doc-paths.sh
       - name: Check repo shape against the base
         run: |
           git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
