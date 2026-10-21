@@ -2060,10 +2060,11 @@ export function DesktopContent({
           {d.staff_excluded && <StaffExcludedBadge />}
           <Link
             to="/admin/versions"
+            search={{ view: 'traffic' }}
             className="analytics-drawer-utility"
             title="Version adoption and error rates"
           >
-            Versions <span aria-hidden>↗</span>
+            System <span aria-hidden>↗</span>
           </Link>
         </div>
         <AnalyticsPanels

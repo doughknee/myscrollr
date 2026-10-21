@@ -199,7 +199,7 @@ describe('the page frame', () => {
     const host = await render(width)
     await open(host, 'Morgan Ellis')
     const back = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('All of support'),
+      b.textContent.includes('Back to queue'),
     )!
     expect(document.activeElement).toBe(
       width < 768
@@ -222,7 +222,7 @@ describe('the page frame', () => {
     })
     await caseEvent()
     const back = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('All of support'),
+      b.textContent.includes('Back to queue'),
     )!
     await act(() => back.click())
     expect(document.activeElement).toBe(
@@ -271,12 +271,10 @@ describe('the page frame', () => {
 
   it('counts what needs you, what waits on them, and what is resolved', async () => {
     const host = await render(1440)
-    const strip = host.querySelector(
-      '[aria-label="Staff workspace"] > div > div',
-    )!
-    expect(strip.textContent).toContain('3 need you')
-    expect(strip.textContent).toContain('2 waiting on them')
-    expect(strip.textContent).toContain('2 resolved')
+    const strip = host.querySelector('[aria-label="Support queue views"]')!
+    expect(strip.textContent).toContain('Needs you3')
+    expect(strip.textContent).toContain('Waiting2')
+    expect(strip.textContent).toContain('Handled2')
   })
 
   it('keeps every section, in order, and never reorders them', async () => {
@@ -399,7 +397,7 @@ describe('the three panes', () => {
     expect(host.querySelector('aside')).toBeNull()
     await open(host, 'Morgan Ellis')
     const back = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('All of support'),
+      b.textContent.includes('Back to queue'),
     )
     expect(back).toBeTruthy()
     expect(back!.className).toContain('md:hidden')
@@ -732,4 +730,45 @@ describe('the case', () => {
     // The open one is not repeated in its own list.
     expect(others).not.toContain('#752473 ')
   })
+})
+
+it('filters mixed-state people and opens the matching waiting ticket', async () => {
+  const host = await render(390)
+  const waiting = host.querySelectorAll<HTMLButtonElement>(
+    '[aria-label="Support queue views"] button',
+  )[2]
+  await act(() => waiting.click())
+  const cards = Array.from(
+    host.querySelectorAll<HTMLButtonElement>('[data-support-row]'),
+  )
+  expect(cards.map((c) => c.dataset.supportRow)).toEqual([
+    'person:morgan',
+    'person:sam',
+  ])
+  expect(cards[0].textContent).not.toContain('needs you')
+  await act(async () => cards[0].click())
+  expect(mocks.supportCase).toHaveBeenLastCalledWith(
+    mocks.token,
+    '584802',
+    expect.any(AbortSignal),
+  )
+  expect(host.querySelector('a[href*="view=support"]')?.textContent).toContain(
+    'Performance',
+  )
+})
+
+it('shows handled tickets without requiring the resolved disclosure', async () => {
+  const host = await render(1440)
+  await act(() =>
+    host
+      .querySelectorAll<HTMLButtonElement>(
+        '[aria-label="Support queue views"] button',
+      )[3]
+      .click(),
+  )
+  expect(
+    host.querySelector('[data-support-row="person:morgan"]'),
+  ).not.toBeNull()
+  expect(host.querySelector('[data-support-row="person:sam"]')).toBeNull()
+  expect(host.querySelector('[aria-label="Show resolved"]')).toBeNull()
 })

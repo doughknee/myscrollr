@@ -502,7 +502,7 @@ describe('DesktopContent', () => {
     // Configuration figures are available in their focused metric view.
     expect(html).toContain('Configuration')
     expect(html).toContain('Find a widget')
-    expect(html).toContain('href="/admin/versions"')
+    expect(html).toContain('href="/admin/versions?view=traffic"')
   })
 
   it('shows additions and removals as a dash under a per-computer filter', async () => {

@@ -26,6 +26,7 @@ export const Route = createFileRoute('/admin/support')({
         dir: 'desc',
         rows: 'person',
         resolved: false,
+        inbox: 'all',
       }),
     ],
   },
@@ -43,6 +44,7 @@ function SupportRoute() {
           void navigate({
             search: (current) => ({ ...current, ...patch }),
             replace,
+            resetScroll: false,
           })
         }}
       />

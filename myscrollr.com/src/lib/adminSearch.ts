@@ -7,6 +7,7 @@ export interface UsersSearch {
 }
 
 export interface SupportSearch {
+  inbox: 'all' | 'needs_you' | 'waiting' | 'handled'
   q: string
   sort: QueueSort
   dir: QueueDir
@@ -24,6 +25,12 @@ export function parseSupportSearch(
       ? search.ticket
       : undefined
   return {
+    inbox:
+      search.inbox === 'needs_you' ||
+      search.inbox === 'waiting' ||
+      search.inbox === 'handled'
+        ? search.inbox
+        : 'all',
     q: typeof search.q === 'string' ? search.q.slice(0, 200) : '',
     sort:
       search.sort === 'waiting' ||

@@ -29,7 +29,11 @@ import {
   formatMinor,
   plural,
 } from '@/lib/adminFormat'
-import { isStale, verdicts } from '@/lib/overviewVerdicts'
+import {
+  MONITORED_FEEDS as FEEDS,
+  isStale,
+  verdicts,
+} from '@/lib/overviewVerdicts'
 
 /**
  * The Overview, at a glance (SCROLLR-215).
@@ -68,13 +72,6 @@ const TONE: Record<
   bad: { dot: 'bg-error', label: 'text-error', number: 'text-error' },
   none: { dot: 'bg-base-400', label: 'text-base-content/45', number: '' },
 }
-
-/** The current feeds monitored by the overview endpoint. */
-const FEEDS: ReadonlyArray<{ table: string; name: string }> = [
-  { table: 'games', name: 'Sports scores' },
-  { table: 'trades', name: 'Stock prices' },
-  { table: 'rss_items', name: 'News headlines' },
-]
 
 /**
  * Live presence, re-read every 30 s while the page is visible. A poll error

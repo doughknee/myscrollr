@@ -4,8 +4,11 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import VersionsPage from './VersionsPage'
+import { overview } from './dashboardFixtures'
 import type { AdminVersions } from '@/api/admin'
+import type { ReactNode } from 'react'
 import { adminApi } from '@/api/admin'
+import { loadBoundedAdminReport } from '@/api/adminAnalytics'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
@@ -14,6 +17,10 @@ vi.mock('@/hooks/useGetToken', () => {
   return { useGetToken: () => getToken }
 })
 vi.mock('@/api/admin', () => ({ adminApi: { versions: vi.fn() } }))
+vi.mock('@/api/adminAnalytics', () => ({ loadBoundedAdminReport: vi.fn() }))
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
+}))
 
 const data = (days: number): AdminVersions => ({
   generated_at: '2026-09-18T12:00:00Z',
@@ -41,16 +48,19 @@ const button = (c: HTMLElement, text: string) =>
     b.textContent.includes(text),
   )!
 
-async function mount() {
+async function mount(view: 'health' | 'traffic' = 'traffic') {
   const container = document.createElement('div')
   document.body.append(container)
   await act(() => createRoot(container).render(<VersionsPage />))
   await wait(10)
+  if (view === 'traffic')
+    await act(() => button(container, 'Desktop API').click())
   return container
 }
 
 beforeEach(() => {
   versions.mockReset()
+  vi.mocked(loadBoundedAdminReport).mockReset().mockResolvedValue(overview)
   document.body.innerHTML = ''
 })
 
@@ -84,7 +94,32 @@ describe('VersionsPage loading', () => {
     await act(() => {
       button(c, '7d').click()
     })
-    expect(c.textContent).toContain('Updating the counters')
+    expect(c.textContent).toContain('Updating desktop API counters')
     expect(c.textContent).toContain('1.6.7')
   })
+})
+
+it('separates current health from date-filtered traffic and reuses reports when switching views', async () => {
+  versions.mockResolvedValue(data(30))
+  const c = await mount('health')
+  expect(c.textContent).toContain('Data feeds')
+  expect(c.textContent).not.toContain('Time window')
+  await act(() => button(c, 'Desktop API').click())
+  expect(c.textContent).toContain('Time window')
+  expect(c.textContent).not.toContain('Data feeds')
+  await act(() => button(c, 'Service health').click())
+  expect(c.textContent).toContain('Data feeds')
+  expect(versions).toHaveBeenCalledTimes(1)
+  expect(loadBoundedAdminReport).toHaveBeenCalledTimes(1)
+})
+
+it('keeps desktop traffic accessible when service health fails', async () => {
+  versions.mockResolvedValue(data(30))
+  vi.mocked(loadBoundedAdminReport).mockRejectedValueOnce(
+    new Error('Health unavailable'),
+  )
+  const c = await mount('health')
+  expect(c.textContent).toContain('Health unavailable')
+  await act(() => button(c, 'Desktop API').click())
+  expect(c.textContent).toContain('1.6.7')
 })

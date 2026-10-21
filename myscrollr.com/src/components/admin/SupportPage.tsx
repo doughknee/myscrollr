@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useBlocker } from '@tanstack/react-router'
+import { Link, useBlocker } from '@tanstack/react-router'
 import {
   AlertTriangle,
   ArrowDown,
@@ -15,6 +15,7 @@ import {
   Pause,
   Play,
   Radio,
+  RefreshCw,
   Search,
   Star,
 } from 'lucide-react'
@@ -1667,10 +1668,13 @@ export default function SupportPage({
       return selectedTicket
     }
     return (
-      mine.find((r) => r.group === 'needs_you')?.ticket_number ??
-      (mine.length > 0 ? mine[0].ticket_number : null)
+      mine.find(
+        (r) =>
+          r.group ===
+          (selection.inbox === 'all' ? 'needs_you' : selection.inbox),
+      )?.ticket_number ?? (mine.length > 0 ? mine[0].ticket_number : null)
     )
-  }, [rowsMode, selectedTicket, person, mine])
+  }, [rowsMode, selectedTicket, person, mine, selection.inbox])
 
   const { detail, error: caseError, setDetail } = useCase(activeTicket, caseKey)
 
@@ -1706,6 +1710,31 @@ export default function SupportPage({
   const back = () => {
     updateSearch({ person: undefined, ticket: undefined })
   }
+  const inbox = selection.inbox
+  const inboxLabels = {
+    all: 'All conversations',
+    needs_you: 'Needs you',
+    waiting: 'Waiting',
+    handled: 'Handled',
+  } as const
+  // Keep server sections and sorting: a person waiting on one ticket may still need us on another.
+  const visiblePeople =
+    inbox === 'all'
+      ? people
+      : people
+          .filter((p) => p[inbox] > 0)
+          .map((p) => ({
+            ...p,
+            headline:
+              rows.find(
+                (row) => row.person_key === p.key && row.group === inbox,
+              )?.subject ?? p.headline,
+            needs_you: inbox === 'needs_you' ? p.needs_you : 0,
+          }))
+  const visibleRows =
+    inbox === 'all' ? rows : rows.filter((r) => r.group === inbox)
+  const visibleCount =
+    rowsMode === 'person' ? visiblePeople.length : visibleRows.length
   const needsYou = queue?.counts.needs_you ?? 0
   const waiting = queue?.counts.waiting ?? 0
   const resolved = queue?.counts.handled ?? 0
@@ -1763,35 +1792,66 @@ export default function SupportPage({
        so the window never scrolls. Below it the mobile nav adds a row of its
        own and the page is an ordinary scrolling column. */
     <div className="flex flex-col md:h-[calc(100dvh-var(--admin-shell-height))]">
-      <div className="flex min-h-11 shrink-0 flex-wrap items-baseline gap-x-2.5 border-b border-hairline px-4 py-2">
-        <h1 className="self-center text-base font-extrabold tracking-[-0.01em]">
-          Support
-        </h1>
-        {queue ? (
-          <>
-            <span
-              className={`self-center text-[13px] font-bold ${needsYou > 0 ? 'text-error' : 'text-base-content/65'}`}
-            >
-              {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
-            </span>
-            <span className="self-center text-[13px] text-base-content/45">
-              · {waiting} waiting on them · {resolved} resolved
-            </span>
-          </>
-        ) : (
-          <span className="self-center text-[13px] text-base-content/45">
-            {error ? 'Queue unavailable' : 'Loading queue…'}
-          </span>
-        )}
+      <header className="admin-support-header">
+        <div>
+          <h1>Support</h1>
+          <p>Review conversations and manage replies.</p>
+        </div>
+        <div className="admin-support-header-actions">
+          <Link to="/admin/analytics" search={{ view: 'support' }}>
+            Performance <span aria-hidden>↗</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setQueueKey((n) => n + 1)
+              setCaseKey((n) => n + 1)
+            }}
+          >
+            <RefreshCw size={15} aria-hidden />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </header>
+      <div
+        className="admin-support-inbox"
+        role="group"
+        aria-label="Support queue views"
+      >
+        {(['all', 'needs_you', 'waiting', 'handled'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={inbox === key}
+            aria-label={key === 'all' ? 'All conversations' : undefined}
+            title={
+              key === 'all'
+                ? 'Every conversation, grouped by priority'
+                : `${inboxLabels[key]} tickets`
+            }
+            onClick={() =>
+              updateSearch({ inbox: key, person: undefined, ticket: undefined })
+            }
+          >
+            {key === 'all' ? 'All' : inboxLabels[key]}
+            {queue && key !== 'all' && (
+              <span>
+                {key === 'needs_you'
+                  ? needsYou
+                  : key === 'waiting'
+                    ? waiting
+                    : resolved}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {error && (
         <div role="alert" className="admin-support-error m-4">
           <AlertTriangle size={18} aria-hidden />
           <div>
-            <h2>
-              {queue ? 'Support update failed' : 'Couldn’t load the queue'}
-            </h2>
+            <h2>{queue ? 'Support update failed' : 'Queue unavailable'}</h2>
             <p>
               {queue ? 'Showing the last queue update. ' : ''}
               {error}
@@ -1843,7 +1903,7 @@ export default function SupportPage({
             </div>
 
             <div className="px-2 pt-1.5 pb-3">
-              {(rowsMode === 'person' ? people : rows).length === 0 ? (
+              {visibleCount === 0 ? (
                 <div className="admin-support-empty admin-support-queue-empty">
                   {debounced.trim() ? (
                     <Search size={24} aria-hidden />
@@ -1853,13 +1913,30 @@ export default function SupportPage({
                   <h2>
                     {debounced.trim()
                       ? 'No matching conversations'
-                      : 'No conversations yet'}
+                      : inbox === 'all'
+                        ? 'No conversations yet'
+                        : inbox === 'needs_you'
+                          ? 'Nothing needs you'
+                          : inbox === 'waiting'
+                            ? 'No conversations waiting'
+                            : 'No handled conversations'}
                   </h2>
                   <p>
                     {debounced.trim()
                       ? 'Try another name, email or ticket number.'
-                      : 'New support conversations will appear here when they arrive.'}
+                      : inbox === 'all'
+                        ? 'New support conversations will appear here when they arrive.'
+                        : 'Choose All conversations to see the rest of the queue.'}
                   </p>
+                  {!debounced.trim() && inbox !== 'all' && (
+                    <button
+                      type="button"
+                      className="admin-support-retry"
+                      onClick={() => updateSearch({ inbox: 'all' })}
+                    >
+                      All conversations
+                    </button>
+                  )}
                   {debounced.trim() && (
                     <button
                       type="button"
@@ -1872,15 +1949,19 @@ export default function SupportPage({
                 </div>
               ) : (
                 QUEUE_SECTIONS.map((section) => {
-                  const count = queue.sections[section.key] ?? 0
                   const inSection =
                     rowsMode === 'person'
-                      ? people.filter((p) => p.section === section.key)
-                      : rows.filter((r) => r.section === section.key)
+                      ? visiblePeople.filter((p) => p.section === section.key)
+                      : visibleRows.filter((r) => r.section === section.key)
 
                   // Resolved is a count that opens. Forty-six closed tickets are
                   // not what anybody came here to read.
-                  const collapsed = section.key === 'resolved' && !showResolved
+                  if (inbox !== 'all' && inSection.length === 0) return null
+                  const count = inSection.length
+                  const collapsed =
+                    inbox === 'all' &&
+                    section.key === 'resolved' &&
+                    !showResolved
 
                   return (
                     <section key={section.key}>
@@ -1891,7 +1972,10 @@ export default function SupportPage({
                         <h2
                           className={`text-[11px] font-bold tracking-[0.08em] uppercase ${SECTION_STYLE[section.key]}`}
                         >
-                          {section.label}
+                          {section.key === 'open' &&
+                          (inbox === 'waiting' || inbox === 'handled')
+                            ? 'Also needs attention'
+                            : section.label}
                         </h2>
                         <span className="ml-auto font-mono text-[11px] text-base-content/40">
                           {section.key === 'paying' && queue.accounts.paying > 0
@@ -1900,7 +1984,7 @@ export default function SupportPage({
                               ? count
                               : inSection.length}
                         </span>
-                        {section.key === 'resolved' && (
+                        {section.key === 'resolved' && inbox === 'all' && (
                           <button
                             type="button"
                             onClick={() =>
@@ -2000,7 +2084,7 @@ export default function SupportPage({
                 onClick={back}
                 className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 px-4 text-sm font-medium text-base-content/70 hover:text-base-content md:hidden"
               >
-                <ArrowLeft size={16} /> All of support
+                <ArrowLeft size={16} /> Back to queue
               </button>
             )}
 

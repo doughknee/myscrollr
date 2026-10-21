@@ -27,6 +27,12 @@ export interface FeedReading {
   has_data: boolean
 }
 
+export const MONITORED_FEEDS = [
+  { table: 'games', name: 'Sports scores' },
+  { table: 'trades', name: 'Stock prices' },
+  { table: 'rss_items', name: 'News headlines' },
+] as const
+
 export interface VerdictInput {
   /** Live desktop presence. Null while it is still loading or failed. */
   presence: { available: boolean; active_users: number } | null

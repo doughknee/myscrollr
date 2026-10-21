@@ -49,3 +49,10 @@ describe('staff investigation URLs', () => {
     expect(parseVersionDays('10000')).toBe(30)
   })
 })
+
+it('validates support queue views without changing ticket links', () => {
+  expect(parseSupportSearch({ inbox: 'waiting', ticket: '123' })).toMatchObject(
+    { inbox: 'waiting', ticket: '123', rows: 'ticket' },
+  )
+  expect(parseSupportSearch({ inbox: 'unexpected' }).inbox).toBe('all')
+})
