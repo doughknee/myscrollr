@@ -264,6 +264,7 @@ func (s *Server) setupRoutes() {
 	// the disposition vocabulary, the proven-fix walk, the hold clock - is
 	// unexported there.
 	s.App.Get("/admin/support/queue", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminQueue)
+	s.App.Get("/admin/support/search", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminTicketSearch)
 	s.App.Get("/admin/support/case/:ticket", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminCase)
 
 	// The write half (REL-261). Every one of these is the same function the

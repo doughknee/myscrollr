@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminQuickSearch } from './AdminQuickSearch'
 import { queue } from './supportFixtures'
 import type { Root } from 'react-dom/client'
-import type { AccountsPage } from '@/api/admin'
+import type { AccountsPage, TicketSearchPage } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -21,10 +21,22 @@ vi.mock('@/hooks/useGetToken', () => {
   return { useGetToken: () => token }
 })
 vi.mock('@/api/admin', () => ({
-  adminApi: { accounts: vi.fn(), supportQueue: vi.fn() },
+  adminApi: { accounts: vi.fn(), searchTickets: vi.fn() },
 }))
 const accounts = vi.mocked(adminApi.accounts)
-const tickets = vi.mocked(adminApi.supportQueue)
+const tickets = vi.mocked(adminApi.searchTickets)
+const ticketPage: TicketSearchPage = {
+  rows: (queue.rows ?? []).map((row) => ({
+    ticket_number: row.ticket_number,
+    subject: row.subject,
+    name: row.name ?? '',
+    user_email: row.user_email ?? '',
+    status: row.status,
+    console_status: '',
+    updated_at: row.updated_at,
+    legacy: false,
+  })),
+}
 const users: AccountsPage = {
   accounts: [
     {
@@ -99,7 +111,7 @@ async function search(host: HTMLElement, text: string) {
 beforeEach(() => {
   vi.useFakeTimers()
   accounts.mockReset().mockResolvedValue(users)
-  tickets.mockReset().mockResolvedValue(queue)
+  tickets.mockReset().mockResolvedValue(ticketPage)
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   HTMLDialogElement.prototype.showModal = function () {
     this.open = true
@@ -149,7 +161,8 @@ describe('global staff quick search', () => {
     )
     expect(tickets).toHaveBeenCalledWith(
       expect.any(Function),
-      { q: 'ada', rows: 'ticket', state: 'all' },
+      'ada',
+      '',
       expect.any(AbortSignal),
     )
     expect(host.textContent).toContain('Ada')
@@ -218,18 +231,18 @@ describe('global staff quick search', () => {
     expect(host.textContent).not.toContain('No matching users')
     expect(host.querySelector('a[href*="ticket="]')).not.toBeNull()
     accounts.mockResolvedValueOnce({ ...users, source: 'local', accounts: [] })
-    tickets.mockResolvedValueOnce({ ...queue, rows: [] })
+    tickets.mockResolvedValueOnce({ rows: [] })
     await act(() =>
       host.querySelector<HTMLButtonElement>('.admin-search-retry')!.click(),
     )
     await tick()
     expect(host.textContent).toContain('Showing local accounts only')
     expect(host.textContent).toContain('No matching users')
-    expect(host.textContent).toContain('No matches in the recent queue')
+    expect(host.textContent).toContain('No matching tickets')
   })
 
   it('supports exact older ticket links and arrow navigation without a queue match', async () => {
-    tickets.mockResolvedValue({ ...queue, rows: [] })
+    tickets.mockResolvedValue({ rows: [] })
     const { host } = await mount()
     await open(host)
     await search(host, '#12345')
@@ -271,5 +284,71 @@ describe('global staff quick search', () => {
     await tick()
     expect(router.state.location.pathname).toBe('/admin/users')
     expect(host.querySelector('dialog')).toBeNull()
+  })
+
+  it('loads more history without reloading users and keeps results on a pagination error', async () => {
+    tickets.mockResolvedValueOnce({ ...ticketPage, next_cursor: 'page-2' })
+    const { host } = await mount()
+    await open(host)
+    await search(host, 'archive')
+    await tick()
+    const before = host.querySelectorAll('.admin-search-result').length
+    tickets.mockRejectedValueOnce(new Error('offline'))
+    await act(() =>
+      host.querySelector<HTMLButtonElement>('.admin-search-more')!.click(),
+    )
+    expect(host.textContent).toContain('Your results are still here')
+    expect(host.querySelectorAll('.admin-search-result')).toHaveLength(before)
+    tickets.mockResolvedValueOnce({
+      rows: [
+        {
+          ...ticketPage.rows[0],
+          ticket_number: '11111',
+          subject: 'Older archived ticket',
+          legacy: true,
+        },
+      ],
+    })
+    await act(() =>
+      host.querySelector<HTMLButtonElement>('.admin-search-more')!.click(),
+    )
+    expect(accounts).toHaveBeenCalledTimes(1)
+    expect(tickets).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      'archive',
+      'page-2',
+      expect.any(AbortSignal),
+    )
+    expect(host.textContent).toContain('Older archived ticket')
+    expect(host.textContent).toContain('Legacy')
+    expect(host.querySelector('.admin-search-more')).toBeNull()
+    expect(host.textContent).not.toContain('latest 500')
+  })
+
+  it('does not append obsolete pages after the query changes', async () => {
+    tickets.mockResolvedValueOnce({ ...ticketPage, next_cursor: 'page-2' })
+    const { host } = await mount()
+    await open(host)
+    await search(host, 'first')
+    await tick()
+    let resolve!: (value: TicketSearchPage) => void
+    tickets.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    await act(() =>
+      host.querySelector<HTMLButtonElement>('.admin-search-more')!.click(),
+    )
+    const signal = tickets.mock.calls[1][3]!
+    await search(host, 'second')
+    expect(signal.aborted).toBe(true)
+    tickets.mockResolvedValueOnce({ rows: [] })
+    await tick()
+    await act(() =>
+      resolve({ rows: [{ ...ticketPage.rows[0], subject: 'Obsolete page' }] }),
+    )
+    expect(host.textContent).not.toContain('Obsolete page')
+    expect(host.textContent).toContain('No matching tickets')
   })
 })

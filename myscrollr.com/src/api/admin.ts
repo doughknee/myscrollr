@@ -193,6 +193,20 @@ export interface AccountRow {
   deletion_state: string | null
 }
 
+export interface TicketSearchPage {
+  rows: Array<{
+    ticket_number: string
+    subject: string
+    name: string
+    user_email: string
+    status: string
+    console_status: string
+    updated_at: string
+    legacy: boolean
+  }>
+  next_cursor?: string
+}
+
 export interface AccountsPage {
   accounts: Array<AccountRow>
   /** Accounts in Logto, or — when source is 'local' — accounts with local data. */
@@ -655,6 +669,21 @@ export const adminApi = {
     if (opts.q?.trim()) params.set('q', opts.q.trim())
     return adminFetch<SupportQueue>(
       `/admin/support/queue?${params.toString()}`,
+      getToken,
+      { signal },
+    )
+  },
+
+  searchTickets: (
+    getToken: Token,
+    query: string,
+    cursor = '',
+    signal?: AbortSignal,
+  ) => {
+    const params = new URLSearchParams({ q: query })
+    if (cursor) params.set('cursor', cursor)
+    return adminFetch<TicketSearchPage>(
+      `/admin/support/search?${params}`,
       getToken,
       { signal },
     )

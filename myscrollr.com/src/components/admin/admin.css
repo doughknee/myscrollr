@@ -233,6 +233,16 @@
   font-size: 13px;
   cursor: pointer;
 }
+.admin-search-more {
+  width: calc(100% - 24px);
+  margin: 8px 12px;
+  border: 1px solid var(--staff-line);
+  font-size: 13px;
+}
+.admin-search-more:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 .admin-search-panel > footer {
   display: flex;
   flex-shrink: 0;

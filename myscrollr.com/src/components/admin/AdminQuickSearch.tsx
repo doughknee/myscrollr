@@ -1,7 +1,7 @@
 import { Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Search, Ticket, UserRound, X } from 'lucide-react'
-import type { AccountsPage, SupportQueue } from '@/api/admin'
+import type { AccountsPage, TicketSearchPage } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
 
@@ -59,12 +59,15 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
   const input = useRef<HTMLInputElement>(null)
   const [text, setText] = useState('')
   const [retry, setRetry] = useState(0)
+  const moreRequest = useRef<AbortController | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreFailed, setMoreFailed] = useState(false)
   const query = text.trim().replace(/^#(?=\d+$)/, '')
   const ready = query.length >= 2 || /^\d+$/.test(query)
   const [result, setResult] = useState<{
     query: string
     users?: AccountsPage
-    tickets?: SupportQueue
+    tickets?: TicketSearchPage
     usersFailed?: boolean
     ticketsFailed?: boolean
   }>({ query: '' })
@@ -78,6 +81,8 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
   }, [])
 
   useEffect(() => {
+    setLoadingMore(false)
+    setMoreFailed(false)
     if (!ready) return
     const controller = new AbortController()
     const { signal } = controller
@@ -92,27 +97,61 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
             setResult((prev) => ({ ...prev, usersFailed: true }))
         },
       )
-      void adminApi
-        .supportQueue(
-          getToken,
-          { q: query, rows: 'ticket', state: 'all' },
-          signal,
-        )
-        .then(
-          (tickets) => {
-            if (!signal.aborted) setResult((prev) => ({ ...prev, tickets }))
-          },
-          () => {
-            if (!signal.aborted)
-              setResult((prev) => ({ ...prev, ticketsFailed: true }))
-          },
-        )
+      void adminApi.searchTickets(getToken, query, '', signal).then(
+        (tickets) => {
+          if (!signal.aborted) setResult((prev) => ({ ...prev, tickets }))
+        },
+        () => {
+          if (!signal.aborted)
+            setResult((prev) => ({ ...prev, ticketsFailed: true }))
+        },
+      )
     }, 250)
     return () => {
       clearTimeout(timer)
       controller.abort()
+      moreRequest.current?.abort()
     }
   }, [getToken, query, ready, retry])
+
+  async function loadMore() {
+    const cursor = current.tickets?.next_cursor
+    if (!cursor || loadingMore) return
+    const controller = new AbortController()
+    moreRequest.current?.abort()
+    moreRequest.current = controller
+    setLoadingMore(true)
+    setMoreFailed(false)
+    try {
+      const page = await adminApi.searchTickets(
+        getToken,
+        query,
+        cursor,
+        controller.signal,
+      )
+      if (controller.signal.aborted) return
+      setResult((previous) => {
+        if (previous.query !== query || !previous.tickets) return previous
+        const seen = new Set(
+          previous.tickets.rows.map((row) => row.ticket_number),
+        )
+        return {
+          ...previous,
+          tickets: {
+            ...page,
+            rows: [
+              ...previous.tickets.rows,
+              ...page.rows.filter((row) => !seen.has(row.ticket_number)),
+            ],
+          },
+        }
+      })
+    } catch {
+      if (!controller.signal.aborted) setMoreFailed(true)
+    } finally {
+      if (!controller.signal.aborted) setLoadingMore(false)
+    }
+  }
 
   return (
     <dialog
@@ -271,39 +310,24 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </section>
               <section aria-labelledby="admin-search-tickets">
-                {/* shortcut: queue search covers 500 recent cases; use a dedicated search API if the queue outgrows this. Exact ticket links bypass that cap. */}
                 <div className="admin-search-section-heading">
                   <h3 id="admin-search-tickets">
-                    <Ticket size={15} aria-hidden /> Recent tickets
+                    <Ticket size={15} aria-hidden /> Tickets
                   </h3>
-                  {current.tickets && (
-                    <Link
-                      to="/admin/support"
-                      search={{
-                        q: query,
-                        rows: 'ticket',
-                        resolved: true,
-                        inbox: 'all',
-                      }}
-                    >
-                      View all <ArrowUpRight size={14} aria-hidden />
-                    </Link>
-                  )}
+                  <span>All history</span>
                 </div>
                 <div role="status">
                   {current.ticketsFailed ? (
                     <p className="admin-search-message">
-                      Ticket search couldn’t load.
+                      Ticket history search couldn’t load.
                     </p>
                   ) : !current.tickets ? (
                     <p className="admin-search-message">Searching tickets…</p>
-                  ) : !current.tickets.rows?.length ? (
-                    <p className="admin-search-message">
-                      No matches in the recent queue.
-                    </p>
+                  ) : !current.tickets.rows.length ? (
+                    <p className="admin-search-message">No matching tickets.</p>
                   ) : null}
                 </div>
-                {current.tickets?.rows?.slice(0, 5).map((ticket) => (
+                {current.tickets?.rows.map((ticket) => (
                   <Link
                     key={ticket.ticket_number}
                     to="/admin/support"
@@ -323,15 +347,46 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
                         {ticket.name ||
                           ticket.user_email ||
                           'Requester unknown'}
+                        {' · '}
+                        {ticket.console_status === 'dismissed'
+                          ? 'Dismissed'
+                          : ticket.legacy
+                            ? 'Legacy'
+                            : ticket.status === 'closed' ||
+                                ticket.status === 'resolved'
+                              ? 'Closed'
+                              : ticket.status === 'open'
+                                ? 'Open'
+                                : 'Status unknown'}
                       </span>
                     </span>
                     <ArrowUpRight size={16} aria-hidden />
                   </Link>
                 ))}
-                <p className="admin-search-message">
-                  Searches the latest 500 tickets. Enter a ticket number to open
-                  an older case.
-                </p>
+                <div role="status" className="sr-only">
+                  {current.tickets
+                    ? `${current.tickets.rows.length} matching tickets shown${current.tickets.next_cursor ? '. More available.' : '.'}`
+                    : ''}
+                </div>
+                {moreFailed && (
+                  <p role="status" className="admin-search-message">
+                    More tickets couldn’t load. Your results are still here.
+                  </p>
+                )}
+                {current.tickets?.next_cursor && (
+                  <button
+                    type="button"
+                    className="admin-search-more"
+                    disabled={loadingMore}
+                    onClick={() => void loadMore()}
+                  >
+                    {loadingMore
+                      ? 'Loading more tickets…'
+                      : moreFailed
+                        ? 'Retry more tickets'
+                        : 'Load more tickets'}
+                  </button>
+                )}
               </section>
               {(current.usersFailed || current.ticketsFailed) && (
                 <button
