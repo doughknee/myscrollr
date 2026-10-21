@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -95,7 +96,7 @@ func HandleOSTicketThreadMessage(c *fiber.Ctx) error {
 		log.Printf("[OSTicketWebhook] ignoring unknown event=%q", ev.Event)
 		return c.JSON(fiber.Map{"status": "ignored", "reason": "unknown event"})
 	}
-	if ev.TicketNumber == "" || ev.MessageHTML == "" || parseISO(&ev.Created).IsZero() {
+	if ev.TicketNumber == "" || ev.MessageHTML == "" || parseThreadMessageTime(ev.Created).IsZero() {
 		log.Printf("[OSTicketWebhook] missing required fields (ticket=%q body_len=%d)", ev.TicketNumber, len(ev.MessageHTML))
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
@@ -146,13 +147,14 @@ func HandleOSTicketThreadMessage(c *fiber.Ctx) error {
 // the partner doesn't get an AI-drafted reply for this round and has
 // to handle it manually inside osTicket.
 func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Classification and drafting have separate budgets; leave time for context and persistence too.
+	ctx, cancel := context.WithTimeout(context.Background(), classifyTimeout+draftTimeout+30*time.Second)
 	defer cancel()
 
 	// Case DB first: the user's follow-up is an event whether or not
 	// triage produces a draft. A user reply reopens the ticket in osTicket,
 	// so the case goes back to open too.
-	eventTime := parseISO(&ev.Created)
+	eventTime := parseThreadMessageTime(ev.Created)
 	if platform.DBPool != nil {
 		if err := upsertSupportCase(ctx, SupportCase{
 			TicketNumber: ev.TicketNumber, UserEmail: ev.UserEmail, UserName: strings.TrimSpace(ev.UserName),
@@ -208,7 +210,7 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	})
 	if triage == nil || strings.TrimSpace(triage.DraftReplyHTML) == "" {
 		log.Printf("[OSTicketWebhook] triage produced no reply for ticket %s (entry=%d); escalating", ev.TicketNumber, ev.ThreadEntryID)
-		escalateWithoutDraft(ctx, ev.TicketNumber, ev.Subject, "The triage call did not produce a reply to this follow-up.")
+		recordReplyTriageFailure(ev, "The bot could not prepare a reply to this follow-up. A staff reply is needed.")
 		return
 	}
 
@@ -240,6 +242,10 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	})
 	if err != nil {
 		log.Printf("[OSTicketWebhook] createSupportDraft for ticket %s entry=%d: %v", ev.TicketNumber, ev.ThreadEntryID, err)
+		if errors.Is(err, ErrCaseDismissed) || hasDraftForThreadEntry(ctx, ev.ThreadEntryID) {
+			return
+		}
+		recordReplyTriageFailure(ev, "The bot could not save a reply to this follow-up. Refresh the conversation and review the latest draft before replying.")
 		return
 	}
 
@@ -258,3 +264,25 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 // indirectly via Fiber's BodyParser). Keeps the import non-redundant
 // if the parser layer ever changes.
 var _ = json.Marshal
+
+// osTicket getCreated() returns a UTC database timestamp, while exports use RFC3339.
+func parseThreadMessageTime(value string) time.Time {
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
+}
+
+func recordReplyTriageFailure(ev osTicketThreadMessageEvent, reason string) {
+	// The triage context may already be expired; recording the failure still needs to succeed.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: ev.TicketNumber, Kind: "note", BodyText: reason,
+	}); err != nil {
+		log.Printf("[OSTicketWebhook] record failure for ticket %s: %v", ev.TicketNumber, err)
+	}
+	escalateWithoutDraft(ctx, ev.TicketNumber, ev.Subject, reason)
+}

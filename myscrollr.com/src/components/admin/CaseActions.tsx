@@ -48,6 +48,11 @@ export default function CaseActions({
   const draft = detail.draft
   const dismissed = detail.console_status === 'dismissed'
   const pending = draft?.status === 'pending' && !dismissed
+  const canWrite =
+    !pending &&
+    !dismissed &&
+    detail.group === 'needs_you' &&
+    (!draft || ['sent', 'asked', 'skipped', 'failed'].includes(draft.status))
 
   const [panel, setPanel] = useState<Panel>('none')
   const [busy, setBusy] = useState<string | null>(null)
@@ -116,7 +121,10 @@ export default function CaseActions({
   const unchanged = isUnchanged(draft?.body ?? '', edited)
 
   return (
-    <section className="admin-reply-controls">
+    <section
+      id="support-reply-controls"
+      className="admin-reply-controls scroll-mt-24"
+    >
       {/* ── The reply, editable where it is read ────────────────
           The mockup's "Proposed reply · edit it here" is this box. It used to
           sit behind an Edit button, which meant the thing you are here to do
@@ -157,7 +165,47 @@ export default function CaseActions({
         </>
       )}
 
-      {!pending && (
+      {canWrite && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Write a reply</h2>
+            <p className="mt-1 text-sm leading-relaxed text-base-content/65">
+              No current reply is ready to send. Write your answer below, then
+              save it for review. Saving does not email the customer or start an
+              auto-send timer.
+            </p>
+          </div>
+          <label htmlFor="new-reply-body" className="sr-only">
+            New reply
+          </label>
+          <textarea
+            id="new-reply-body"
+            value={body}
+            onChange={(e) => onEdit({ body: e.target.value })}
+            rows={8}
+            className="w-full resize-y rounded-xl bg-base-100 px-4 py-3 text-sm leading-relaxed ring-1 ring-base-300/60 focus:ring-2 focus:ring-primary/50 focus:outline-none"
+          />
+          <ActionButton
+            label="Save reply for review"
+            icon={<Send size={14} />}
+            tone="primary"
+            busy={busy === 'prepare'}
+            disabled={busy !== null || edited === ''}
+            onClick={() =>
+              run('prepare', () =>
+                adminApi.prepareReply(
+                  getToken,
+                  detail.ticket_number,
+                  edited,
+                  draft?.id ?? 0,
+                ),
+              )
+            }
+          />
+        </div>
+      )}
+
+      {!pending && !canWrite && (
         <p className="rounded-xl bg-base-200/40 px-4 py-3 text-sm text-base-content/60 ring-1 ring-base-300/60">
           {draft
             ? `This draft is ${draft.status}, so there is nothing left to send on it. The issue link below is still yours to change.`

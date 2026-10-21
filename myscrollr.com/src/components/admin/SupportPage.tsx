@@ -740,8 +740,9 @@ function useCase(ticket: string | null, reloadKey: number) {
       return
     if (
       current?.draft &&
+      current.draft.id === next.draft?.id &&
       current.draft.status !== 'pending' &&
-      next.draft?.status === 'pending'
+      next.draft.status === 'pending'
     )
       return
     revision.current += 1
@@ -867,7 +868,7 @@ function CaseConversation({
   onCase: (next: CaseDetail) => void
 }) {
   const tone = dispositionTone(detail.draft?.disposition, detail.draft?.status)
-  const stopped = detail.draft?.disposition_reason || detail.group_reason
+  const stopped = detail.group_reason
 
   return (
     <section className="flex flex-col gap-3.5">
@@ -904,7 +905,38 @@ function CaseConversation({
                 aria-hidden
               />
             )}
-            <p className="max-w-[75ch] text-sm leading-relaxed">{stopped}</p>
+            <div className="max-w-[75ch] text-sm leading-relaxed">
+              <h3 className="font-semibold">
+                {detail.group === 'needs_you'
+                  ? detail.hold && detail.autosend.armed
+                    ? 'Auto-send scheduled'
+                    : detail.draft?.status === 'pending'
+                      ? 'Reply needs review'
+                      : 'Customer needs an answer'
+                  : detail.group === 'waiting'
+                    ? 'Waiting on the customer'
+                    : 'No reply needed'}
+              </h3>
+              <p className="mt-1 text-base-content/75">{stopped}</p>
+              {detail.group === 'needs_you' && (
+                <a
+                  href="#support-reply-controls"
+                  className="mt-2 inline-flex min-h-11 items-center font-semibold text-primary hover:underline"
+                >
+                  {detail.draft?.status === 'pending'
+                    ? 'Review reply'
+                    : 'Go to reply controls'}
+                  <ChevronRight size={14} className="ml-1.5" aria-hidden />
+                </a>
+              )}
+              {detail.group === 'needs_you' &&
+                detail.draft?.status === 'pending' &&
+                detail.draft.disposition_reason && (
+                  <p className="mt-2 text-base-content/65">
+                    {detail.draft.disposition_reason}
+                  </p>
+                )}
+            </div>
           </div>
         </div>
       )}
@@ -1743,7 +1775,7 @@ export default function SupportPage({
     ? `${detail.ticket_number}:${detail.draft?.id ?? 'none'}`
     : ''
   const currentEdits: CaseEdits = {
-    body: detail?.draft?.body ?? '',
+    body: detail?.draft?.status === 'pending' ? detail.draft.body : '',
     question: detail?.draft?.ask_user_for ?? '',
     issueKey: '',
     ...edits[editKey],
@@ -2145,13 +2177,13 @@ export default function SupportPage({
                     }}
                   />
                 )}
+                {/* Keep the current reply ahead of unrelated ticket history on phones. */}
+                {!wide && workbench}
                 <OtherTickets
                   rows={mine}
                   active={activeTicket}
                   onSelect={(ticket) => updateSearch({ ticket })}
                 />
-                {/* Under 1440 the right pane's content lands here, in order. */}
-                {!wide && workbench}
               </div>
             )}
           </div>

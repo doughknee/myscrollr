@@ -40,10 +40,11 @@ import (
 // fields do not overlap: an edit has a body, an ask has a question, a link has
 // a key, and the rest have nothing.
 type actionRequest struct {
-	Body     string `json:"body"`
-	Question string `json:"question"`
-	IssueKey string `json:"issue_key"`
-	Paused   bool   `json:"paused"`
+	Body            string `json:"body"`
+	Question        string `json:"question"`
+	IssueKey        string `json:"issue_key"`
+	Paused          bool   `json:"paused"`
+	ExpectedDraftID *int64 `json:"expected_draft_id"`
 }
 
 // draftIDFromPath parses :draft, which is the id the queue handed the page.
@@ -91,7 +92,7 @@ func respondWithCase(c *fiber.Ctx, ctx context.Context, ticket, verb string) err
 func actionErrorResponse(c *fiber.Ctx, verb string, err error) error {
 	var linked ErrAlreadyLinked
 	switch {
-	case errors.Is(err, ErrCaseDismissed), errors.Is(err, ErrCaseSending):
+	case errors.Is(err, ErrCaseDismissed), errors.Is(err, ErrCaseSending), errors.Is(err, ErrReplyChanged):
 		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
 	case errors.Is(err, pgx.ErrNoRows):
 		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{Status: "error", Error: "That ticket no longer exists."})
@@ -137,6 +138,18 @@ func actionErrorResponse(c *fiber.Ctx, verb string, err error) error {
 // and Resend) and the page is waiting on the answer rather than guessing it.
 func actionContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 60*time.Second)
+}
+
+func HandleAdminPrepareReply(c *fiber.Ctx) error {
+	var req actionRequest
+	if err := c.BodyParser(&req); err != nil || req.ExpectedDraftID == nil || *req.ExpectedDraftID < 0 {
+		return badBody(c)
+	}
+	ctx, cancel := actionContext()
+	defer cancel()
+	draft, err := ActionPrepareReply(ctx, c.Params("ticket"), req.Body, *req.ExpectedDraftID)
+	log.Printf("[AdminSupport] prepare reply on %s by %s (err=%v)", c.Params("ticket"), admin.ActingAdmin(c), err)
+	return respondWithAction(c, ctx, draft, err, "prepare reply")
 }
 
 // HandleAdminSend - POST /admin/support/draft/:draft/send

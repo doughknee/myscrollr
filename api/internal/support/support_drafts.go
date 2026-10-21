@@ -86,6 +86,11 @@ var ErrNoDraftBody = errors.New("triage produced no reply body")
 // receives the row back with those fields filled in. Status is always
 // 'pending' on create; the partner-approval handlers transition it.
 func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft, error) {
+	return insertSupportDraft(ctx, draft, nil)
+}
+
+// expectedDraft is set only for a staff-authored reply: a stale editor must not replace another reply.
+func insertSupportDraft(ctx context.Context, draft *SupportDraft, expectedDraft *int64) (*SupportDraft, error) {
 	if platform.DBPool == nil {
 		return nil, fmt.Errorf("DB not initialized")
 	}
@@ -104,6 +109,19 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	if err := caseAllowsDraft(ctx, tx, draft.TicketNumber); err != nil {
 		return nil, err
 	}
+	if expectedDraft != nil {
+		var latestID int64
+		var status, caseStatus string
+		if err := tx.QueryRow(ctx, `SELECT c.status, COALESCE(d.id,0), COALESCE(d.status,'')
+			FROM support_cases c LEFT JOIN LATERAL (
+				SELECT id,status FROM support_drafts WHERE ticket_number=c.ticket_number ORDER BY id DESC LIMIT 1
+			) d ON true WHERE c.ticket_number=$1`, draft.TicketNumber).Scan(&caseStatus, &latestID, &status); err != nil {
+			return nil, err
+		}
+		if latestID != *expectedDraft || status == "pending" || status == "approved" || status == "edited" || strings.EqualFold(strings.TrimSpace(caseStatus), "closed") {
+			return nil, ErrReplyChanged
+		}
+	}
 
 	const q = `
 		INSERT INTO support_drafts
@@ -113,10 +131,10 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			 ai_widget, ai_duplicate_of, ai_confidence, status,
 			 osticket_thread_entry_id, should_close,
 			 internal_note, ask_user_for, grounded_in, unknowns, needs_info,
-			 sentiment, drafter_category)
+			 sentiment, drafter_category, disposition, disposition_reason, intervened)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,
 			 NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),NULLIF($18,''),$19,
-			 NULLIF($20,''),NULLIF($21,''))
+			 NULLIF($20,''),NULLIF($21,''),NULLIF($22,''),NULLIF($23,''),$24)
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -155,6 +173,9 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.NeedsInfo,
 		draft.Sentiment,
 		draft.DrafterCategory,
+		draft.Disposition,
+		draft.DispositionReason,
+		draft.Intervened,
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)

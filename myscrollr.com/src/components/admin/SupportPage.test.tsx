@@ -52,6 +52,7 @@ const mocks = vi.hoisted(() => ({
   skipDraft: vi.fn(),
   dismissCase: vi.fn(),
   restoreCase: vi.fn(),
+  prepareReply: vi.fn(),
   onConnection: null as null | ((connected: boolean) => void),
   onEvent: null as null | ((e: { ticket_number?: string }) => void),
 }))
@@ -69,6 +70,7 @@ vi.mock('@/api/admin', async () => {
       skipDraft: mocks.skipDraft,
       dismissCase: mocks.dismissCase,
       restoreCase: mocks.restoreCase,
+      prepareReply: mocks.prepareReply,
     },
     // Report the stream as live, the way a connected console does.
     subscribeToSupportEvents: (
@@ -523,12 +525,75 @@ describe('the case', () => {
     mocks.supportCase.mockResolvedValue({
       ...original,
       draft: { ...original.draft!, status: 'sent' },
+      group: 'waiting',
     })
     await caseEvent()
     await act(() => finish(original))
     expect(host.querySelector('#reply-body')).toBeNull()
     expect(host.textContent).toContain('This draft is sent')
   })
+
+  it.each([390, 1440])(
+    'makes an unanswered follow-up actionable at %ipx without reusing the sent draft',
+    async (width) => {
+      const original = cases['752473']
+      const reason =
+        'The user wrote after the latest reply or draft, so this needs a new answer.'
+      const followUp: CaseDetail = {
+        ...original,
+        group: 'needs_you',
+        group_reason: reason,
+        hold: undefined,
+        draft: {
+          ...original.draft!,
+          status: 'sent',
+          disposition_reason: 'OLD REASON',
+        },
+      }
+      mocks.supportCase.mockResolvedValue(followUp)
+      const host = await render(width)
+      await open(host, 'Morgan Ellis')
+      expect(host.textContent).toContain(reason)
+      expect(host.textContent).toContain('Customer needs an answer')
+      expect(
+        host.querySelector('.admin-reply-controls')?.textContent,
+      ).not.toContain('This draft is sent')
+      const input = host.querySelector<HTMLTextAreaElement>('#new-reply-body')!
+      expect(input.value).toBe('')
+      await act(() => {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          'value',
+        )!.set!.call(input, 'Thanks for the update. A new answer.')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      const saved = {
+        ...followUp,
+        draft: {
+          ...original.draft!,
+          id: original.draft!.id + 1,
+          body: input.value,
+          status: 'pending',
+        },
+      }
+      mocks.prepareReply.mockResolvedValue(saved)
+      const save = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === 'Save reply for review',
+      )!
+      await act(async () => save.click())
+      expect(mocks.prepareReply).toHaveBeenCalledWith(
+        mocks.token,
+        original.ticket_number,
+        'Thanks for the update. A new answer.',
+        original.draft!.id,
+      )
+      expect(
+        host.querySelector<HTMLTextAreaElement>('#reply-body')?.value,
+      ).toBe(saved.draft.body)
+      expect(host.querySelector('#new-reply-body')).toBeNull()
+      expect(host.textContent).toContain('Send reply')
+    },
+  )
 
   it('still offers every action, by name', async () => {
     const host = await render(1440)
