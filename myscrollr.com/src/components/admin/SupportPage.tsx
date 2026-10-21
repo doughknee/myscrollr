@@ -906,7 +906,7 @@ function CaseConversation({
               />
             )}
             <div className="max-w-[75ch] text-sm leading-relaxed">
-              <h3 className="font-semibold">
+              <h3 className="text-sm font-semibold">
                 {detail.group === 'needs_you'
                   ? detail.hold && detail.autosend.armed
                     ? 'Auto-send scheduled'

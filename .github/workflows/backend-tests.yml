@@ -179,7 +179,7 @@ jobs:
       # passing one — which is exactly how a missing service goes
       # unnoticed.
       - name: Check osTicket follow-up webhook timestamps
-        run: php ../scripts/osticket-plugin/notify.message.test.php
+        run: php -n ../scripts/osticket-plugin/notify.message.test.php
 
       - run: go test -v ./...
         env:
