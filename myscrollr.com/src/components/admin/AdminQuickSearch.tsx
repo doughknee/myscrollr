@@ -60,6 +60,7 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState('')
   const [retry, setRetry] = useState(0)
   const moreRequest = useRef<AbortController | null>(null)
+  const nextFocus = useRef<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreFailed, setMoreFailed] = useState(false)
   const query = text.trim().replace(/^#(?=\d+$)/, '')
@@ -74,6 +75,16 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
   const current = result.query === query ? result : { query }
 
   useEffect(() => {
+    if (!nextFocus.current) return
+    const target = Array.from(
+      dialog.current?.querySelectorAll<HTMLAnchorElement>('[data-ticket]') ??
+        [],
+    ).find((link) => link.dataset.ticket === nextFocus.current)
+    target?.focus()
+    nextFocus.current = null
+  }, [current.tickets])
+
+  useEffect(() => {
     const panel = dialog.current!
     panel.showModal()
     input.current?.focus()
@@ -83,6 +94,7 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     setLoadingMore(false)
     setMoreFailed(false)
+    nextFocus.current = null
     if (!ready) return
     const controller = new AbortController()
     const { signal } = controller
@@ -130,6 +142,13 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
         controller.signal,
       )
       if (controller.signal.aborted) return
+      nextFocus.current =
+        page.rows.find(
+          (row) =>
+            !current.tickets?.rows.some(
+              (existing) => existing.ticket_number === row.ticket_number,
+            ),
+        )?.ticket_number ?? null
       setResult((previous) => {
         if (previous.query !== query || !previous.tickets) return previous
         const seen = new Set(
@@ -330,6 +349,7 @@ function QuickSearchDialog({ onClose }: { onClose: () => void }) {
                 {current.tickets?.rows.map((ticket) => (
                   <Link
                     key={ticket.ticket_number}
+                    data-ticket={ticket.ticket_number}
                     to="/admin/support"
                     search={{
                       ticket: ticket.ticket_number,

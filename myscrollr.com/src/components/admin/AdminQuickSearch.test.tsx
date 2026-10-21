@@ -320,6 +320,9 @@ describe('global staff quick search', () => {
       expect.any(AbortSignal),
     )
     expect(host.textContent).toContain('Older archived ticket')
+    expect(document.activeElement?.textContent).toContain(
+      'Older archived ticket',
+    )
     expect(host.textContent).toContain('Legacy')
     expect(host.querySelector('.admin-search-more')).toBeNull()
     expect(host.textContent).not.toContain('latest 500')

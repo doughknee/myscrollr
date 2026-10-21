@@ -57,7 +57,7 @@
   max-height: calc(100dvh - 24px);
   margin: 12vh auto auto;
   padding: 0;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid var(--staff-line);
   border-radius: 16px;
   background: var(--staff-surface);
@@ -134,6 +134,7 @@
   box-shadow: none;
 }
 .admin-search-results {
+  position: relative;
   min-height: 160px;
   overflow-y: auto;
   overscroll-behavior: contain;
