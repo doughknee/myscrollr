@@ -13,9 +13,7 @@
 #                     probes + /{source}/health)
 #
 # Everything else inbound is denied by the namespace-wide default-deny.
-# Egress is intentionally unrestricted (policyTypes: [Ingress] everywhere) —
-# pods reach the DO-managed Postgres/Redis, Logto, Stripe, and the external
-# data providers, and nothing here touches that.
+# RSS egress excludes link-local metadata; DNS and public feed/database access remain allowed.
 #
 # Notes:
 #   - Kubelet liveness/readiness probes and `kubectl port-forward` (used by
@@ -165,3 +163,38 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
+---
+# Defense in depth for RSS SSRF; Cilium needs an explicit cluster DNS allowance.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rss-deny-link-local-egress
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: rss-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fe80::/10
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
