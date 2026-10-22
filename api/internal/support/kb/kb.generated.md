@@ -787,7 +787,7 @@ The support queue now explains what needs your attention and gives you a clear n
 
 - See the current reason a ticket needs you, with a direct link to its reply controls.
 - Write a reply to an unanswered follow-up and save it for review. Sending remains a separate, explicit action.
-- Fixed follow-up timestamps in the osTicket integration and gave draft generation enough time to complete. Future drafting failures now appear in case history.
+- Fixed follow-up timestamps in the support integration and gave draft generation enough time to complete. Future drafting failures now appear in case history.
 - Reply controls are easier to reach on mobile, and saved edits no longer leave an incorrect unsaved-changes warning.
 
 Staff console and support integration update; no desktop application update is required.
