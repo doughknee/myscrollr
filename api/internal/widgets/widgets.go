@@ -161,6 +161,11 @@ func CreateWidget(c *fiber.Ctx) error {
 	}
 
 	req.Config = configOrDefault(req.WidgetType, req.Config)
+	if platform.DataSourceForWidget(req.WidgetType) == "rss" {
+		if err := ingestread.ValidateRSSConfig(req.Config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
+		}
+	}
 
 	tier := platform.TierFromRoles(platform.GetUserRoles(c))
 
@@ -329,6 +334,12 @@ func UpdateWidget(c *fiber.Ctx) error {
 	}
 	if req.LocalWidgets < 0 {
 		req.LocalWidgets = 0
+	}
+
+	if platform.DataSourceForWidget(widgetType) == "rss" && req.Config != nil {
+		if err := ingestread.ValidateRSSConfig(req.Config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
+		}
 	}
 
 	// Gate RE-ENABLING against the widget-slot cap, exactly like

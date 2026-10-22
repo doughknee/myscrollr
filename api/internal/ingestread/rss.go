@@ -571,6 +571,10 @@ func PublicRSS(ctx context.Context, feedURLs []string) ([]RssItem, error) {
 // Curated-default URLs are skipped for the latter so the catalog UNION
 // never re-labels them as "Custom".
 func syncRSSFeedsToTracked(userSub string, config map[string]interface{}) {
+	if err := ValidateRSSConfig(config); err != nil {
+		log.Printf("[RSS] Unsafe feed configuration rejected")
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[RSS] PANIC in syncRSSFeedsToTracked for user %s: %v", userSub, r)

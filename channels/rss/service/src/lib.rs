@@ -15,6 +15,7 @@ pub mod log;
 pub mod database;
 pub mod init;
 pub mod types;
+pub mod feed_http;
 
 /// Upper bound on a single feed HTTP body. Anything larger is almost certainly
 /// either a misconfigured source streaming logs, a CDN serving us an error
@@ -144,7 +145,7 @@ async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> a
     // Stream the body into a bounded buffer so a hostile or misbehaving feed
     // can't OOM the pod. `.error_for_status()?` also surfaces 4xx/5xx as
     // errors up front so we don't try to parse an HTML error page as RSS.
-    let mut response = client.get(&feed.url).send().await?.error_for_status()?;
+    let mut response = feed_http::get(client, &feed.url).await?;
     let mut buf = BytesMut::with_capacity(64 * 1024);
     while let Some(chunk) = response.chunk().await? {
         if buf.len() + chunk.len() > MAX_FEED_BODY_BYTES {
