@@ -778,8 +778,19 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ admin-v1.0.0 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ admin-v1.0.1 -->
 The last 8 published releases, newest first, as users read them.
+
+### Staff console 1.0.1 - Actionable support follow-ups (`admin-v1.0.1`, 2026-10-21)
+
+The support queue now explains what needs your attention and gives you a clear next step.
+
+- See the current reason a ticket needs you, with a direct link to its reply controls.
+- Write a reply to an unanswered follow-up and save it for review. Sending remains a separate, explicit action.
+- Fixed follow-up timestamps in the support integration and gave draft generation enough time to complete. Future drafting failures now appear in case history.
+- Reply controls are easier to reach on mobile, and saved edits no longer leave an incorrect unsaved-changes warning.
+
+Staff console and support integration update; no desktop application update is required.
 
 ### Staff console — full-history search and unified workflows (`admin-v1.0.0`, 2026-10-21)
 
@@ -898,17 +909,3 @@ Platform notes:
 - **Linux:** lock, idle and sleep/wake are reported where the desktop provides them (logind and the screensaver interfaces); display sleep still reports "unknown", because Linux has no reliable cross-desktop signal for it.
 
 Fixes: none user-facing in this release.
-
-### Scrollr 1.6.6 — One analytics setting (`desktop-v1.6.6`, 2026-09-11)
-
-#### Improvements
-
-- **One analytics setting.** Settings → Data & privacy now has a single **Share usage analytics** switch. It controls Scrollr and PostHog usage measurement together; crash reporting stays separate.
-- **Clear setting status.** Loading or a failed connection no longer looks like an opt-out. If the setting cannot be checked, you can retry from the same page.
-
-#### Fixes
-
-- Analytics is on by default for accounts without a saved choice. Recorded opt-outs remain off, and resetting local settings preserves your account's analytics choice.
-- Fixed analytics delivery for internal testing without counting that activity as customer usage, and fixed daily usage counting for apps left running overnight.
-
-Your ticker contents, tracked symbols, teams, feeds and other apps' activity remain excluded. Existing settings and widgets are preserved when updating.
