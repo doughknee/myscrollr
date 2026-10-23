@@ -778,8 +778,16 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ admin-v1.0.1 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.22.1 -->
 The last 8 published releases, newest first, as users read them.
+
+### Server update — Safer RSS feeds (`server-2026.10.22.1`, 2026-10-22)
+
+Custom RSS fetching now checks destinations and redirects to prevent requests to internal services. An additional network safeguard blocks cloud metadata access.
+
+This server-side security update is deployed; RSS ingestion is running normally. No desktop download is required.
+
+Changes: #511 and #512.
 
 ### Staff console 1.0.1 - Actionable support follow-ups (`admin-v1.0.1`, 2026-10-21)
 
@@ -893,19 +901,3 @@ Update from the app or at https://myscrollr.com/download.
 The ticker now runs inside a real browser in our test suite, so scrolling, chip widths and rotation are checked on every change before it reaches you. Nothing to see, but the next "the ticker stopped" bug should get caught before it ships.
 
 Update from the app or at https://myscrollr.com/download.
-
-### Scrollr desktop-v1.6.7 (`desktop-v1.6.7`, 2026-09-12)
-
-**Scrollr 1.6.7**
-
-No visible changes in this build — it looks and behaves exactly like 1.6.6.
-
-What changed is under the hood: the app now starts reporting anonymous usage so we can see how the app is actually used. While signed in, it checks in about every 30 seconds to say that it is running, whether the computer is locked, its display asleep or its input idle, whether each ticker screen is showing, and which widget types each screen shows. The check-in uses a random identifier created fresh at every launch — never a device identifier — and never carries ticker contents, symbols, teams or feed URLs. You can turn it off any time in Settings → Data & privacy → Share usage analytics; turning it off deletes the stored usage.
-
-Platform notes:
-
-- **Windows:** unchanged from 1.6.6.
-- **macOS:** the check-in now reports screen lock, idle input, display sleep and system sleep/wake honestly instead of "unknown".
-- **Linux:** lock, idle and sleep/wake are reported where the desktop provides them (logind and the screensaver interfaces); display sleep still reports "unknown", because Linux has no reliable cross-desktop signal for it.
-
-Fixes: none user-facing in this release.

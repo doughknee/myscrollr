@@ -70,6 +70,7 @@ func NewServer() *Server {
 
 // Setup configures middleware and registers all routes.
 func (s *Server) Setup() {
+	platform.CheckAccountAccess = accounts.CheckAccountAccess
 	billing.InitStripe()
 	s.setupMiddleware()
 	s.setupRoutes()
