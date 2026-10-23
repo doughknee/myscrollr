@@ -8,6 +8,8 @@ on:
       - "scripts/osticket-plugin/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      - "channels/**/Cargo.toml"
+      - "channels/**/Cargo.lock"
       # The desktop app's native half (REL-62). It is Rust, so its gate
       # lives here with every other cargo job rather than in the npm-only
       # frontend workflow.
@@ -40,6 +42,8 @@ on:
       - "scripts/osticket-plugin/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      - "channels/**/Cargo.toml"
+      - "channels/**/Cargo.lock"
       # The desktop app's native half (REL-62). It is Rust, so its gate
       # lives here with every other cargo job rather than in the npm-only
       # frontend workflow.
@@ -232,7 +236,7 @@ jobs:
         with:
           cache-on-failure: "true"
 
-      - run: cargo test --quiet
+      - run: cargo test --locked --quiet
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
 
@@ -303,4 +307,4 @@ jobs:
           prefix-key: "v1-rust-no-bin"
           cache-bin: "false"
 
-      - run: cargo test --quiet
+      - run: cargo test --locked --quiet

@@ -1,5 +1,4 @@
 // @vitest-environment node
-// @ts-expect-error -- the desktop tsconfig has no node types; vitest runs this in node.
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { liftForTint, luminance, readableInk } from "./chipAccent";

@@ -234,7 +234,7 @@ pub(crate) async fn get_quote(symbol: String, client: Arc<Client>, api_key: &str
         "{}/quote?symbol={}&apikey={}",
         rest_base, symbol, api_key
     );
-    let response = client.get(&url).send().await?.text().await?;
+    let response = client.get(&url).send().await.map_err(reqwest::Error::without_url)?.text().await.map_err(reqwest::Error::without_url)?;
     let data: QuoteResponse = serde_json::from_str(&response)?;
     if data.is_error() {
         let msg = data.message.as_deref().unwrap_or("unknown error");
@@ -268,7 +268,7 @@ pub(crate) async fn get_time_series(
         "{}/time_series?symbol={}&interval={}&outputsize={}&apikey={}",
         rest_base, symbol, SPARKLINE_INTERVAL, SPARKLINE_POINTS, api_key
     );
-    let response = client.get(&url).send().await?.text().await?;
+    let response = client.get(&url).send().await.map_err(reqwest::Error::without_url)?.text().await.map_err(reqwest::Error::without_url)?;
     let data: TimeSeriesResponse = serde_json::from_str(&response)?;
     if data.is_error() {
         let msg = data.message.as_deref().unwrap_or("unknown error");
@@ -460,6 +460,23 @@ pub fn should_poll(environment: Option<&str>, api_key: Option<&str>) -> bool {
 #[cfg(test)]
 mod keyless_tests {
     use super::should_poll;
+
+    #[tokio::test]
+    async fn request_failures_do_not_include_api_keys() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let proxy = format!("http://{}", listener.local_addr().unwrap());
+        drop(listener);
+        let client = std::sync::Arc::new(reqwest::Client::builder()
+            .proxy(reqwest::Proxy::all(proxy).unwrap())
+            .timeout(std::time::Duration::from_secs(2)).build().unwrap());
+        let key = "SYNTHETIC_SECRET_MUST_NOT_APPEAR";
+        let quote = super::get_quote("AAPL".into(), client.clone(), key).await.unwrap_err();
+        let series = super::get_time_series("AAPL".into(), client, key).await.unwrap_err();
+        for error in [quote, series] {
+            assert!(!format!("{error:#?}").contains(key));
+            assert!(!format!("{error:#}").contains("apikey="));
+        }
+    }
 
     #[test]
     fn development_without_a_key_does_not_poll() {

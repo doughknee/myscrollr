@@ -6,7 +6,7 @@ import (
 )
 
 func TestEncryptRoundTrip(t *testing.T) {
-	t.Setenv("ENCRYPTION_KEY", "0123456789abcdef")
+	t.Setenv("ENCRYPTION_KEY", "0123456789abcdef") // gitleaks:allow -- synthetic test key
 	sealed, err := Encrypt("ghu_secret")
 	if err != nil {
 		t.Fatal(err)

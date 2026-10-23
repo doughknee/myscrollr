@@ -11,7 +11,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN cargo build --release --bin rss_service
+RUN cargo build --locked --release --bin rss_service
 # ── Dev stage: hot reload (NOT the default build target) ─────────────
 # Deliberately placed BEFORE the runtime stage: deploy.yml runs
 # `docker build` with no --target, which builds the LAST stage. Keeping the

@@ -31,12 +31,6 @@ FIX ON RECORD (server-computed; the ONLY thing that permits a fix claim)
 None. No shipped fix is on record for this report.
 You may NOT say this was fixed, name a version as the remedy, or tell them to update as the answer. Asking which version they are running to narrow the problem is a different thing and is fine. If you think it may be fixed, ASK whether it is still happening rather than asserting that it is not.
 
-SIMILAR PAST CASES — what we actually sent. Use them for approach and tone.
-NEVER copy one verbatim: the details in it belong to a different user.
-1. Bug Report: scores stopped updating
-   they wrote: My scores froze in the 6th inning and never moved.
-   we sent: Thanks for flagging that. The game was stuck on our side, not yours, and it is moving again now.
-
 THIS IS A FOLLOW-UP on ticket #700042. It is a continued conversation:
 - Do not open with a greeting. Acknowledge briefly ("Got it,", "Thanks for the update,") and
   go straight to the answer.
@@ -58,8 +52,6 @@ HOW TO WRITE IT:
   block above. List what each rests on in grounded_in.
 - Anything you cannot answer from those goes in unknowns, and the reply says the partner will
   follow up rather than guessing. Set confidence low when unknowns is not empty.
-- The similar past cases are reference for approach and tone. Never reuse their wording or
-  their specifics.
 - Every reply, however short, ends with these two lines and nothing after them:
       Best Regards,
       Scrollr Support

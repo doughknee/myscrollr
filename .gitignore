@@ -3,16 +3,12 @@
 # Cache file written by @sentry/vite-plugin during source map upload.
 .env.sentry-build-plugin
 target/
-# Cargo.lock is ignored by default for the rest of the workspace (Rust
-# convention for libraries — re-resolution per build is fine when the
-# crate is consumed as a dependency). The desktop binary is a different
-# story: it's a deployable application, and CI was non-deterministically
-# resolving Tauri to 2.11.0 while the npm side stayed at 2.10.1, breaking
-# the major.minor match check. Commit the desktop binary's lockfile so
-# CI gets the same versions every build. The exception below opts it
-# back in.
+# Deployable Rust applications pin their audited dependency graph.
 Cargo.lock
 !desktop/src-tauri/Cargo.lock
+!channels/finance/service/Cargo.lock
+!channels/sports/service/Cargo.lock
+!channels/rss/service/Cargo.lock
 .log
 acme_cache/
 release/

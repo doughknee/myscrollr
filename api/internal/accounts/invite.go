@@ -293,7 +293,7 @@ func findActiveOneTimeToken(endpoint, m2mToken, email, ott string) error {
 
 // findUserByEmail searches for a user by primary email and returns (userID, username, error).
 func findUserByEmail(endpoint, token, email string) (string, string, error) {
-	searchURL := fmt.Sprintf("%s/api/users?search.primaryEmail=%s", endpoint, url.QueryEscape(email))
+	searchURL := fmt.Sprintf("%s/api/users?search.primaryEmail=%s&mode.primaryEmail=exact", endpoint, url.QueryEscape(email))
 	req, err := http.NewRequest("GET", searchURL, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("create search request: %w", err)
@@ -315,12 +315,13 @@ func findUserByEmail(endpoint, token, email string) (string, string, error) {
 	var users []struct {
 		ID       string  `json:"id"`
 		Username *string `json:"username"`
+		Email    string  `json:"primaryEmail"`
 	}
 	if err := json.Unmarshal(body, &users); err != nil {
 		return "", "", fmt.Errorf("parse search response: %w", err)
 	}
-	if len(users) == 0 {
-		return "", "", fmt.Errorf("no user found with email %s", email)
+	if len(users) != 1 || users[0].ID == "" || !strings.EqualFold(users[0].Email, email) {
+		return "", "", fmt.Errorf("no unique exact email match")
 	}
 
 	username := ""

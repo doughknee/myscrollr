@@ -161,10 +161,7 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 	if input.KnownIssues == "" {
 		input.KnownIssues = knownIssuesBlock(ctx)
 	}
-	if input.Similar == nil {
-		input.Similar = FetchSimilarCases(ctx,
-			input.Subject+" "+htmlToPlain(input.Body), input.ReplyTicketNumber, similarCaseCount)
-	}
+
 	// A brand-new ticket has no case yet, so no link and no waiting: the zero
 	// values are already the truth for it, and they forbid a fix claim, which
 	// is the right default for a report nobody has looked at.
@@ -585,9 +582,7 @@ func buildDraftPrompt(in TriageInput, cls *classification) string {
 	b.WriteString("\n" + in.KnownIssues + "\n")
 	b.WriteString("\n" + renderFixRecord(in.ProvenFix, in.StaleDays, in.Context.AppVersion))
 
-	if s := renderSimilarCases(in.Similar); s != "" {
-		b.WriteString("\n" + s)
-	}
+	// Other customers' case content must never enter a customer-facing draft prompt.
 
 	if in.IsReply {
 		fmt.Fprintf(&b, `
@@ -625,8 +620,6 @@ HOW TO WRITE IT:
   block above. List what each rests on in grounded_in.
 - Anything you cannot answer from those goes in unknowns, and the reply says the partner will
   follow up rather than guessing. Set confidence low when unknowns is not empty.
-- The similar past cases are reference for approach and tone. Never reuse their wording or
-  their specifics.
 - Every reply, however short, ends with these two lines and nothing after them:
       Best Regards,
       Scrollr Support

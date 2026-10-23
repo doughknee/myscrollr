@@ -26,6 +26,7 @@ spec:
       labels:
         app: core-api
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: core-api
           image: registry.digitalocean.com/scrollr/core-api:latest

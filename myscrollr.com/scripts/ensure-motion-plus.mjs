@@ -12,10 +12,9 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const root = process.cwd()
 
 if (existsSync(join(root, 'node_modules', 'motion-plus', 'package.json'))) {
   console.log('[ensure-motion-plus] motion-plus present, skipping')
@@ -33,7 +32,7 @@ if (!token) {
 }
 
 // Pinned, never `latest`: motion-plus 3.0.0 (30 Sep 2026) needs motion ^13 and broke
-// every website build overnight. Keep in step with desktop/package.json (2.11.0).
+// every website build overnight. Both clients use this pinned version.
 const MOTION_PLUS_VERSION = '2.11.0'
 const url = `https://api.motion.dev/registry?package=motion-plus&version=${MOTION_PLUS_VERSION}&token=${token}`
 console.log('[ensure-motion-plus] installing motion-plus (--no-save)…')
@@ -63,12 +62,20 @@ if (!npmCli) {
 try {
   execFileSync(
     process.execPath,
-    [npmCli, 'install', '--no-save', '--no-audit', '--no-fund', url],
-    { cwd: root, stdio: ['ignore', 'inherit', 'inherit'] },
+    [
+      npmCli,
+      'install',
+      '--no-save',
+      '--no-audit',
+      '--no-fund',
+      '--logs-max=0',
+      url,
+    ],
+    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] },
   )
 } catch (err) {
   console.error(
-    `[ensure-motion-plus] npm install failed (${err?.code ?? err?.message ?? 'unknown error'}).\n` +
+    `[ensure-motion-plus] npm install failed (exit ${Number.isInteger(err?.status) ? err.status : 'unknown'}).\n` +
       '  The Motion+ registry URL is redacted here on purpose — it embeds MOTION_PLUS_TOKEN.\n' +
       '  Check that MOTION_PLUS_TOKEN is valid and that npm is on PATH.',
   )

@@ -16,6 +16,7 @@ spec:
       labels:
         app: finance-service
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: finance-service
           image: registry.digitalocean.com/scrollr/finance-service:latest

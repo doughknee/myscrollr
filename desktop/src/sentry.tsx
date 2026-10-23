@@ -46,16 +46,21 @@ export function initSentry(window: "ticker" | "app") {
 
     sendDefaultPii: false,
     attachStacktrace: true,
-    maxBreadcrumbs: 50,
+    maxBreadcrumbs: 0,
+    beforeBreadcrumb: () => null,
 
     initialScope: {
       tags: { runtime: "webview", window },
     },
 
-    tracesSampleRate: 0.1,
+    tracesSampleRate: 0,
     tracePropagationTargets: [/^https:\/\/api\.myscrollr\./],
 
     beforeSend(event) {
+      // Automatic breadcrumbs and request URLs can contain authentication credentials.
+      delete event.breadcrumbs;
+      delete event.request;
+
       if (!crashReports) return null;
       // Strip filesystem paths — Tauri webviews surface fs:// and
       // tauri:// URLs in stack frames that can leak install paths.
@@ -72,20 +77,6 @@ export function initSentry(window: "ticker" | "app") {
         }
       }
       delete event.user;
-      if (event.request) {
-        delete event.request.cookies;
-        delete event.request.headers;
-        delete event.request.data;
-        if (event.request.url) {
-          try {
-            const u = new URL(event.request.url);
-            u.search = "";
-            event.request.url = u.toString();
-          } catch {
-            // malformed — leave alone
-          }
-        }
-      }
       return event;
     },
   });

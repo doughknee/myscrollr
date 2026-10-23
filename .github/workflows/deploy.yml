@@ -308,7 +308,6 @@ jobs:
               "VITE_SENTRY_DSN=$VITE_SENTRY_DSN" \
               "SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN" \
               "SENTRY_ORG=$SENTRY_ORG" \
-              "MOTION_PLUS_TOKEN=$MOTION_PLUS_TOKEN" \
               "GITHUB_TOKEN=$GH_API_TOKEN" \
               "CI=true"; do
               BUILD_ARGS="$BUILD_ARGS --build-arg $arg"
@@ -319,6 +318,7 @@ jobs:
             -f ${{ matrix.dockerfile }} \
             -t "${IMAGE}:${SHA_TAG}" \
             -t "${IMAGE}:latest" \
+            --secret id=MOTION_PLUS_TOKEN,env=MOTION_PLUS_TOKEN \
             $BUILD_ARGS \
             ${{ matrix.context }}
 

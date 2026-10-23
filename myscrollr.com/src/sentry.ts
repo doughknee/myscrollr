@@ -37,29 +37,19 @@ export function initSentry() {
     // Privacy: do not send any default PII (IP, cookies, etc.)
     sendDefaultPii: false,
     attachStacktrace: true,
-    maxBreadcrumbs: 50,
+    maxBreadcrumbs: 0,
+    beforeBreadcrumb: () => null,
 
-    tracesSampleRate: 0.1,
+    tracesSampleRate: 0,
     // Only attach tracing headers to our own API. NEVER to third-party
     // services (Stripe, Logto, TwelveData, ESPN, RSS sources).
     tracePropagationTargets: [/^https:\/\/api\.myscrollr\./],
 
     beforeSend(event) {
-      // Strip query strings (may contain Logto auth code/state)
-      if (event.request?.url) {
-        try {
-          const u = new URL(event.request.url)
-          u.search = ''
-          event.request.url = u.toString()
-        } catch {
-          // malformed URL — leave it alone rather than risk a different bug
-        }
-      }
-      if (event.request) {
-        delete event.request.cookies
-        delete event.request.headers
-        delete event.request.data
-      }
+      // Automatic breadcrumbs and request URLs can contain authentication credentials.
+      delete event.breadcrumbs
+      delete event.request
+
       if (event.user) {
         delete event.user.ip_address
         delete event.user.email

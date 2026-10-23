@@ -77,7 +77,8 @@ type discordInteraction struct {
 }
 
 type discordMember struct {
-	User *discordUser `json:"user"`
+	User        *discordUser `json:"user"`
+	Permissions string       `json:"permissions"`
 }
 
 type discordUser struct {
@@ -147,6 +148,9 @@ func HandleDiscordInteractions(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("malformed body")
 	}
 
+	if interaction.Type != discordInteractionPing && !discordStaffAuthorized(&interaction) {
+		return discordEphemeralResponse(c, "Scrollr support actions require an administrator in the configured server.")
+	}
 	switch interaction.Type {
 	case discordInteractionPing:
 		return c.JSON(fiber.Map{"type": discordResponsePong})
@@ -160,6 +164,15 @@ func HandleDiscordInteractions(c *fiber.Ctx) error {
 		log.Printf("[DiscordInteraction] unknown type %d", interaction.Type)
 		return c.Status(fiber.StatusBadRequest).SendString("unknown interaction type")
 	}
+}
+
+func discordStaffAuthorized(ix *discordInteraction) bool {
+	guild, app := os.Getenv("DISCORD_GUILD_ID"), os.Getenv("DISCORD_APPLICATION_ID")
+	if guild == "" || app == "" || ix.GuildID != guild || ix.ApplicationID != app || ix.Member == nil || ix.Member.User == nil || ix.Member.User.ID == "" {
+		return false
+	}
+	permissions, err := strconv.ParseUint(ix.Member.Permissions, 10, 64)
+	return err == nil && permissions&(8|32) != 0 // Administrator or Manage Server.
 }
 
 // =============================================================================

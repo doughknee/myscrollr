@@ -16,6 +16,7 @@ spec:
       labels:
         app: sports-service
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: sports-service
           image: registry.digitalocean.com/scrollr/sports-service:latest

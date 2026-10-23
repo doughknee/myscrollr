@@ -47,8 +47,6 @@ HOW TO WRITE IT:
   block above. List what each rests on in grounded_in.
 - Anything you cannot answer from those goes in unknowns, and the reply says the partner will
   follow up rather than guessing. Set confidence low when unknowns is not empty.
-- The similar past cases are reference for approach and tone. Never reuse their wording or
-  their specifics.
 - Every reply, however short, ends with these two lines and nothing after them:
       Best Regards,
       Scrollr Support
