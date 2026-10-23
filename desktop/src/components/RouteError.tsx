@@ -11,7 +11,7 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 
 export default function RouteError({ error, reset }: ErrorComponentProps) {
   const rawMessage =
-    typeof error?.message === "string" && error.message.length > 0
+    error instanceof Error && error.message.length > 0
       ? error.message
       : String(error ?? "Unknown error");
 

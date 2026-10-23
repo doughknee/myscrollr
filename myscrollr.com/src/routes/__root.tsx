@@ -40,7 +40,7 @@ const themeScript = `;(function () {
   } catch (e) {}
 })()`
 
-function RootErrorComponent({ error }: { error: Error }) {
+function RootErrorComponent({ error }: { error: unknown }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
       <p className="text-sm font-semibold text-error">Error</p>
@@ -52,7 +52,7 @@ function RootErrorComponent({ error }: { error: Error }) {
       </p>
       {import.meta.env.DEV && (
         <pre className="mt-6 max-w-lg text-left text-xs text-error/80 bg-error/5 p-4 rounded-lg overflow-auto border border-error/20">
-          {error.message}
+          {error instanceof Error ? error.message : String(error)}
         </pre>
       )}
       <div className="mt-8 flex gap-4">
@@ -141,7 +141,7 @@ function RootDocument({ children }: { children: ReactNode }) {
   )
 }
 
-function RootErrorDocument(props: { error: Error }) {
+function RootErrorDocument(props: { error: unknown }) {
   return (
     <RootDocument>
       <RootErrorComponent {...props} />

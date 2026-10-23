@@ -62,6 +62,19 @@ export function devBus(): Plugin {
         const url = new URL(req.url ?? "/", "http://x");
         if (!url.pathname.startsWith("/__dev/")) return next();
 
+        // Only local tooling and this dev origin may reach the native command bus.
+        const peer = req.socket.remoteAddress;
+        const local = peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
+        const hosts = ["localhost", "127.0.0.1", "[::1]"].map((host) => `${host}:${req.socket.localPort}`);
+        if (!local || !hosts.includes(req.headers.host ?? "") ||
+            (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) ||
+            req.headers["sec-fetch-site"] === "cross-site") {
+          return json(res, 403, { ok: false, error: "Local dev requests only" });
+        }
+        if (req.method === "POST" && req.headers["content-type"]?.split(";")[0].trim() !== "application/json") {
+          return json(res, 415, { ok: false, error: "JSON required" });
+        }
+
         if (url.pathname === "/__dev/cmd" && req.method === "POST") {
           const b = await readBody(req);
           const win = String(b.window ?? "ticker");

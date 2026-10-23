@@ -15,6 +15,7 @@ spec:
       labels:
         app: website
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: website
           image: registry.digitalocean.com/scrollr/website:latest

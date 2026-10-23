@@ -16,6 +16,7 @@ spec:
       labels:
         app: rss-service
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: rss-service
           image: registry.digitalocean.com/scrollr/rss-service:latest

@@ -13,7 +13,7 @@
 #                     probes + /{source}/health)
 #
 # Everything else inbound is denied by the namespace-wide default-deny.
-# RSS egress excludes link-local metadata; DNS and public feed/database access remain allowed.
+# Workload egress excludes link-local metadata; DNS and public feed/database access remain allowed.
 #
 # Notes:
 #   - Kubelet liveness/readiness probes and `kubectl port-forward` (used by
@@ -164,16 +164,49 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
 ---
-# Defense in depth for RSS SSRF; Cilium needs an explicit cluster DNS allowance.
+# Cilium ipBlock rules exclude cluster pods, so core needs explicit health-probe egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-core-egress-to-ingesters
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: core-api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: finance-service
+      ports:
+        - protocol: TCP
+          port: 3001
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sports-service
+      ports:
+        - protocol: TCP
+          port: 3002
+    - to:
+        - podSelector:
+            matchLabels:
+              app: rss-service
+      ports:
+        - protocol: TCP
+          port: 3004
+---
+# Defense in depth for every workload; Cilium needs an explicit cluster DNS allowance.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: rss-deny-link-local-egress
   namespace: scrollr
 spec:
-  podSelector:
-    matchLabels:
-      app: rss-service
+  podSelector: {}
   policyTypes:
     - Egress
   egress:

@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26.10-alpine AS builder
 
 WORKDIR /app
 
@@ -38,11 +38,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o support-regen ./cmd/support-regen
 #
 # Source is bind-mounted from the host, so `air` rebuilds the binary in
 # place on save — no image rebuild per edit.
-FROM golang:1.25-alpine AS dev
+FROM golang:1.26.10-alpine AS dev
 WORKDIR /app
 # air is PINNED, not @latest: v1.67.2 raised its minimum to Go 1.26 and
 # broke this build with no warning. v1.67.1 is the last release that
-# builds on the Go 1.25 this image pins to match go.mod. Bump both
+# was validated for the dev watcher. Toolchain matches go.mod. Bump both
 # together or not at all.
 RUN apk add --no-cache git curl && go install github.com/air-verse/air@v1.67.1
 ENV GOFLAGS=-buildvcs=false

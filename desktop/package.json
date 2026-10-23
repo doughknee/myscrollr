@@ -1,8 +1,8 @@
 {
   "name": "scrollr-desktop",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
-  "description": "Scrollr desktop app — pinned always-on-top ticker for sports, finance, RSS, and Yahoo Fantasy. Tauri + React.",
+  "description": "Scrollr desktop app â€” pinned always-on-top ticker for sports, finance, RSS, and Yahoo Fantasy. Tauri + React.",
   "author": "Brandon Ruth <brandon@myscrollr.com>",
   "license": "AGPL-3.0-or-later",
   "repository": {
@@ -29,7 +29,12 @@
     "screenshots:page": "node scripts/capture-screenshots.mjs page",
     "screenshots:themes": "node scripts/capture-screenshots.mjs themes",
     "screenshots:crop": "node scripts/capture-screenshots.mjs crop",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "predev": "node ../myscrollr.com/scripts/ensure-motion-plus.mjs",
+    "preweb": "node ../myscrollr.com/scripts/ensure-motion-plus.mjs",
+    "prebuild": "node ../myscrollr.com/scripts/ensure-motion-plus.mjs",
+    "pretest": "node ../myscrollr.com/scripts/ensure-motion-plus.mjs",
+    "pretest:browser": "node ../myscrollr.com/scripts/ensure-motion-plus.mjs"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
@@ -48,7 +53,6 @@
     "lucide-react": "^0.577.0",
     "marked": "^18.0.5",
     "motion": "^12.35.1",
-    "motion-plus": "https://api.motion.dev/registry.tgz?package=motion-plus&version=2.11.0&token=032997dbced0702754906e3f43111740b10beaa970fd6d26423e34e43a46acfe",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sonner": "^2.0.7"
@@ -62,14 +66,15 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.20.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
-    "@vitest/ui": "^4.1.5",
+    "@vitest/ui": "^4.1.12",
     "jsdom": "^29.0.2",
     "tailwindcss": "^4.0.6",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.12"
   }
 }

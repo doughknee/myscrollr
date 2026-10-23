@@ -27,5 +27,17 @@ describe("crash-report gate", () => {
 
     setCrashReports(true);
     expect(options.beforeSend!(event, {})).toBe(event);
+    const sensitive: ErrorEvent = {
+      type: undefined,
+      request: { url: "/callback?code=secret#token", headers: { Authorization: "secret" } },
+      breadcrumbs: [{ category: "navigation", data: { from: "/callback?code=secret", to: "/account" } }],
+    };
+    options.beforeSend!(sensitive, {});
+    expect(JSON.stringify(sensitive)).not.toContain("secret");
+    expect(sensitive.request).toBeUndefined();
+    expect(sensitive.breadcrumbs).toBeUndefined();
+    expect(options.maxBreadcrumbs).toBe(0);
+    expect(options.beforeBreadcrumb!({ category: "navigation" }, {})).toBeNull();
+    expect(options.tracesSampleRate).toBe(0);
   });
 });

@@ -36,6 +36,9 @@ on:
       # breakage ship silently in backend-tests).
       - ".github/workflows/frontend-tests.yml"
 
+env:
+  MOTION_PLUS_TOKEN: ${{ secrets.MOTION_PLUS_TOKEN }}
+
 jobs:
   vitest:
     strategy:

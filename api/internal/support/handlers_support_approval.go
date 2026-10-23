@@ -69,6 +69,9 @@ func signApprovalToken(t SupportApprovalToken) (string, error) {
 // claims on success. Errors are intentionally generic so we don't
 // leak which step failed.
 func verifyApprovalToken(raw string) (*SupportApprovalToken, error) {
+	if len(supportApprovalSecret()) == 0 {
+		return nil, fmt.Errorf("approval signing key unavailable")
+	}
 	parts := strings.SplitN(raw, ".", 2)
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("malformed token")
@@ -87,7 +90,7 @@ func verifyApprovalToken(raw string) (*SupportApprovalToken, error) {
 	if err := json.Unmarshal(body, &t); err != nil {
 		return nil, fmt.Errorf("parse claims: %w", err)
 	}
-	if t.Exp > 0 && time.Now().Unix() > t.Exp {
+	if t.Exp <= time.Now().Unix() || t.DraftID <= 0 {
 		return nil, fmt.Errorf("token expired")
 	}
 	return &t, nil
@@ -236,6 +239,16 @@ func handleApprovalAction(c *fiber.Ctx, action string) error {
 	_, draft, err := loadAndVerifyApprovalToken(c, action)
 	if err != nil {
 		return errorHTMLResponse(c, fiber.StatusBadRequest, err.Error())
+	}
+	if c.Method() == fiber.MethodGet {
+		c.Set("Cache-Control", "no-store")
+		c.Set("Referrer-Policy", "no-referrer")
+		c.Set("Content-Security-Policy", "default-src 'none'; form-action 'self'; frame-ancestors 'none'")
+		c.Type("html")
+		return c.SendString(fmt.Sprintf(`<!doctype html><html><head><title>Confirm support action</title></head><body><h1>Confirm %s for ticket %s</h1><form method="post" action="/support/%s"><input type="hidden" name="token" value="%s"><button type="submit">Confirm %s</button></form></body></html>`, html.EscapeString(action), html.EscapeString(draft.TicketNumber), html.EscapeString(action), html.EscapeString(c.Query("token")), html.EscapeString(action)))
+	}
+	if c.Method() != fiber.MethodPost {
+		return c.SendStatus(fiber.StatusMethodNotAllowed)
 	}
 
 	switch action {

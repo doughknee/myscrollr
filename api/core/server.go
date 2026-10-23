@@ -323,8 +323,10 @@ func (s *Server) setupRoutes() {
 	// Partner-approval URLs for AI-drafted replies. No auth — these are
 	// HMAC-signed single-use tokens that the partner clicks from email.
 	s.App.Get("/support/send", support.HandleSupportSend)
+	s.App.Post("/support/send", support.HandleSupportSend)
 	s.App.Get("/support/edit", support.HandleSupportEdit)
 	s.App.Get("/support/skip", support.HandleSupportSkip)
+	s.App.Post("/support/skip", support.HandleSupportSkip)
 	s.App.Post("/support/edit/submit", support.HandleSupportEditSubmit)
 	// Case DB full-text search (REL-243). Server-to-server: gated by the
 	// osTicket webhook's shared secret inside the handler.

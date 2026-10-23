@@ -10,6 +10,9 @@ WORKDIR /app/desktop
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 COPY desktop/package.json desktop/package-lock.json ./
 RUN npm ci
+COPY myscrollr.com/scripts/ensure-motion-plus.mjs /app/myscrollr.com/scripts/ensure-motion-plus.mjs
+RUN --mount=type=secret,id=MOTION_PLUS_TOKEN,required=true \
+    MOTION_PLUS_TOKEN="$(cat /run/secrets/MOTION_PLUS_TOKEN)" npm run prebuild
 COPY desktop/embed.html desktop/vite.config.ts desktop/tsconfig.json ./
 COPY desktop/public ./public
 COPY desktop/scripts ./scripts
@@ -45,12 +48,7 @@ ARG GITHUB_TOKEN
 # guard that exits non-zero in CI precisely to stop that; the guard was
 # fine, it just never saw CI=true.
 ARG CI
-# Required: Motion+ registry token for scripts/ensure-motion-plus.mjs
-# (motion-plus is deliberately absent from package.json — this repo is
-# public and the install URL embeds the private token). Builder-stage
-# only; the final nginx image never sees it. Set MOTION_PLUS_TOKEN as a
-# build-time variable in Coolify.
-ARG MOTION_PLUS_TOKEN
+# Motion+ is supplied as a BuildKit secret, never an image build argument.
 ARG VITE_API_URL
 ARG VITE_LOGTO_ENDPOINT
 ARG VITE_LOGTO_APP_ID
@@ -88,7 +86,8 @@ ENV SKIP_MOBILE_VIEWPORT_CHECK=1
 
 # Build (vite build + tsc)
 WORKDIR /app/myscrollr.com
-RUN npm run build
+RUN --mount=type=secret,id=MOTION_PLUS_TOKEN,required=true \
+    MOTION_PLUS_TOKEN="$(cat /run/secrets/MOTION_PLUS_TOKEN)" npm run build
 
 # ── Stage 2: Serve ──────────────────────────────────────────────
 FROM nginx:alpine

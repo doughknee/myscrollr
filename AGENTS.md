@@ -73,7 +73,7 @@ version (and feeds the support KB, so a change to it needs `kbgen`).
 Monorepo — each component is independently deployable with its own dependencies:
 
 - `.claude/skills/` — project skills for AI assistants: routers to the extension points above (`scripts/ci/check-doc-paths.sh` keeps their paths real)
-- `api/` — Core API (Go 1.25, Fiber v2). Internal packages under `api/internal/`; `api/core` wires them into one binary
+- `api/` — Core API (Go 1.26.10, Fiber v2). Internal packages under `api/internal/`; `api/core` wires them into one binary
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
 - The finance, sports, rss, and predictions Go APIs were folded into `api/internal/ingestread/` (ADR-0002); fantasy and predictions were removed outright (SCROLLR-239) — every widget source is now served in-process by core
@@ -238,7 +238,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ## Code Style — Go
 
-- `gofmt` formatting. No custom linter. Go 1.25 across all modules.
+- `gofmt` formatting. No custom linter. Go 1.26.10 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
 - One Go module: `api/` (core, incl. every folded widget source). `channels/fantasy/api/` was the only other module and was deleted outright (SCROLLR-239) rather than folded — no shared packages, no HTTP-only contract to preserve.
 - Core API: internal packages under `api/internal/` (`platform`, `events`, `widgets`, `ingestread`, `accounts`, `billing`, `support`, plus `testsupport` for test helpers) wired by `api/core`. One binary. `platform` is the leaf — package-level `DBPool`/`Rdb` live there; `core` is the only package that imports everything. Widget sources register in `LocalSources` (`api/internal/ingestread/sources.go`).

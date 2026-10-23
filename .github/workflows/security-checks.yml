@@ -1,0 +1,66 @@
+name: Security checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  go-vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        working-directory: api
+
+  javascript-vulnerabilities:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [desktop, myscrollr.com]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm audit --omit=dev --audit-level=moderate
+        working-directory: ${{ matrix.dir }}
+      - run: node --test myscrollr.com/scripts/ensure-motion-plus.test.mjs
+
+  rust-vulnerabilities:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [desktop/src-tauri, channels/finance/service, channels/sports/service, channels/rss/service]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Audit with bounded, documented exceptions
+        working-directory: ${{ matrix.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ '${{ matrix.dir }}' = desktop/src-tauri ]; then
+            # rkyv is optional and unselected. Fail if that changes.
+            tree=$(cargo tree --locked --target all --invert rkyv)
+            test -z "$tree"
+            # shortcut: Tauri's Windows updater still requires zip 4; it verifies
+            # our release signature before extraction. Remove these exceptions
+            # when upstream adopts zip >=9 (SCROLLR-373). Never accept unsigned updates.
+            cargo audit --ignore RUSTSEC-2026-0235 --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
+          else
+            # SQLx's optional MySQL RSA dependency is not compiled by our PostgreSQL services.
+            tree=$(cargo tree --locked --target all --invert rsa)
+            test -z "$tree"
+            cargo audit --ignore RUSTSEC-2023-0071
+          fi
