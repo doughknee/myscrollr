@@ -7,6 +7,7 @@ package admin
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strings"
 
@@ -120,11 +121,26 @@ func RequireAdmin(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-// countAdmins returns how many admin rows exist. Used by the delete guard.
-func countAdmins(ctx context.Context) (int, error) {
-	var n int
-	err := platform.DBPool.QueryRow(ctx, `SELECT count(*) FROM admin_users`).Scan(&n)
-	return n, err
+var errAdminRevoked = errors.New("staff access revoked")
+
+// Serialize membership changes and recheck the actor after waiting for the lock.
+func beginAdminChange(ctx context.Context, sub string) (pgx.Tx, error) {
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `LOCK TABLE admin_users IN SHARE ROW EXCLUSIVE MODE`); err == nil {
+		var allowed bool
+		err = tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM admin_users WHERE logto_sub = $1)`, sub).Scan(&allowed)
+		if err == nil && !allowed {
+			err = errAdminRevoked
+		}
+	}
+	if err != nil {
+		_ = tx.Rollback(context.Background())
+		return nil, err
+	}
+	return tx, nil
 }
 
 // HandleWhoAmI - GET /admin/me

@@ -2,6 +2,7 @@ package events
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -91,6 +92,7 @@ func StreamAdminEvents(c *fiber.Ctx) error {
 // disconnects. Shared by the desktop stream and the console stream so the
 // heartbeat, the retry hint and the panic containment below exist once.
 func streamToClient(c *fiber.Ctx, client *Client, label, sub string, expires time.Time) error {
+	isAdmin := client.UserID == AdminClientKey(sub)
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
@@ -125,11 +127,11 @@ func streamToClient(c *fiber.Ctx, client *Client, label, sub string, expires tim
 			case <-expiry.C:
 				return
 			case <-accessTicker.C:
-				if !time.Now().Before(expires) || platform.CheckAccountAccess(sub) != nil {
+				if !time.Now().Before(expires) || platform.CheckAccountAccess(sub) != nil || (isAdmin && !staffStreamAllowed(sub)) {
 					return
 				}
 			case msg, ok := <-client.Ch:
-				if !ok || !time.Now().Before(expires) {
+				if !ok || !time.Now().Before(expires) || (isAdmin && !staffStreamAllowed(sub)) {
 					return
 				}
 				fmt.Fprintf(w, "data: %s\n\n", msg)
@@ -151,3 +153,15 @@ func streamToClient(c *fiber.Ctx, client *Client, label, sub string, expires tim
 }
 
 var streamAccessInterval = 5 * time.Second
+
+// Check every staff event as well as idle streams; outages fail closed.
+func staffStreamAllowed(sub string) bool {
+	if platform.DBPool == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	var allowed bool
+	err := platform.DBPool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM admin_users WHERE logto_sub = $1)`, sub).Scan(&allowed)
+	return err == nil && allowed
+}
