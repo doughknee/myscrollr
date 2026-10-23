@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The published release the KB should know about (desktop-v…)"
+        description: "The published release the KB should know about"
         required: true
 
 permissions:
@@ -43,7 +43,6 @@ concurrency:
 jobs:
   refresh:
     name: Regenerate and commit the knowledge base
-    if: startsWith(github.event.release.tag_name, 'desktop-v') || startsWith(inputs.tag, 'desktop-v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
