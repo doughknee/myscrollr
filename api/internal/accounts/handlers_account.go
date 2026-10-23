@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/mail"
 	"os"
 	"strings"
 	"sync"
@@ -95,8 +94,7 @@ type UpdateProfileResponse struct {
 	Email  string `json:"email,omitempty"`
 }
 
-// HandleUpdateProfile updates the user's display name and/or primary
-// email via Logto Management API. Username changes are rejected.
+// HandleUpdateProfile updates display names. Identity changes require verification.
 func HandleUpdateProfile(c *fiber.Ctx) error {
 	userID := platform.GetUserID(c)
 	if userID == "" {
@@ -128,37 +126,11 @@ func HandleUpdateProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate email: format, length, and control characters. We do
-	// this before contacting Logto so a malformed value gets a precise
-	// 400 instead of bouncing off the upstream API.
+	// A Management API email write would bypass mailbox ownership verification.
 	if req.Email != nil {
-		email := strings.TrimSpace(*req.Email)
-		if email == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
-				Status: "error",
-				Error:  "email cannot be empty",
-			})
-		}
-		if len(email) > 254 {
-			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
-				Status: "error",
-				Error:  "email exceeds maximum length",
-			})
-		}
-		if strings.ContainsAny(email, "\n\r\x00") {
-			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
-				Status: "error",
-				Error:  "email contains invalid characters",
-			})
-		}
-		if _, err := mail.ParseAddress(email); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
-				Status: "error",
-				Error:  "invalid email format",
-			})
-		}
-		// Persist the trimmed value for the Logto patch + response echo.
-		*req.Email = email
+		return c.Status(fiber.StatusForbidden).JSON(platform.ErrorResponse{
+			Status: "forbidden", Error: "Email changes are temporarily unavailable while we add email verification.",
+		})
 	}
 
 	// Validate name: length cap and control-character rejection.
@@ -205,15 +177,6 @@ func HandleUpdateProfile(c *fiber.Ctx) error {
 			})
 		}
 	}
-	if req.Email != nil {
-		if err := updateUserEmail(cfg.Endpoint, token, userID, *req.Email); err != nil {
-			log.Printf("[UpdateProfile] email update for %s: %v", userID, err)
-			return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
-				Status: "error",
-				Error:  "failed to update email",
-			})
-		}
-	}
 
 	// Refresh the overview cache so /users/me/overview returns the new
 	// values on the very next call.
@@ -224,9 +187,6 @@ func HandleUpdateProfile(c *fiber.Ctx) error {
 	resp := UpdateProfileResponse{Status: "ok"}
 	if req.Name != nil {
 		resp.Name = *req.Name
-	}
-	if req.Email != nil {
-		resp.Email = *req.Email
 	}
 	return c.JSON(resp)
 }
@@ -256,35 +216,6 @@ func updateUserName(endpoint, token, userID, name string) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("name update returned %d: %s", resp.StatusCode, string(body))
-	}
-	return nil
-}
-
-// updateUserEmail patches the user's primary email via Logto Management API.
-func updateUserEmail(endpoint, token, userID, email string) error {
-	payload, _ := json.Marshal(map[string]string{"primaryEmail": email})
-
-	req, err := http.NewRequest(
-		http.MethodPatch,
-		fmt.Sprintf("%s/api/users/%s", endpoint, userID),
-		bytes.NewReader(payload),
-	)
-	if err != nil {
-		return fmt.Errorf("build email request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: platform.LogtoM2MTokenTimeout}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("email request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("email update returned %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }

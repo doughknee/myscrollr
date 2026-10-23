@@ -101,7 +101,17 @@ func HandleAddAdmin(c *fiber.Ctx) error {
 
 	me := ActingAdmin(c)
 	var id int64
-	err := platform.DBPool.QueryRow(context.Background(),
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tx, err := beginAdminChange(ctx, platform.GetUserID(c))
+	if err == errAdminRevoked {
+		return forbidden(c)
+	}
+	if err != nil {
+		return c.SendStatus(fiber.StatusServiceUnavailable)
+	}
+	defer tx.Rollback(context.Background())
+	err = tx.QueryRow(ctx,
 		`INSERT INTO admin_users (email, added_by, note) VALUES ($1, $2, $3)
 		 ON CONFLICT (lower(email)) DO NOTHING
 		 RETURNING id`,
@@ -118,6 +128,9 @@ func HandleAddAdmin(c *fiber.Ctx) error {
 		})
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return c.SendStatus(fiber.StatusServiceUnavailable)
+	}
 	log.Printf("[Admin] GRANT %s added by %s", email, me)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "ok", "id": id})
 }
@@ -136,8 +149,18 @@ func HandleRemoveAdmin(c *fiber.Ctx) error {
 		})
 	}
 
-	ctx := context.Background()
-	total, err := countAdmins(ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tx, err := beginAdminChange(ctx, platform.GetUserID(c))
+	if err == errAdminRevoked {
+		return forbidden(c)
+	}
+	if err != nil {
+		return c.SendStatus(fiber.StatusServiceUnavailable)
+	}
+	defer tx.Rollback(context.Background())
+	var total int
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM admin_users`).Scan(&total)
 	if err != nil {
 		log.Printf("[Admin] count admins: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
@@ -151,7 +174,7 @@ func HandleRemoveAdmin(c *fiber.Ctx) error {
 	}
 
 	var email string
-	if err := platform.DBPool.QueryRow(ctx,
+	if err := tx.QueryRow(ctx,
 		`SELECT email FROM admin_users WHERE id = $1`, id).Scan(&email); err != nil {
 		if err == pgx.ErrNoRows {
 			return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
@@ -171,13 +194,16 @@ func HandleRemoveAdmin(c *fiber.Ctx) error {
 		})
 	}
 
-	if _, err := platform.DBPool.Exec(ctx, `DELETE FROM admin_users WHERE id = $1`, id); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM admin_users WHERE id = $1`, id); err != nil {
 		log.Printf("[Admin] remove admin %d: %v", id, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error", Error: "Could not remove that admin",
 		})
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return c.SendStatus(fiber.StatusServiceUnavailable)
+	}
 	log.Printf("[Admin] REVOKE %s removed by %s", email, me)
 	return c.JSON(fiber.Map{"status": "ok"})
 }

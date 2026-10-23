@@ -778,8 +778,16 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.22.2 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.23.1 -->
 The last 8 published releases, newest first, as users read them.
+
+### Server update - Complete feed data cleanup (`server-2026.10.23.1`, 2026-10-23)
+
+Account data exports now include your saved custom feeds, with their names, categories, URLs, and saved dates.
+
+When an account is permanently deleted after the existing undo period, its saved-feed associations and creator attribution are removed too. Shared feeds, articles, and other users' settings remain intact.
+
+This is a server update; no desktop download is required.
 
 ### Server update - Account and feed abuse protection (`server-2026.10.22.2`, 2026-10-23)
 
@@ -875,17 +883,5 @@ Existing users are moved to Pages once, with a notice; switch back any time.
 - **No more surprise sign-outs.** Some of you were being signed out every few days, especially with the bar on more than one monitor. The app's windows were racing each other to renew your session; now only one of them does it.
 - **The bar no longer jumps when it starts.** Scrollr's fonts now ship inside the app instead of loading from the internet, so the bar draws once, at the right size, even offline.
 - **European football is back.** Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and Champions League fixtures had disappeared during the international break; they're back, along with handball and rugby. (This one was fixed on our servers last night, so you already have it.)
-
-Update from the app or at https://myscrollr.com/download.
-
-### Scrollr 1.6.9 — Trimmed down, Linux sign-in fixed (`desktop-v1.6.9`, 2026-09-27)
-
-#### Removed
-
-- **Fantasy and Predictions are gone for now.** Yahoo shut off the API our Fantasy widget depended on, and Predictions never earned its place on the bar. Both are out of the directory and off the ticker. If you had either one, the app tells you once on next launch and the rest of your bar is untouched. We are spending the next while polishing News, Sports, the utilities and Finance instead of adding widgets; these two come back only if they can be done properly.
-
-#### Fixes
-
-- **Linux AppImage: sign-in opens your browser.** On the AppImage build, clicking sign in left you on "Signing you in…" with no browser window, because the AppImage's own environment leaked into the browser it tried to launch. The handoff now runs with a clean environment. And if a browser still does not appear, the sign-in screen has a **Copy the sign-in link** button so you can paste it anywhere and finish.
 
 Update from the app or at https://myscrollr.com/download.

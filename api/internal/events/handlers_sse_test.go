@@ -2,6 +2,7 @@ package events
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
@@ -11,11 +12,13 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -122,6 +125,72 @@ func TestOpenStreamsCloseOnExpirySuspensionAndAuthorityFailure(t *testing.T) {
 			}
 			if h.clientCount.Load() != 0 {
 				t.Fatal("stream remains registered")
+			}
+		})
+	}
+}
+
+func TestStaffStreamStopsBeforeDeliveringAfterRevocation(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	for _, mode := range []string{"revoked", "idle", "database-unavailable"} {
+		t.Run(mode, func(t *testing.T) {
+			h := swapHub(t)
+			testsupport.MustExec(t, `DELETE FROM admin_users`)
+			testsupport.MustExec(t, `INSERT INTO admin_users (email,logto_sub) VALUES ('staff@example.test','staff')`)
+			previousCheck, previousInterval := platform.CheckAccountAccess, streamAccessInterval
+			platform.CheckAccountAccess = func(string) error { return nil }
+			streamAccessInterval = 20 * time.Millisecond
+			defer func() { platform.CheckAccountAccess, streamAccessInterval = previousCheck, previousInterval }()
+			client := &Client{UserID: AdminClientKey("staff"), Ch: make(chan []byte, 2)}
+			h.register(client)
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Get("/stream", func(c *fiber.Ctx) error {
+				return streamToClient(c, client, "test", "staff", time.Now().Add(time.Minute))
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			go app.Listener(listener)
+			defer app.Shutdown()
+			resp, err := (&http.Client{Timeout: 2 * time.Second}).Get("http://" + listener.Addr().String() + "/stream")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			reader := bufio.NewReader(resp.Body)
+			trySend(client, []byte(`{"allowed":true}`))
+			for {
+				line, err := reader.ReadString('\n')
+				if err != nil {
+					t.Fatal(err)
+				}
+				if strings.HasPrefix(line, "data:") {
+					break
+				}
+			}
+			if mode == "database-unavailable" {
+				testsupport.MustExec(t, `ALTER TABLE admin_users RENAME TO admin_users_unavailable`)
+				defer func() {
+					_, err := platform.DBPool.Exec(context.Background(), `ALTER TABLE admin_users_unavailable RENAME TO admin_users`)
+					if err != nil {
+						t.Error(err)
+					}
+				}()
+			} else {
+				testsupport.MustExec(t, `DELETE FROM admin_users WHERE logto_sub='staff'`)
+			}
+			if mode != "idle" {
+				trySend(client, []byte(`{"must_not_arrive":true}`))
+			}
+			rest, err := io.ReadAll(reader)
+			if err != nil {
+				t.Fatalf("stream did not close: %v", err)
+			}
+			if strings.Contains(string(rest), "must_not_arrive") {
+				t.Fatal("revoked staff received an event")
 			}
 		})
 	}
