@@ -1,13 +1,77 @@
 package accounts
 
 import (
+	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
 	"github.com/gofiber/fiber/v2"
 )
+
+func TestExportCustomFeedsIsAccountScoped(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	const owner, other = "export-feeds-owner", "export-feeds-other"
+	t.Cleanup(func() {
+		_, _ = platform.DBPool.Exec(context.Background(), `DELETE FROM user_custom_feeds WHERE logto_sub IN ($1,$2)`, owner, other)
+	})
+	testsupport.MustExec(t, `INSERT INTO user_custom_feeds (logto_sub,url,name,category) VALUES
+		($1,'https://example.com/shared','My shared feed','News'),
+		($1,'https://example.com/saved-only','Saved without a widget','Custom'),
+		($2,'https://example.com/shared','Someone else''s name','Other'),
+		($2,'https://example.com/private','Someone else''s feed','Other')`, owner, other)
+	for _, sub := range []string{owner, "export-feeds-empty"} {
+		resp, err := newDeletionTestApp(sub).Test(httptest.NewRequest("GET", "/users/me/export", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var archive struct {
+			Feeds []struct {
+				URL       string    `json:"url"`
+				Name      string    `json:"name"`
+				Category  string    `json:"category"`
+				CreatedAt time.Time `json:"created_at"`
+			} `json:"custom_feeds"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&archive)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 || archive.Feeds == nil {
+			t.Fatalf("export status=%d err=%v feeds=%v", resp.StatusCode, err, archive.Feeds)
+		}
+		if sub != owner {
+			if len(archive.Feeds) != 0 {
+				t.Fatal("empty account received feeds")
+			}
+			continue
+		}
+		if len(archive.Feeds) != 2 {
+			t.Fatalf("exported %d feeds; want 2", len(archive.Feeds))
+		}
+		for _, feed := range archive.Feeds {
+			if feed.CreatedAt.IsZero() {
+				t.Fatal("missing saved date")
+			}
+			switch feed.URL {
+			case "https://example.com/shared":
+				if feed.Name != "My shared feed" || feed.Category != "News" {
+					t.Fatalf("wrong account metadata: %+v", feed)
+				}
+			case "https://example.com/saved-only":
+				if feed.Name != "Saved without a widget" {
+					t.Fatalf("wrong saved feed: %+v", feed)
+				}
+			default:
+				t.Fatalf("unexpected feed: %+v", feed)
+			}
+		}
+	}
+}
 
 // =============================================================================
 // Subscription guard — deletionBlockedBySubscription
