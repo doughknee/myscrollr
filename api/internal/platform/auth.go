@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v2"
 	"github.com/getsentry/sentry-go"
@@ -15,7 +16,11 @@ import (
 )
 
 var (
-	jwks *keyfunc.JWKS
+	jwks                       *keyfunc.JWKS
+	ErrAccountBlocked          = errors.New("account access disabled")
+	ErrAccountCheckUnavailable = errors.New("account verification temporarily unavailable")
+	// Wired by core to avoid an accounts -> platform import cycle. Fail closed before setup.
+	CheckAccountAccess = func(string) error { return ErrAccountCheckUnavailable }
 )
 
 // InitAuth initialises the JWKS keyfunc for JWT validation.
@@ -65,7 +70,7 @@ func ValidateToken(tokenString string) (sub string, claims jwt.MapClaims, err er
 		return "", nil, fmt.Errorf("JWKS not initialized")
 	}
 
-	token, err := jwt.Parse(tokenString, jwks.Keyfunc)
+	token, err := jwt.Parse(tokenString, jwks.Keyfunc, jwt.WithExpirationRequired())
 	if err != nil {
 		return "", nil, fmt.Errorf("JWT parse failed: %w", err)
 	}
@@ -104,6 +109,9 @@ func ValidateToken(tokenString string) (sub string, claims jwt.MapClaims, err er
 	}
 	if expectedAudience != "" && !audValid {
 		return "", nil, fmt.Errorf("invalid token audience")
+	}
+	if err := CheckAccountAccess(sub); err != nil {
+		return "", nil, err
 	}
 
 	return sub, mapClaims, nil
@@ -152,6 +160,15 @@ func ValidateAuth(c *fiber.Ctx) error {
 
 	sub, claims, err := ValidateToken(tokenString)
 	if err != nil {
+		if errors.Is(err, ErrAccountBlocked) {
+			_ = c.Status(fiber.StatusForbidden).JSON(ErrorResponse{Status: "forbidden", Error: "Account access is suspended or unavailable."})
+			return ErrUnauthenticated
+		}
+		if errors.Is(err, ErrAccountCheckUnavailable) {
+			c.Set("Retry-After", "5")
+			_ = c.Status(fiber.StatusServiceUnavailable).JSON(ErrorResponse{Status: "unavailable", Error: "Account verification temporarily unavailable. Please retry."})
+			return ErrUnauthenticated
+		}
 		log.Printf("[Auth Error] %v", err)
 		_ = c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
 			Status: "unauthorized",
@@ -161,6 +178,9 @@ func ValidateAuth(c *fiber.Ctx) error {
 	}
 
 	c.Locals("user_id", sub)
+	if expires, err := claims.GetExpirationTime(); err == nil && expires != nil {
+		c.Locals("auth_expires_at", expires.Time)
+	}
 
 	// Attach an anonymous user ID to the Sentry hub for this request.
 	// The hash is irreversible (SHA-256 of sub + SENTRY_USER_SALT, first
@@ -204,6 +224,12 @@ func ValidateAuth(c *fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+// AuthExpiresAt is copied before an SSE writer outlives the request context.
+func AuthExpiresAt(c *fiber.Ctx) time.Time {
+	expires, _ := c.Locals("auth_expires_at").(time.Time)
+	return expires
 }
 
 // LogtoAuth is the Fiber middleware that validates the Logto JWT and advances

@@ -24,6 +24,7 @@ func ConnectRedis() {
 		log.Fatalf("Unable to parse REDIS_URL: %v", err)
 	}
 
+	opts.ContextTimeoutEnabled = true
 	Rdb = redis.NewClient(opts)
 
 	if err := Rdb.Ping(context.Background()).Err(); err != nil {

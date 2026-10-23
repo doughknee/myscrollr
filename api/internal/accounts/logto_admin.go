@@ -456,15 +456,19 @@ func DeleteLogtoUser(logtoSub string) error {
 // Returns (nil, nil) when Logto has no such user - local rows can outlive a
 // deleted account, and that is not an error worth failing a page over.
 func GetLogtoUser(logtoSub string) (*LogtoUser, error) {
+	return getLogtoUserContext(context.Background(), logtoSub)
+}
+
+func getLogtoUserContext(ctx context.Context, logtoSub string) (*LogtoUser, error) {
 	cfg := getM2MConfig()
 
-	token, err := getM2MToken()
+	token, err := getM2MTokenContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/api/users/%s", cfg.Endpoint, logtoSub)
-	req, err := http.NewRequest("GET", reqURL, nil)
+	reqURL := fmt.Sprintf("%s/api/users/%s", cfg.Endpoint, url.PathEscape(logtoSub))
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create get user request: %w", err)
 	}
@@ -482,12 +486,18 @@ func GetLogtoUser(logtoSub string) (*LogtoUser, error) {
 		return nil, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("get user returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("get user returned %d", resp.StatusCode)
 	}
 
 	var user LogtoUser
 	if err := json.Unmarshal(body, &user); err != nil {
 		return nil, fmt.Errorf("decode user: %w", err)
+	}
+	var status struct {
+		IsSuspended *bool `json:"isSuspended"`
+	}
+	if err := json.Unmarshal(body, &status); err != nil || status.IsSuspended == nil {
+		return nil, fmt.Errorf("get user returned missing suspension status")
 	}
 	return &user, nil
 }
