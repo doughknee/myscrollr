@@ -778,8 +778,16 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.22.1 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.22.2 -->
 The last 8 published releases, newest first, as users read them.
+
+### Server update - Account and feed abuse protection (`server-2026.10.22.2`, 2026-10-23)
+
+Scrollr now applies account suspensions to API requests and live updates, including sessions that were already connected.
+
+Custom RSS changes have account-level limits to curb automated abuse. Existing saved feeds, curated news sources, and ticker visibility controls continue to work; rejected changes leave the saved widget intact.
+
+Bot protection is also enabled on sign-in and signup. This is a server update; no desktop download is required.
 
 ### Server update — Safer RSS feeds (`server-2026.10.22.1`, 2026-10-22)
 
@@ -879,25 +887,5 @@ Update from the app or at https://myscrollr.com/download.
 #### Fixes
 
 - **Linux AppImage: sign-in opens your browser.** On the AppImage build, clicking sign in left you on "Signing you in…" with no browser window, because the AppImage's own environment leaked into the browser it tried to launch. The handoff now runs with a clean environment. And if a browser still does not appear, the sign-in screen has a **Copy the sign-in link** button so you can paste it anywhere and finish.
-
-Update from the app or at https://myscrollr.com/download.
-
-### Scrollr 1.6.8 — The ticker scrolls again (`desktop-v1.6.8`, 2026-09-22)
-
-#### Fixes
-
-- **The ticker scrolls again for everyone.** If Windows had animation effects turned off, or battery saver switched them off for you, the bar filled with chips and then never moved — it just lurched once in a while. Two of you reported it, and you were right. The bar now scrolls regardless of that setting; the setting still calms the decorative pulses on chips, which is what it is for.
-- **The bar spans your second monitor properly.** On a second screen with a different scale factor than your main one, the ticker came up narrower than the screen and shoved to one side. It now fills the monitor you chose, edge to edge, at any scale.
-- **Pinning your team always shows something.** Pin a team whose next game was more than a day out and the pinned spot stayed blank, as if the pin had failed. A pinned team now always shows its live game, its next fixture or its last result. If there is genuinely nothing — a team between seasons — the pin control says so instead of leaving you guessing.
-- **Game chips hold still.** A chip at its maximum width could shrink or grow when a score came in and nudge the whole bar. It stays put now.
-
-#### New
-
-- **Eight new news sources.** CNN, Fox News, Axios, Politico, ABC News, PBS NewsHour, The Hill and Reason are in the widget directory. One dead feed that had stopped publishing was removed.
-- **The Discord is one click away.** Support now has a card that opens the Scrollr Discord, where the community and the maintainers usually answer within the hour.
-
-#### Under the hood
-
-The ticker now runs inside a real browser in our test suite, so scrolling, chip widths and rotation are checked on every change before it reaches you. Nothing to see, but the next "the ticker stopped" bug should get caught before it ships.
 
 Update from the app or at https://myscrollr.com/download.

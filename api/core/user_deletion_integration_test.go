@@ -48,7 +48,8 @@ func setupIntegrationDB(t *testing.T) {
 	}
 	_, err := platform.DBPool.Exec(context.Background(), `
 		TRUNCATE TABLE product_analytics_enrollments, user_widgets, user_preferences, stripe_customers,
-		               stripe_webhook_events, user_deletion_requests, github_connections CASCADE
+		               stripe_webhook_events, user_deletion_requests, github_connections,
+		               user_custom_feeds, tracked_feeds CASCADE
 	`)
 	if err != nil {
 		t.Fatalf("truncate test tables: %v", err)
@@ -230,6 +231,86 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 	}
 	if status != "purged" || purgedAt == nil {
 		t.Errorf("deletion request after purge: status=%q purged_at=%v, want status=purged with timestamp", status, purgedAt)
+	}
+}
+
+func TestIntegrationPurgePreservesSharedFeeds(t *testing.T) {
+	for _, failure := range []string{"none", "logto", "database"} {
+		t.Run(failure, func(t *testing.T) {
+			setupIntegrationDB(t)
+			stub := newLogtoStub(t)
+			stub.failDelete = failure == "logto"
+			const owner, other = "feed-purge-owner", "feed-purge-other"
+			seedPurgeableUser(t, owner, false)
+			testsupport.MustExec(t, `INSERT INTO user_preferences (logto_sub) VALUES ($1)`, other)
+			const otherConfig = `{"feeds":[{"url":"https://example.com/shared","name":"My shared source"}]}`
+			testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub,widget_type,config) VALUES ($1,'rss_custom',$2::jsonb)`, other, otherConfig)
+			testsupport.MustExec(t, `INSERT INTO tracked_feeds (url,name,added_by,is_default,is_enabled) VALUES
+				('https://example.com/shared','Shared',$1,false,true),
+				('https://example.com/owner-only','Owner only',$1,false,false),
+				('https://example.com/other-only','Other only',$2,false,true),
+				('https://example.com/curated','Curated',$1,true,true)`, owner, other)
+			testsupport.MustExec(t, `INSERT INTO user_custom_feeds (logto_sub,url,name) VALUES
+				($1,'https://example.com/shared','Owner name'),
+				($1,'https://example.com/owner-only','Owner only'),
+				($2,'https://example.com/shared','Other name'),
+				($2,'https://example.com/other-only','Other only')`, owner, other)
+			testsupport.MustExec(t, `INSERT INTO rss_items (feed_url,guid,title)
+				SELECT url,url,'Retained article' FROM tracked_feeds`)
+			ctx := context.Background()
+			var before string
+			if err := platform.DBPool.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(f)-'added_by' ORDER BY url)::text FROM tracked_feeds f`).Scan(&before); err != nil {
+				t.Fatal(err)
+			}
+			if failure == "database" {
+				// Fail after feed cleanup to prove the whole local cascade rolls back.
+				testsupport.MustExec(t, `CREATE FUNCTION reject_widget_purge() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test purge failure'; END $$`)
+				testsupport.MustExec(t, `CREATE TRIGGER reject_widget_purge BEFORE DELETE ON user_widgets FOR EACH ROW EXECUTE FUNCTION reject_widget_purge()`)
+				t.Cleanup(func() {
+					_, _ = platform.DBPool.Exec(ctx, `DROP TRIGGER reject_widget_purge ON user_widgets; DROP FUNCTION reject_widget_purge()`)
+				})
+			}
+			err := accounts.PurgeUserAccount(ctx, owner)
+			if (err != nil) != (failure != "none") {
+				t.Fatalf("purge failure=%s err=%v", failure, err)
+			}
+			wantOwned, wantAttributed := 0, 0
+			if failure != "none" {
+				wantOwned, wantAttributed = 2, 3
+			}
+			if n := queryCount(t, `SELECT count(*) FROM user_custom_feeds WHERE logto_sub=$1`, owner); n != wantOwned {
+				t.Fatalf("owner feeds=%d want=%d", n, wantOwned)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM tracked_feeds WHERE added_by=$1`, owner); n != wantAttributed {
+				t.Fatalf("owner attribution=%d want=%d", n, wantAttributed)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM user_custom_feeds WHERE logto_sub=$1`, other); n != 2 {
+				t.Fatalf("other user's feeds changed: %d", n)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM tracked_feeds WHERE added_by=$1`, other); n != 1 {
+				t.Fatalf("other attribution changed: %d", n)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM rss_items WHERE title='Retained article'`); n != 4 {
+				t.Fatalf("shared articles changed: %d", n)
+			}
+			var after string
+			if err := platform.DBPool.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(f)-'added_by' ORDER BY url)::text FROM tracked_feeds f`).Scan(&after); err != nil || after != before {
+				t.Fatalf("polling targets changed: err=%v", err)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM user_widgets WHERE logto_sub=$1 AND config=$2::jsonb`, other, otherConfig); n != 1 {
+				t.Fatal("other user's widget changed")
+			}
+			if n := queryCount(t, `SELECT count(*) FROM user_preferences WHERE logto_sub=$1`, other); n != 1 {
+				t.Fatal("other user's preferences changed")
+			}
+			wantStatus := "purged"
+			if failure != "none" {
+				wantStatus = "pending"
+			}
+			if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub=$1 AND status=$2`, owner, wantStatus); n != 1 {
+				t.Fatal("wrong purge status")
+			}
+		})
 	}
 }
 

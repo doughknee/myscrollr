@@ -87,6 +87,13 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export PostHog analytics"})
 	}
 	archive["posthog_analytics"] = postHogAnalytics
+	var customFeeds json.RawMessage
+	if err := platform.DBPool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
+		'url', url, 'name', name, 'category', category, 'created_at', created_at) ORDER BY created_at, url), '[]'::jsonb)
+		FROM user_custom_feeds WHERE logto_sub=$1`, userID).Scan(&customFeeds); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export custom feeds"})
+	}
+	archive["custom_feeds"] = customFeeds
 	if actor := platform.HashUserSub(userID); actor != "" {
 		var audit json.RawMessage
 		if err := platform.DBPool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -573,6 +580,14 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		if _, err := tx.Exec(ctx, `DELETE FROM rss_security_events WHERE actor=$1`, actor); err != nil {
 			return fmt.Errorf("delete RSS security activity: %w", err)
 		}
+	}
+
+	// Targets and articles are shared; remove only this account's ownership and attribution.
+	if _, err := tx.Exec(ctx, `DELETE FROM user_custom_feeds WHERE logto_sub=$1`, logtoSub); err != nil {
+		return fmt.Errorf("delete custom feed ownership: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE tracked_feeds SET added_by=NULL WHERE added_by=$1`, logtoSub); err != nil {
+		return fmt.Errorf("clear feed attribution: %w", err)
 	}
 
 	// Widget configs (user_widgets rows)
