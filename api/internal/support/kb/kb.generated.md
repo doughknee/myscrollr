@@ -778,8 +778,18 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.23.1 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.23.2 -->
 The last 8 published releases, newest first, as users read them.
+
+### Server update - Stronger account and data protection (`server-2026.10.23.2`, 2026-10-23)
+
+Scrollr now applies stricter checks to staff access, account invitations, and support actions. Email approval links ask for confirmation before sending or skipping a reply, and removed staff lose access to open support streams.
+
+Website error reports no longer include sign-in navigation details, and automated support replies no longer receive other customers' raw case histories. This update also patches dependencies and adds protections around production workloads.
+
+Profile email changes are temporarily unavailable while a verified mailbox-change flow is built. Display-name changes, sign-in, and existing feeds remain available.
+
+Discord support actions now require Administrator or Manage Server permission. Staff can also use the website support console.
 
 ### Server update - Complete feed data cleanup (`server-2026.10.23.1`, 2026-10-23)
 
@@ -796,6 +806,12 @@ Scrollr now applies account suspensions to API requests and live updates, includ
 Custom RSS changes have account-level limits to curb automated abuse. Existing saved feeds, curated news sources, and ticker visibility controls continue to work; rejected changes leave the saved widget intact.
 
 Bot protection is also enabled on sign-in and signup. This is a server update; no desktop download is required.
+
+### Scrollr 1.7.2 - Security and privacy improvements (`desktop-v1.7.2`, 2026-10-23)
+
+This update keeps sign-in navigation details out of crash reports and includes security updates for libraries used by Scrollr.
+
+Your widgets, feed selections, and ticker settings stay in place. Update to 1.7.2 to receive the desktop protections.
 
 ### Server update — Safer RSS feeds (`server-2026.10.22.1`, 2026-10-22)
 
@@ -845,43 +861,3 @@ The GitHub widget is new from the ground up. It tells you what broke and what's 
 **Off the edge.** GitHub is always a page now, never squeezed into the edge, which stays for your clocks, weather and timers.
 
 **Also:** when there's only one page on the bar, the edge's clocks and weather still rotate on their own.
-
-### Scrollr 1.7.0 — Pages (`desktop-v1.7.0`, 2026-10-02)
-
-#### Scrollr 1.7.0 — Pages
-
-The bar has a new default. Instead of chips scrolling by, each widget gets **a whole page of the bar**: NFL is a row of games, NPR a row of headlines, Stocks a row of quotes, in equal columns that fill your screen. Nothing moves while a page is up; after a few seconds it swipes out and the next widget swipes in. Continuous scrolling is still there in Settings › Ticker if you prefer it.
-
-**The band.** The left end of the bar now tells you where you are without a word to read: a colour-coded strip for your widgets, the widget's name, a dot when something is happening (red = games live, green = market open, the widget's colour = fresh stories), and a row of pills for its pages — the current one fills as the page's time runs out, the ones you've seen are lit. Hover the bar for ‹ ˄ ˅ › : ‹ › walk every page, ˄ ˅ skip a widget. Arrow keys and the wheel do the same.
-
-**Every page is full.** A short watchlist tops up with popular symbols (marked with a +) until you add your own. Live games and your teams lead. A page shows exactly one page per lap, so a long feed doesn't hold the bar.
-
-**GitHub, connected.** Press **Connect GitHub** in the widget, pick the repos Scrollr can see, and they show up on their own — private ones included. Each repo's chip says one thing: a green dot when main is passing, red with the workflow when it breaks, a pulse while your branch is running, and a count when something is waiting on you. Pull requests that need you — review requested, changes requested, failing checks — get their own page on the bar. Choose what counts in the widget, and set quiet hours so the bar stays silent when you want it to.
-
-**Fewer settings.** Colors, item order, font weight and the compact density are gone — one bar, one look, ten themes. Startup and Shortcuts now live under App.
-
-**Also**
-- Clock and Weather are free and never use a widget slot.
-- A new account starts with NPR + Stocks and the Clock on the edge.
-- The catalog finds stocks and crypto by symbol.
-- The edge zone (clocks, weather, pins) never takes more than 40% of the bar.
-- Weather ranges print in your unit; alert amber reads on every theme.
-- All ten themes pass 4.5:1 on the bar.
-- Scrollr starts with your computer by default on new installs (one-time notice; turn it off under App › Startup).
-
-Existing users are moved to Pages once, with a notice; switch back any time.
-
-### Scrollr 1.6.10 — Something on your bar from the first second (`desktop-v1.6.10`, 2026-09-30)
-
-#### New
-
-- **Your bar has something on it from the first second.** A brand-new account now starts with NPR headlines scrolling the moment you sign in, instead of an empty bar asking you to add a source. Remove it whenever you like; it won't come back.
-- **Stocks and Crypto work the moment you add them.** Stocks now starts with Apple, Microsoft, Nvidia, Amazon and Tesla, and Crypto with Bitcoin and Ethereum. Swap them for your own anytime.
-
-#### Fixes
-
-- **No more surprise sign-outs.** Some of you were being signed out every few days, especially with the bar on more than one monitor. The app's windows were racing each other to renew your session; now only one of them does it.
-- **The bar no longer jumps when it starts.** Scrollr's fonts now ship inside the app instead of loading from the internet, so the bar draws once, at the right size, even offline.
-- **European football is back.** Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and Champions League fixtures had disappeared during the international break; they're back, along with handball and rugby. (This one was fixed on our servers last night, so you already have it.)
-
-Update from the app or at https://myscrollr.com/download.
