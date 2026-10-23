@@ -56,7 +56,7 @@ jobs:
             test -z "$tree"
             # shortcut: Tauri's Windows updater still requires zip 4; it verifies
             # our release signature before extraction. Remove these exceptions
-            # when upstream adopts zip >=9 (SCROLLR-373). Never accept unsigned updates.
+            # when upstream adopts zip >=9 (SCROLLR-385). Never accept unsigned updates.
             cargo audit --ignore RUSTSEC-2026-0235 --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
           else
             # SQLx's optional MySQL RSA dependency is not compiled by our PostgreSQL services.
