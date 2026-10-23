@@ -1,34 +1,37 @@
-# Security hardening status - 23 October 2026
+# Scrollr security hardening — 23 October 2026
 
-## Confirmed shipped
+## Verified production protections
 
-PR #516 / main 2696fb8 / deploy 39913018109 passed production readiness. Staff membership mutations serialize with actor revalidation; revoked staff streams expire. Unverified profile email writes are disabled before any partial mutation, while name updates work (SCROLLR-341, SCROLLR-372). All four incident accounts remain suspended on the latest read. Session endpoint response was inconclusive; no claim of independently enumerated sessions.
+- Server release: [server-2026.10.23.2](https://github.com/doughknee/myscrollr/releases/tag/server-2026.10.23.2).
+- [Deployment 39918055314](https://github.com/doughknee/myscrollr/actions/runs/39918055314) passed production readiness; all five application deployments were pinned to the reviewed security revision and ready.
+- Staff membership changes revalidate authority; revoked staff lose open support streams. Profile email writes are blocked until verified mailbox changes are implemented; display-name updates remain supported.
+- Account invitations require an exact, unique primary-email identity match.
+- Support approval links use confirmation POST requests, expiring single-use tokens, and fail closed without a signing key. Discord support actions require configured app/guild identity plus Administrator or Manage Server permission.
+- Support draft generation no longer retrieves or renders other customers' raw case histories. Website error reports omit request/navigation breadcrumbs and tracing.
+- Production application pods no longer mount Kubernetes service-account tokens. Link-local metadata access is blocked; live core-to-ingester readiness requests still succeeded.
+- Finance request failures remove provider URLs before logging. Embedded Motion dependency credentials were removed from current desktop and promotional dependency files, and private installation suppresses credential-bearing output.
+- Dependency and committed-secret checks now run on relevant pull requests and main commits. No recurring external scheduler was created.
 
-## Second batch - awaiting CI and deployment
+## User data and availability checks
 
-- Exact verified identity matching for invite completion (379).
-- Reject empty approval signing keys and nonexpiring tokens; confirmation POST before support send/skip; Discord actions restricted to configured guild/application administrators/managers (378).
-- Remove other customers' raw case histories from reply generation, including defensive rejection of supplied Similar context (382).
-- Remove OAuth request/navigation details and tracing from client error telemetry (374).
-- Restrict the development command bus to loopback and its own origin, with JSON-only mutations (375).
-- Remove embedded Motion registry credentials; private installer suppresses token-bearing failure output and logs, build uses a BuildKit secret (376).
-- Patch Go/JS/Rust dependencies, pin channel binary lockfiles, check advisories on PR/main (373).
-- Strip unused Kubernetes service-account token mounts and block link-local egress for all application workloads, with explicit DNS and core-to-ingester paths (384).
-- Strip finance HTTP request URLs from errors before logging (380).
+Read-only comparison preserved all 129 RSS target records, the complete URL fingerprint, all 24 custom-feed ownership records and the one target shared by multiple users. All four incident accounts remain suspended. No customer feeds were deleted by this hardening batch. Of the enabled sources, 123 had succeeded within 15 minutes. Three curated sources became enabled during the service restart, consistent with its existing curated-feed startup seeding.
 
-## Validation so far
+All service health checks were healthy. Public feed, website and auth discovery returned 200. Anonymous protected API routes returned 401/403. The existing signed-in account page loaded its profile and plan without browser console errors. Fresh signup was not repeated; the earlier human Turnstile/login check passed before this batch.
 
-Full Go suite with race detector and disposable PostgreSQL passed. Finance Rust tests, including schema contract and synthetic credential-error checks, passed. Website 416 tests and desktop 1002 tests passed. Website production build and desktop typecheck passed. Network policy server-side dry-run passed. Independent reviewers' build/network issues are corrected. Clean Docker embed build passed; the npm no-save install preserved the lockfile byte-for-byte. Signed Discord nonstaff handler regression passed. No production customer writes, feed cleanup, or attack requests used in these checks.
+## Desktop release
 
-## Bounded dependency exceptions and remaining work
+[Desktop 1.7.2](https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.7.2) is published from reviewed commit 631d7826. PR #518 aligned the updater Rust/JavaScript versions and added a regression test. All platform builds and final publishing/signature jobs passed in [release workflow 39991274744](https://github.com/doughknee/myscrollr/actions/runs/39991274744). Every updater entry was independently verified against the release public key. The Windows application and both installers have valid Authenticode signatures and timestamps from the same signer. macOS app and DMG notarization passed. The public latest.json serves the exact verified 1.7.2 manifest with all nine platform entries preserved from 1.7.1. Users must update to receive desktop protections.
 
-- Go govulncheck: no vulnerable calls after Go 1.26.10 and library upgrades. Production npm audits: zero advisories. Website development-only dependency advisories remain; do not expose dev servers publicly.
-- Rust optional rsa (SQLx MySQL) and rkyv are absent from compiled graphs; CI asserts this before advisory exceptions. Tauri Windows updater still uses zip 4 even in upstream 2.14.0. The zip >=9 fixes cannot be applied by a lock-only compatible update. Current updater verifies a release signature before archive extraction. Three zip advisories remain explicitly excepted and tracked in 385; signed malicious archives or signer compromise remain a risk. No claim of a fully clean cargo audit.
-- Motion credential was already present in git history. The scan also found the same embedded token in the unused promo dependency; that copy is removed too. Repository cleanup does not revoke it. Owner rotation remains pending (376); no value retained in this report.
-- Verified profile mailbox-change flow (377), Stripe failed-event retryability (381), desktop token storage/native permissions/CSP (383), and webhook replay-window hardening remain follow-ups. No exploitable renderer injection was demonstrated during this audit.
-- Support email links now require confirmation; Discord operators need Administrator or Manage Server permission. Website staff tools remain available.
-- DigitalOcean's investigation of potential worker observability credential exposure remains unresolved. Current hardening cannot prove historic non-access or absence of customer-data theft. This was a source/configuration/dependency review with isolated tests, not an independent penetration test.
+## Remaining risks and owner actions
 
-## Historical credential scan
+1. **Urgent: rotate the API-Sports credential (SCROLLR-386).** A key in old git history matches the currently configured production key. Dashboard access is needed to coordinate replacement and verify sports ingestion. Historical disclosure creates provider quota/subscription abuse risk; it is not proof of customer-data access.
+2. **Rotate the Motion+ download token (SCROLLR-376).** Removing it from current files does not revoke copies in git history. Use provider controls; do not paste replacements into chat.
+3. **DigitalOcean investigation remains unresolved (SCROLLR-368).** The support session expired, so no new provider finding was verified this turn. Current application fixes cannot prove that no historical secrets or customer data were accessed.
+4. **Tracked follow-ups:** verified email changes (377), reliable Stripe failed-event retries (381), desktop credential storage/permissions/CSP (383), upstream Windows updater ZIP advisories (385), signed Discord request replay-window enforcement (387), and per-service secret/runtime permission isolation (388).
+5. **Dependency exceptions:** Windows updater ZIP advisories remain because a compatible upstream fix is unavailable; updater signatures are checked before extraction. Optional Rust rsa/rkyv packages are excluded from compiled graphs with CI assertions. Website development-only advisories remain; production npm audits have zero reported advisories.
 
-Gitleaks 8.30.1 scanned the tracked snapshot and 1,655 reachable commits with redacted output and no network access. It found a historical API-Sports key matching the currently configured production credential; provider rotation is urgent and requires dashboard access. No value is retained here. Other findings include Motion URLs, synthetic test keys, public Stripe/Logto identifiers, and build metadata; scan completeness is bounded by detector coverage. Current source cleanup does not revoke historical credentials.
+## Validation and limits
+
+Full Go race tests against disposable PostgreSQL, Rust schema/error-path tests, website and desktop unit tests, frontend builds, a clean embedded-ticker Docker build, signed Discord authorization regressions, private installer redaction checks and network-policy validation passed. The broad PR passed all 26 checks; the updater correction passed all 24 checks. Post-merge backend CI later failed only because the newly published server release made generated support release notes stale. PR #519 removed the desktop-only refresh restriction (SCROLLR-389); the support refresh completed successfully after desktop publication. The generated knowledge-base commit 92e869db passed backend CI and deployment 39994511900; website refresh 39994437162 and a manual server-tag refresh 39994726841 also passed. Final live health, nonempty public feed, download page version 1.7.2 and all four suspended accounts were rechecked successfully. Gitleaks scanned the tracked snapshot and 1,655 reachable commits with redacted output; detector coverage is not exhaustive.
+
+This is a source, dependency and configuration audit with bounded production checks, not a guarantee of security or an independent penetration test. No live customer messages or destructive attack probes were sent. Native installer behavior on users' physical machines and historical non-exfiltration are not verified.
