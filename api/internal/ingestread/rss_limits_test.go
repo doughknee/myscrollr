@@ -189,3 +189,70 @@ func TestRSSAuditStoresOnlyHashedActorAndCounts(t *testing.T) {
 		t.Fatalf("audit count=%d err=%v", count, err)
 	}
 }
+
+func TestRSSJanitorPrunesExpiredSecurityEvents(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+	ctx := context.Background()
+	const actor = "retention-test"
+	t.Cleanup(func() {
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM rss_security_events WHERE actor=$1`, actor)
+	})
+	if _, err := platform.DBPool.Exec(ctx, `INSERT INTO rss_security_events (hour, actor, reason)
+		VALUES (now() - interval '31 days', $1, 'expired'), (now() - interval '29 days', $1, 'recent')`, actor); err != nil {
+		t.Fatal(err)
+	}
+	runJanitorOnce(ctx)
+	var count int
+	var reason string
+	if err := platform.DBPool.QueryRow(ctx, `SELECT count(*), min(reason) FROM rss_security_events WHERE actor=$1`, actor).Scan(&count, &reason); err != nil || count != 1 || reason != "recent" {
+		t.Fatalf("retention count=%d reason=%s err=%v", count, reason, err)
+	}
+}
+
+func TestRSSOverlappingTargetsAcrossAccounts(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	prefix := fmt.Sprintf("rss-overlap-%d", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_, _ = platform.DBPool.Exec(context.Background(), `DELETE FROM user_custom_feeds WHERE logto_sub IN ($1,$2)`, prefix+"a", prefix+"b")
+		_, _ = platform.DBPool.Exec(context.Background(), `DELETE FROM tracked_feeds WHERE added_by IN ($1,$2)`, prefix+"a", prefix+"b")
+	})
+	var forward, reverse []string
+	for i := 0; i < 40; i++ {
+		forward = append(forward, fmt.Sprintf("https://example.com/%s/%02d", prefix, i))
+		reverse = append(reverse, fmt.Sprintf("https://example.com/%s/%02d", prefix, 39-i))
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for i, urls := range [][]string{forward, reverse} {
+		go func(i int, urls []string) {
+			<-start
+			tx, err := platform.DBPool.Begin(ctx)
+			if err != nil {
+				results <- err
+				return
+			}
+			defer tx.Rollback(ctx)
+			err = SyncRSSFeeds(ctx, tx, prefix+string(rune('a'+i)), rssLimitConfig(urls...))
+			if err == nil {
+				err = tx.Commit(ctx)
+			}
+			results <- err
+		}(i, urls)
+	}
+	close(start)
+	for i := 0; i < 2; i++ {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+}

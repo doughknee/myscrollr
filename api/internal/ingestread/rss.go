@@ -659,6 +659,10 @@ func runJanitorOnce(parent context.Context) {
 		return
 	}
 
+	if _, err := platform.DBPool.Exec(ctx, `DELETE FROM rss_security_events WHERE hour < now() - interval '30 days'`); err != nil {
+		log.Print("[RSS Janitor] security event retention step failed")
+	}
+
 	// Step 1 — disable broken curated feeds (operator action required
 	// for actual removal).
 	disabled, err := disableBrokenCuratedFeeds(ctx)

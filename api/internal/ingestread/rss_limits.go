@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
@@ -135,6 +136,8 @@ func SyncRSSFeeds(ctx context.Context, tx pgx.Tx, sub string, config map[string]
 			return err
 		}
 	}
+	// Shared targets must acquire unique-key locks in the same order across accounts.
+	sort.SliceStable(parsed.Feeds, func(i, j int) bool { return parsed.Feeds[i].URL < parsed.Feeds[j].URL })
 	seen := make(map[string]bool)
 	for _, feed := range parsed.Feeds {
 		if seen[feed.URL] {
