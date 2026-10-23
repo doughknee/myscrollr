@@ -10,6 +10,13 @@ permissions:
   contents: read
 
 jobs:
+  committed-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Scan current files without sending source or findings off the runner
+        run: docker run --rm --network none -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f dir /repo --redact --no-banner
+
   go-vulnerabilities:
     runs-on: ubuntu-latest
     steps:
