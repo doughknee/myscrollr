@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
@@ -100,7 +101,13 @@ func applyStarter(ctx context.Context, userID string, types []string) ([]platfor
 	var created []platform.Widget
 	if !hasWidgets {
 		for _, wt := range types {
-			cfgJSON, _ := json.Marshal(configOrDefault(wt, nil))
+			config := configOrDefault(wt, nil)
+			if platform.DataSourceForWidget(wt) == "rss" {
+				if err := ingestread.SyncRSSFeeds(ctx, tx, userID, config); err != nil {
+					return nil, err
+				}
+			}
+			cfgJSON, _ := json.Marshal(config)
 			var w platform.Widget
 			var cfgBytes []byte
 			if err := tx.QueryRow(ctx, `

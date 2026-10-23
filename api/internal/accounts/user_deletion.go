@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -86,6 +87,15 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export PostHog analytics"})
 	}
 	archive["posthog_analytics"] = postHogAnalytics
+	if actor := platform.HashUserSub(userID); actor != "" {
+		var audit json.RawMessage
+		if err := platform.DBPool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
+			'hour', hour, 'reason', reason, 'attempts', attempts, 'first_seen', first_seen, 'last_seen', last_seen) ORDER BY hour), '[]'::jsonb)
+			FROM rss_security_events WHERE actor=$1`, actor).Scan(&audit); err != nil {
+			return c.Status(500).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export security activity"})
+		}
+		archive["rss_security_activity"] = audit
+	}
 
 	// widgets
 	if chans, err := platform.GetUserWidgets(userID); err == nil {
@@ -558,6 +568,11 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	defer tx.Rollback(ctx)
 	if err := lockAccountMutation(ctx, tx, logtoSub); err != nil {
 		return fmt.Errorf("lock account mutation: %w", err)
+	}
+	if actor := platform.HashUserSub(logtoSub); actor != "" {
+		if _, err := tx.Exec(ctx, `DELETE FROM rss_security_events WHERE actor=$1`, actor); err != nil {
+			return fmt.Errorf("delete RSS security activity: %w", err)
+		}
 	}
 
 	// Widget configs (user_widgets rows)

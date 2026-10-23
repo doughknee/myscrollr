@@ -172,7 +172,7 @@ func queryUserCatalog(ctx context.Context, userSub string, includeFailing bool) 
 	curatedClauses := "WHERE is_default = true AND is_enabled = true"
 	// Safety net: even if user_custom_feeds contains a row for a URL that's
 	// also a curated default, exclude it here so the UNION never returns
-	// the same URL twice. The runtime guard in syncRSSFeedsToTracked
+	// the same URL twice. The runtime guard in SyncRSSFeeds
 	// prevents new pollution; this filter is defense in depth.
 	customClauses := "WHERE ucf.logto_sub = $1 AND (tf.is_enabled IS NULL OR tf.is_enabled = true) AND NOT EXISTS (SELECT 1 FROM tracked_feeds tf2 WHERE tf2.url = ucf.url AND tf2.is_default = true)"
 	if !includeFailing {
@@ -407,22 +407,18 @@ func rssDashboard(ctx context.Context, userSub string) map[string]interface{} {
 	return map[string]interface{}{"rss": items}
 }
 
-// rssLifecycle handles channel lifecycle events in-process. Unlike the
-// other local sources, rss does real work here: syncing the user's
-// custom feed URLs into tracked_feeds/user_custom_feeds so the Rust
-// poller discovers them. (The subscriber-set maintenance the proxied
-// handler also did was write-only — ADR-0002 Appendix A — and is gone.)
+// Polling targets commit with widget writes; lifecycle only invalidates caches.
 func rssLifecycle(event, userSub string, config, oldConfig map[string]interface{}, enabled bool) {
 	ctx := context.Background()
 	switch event {
 	case "created":
-		go syncRSSFeedsToTracked(userSub, config)
+		invalidateUserCatalogCache(ctx, userSub)
 	case "updated":
 		if config == nil {
 			return
 		}
 		platform.Rdb.Del(ctx, CacheKeyRSSPrefix+userSub)
-		go syncRSSFeedsToTracked(userSub, config)
+		invalidateUserCatalogCache(ctx, userSub)
 	case "deleted":
 		platform.Rdb.Del(ctx, CacheKeyRSSPrefix+userSub)
 	case "sync":
@@ -565,101 +561,6 @@ func PublicRSS(ctx context.Context, feedURLs []string) ([]RssItem, error) {
 	return items, rows.Err()
 }
 
-// syncRSSFeedsToTracked upserts feed URLs from a user's RSS channel config
-// into tracked_feeds (the polling-target table, deduplicated on URL) and
-// user_custom_feeds (the per-user visibility row the catalog reads).
-// Curated-default URLs are skipped for the latter so the catalog UNION
-// never re-labels them as "Custom".
-func syncRSSFeedsToTracked(userSub string, config map[string]interface{}) {
-	if err := ValidateRSSConfig(config); err != nil {
-		log.Printf("[RSS] Unsafe feed configuration rejected")
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[RSS] PANIC in syncRSSFeedsToTracked for user %s: %v", userSub, r)
-		}
-	}()
-
-	// Dedicated timeout context — this runs in a background goroutine,
-	// not tied to any HTTP request lifecycle.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		log.Printf("[RSS] Failed to marshal config for sync: %v", err)
-		return
-	}
-
-	var parsed struct {
-		Feeds []struct {
-			URL  string `json:"url"`
-			Name string `json:"name"`
-		} `json:"feeds"`
-	}
-	if err := json.Unmarshal(configJSON, &parsed); err != nil {
-		log.Printf("[RSS] Failed to parse feeds from config: %v", err)
-		return
-	}
-
-	// Preload curated default URLs so we can skip writing duplicates into
-	// user_custom_feeds.
-	curatedURLs := make(map[string]struct{})
-	curatedRows, curErr := platform.DBPool.Query(ctx, `SELECT url FROM tracked_feeds WHERE is_default = true`)
-	if curErr != nil {
-		log.Printf("[RSS] Failed to load curated URLs for sync (continuing without dedup): %v", curErr)
-	} else {
-		for curatedRows.Next() {
-			var u string
-			if scanErr := curatedRows.Scan(&u); scanErr == nil {
-				curatedURLs[u] = struct{}{}
-			}
-		}
-		curatedRows.Close()
-	}
-
-	for _, feed := range parsed.Feeds {
-		if feed.URL == "" {
-			continue
-		}
-		name := feed.Name
-		if name == "" {
-			name = feed.URL
-		}
-
-		// Global polling target, deduplicated on URL: two users adding
-		// the same URL still get one row (the Rust service polls each
-		// unique URL once). added_by records whoever was first.
-		_, err := platform.DBPool.Exec(ctx, `
-			INSERT INTO tracked_feeds (url, name, category, is_default, is_enabled, added_by)
-			VALUES ($1, $2, 'Custom', false, true, $3)
-			ON CONFLICT (url) DO NOTHING
-		`, feed.URL, name, userSub)
-		if err != nil {
-			log.Printf("[RSS] Failed to sync feed %s to tracked_feeds: %v", feed.URL, err)
-			continue
-		}
-
-		if _, isCurated := curatedURLs[feed.URL]; isCurated {
-			continue
-		}
-
-		// Per-user visibility row. ON CONFLICT updates the name so
-		// renaming an already-added feed works.
-		_, err = platform.DBPool.Exec(ctx, `
-			INSERT INTO user_custom_feeds (logto_sub, url, name, category)
-			VALUES ($1, $2, $3, 'Custom')
-			ON CONFLICT (logto_sub, url) DO UPDATE SET name = EXCLUDED.name
-		`, userSub, feed.URL, name)
-		if err != nil {
-			log.Printf("[RSS] Failed to sync feed %s to user_custom_feeds for %s: %v", feed.URL, userSub, err)
-		}
-	}
-
-	invalidateUserCatalogCache(ctx, userSub)
-}
-
 // =============================================================================
 // Auto-cleanup janitor
 // =============================================================================
@@ -756,6 +657,10 @@ func runJanitorOnce(parent context.Context) {
 	if !locked {
 		log.Printf("[RSS Janitor] another replica holds the lock — skipping pass")
 		return
+	}
+
+	if _, err := platform.DBPool.Exec(ctx, `DELETE FROM rss_security_events WHERE hour < now() - interval '30 days'`); err != nil {
+		log.Print("[RSS Janitor] security event retention step failed")
 	}
 
 	// Step 1 — disable broken curated feeds (operator action required

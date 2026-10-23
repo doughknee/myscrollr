@@ -3,9 +3,12 @@ package widgets
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
@@ -94,6 +97,39 @@ func GetWidgets(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"widgets": widgets})
 }
 
+// Save the widget and its polling targets atomically, including quota checks.
+func saveWidget(userID, widgetType string, config map[string]interface{}, query string, args ...interface{}) (platform.Widget, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var widget platform.Widget
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		return widget, err
+	}
+	defer tx.Rollback(context.Background())
+	if platform.DataSourceForWidget(widgetType) == "rss" && config != nil {
+		if err := ingestread.SyncRSSFeeds(ctx, tx, userID, config); err != nil {
+			return widget, err
+		}
+	}
+	var raw []byte
+	if err := tx.QueryRow(ctx, query, args...).Scan(&widget.ID, &widget.LogtoSub, &widget.WidgetType, &widget.Enabled, &widget.TickerEnabled, &raw, &widget.CreatedAt, &widget.UpdatedAt); err != nil {
+		return widget, err
+	}
+	if err := json.Unmarshal(raw, &widget.Config); err != nil {
+		return widget, err
+	}
+	return widget, tx.Commit(ctx)
+}
+
+func rssWriteFailure(c *fiber.Ctx, userID string, err *ingestread.RSSWriteError) error {
+	ingestread.RecordRSSAbuse(userID, err.Reason)
+	if err.RetryAfter > 0 {
+		c.Set("Retry-After", strconv.Itoa(err.RetryAfter))
+	}
+	return c.Status(err.Status).JSON(platform.ErrorResponse{Status: "error", Error: err.Message})
+}
+
 // CreateWidget adds a new widget for the authenticated user.
 func CreateWidget(c *fiber.Ctx) error {
 	userID := platform.GetUserID(c)
@@ -163,6 +199,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	req.Config = configOrDefault(req.WidgetType, req.Config)
 	if platform.DataSourceForWidget(req.WidgetType) == "rss" {
 		if err := ingestread.ValidateRSSConfig(req.Config); err != nil {
+			ingestread.RecordRSSAbuse(userID, "invalid_destination")
 			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
 		}
 	}
@@ -208,17 +245,16 @@ func CreateWidget(c *fiber.Ctx) error {
 
 	configJSON, _ := json.Marshal(req.Config)
 
-	var ch platform.Widget
-	var configBytes []byte
-	err := platform.DBPool.QueryRow(context.Background(), `
+	ch, err := saveWidget(userID, req.WidgetType, req.Config, `
 		INSERT INTO user_widgets (logto_sub, widget_type, config)
 		VALUES ($1, $2, $3)
 		RETURNING id, logto_sub, widget_type, enabled, ticker_enabled, config, created_at, updated_at
-	`, userID, req.WidgetType, configJSON).Scan(
-		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.TickerEnabled,
-		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
-	)
+	`, userID, req.WidgetType, configJSON)
 	if err != nil {
+		var limited *ingestread.RSSWriteError
+		if errors.As(err, &limited) {
+			return rssWriteFailure(c, userID, limited)
+		}
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
 			log.Printf("[Widgets] create conflict for %s: %s already added", userID, req.WidgetType)
 			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
@@ -231,10 +267,6 @@ func CreateWidget(c *fiber.Ctx) error {
 			Status: "error",
 			Error:  "Failed to create widget",
 		})
-	}
-
-	if err := json.Unmarshal(configBytes, &ch.Config); err != nil {
-		ch.Config = map[string]interface{}{}
 	}
 
 	afterWidgetCreated(context.Background(), userID, ch)
@@ -338,6 +370,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 
 	if platform.DataSourceForWidget(widgetType) == "rss" && req.Config != nil {
 		if err := ingestread.ValidateRSSConfig(req.Config); err != nil {
+			ingestread.RecordRSSAbuse(userID, "invalid_destination")
 			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
 		}
 	}
@@ -409,13 +442,12 @@ func UpdateWidget(c *fiber.Ctx) error {
 		RETURNING id, logto_sub, widget_type, enabled, ticker_enabled, config, created_at, updated_at
 	`, strings.Join(setClauses, ", "))
 
-	var ch platform.Widget
-	var configBytes []byte
-	err := platform.DBPool.QueryRow(context.Background(), query, args...).Scan(
-		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.TickerEnabled,
-		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
-	)
+	ch, err := saveWidget(userID, widgetType, req.Config, query, args...)
 	if err != nil {
+		var limited *ingestread.RSSWriteError
+		if errors.As(err, &limited) {
+			return rssWriteFailure(c, userID, limited)
+		}
 		errStr := err.Error()
 		if strings.Contains(errStr, "no rows") {
 			log.Printf("[Widgets] update 404 for %s: no %s row", userID, widgetType)
@@ -429,10 +461,6 @@ func UpdateWidget(c *fiber.Ctx) error {
 			Status: "error",
 			Error:  "Failed to update widget",
 		})
-	}
-
-	if err := json.Unmarshal(configBytes, &ch.Config); err != nil {
-		ch.Config = map[string]interface{}{}
 	}
 
 	// Rebuild SSE topic subscriptions on every replica holding a

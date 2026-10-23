@@ -22,6 +22,9 @@ var blockedFeedNetworks = []netip.Prefix{
 }
 
 func validateFeedURL(raw string) error {
+	if len(raw) > 4096 {
+		return fmt.Errorf("RSS feed URL is too long")
+	}
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Opaque != "" {
 		return fmt.Errorf("RSS feeds require a public HTTP(S) URL without credentials")
@@ -58,13 +61,20 @@ func ValidateRSSConfig(config map[string]interface{}) error {
 	}
 	var parsed struct {
 		Feeds []struct {
-			URL string `json:"url"`
+			URL  string `json:"url"`
+			Name string `json:"name"`
 		} `json:"feeds"`
 	}
 	if err := json.Unmarshal(encoded, &parsed); err != nil {
 		return fmt.Errorf("Invalid RSS feed configuration")
 	}
+	if len(parsed.Feeds) > MaxCustomFeeds {
+		return fmt.Errorf("A widget can contain up to %d feeds", MaxCustomFeeds)
+	}
 	for _, feed := range parsed.Feeds {
+		if len(feed.Name) > 512 {
+			return fmt.Errorf("RSS feed name is too long")
+		}
 		if err := validateFeedURL(feed.URL); err != nil {
 			return err
 		}
