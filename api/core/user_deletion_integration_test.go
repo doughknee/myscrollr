@@ -189,9 +189,15 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 	stub := newLogtoStub(t)
 	const sub = "user_purge_full"
 	seedPurgeableUser(t, sub, false)
+	t.Setenv("SENTRY_USER_SALT", "purge-test-salt")
+	actor := platform.HashUserSub(sub)
+	testsupport.MustExec(t, `INSERT INTO rss_security_events (hour, actor, reason) VALUES (date_trunc('hour', now()), $1, 'rate_limit')`, actor)
 
 	if err := accounts.PurgeUserAccount(context.Background(), sub); err != nil {
 		t.Fatalf("purgeUserAccount: %v", err)
+	}
+	if n := queryCount(t, `SELECT count(*) FROM rss_security_events WHERE actor=$1`, actor); n != 0 {
+		t.Fatalf("security activity survives purge: %d", n)
 	}
 
 	// Logto delete happened, and for the right user.
