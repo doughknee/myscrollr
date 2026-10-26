@@ -7,9 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends libwebp-dev \
 COPY inline-image.php patch-inline-image.php /usr/local/lib/scrollr-security/
 COPY security-audit.php /usr/local/lib/scrollr-security/
 COPY security-audit-nginx.conf /etc/nginx/conf.d/scrollr-audit.conf
+COPY nginx.conf /etc/nginx/sites-enabled/osticket.conf
+COPY php.ini /usr/local/etc/php/conf.d/zz-osticket.ini
+COPY php-fpm-security.conf /usr/local/etc/php-fpm.d/zzz-scrollr-security.conf
 COPY start-security.sh /usr/local/bin/start-scrollr-security
 RUN chmod 755 /usr/local/bin/start-scrollr-security \
  && sed -i '/server_tokens off;/a\    access_log syslog:server=unix:/run/scrollr-audit/events.sock,nohostname,tag=scrollr_audit scrollr_audit;' /etc/nginx/sites-enabled/osticket.conf \
  && sed -i '/server_tokens off;/a\    error_log syslog:server=unix:/run/scrollr-audit/events.sock,nohostname,tag=scrollr_error error;' /etc/nginx/sites-enabled/osticket.conf \
- && nginx -t
+ && nginx -t && php-fpm -t
 CMD ["start-scrollr-security"]
