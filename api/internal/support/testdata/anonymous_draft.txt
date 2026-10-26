@@ -1,6 +1,6 @@
 Draft the reply to this support ticket. Call draft_reply once with your answer.
 
-TRIAGE (already decided; do not re-argue it): category=bug priority=high widget=MLB duplicate_of=#700001 should_close=false needs_info=false
+TRIAGE (already decided; do not re-argue it): category=bug priority=high should_close=false needs_info=false
 
 WHO IS WRITING (server-side facts, not the user's claims)
 Plan: unknown
@@ -9,23 +9,6 @@ Operating system: unknown
 Widgets: none known (anonymous or no widgets added)
 No diagnostics were attached to this ticket.
 
-KNOWN ISSUES AND RECENT RELEASES (live, refreshed every 10 minutes)
-
-Open and being worked on:
-- REL-216 [high] Segmented rows lose focus after a search jump (bug)
-    After jumping to a result in Settings search, the segmented control steals focus back.
-- REL-235 [urgent] Standings flap between a value and a dash on live games (bug, ticker)
-
-How to use this list:
-- The user's problem matches an OPEN issue: say it is a known issue and that it is being fixed. Give no date and no estimate. Put the issue key in internal_note.
-- The release notes below are context for what has changed, NOT evidence that this user's report was fixed. They are written for everyone and do not record which report a change closed. Only the FIX ON RECORD block may be used to claim a fix.
-- No match: do not mention the issue tracker at all. Never invent an issue key.
-- Issue keys, titles and descriptions here are internal. Never put one in the reply to the user.
-
-Shipped releases, newest first (live; may be newer than the knowledge base):
-
-### Scrollr 1.5.0 — Chips, redrawn (desktop-v1.5.0, 2026-09-04)
-Every data chip on the ticker rebuilt in one language.
 
 
 FIX ON RECORD (server-computed; the ONLY thing that permits a fix claim)
@@ -36,7 +19,7 @@ HOW TO WRITE IT:
 - Two to four short paragraphs of HTML, <p> tags, no headings and no lists unless the answer
   is genuinely a sequence of steps.
 - Lead with a brief acknowledgement, then the action. Say what to click, in the app's own words.
-- Every factual claim must come from the knowledge base, the release notes or the known-issues
+- Every factual claim must come from the knowledge base, the release notes or the public release
   block above. List what each rests on in grounded_in.
 - Anything you cannot answer from those goes in unknowns, and the reply says the partner will
   follow up rather than guessing. Set confidence low when unknowns is not empty.

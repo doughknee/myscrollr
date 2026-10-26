@@ -190,7 +190,6 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 
 	// Recent summaries for dupe-detection (same Redis sliding window
 	// the initial-message flow uses). Cheap to fetch.
-	recent := FetchRecentTicketSummaries(ctx)
 
 	triage := triageTicket(ctx, TriageInput{
 		UserCategory:      "", // user didn't pick anything — they're replying to email
@@ -198,7 +197,6 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		UserName:          userName,
 		Subject:           ev.Subject,
 		Body:              body,
-		RecentSummaries:   recent,
 		IsReply:           true,
 		ReplyTicketNumber: ev.TicketNumber,
 		// The whole conversation, not just our last reply: a follow-up

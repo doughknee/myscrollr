@@ -1,0 +1,8 @@
+# Extend the verified runtime without changing PHP or the live data volume.
+FROM scrollr/osticket-runtime:8.2.35
+RUN apt-get update && apt-get install -y --no-install-recommends libwebp-dev \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+ && docker-php-ext-install -j2 gd \
+ && rm -rf /var/lib/apt/lists/*
+COPY inline-image.php patch-inline-image.php /usr/local/lib/scrollr-security/
+CMD ["sh", "-c", "php /usr/local/lib/scrollr-security/patch-inline-image.php && exec start-osticket"]

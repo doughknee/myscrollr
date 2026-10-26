@@ -102,7 +102,6 @@ func regenerateDraft(ctx context.Context, ticketNumber string) RegenOutcome {
 		UserName:          src.UserName,
 		Subject:           src.Subject,
 		Body:              src.UserMessageHTML,
-		RecentSummaries:   FetchRecentTicketSummaries(ctx),
 		IsReply:           src.IsReply,
 		ReplyTicketNumber: ticketNumber,
 		Thread:            FetchCaseThread(ctx, ticketNumber),

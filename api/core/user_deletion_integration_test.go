@@ -193,12 +193,21 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 	t.Setenv("SENTRY_USER_SALT", "purge-test-salt")
 	actor := platform.HashUserSub(sub)
 	testsupport.MustExec(t, `INSERT INTO rss_security_events (hour, actor, reason) VALUES (date_trunc('hour', now()), $1, 'rate_limit')`, actor)
+	testsupport.MustExec(t, `SELECT record_security_request($1,'source','GET','/users/me',200,$2)`, actor, sub)
 
 	if err := accounts.PurgeUserAccount(context.Background(), sub); err != nil {
 		t.Fatalf("purgeUserAccount: %v", err)
 	}
 	if n := queryCount(t, `SELECT count(*) FROM rss_security_events WHERE actor=$1`, actor); n != 0 {
 		t.Fatalf("security activity survives purge: %d", n)
+	}
+
+	if n := queryCount(t, `SELECT count(*) FROM security_request_audit WHERE actor=$1`, actor); n != 0 {
+		t.Fatal("request audit survives purge")
+	}
+	testsupport.MustExec(t, `SELECT record_security_request($1,'source','GET','/users/me',200,$2)`, actor, sub)
+	if n := queryCount(t, `SELECT count(*) FROM security_request_audit WHERE actor=$1`, actor); n != 0 {
+		t.Fatal("late request recreated purged audit")
 	}
 
 	// Logto delete happened, and for the right user.

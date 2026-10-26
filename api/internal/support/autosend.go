@@ -226,7 +226,14 @@ func sendDraftNow(ctx context.Context, draftID int64, status string) {
 		log.Printf("[Autosend] draft %d not sent: autonomous sending is off or paused", draftID)
 		return
 	}
-	if err := markDraftDecided(ctx, draftID, status, ""); err != nil {
+	if draft.Intervened {
+		return
+	}
+	if disposition, reason := decideDisposition(gatherDispositionSignals(ctx, draft)); disposition == dispositionEscalate {
+		_ = recordDisposition(ctx, draft.ID, disposition, reason, nil)
+		return
+	}
+	if err := markDraftDecidedWithPolicy(ctx, draftID, status, "", true); err != nil {
 		log.Printf("[Autosend] draft %d not claimed: %v", draftID, err)
 		return
 	}

@@ -61,6 +61,8 @@ func TestDisposition_Table(t *testing.T) {
 
 	closable := sendableSignals()
 	closable.ShouldClose = true
+	closable.IsReply = true
+	closable.ResolutionText = "That fixed it, thanks!"
 	closable.GroundedIn = "" // "glad that fixed it" rests on the user, not the KB
 
 	nothing := sendableSignals()
@@ -331,6 +333,7 @@ func seedDraft(t *testing.T, ticket, category, disposition string, intervened bo
 		DraftBodyHTML:   "<p>seed</p>",
 		AICategory:      category,
 		AIConfidence:    "high",
+		GroundedIn:      "Support KB",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -573,6 +576,10 @@ func TestFailedSendLeavesSentAtNull(t *testing.T) {
 	t.Cleanup(func() { sendApprovedReply = original })
 
 	id := seedDraft(t, "960002", "bug", dispositionAutoSend, false)
+	past := time.Now().Add(-time.Minute)
+	if err := recordDisposition(ctx, id, dispositionAutoSend, "fixture", &past); err != nil {
+		t.Fatal(err)
+	}
 	sendDraftNow(ctx, id, "approved")
 
 	d, _ := loadSupportDraft(ctx, id)

@@ -28,9 +28,6 @@ Operating system: unknown
 Widgets: none known (anonymous or no widgets added)
 No diagnostics were attached to this ticket.
 
-RECENT TICKETS (for duplicate detection only):
-null
-
 THE TICKET:
 From: curious <curious@example.com>
 Category the user picked: feedback

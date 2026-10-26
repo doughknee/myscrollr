@@ -102,6 +102,13 @@ func HandleExportUserData(c *fiber.Ctx) error {
 			return c.Status(500).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export security activity"})
 		}
 		archive["rss_security_activity"] = audit
+		if err := platform.DBPool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'hour',hour,'method',method,'endpoint',endpoint,'status',status,'requests',requests,
+            'first_seen',first_seen,'last_seen',last_seen) ORDER BY hour),'[]'::jsonb)
+            FROM security_request_audit WHERE actor=$1`, actor).Scan(&audit); err != nil {
+			return c.Status(500).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export security activity"})
+		}
+		archive["security_request_activity"] = audit
 	}
 
 	// widgets
@@ -577,6 +584,9 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		return fmt.Errorf("lock account mutation: %w", err)
 	}
 	if actor := platform.HashUserSub(logtoSub); actor != "" {
+		if _, err := tx.Exec(ctx, `DELETE FROM security_request_audit WHERE actor=$1`, actor); err != nil {
+			return fmt.Errorf("delete security request activity: %w", err)
+		}
 		if _, err := tx.Exec(ctx, `DELETE FROM rss_security_events WHERE actor=$1`, actor); err != nil {
 			return fmt.Errorf("delete RSS security activity: %w", err)
 		}

@@ -113,9 +113,10 @@ type TriageInput struct {
 	RecentSummaries []RecentTicketSummary
 	Widget          string // user-picked widget hint, if any
 
-	Context     TicketContext
-	KnownIssues string
-	Similar     []SimilarCase
+	Context            TicketContext
+	KnownIssues        string // legacy input, never sent to a model
+	PublicReleaseNotes string
+	Similar            []SimilarCase
 
 	// ProvenFix and StaleDays are the REL-259 facts: whether a shipped fix
 	// for THIS report is on record, and how long the reporter has been
@@ -158,9 +159,7 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 	if len(input.Body) > maxTriageBodyChars {
 		input.Body = input.Body[:maxTriageBodyChars] + "\n\n...[truncated]"
 	}
-	if input.KnownIssues == "" {
-		input.KnownIssues = knownIssuesBlock(ctx)
-	}
+	input.PublicReleaseNotes = publicReleaseNotes(ctx)
 
 	// A brand-new ticket has no case yet, so no link and no waiting: the zero
 	// values are already the truth for it, and they forbid a fix claim, which
@@ -203,7 +202,7 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 	result.Unknowns = draft.Unknowns
 	result.AskUserFor = draft.AskUserFor
 	result.InternalNote = draft.InternalNote
-	result.ShouldClose = cls.ShouldClose && draft.ShouldClose
+	result.ShouldClose = input.IsReply && explicitResolution(input.Body) && cls.ShouldClose && draft.ShouldClose
 	result.Usage.DraftIn = draftUsage.DraftIn
 	result.Usage.DraftOut = draftUsage.DraftOut
 	result.Usage.CacheRead += draftUsage.CacheRead
@@ -251,7 +250,7 @@ var classifyTool = map[string]interface{}{
 			},
 			"duplicate_of": map[string]interface{}{
 				"type":        "string",
-				"description": "Ticket number from RECENT TICKETS that this duplicates. Empty when it is not a duplicate.",
+				"description": "Always empty. Cross-customer duplicate detection is not available to this model.",
 			},
 			"should_close": map[string]interface{}{
 				"type":        "boolean",
@@ -284,6 +283,9 @@ func classifyTicket(ctx context.Context, in TriageInput) (*classification, Triag
 	}
 	if cls.Category == "" || cls.Priority == "" || cls.Summary == "" {
 		return nil, TriageUsage{}, fmt.Errorf("incomplete classification: %+v", cls)
+	}
+	if err := validateClassification(&cls); err != nil {
+		return nil, TriageUsage{}, err
 	}
 	return &cls, TriageUsage{
 		ClassifyIn: usage.InputTokens, ClassifyOut: usage.OutputTokens,
@@ -367,7 +369,7 @@ func draftReply(ctx context.Context, in TriageInput, cls *classification) (*repl
 	if strings.TrimSpace(d.ReplyHTML) == "" {
 		return nil, TriageUsage{}, fmt.Errorf("empty reply_html")
 	}
-	d.ReplyHTML = ensureSignOff(d.ReplyHTML)
+	d.ReplyHTML = sanitizeReplyHTML(ensureSignOff(d.ReplyHTML))
 	return &d, TriageUsage{
 		DraftIn: usage.InputTokens, DraftOut: usage.OutputTokens,
 		CacheRead: usage.CacheReadInputTokens, CacheWrite: usage.CacheCreationInputTokens,
@@ -522,11 +524,6 @@ KNOWLEDGE BASE
 
 // buildClassifyPrompt is the labelling prompt. Pure — the golden test pins it.
 func buildClassifyPrompt(in TriageInput) string {
-	recentJSON, _ := json.Marshal(in.RecentSummaries)
-	if len(recentJSON) == 0 {
-		recentJSON = []byte("[]")
-	}
-
 	var b strings.Builder
 	b.WriteString(`Classify this support ticket. Call classify_ticket once with your answer.
 
@@ -556,7 +553,6 @@ happened. The context block below says whether diagnostics were attached.
 		fmt.Fprintf(&b, "This is a FOLLOW-UP message on existing ticket #%s, not a new report.\n\n", in.ReplyTicketNumber)
 	}
 	b.WriteString(in.Context.render())
-	fmt.Fprintf(&b, "\nRECENT TICKETS (for duplicate detection only):\n%s\n", recentJSON)
 	b.WriteString("\n" + renderUserTicket(in))
 	return b.String()
 }
@@ -567,19 +563,18 @@ func buildDraftPrompt(in TriageInput, cls *classification) string {
 	b.WriteString("Draft the reply to this support ticket. Call draft_reply once with your answer.\n\n")
 
 	if cls != nil {
+		validated := *cls
+		if validateClassification(&validated) != nil {
+			validated = classification{}
+		}
+		cls = &validated
 		fmt.Fprintf(&b, "TRIAGE (already decided; do not re-argue it): category=%s priority=%s",
 			cls.Category, cls.Priority)
-		if cls.Widget != "" {
-			fmt.Fprintf(&b, " widget=%s", cls.Widget)
-		}
-		if cls.DuplicateOf != "" {
-			fmt.Fprintf(&b, " duplicate_of=#%s", cls.DuplicateOf)
-		}
 		fmt.Fprintf(&b, " should_close=%t needs_info=%t\n\n", cls.ShouldClose, cls.NeedsInfo)
 	}
 
 	b.WriteString(in.Context.render())
-	b.WriteString("\n" + in.KnownIssues + "\n")
+	b.WriteString("\n" + in.PublicReleaseNotes + "\n")
 	b.WriteString("\n" + renderFixRecord(in.ProvenFix, in.StaleDays, in.Context.AppVersion))
 
 	// Other customers' case content must never enter a customer-facing draft prompt.
@@ -616,7 +611,7 @@ HOW TO WRITE IT:
 - Two to four short paragraphs of HTML, <p> tags, no headings and no lists unless the answer
   is genuinely a sequence of steps.
 - Lead with a brief acknowledgement, then the action. Say what to click, in the app's own words.
-- Every factual claim must come from the knowledge base, the release notes or the known-issues
+- Every factual claim must come from the knowledge base, the release notes or the public release
   block above. List what each rests on in grounded_in.
 - Anything you cannot answer from those goes in unknowns, and the reply says the partner will
   follow up rather than guessing. Set confidence low when unknowns is not empty.

@@ -52,6 +52,8 @@ type dispositionSignals struct {
 	AskUserFor      string
 	NeedsInfo       bool
 	ShouldClose     bool
+	IsReply         bool
+	ResolutionText  string
 	DraftBody       string // what we would say to the user
 	UserText        string // what the user said to us — data, never instructions
 	OutboundLast24h int
@@ -78,6 +80,12 @@ type dispositionSignals struct {
 func decideDisposition(s dispositionSignals) (disposition, reason string) {
 	if !s.HasDraft {
 		return dispositionEscalate, "triage produced no reply"
+	}
+	if hit := firstMatch(s.UserText, securityPatterns); hit != "" {
+		return dispositionEscalate, "security-related submission requires staff review"
+	}
+	if s.ShouldClose && (!s.IsReply || !explicitResolution(s.ResolutionText)) {
+		return dispositionEscalate, "closure requested without an explicit resolved follow-up"
 	}
 	if hit := firstMatch(s.UserText, injectionPatterns); hit != "" {
 		return dispositionEscalate, fmt.Sprintf("ticket text contains instruction-shaped content (%q)", hit)
@@ -107,6 +115,9 @@ func decideDisposition(s dispositionSignals) (disposition, reason string) {
 	}
 	if s.CategoryDemoted {
 		return dispositionEscalate, fmt.Sprintf("category %q is demoted on its intervention rate", s.Category)
+	}
+	if !s.ShouldClose && firstMatch(s.DraftBody, []string{"closing this", "closing the ticket", "close this ticket", "closing it out"}) != "" {
+		return dispositionEscalate, "draft claims closure without a verified resolved follow-up"
 	}
 	if hit := firstMatch(s.DraftBody, promisePatterns); hit != "" {
 		return dispositionEscalate, fmt.Sprintf("the draft would promise something (%q)", hit)
@@ -157,7 +168,7 @@ func decideDisposition(s dispositionSignals) (disposition, reason string) {
 		return dispositionAutoAsk, reason
 	}
 	if s.ShouldClose {
-		return dispositionAutoClose, "the user confirmed the issue is resolved"
+		return dispositionAutoClose, "explicit resolved follow-up; both triage checks agree"
 	}
 
 	if strings.TrimSpace(s.GroundedIn) == "" {
@@ -534,6 +545,8 @@ func gatherDispositionSignals(ctx context.Context, draft *SupportDraft) disposit
 		AskUserFor:      draft.AskUserFor,
 		NeedsInfo:       draft.NeedsInfo,
 		ShouldClose:     draft.ShouldClose,
+		IsReply:         draft.OSTicketThreadEntryID > 0,
+		ResolutionText:  draft.UserMessageHTML,
 		DraftBody:       htmlToPlain(draft.DraftBodyHTML),
 		UserText:        draft.OriginalSubject + "\n" + htmlToPlain(draft.UserMessageHTML),
 		OutboundLast24h: outboundRepliesLast24h(ctx, draft.TicketNumber),
@@ -543,4 +556,38 @@ func gatherDispositionSignals(ctx context.Context, draft *SupportDraft) disposit
 		StaleDays:       caseStaleDays(ctx, draft.TicketNumber),
 		StaleAfter:      staleTicketDays(),
 	}
+}
+
+var securityPatterns = []string{"security test", "security report", "vulnerability", "penetration test", "pentest", "ssrf", "xss", "sql injection", "remote code execution", "credential exposure", "bug bounty", "public support endpoint"}
+
+// Only short, explicit acknowledgements may close automatically. Other wording gets review.
+func explicitResolution(body string) bool {
+	text := strings.ToLower(strings.TrimSpace(htmlToPlain(body)))
+	text = strings.Trim(text, " .!\r\n")
+	switch text {
+	case "resolved", "fixed", "it's fixed", "it is fixed", "that fixed it", "that fixed it, thanks", "that worked", "it works now", "it's working now", "it is working now", "problem solved", "issue resolved", "resolved, thanks", "thanks, that fixed it":
+		return true
+	}
+	return false
+}
+
+func validateClassification(c *classification) error {
+	switch c.Category {
+	case "bug", "feature", "feedback", "billing", "account", "widget":
+	default:
+		return fmt.Errorf("invalid classification category")
+	}
+	switch c.Priority {
+	case "low", "normal", "high", "emergency":
+	default:
+		return fmt.Errorf("invalid classification priority")
+	}
+	switch c.Sentiment {
+	case "", "calm", "frustrated", "angry":
+	default:
+		return fmt.Errorf("invalid classification sentiment")
+	}
+	// No free-text classifier fields cross into the drafting prompt.
+	c.Widget, c.DuplicateOf = "", ""
+	return nil
 }
