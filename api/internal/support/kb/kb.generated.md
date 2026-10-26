@@ -778,8 +778,14 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.1 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.2 -->
 The last 8 published releases, newest first, as users read them.
+
+### Support security records improved (`server-2026.10.26.2`, 2026-10-26)
+
+Support security records now help investigate suspicious requests while keeping message text, screenshot contents, and sign-in tokens out of those records.
+
+Normal support requests and screenshot uploads continue to work as before. No desktop update is required.
 
 ### Server update - Safer support and security records (`server-2026.10.26.1`, 2026-10-26)
 
@@ -844,15 +850,3 @@ The support queue now explains what needs your attention and gives you a clear n
 - Reply controls are easier to reach on mobile, and saved edits no longer leave an incorrect unsaved-changes warning.
 
 Staff console and support integration update; no desktop application update is required.
-
-### Staff console — full-history search and unified workflows (`admin-v1.0.0`, 2026-10-21)
-
-The staff console now brings users, support and analytics into one consistent workspace.
-
-- Find users and tickets from any admin page with Search or Ctrl/Cmd+K. Ticket search includes all retained history, with older, closed and dismissed cases available in small, fast-loading pages.
-- Work comfortably on a phone: search controls stay visible while results scroll, replies and confirmation panels fit smaller screens, and navigation is easier to reach.
-- Explore growth, desktop usage, revenue and support with consistent filters and focused detail drawers. Signup diagnostics use warmed snapshots to reduce waiting.
-- Keep the support queue focused with reversible Dismiss and Restore controls, readable conversations and clearer attention states.
-- Start from an action-focused Home page, with System health and traffic organized into distinct views.
-
-This release updates the staff website and API. It does not change the desktop app version.
