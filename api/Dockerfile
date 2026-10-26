@@ -53,14 +53,14 @@ CMD ["air", "-c", ".air.toml"]
 ######## Start a new stage from scratch #######
 FROM alpine:latest
 
-WORKDIR /root/
+WORKDIR /app/
 
 # Sentry release tagging — the runtime reads GIT_SHA via os.Getenv. Pass
 # COOLIFY_GIT_COMMIT (or equivalent) as a build arg at image-build time.
 # Defaults to "unknown" so local builds still work.
 ARG GIT_SHA=unknown
 ENV GIT_SHA=${GIT_SHA}
-ENV COUNTRY_DB_PATH=/root/dbip-country-lite.mmdb
+ENV COUNTRY_DB_PATH=/app/dbip-country-lite.mmdb
 
 # All URL env vars (API_URL, LOGTO_URL, LOGTO_JWKS_URL, YAHOO_CALLBACK_URL)
 # are supplied at runtime via K8s ConfigMap and Secrets.
@@ -74,6 +74,8 @@ COPY --from=builder /app/support-backfill .
 COPY --from=builder /app/support-regen .
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/dbip-country-lite.mmdb ./dbip-country-lite.mmdb
+
+USER 10001:10001
 
 # Expose port 8080 to the outside world
 EXPOSE 8080

@@ -10,6 +10,14 @@ permissions:
   contents: read
 
 jobs:
+  workload-boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 -m pip install PyYAML==6.0.3
+      - run: python3 scripts/check-workload-security.py
+      - run: python3 scripts/doks-firewall.test.py
+
   committed-secrets:
     runs-on: ubuntu-latest
     steps:
