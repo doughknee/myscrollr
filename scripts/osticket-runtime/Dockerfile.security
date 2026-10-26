@@ -5,4 +5,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends libwebp-dev \
  && docker-php-ext-install -j2 gd \
  && rm -rf /var/lib/apt/lists/*
 COPY inline-image.php patch-inline-image.php /usr/local/lib/scrollr-security/
-CMD ["sh", "-c", "php /usr/local/lib/scrollr-security/patch-inline-image.php && exec start-osticket"]
+COPY security-audit.php /usr/local/lib/scrollr-security/
+COPY security-audit-nginx.conf /etc/nginx/conf.d/scrollr-audit.conf
+COPY start-security.sh /usr/local/bin/start-scrollr-security
+RUN chmod 755 /usr/local/bin/start-scrollr-security \
+ && sed -i '/server_tokens off;/a\    access_log syslog:server=unix:/run/scrollr-audit/events.sock,nohostname,tag=scrollr_audit scrollr_audit;' /etc/nginx/sites-enabled/osticket.conf \
+ && sed -i '/server_tokens off;/a\    error_log syslog:server=unix:/run/scrollr-audit/events.sock,nohostname,tag=scrollr_error error;' /etc/nginx/sites-enabled/osticket.conf \
+ && nginx -t
+CMD ["start-scrollr-security"]

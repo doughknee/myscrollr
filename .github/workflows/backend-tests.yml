@@ -188,7 +188,7 @@ jobs:
         run: php -n ../scripts/osticket-plugin/notify.message.test.php
 
       - name: Check osTicket image validation
-        run: docker run --rm -v "$GITHUB_WORKSPACE/scripts/osticket-runtime:/checks:ro" php:8.2-cli sh -c 'apt-get update -qq && apt-get install -y -qq libpng-dev libjpeg62-turbo-dev libwebp-dev >/dev/null && docker-php-ext-configure gd --with-jpeg --with-webp >/dev/null && docker-php-ext-install gd >/dev/null && php -l /checks/patch-inline-image.php && php /checks/inline-image.test.php'
+        run: docker run --rm -v "$GITHUB_WORKSPACE/scripts/osticket-runtime:/checks:ro" php:8.2-cli sh -c 'apt-get update -qq && apt-get install -y -qq libpng-dev libjpeg62-turbo-dev libwebp-dev libsqlite3-dev >/dev/null && docker-php-ext-configure gd --with-jpeg --with-webp >/dev/null && docker-php-ext-install gd sqlite3 >/dev/null && php -l /checks/patch-inline-image.php && php /checks/inline-image.test.php && php /checks/security-audit.test.php'
 
       - run: go test -v ./...
         env:
