@@ -9,7 +9,8 @@ if (strpos($source, $marker) !== false) {
 }
 $needle = "        fclose(\$fp);\n\n        // Check file type to ensure image";
 $beforeRead = "        # Allow for data-uri uploaded files\n";
-if (substr_count($source, $needle) !== 1 || substr_count($source, $beforeRead) !== 1)
+$parse = '            $file[0] = Format::parseRfc2397($data);';
+if (substr_count($source, $needle) !== 1 || substr_count($source, $beforeRead) !== 1 || substr_count($source, $parse) !== 1)
     throw new RuntimeException('Unrecognized osTicket upload source; patch refused');
 $preflight = <<<'PHP'
         // Bound the encoded upload before reading a data URI into memory.
@@ -28,6 +29,11 @@ $guard = <<<'PHP'
         // Check file type to ensure image
 PHP;
 $source = str_replace($beforeRead, $preflight . $beforeRead, $source);
+$source = str_replace($parse, $parse . "\n" . <<<'PHP'
+            if (!is_array($file[0]) || !isset($file[0]['data'], $file[0]['type'])
+                || !is_string($file[0]['data']) || !is_string($file[0]['type']))
+                return Http::response(403, JsonDataEncoder::encode(array('error' => 'Invalid image data')));
+PHP, $source);
 $source = str_replace($needle, $guard, $source);
 if (!copy(__DIR__ . '/inline-image.php', $root . '/include/scrollr-inline-image.php')) throw new RuntimeException('Validator copy failed');
 chmod($root . '/include/scrollr-inline-image.php', 0644);
