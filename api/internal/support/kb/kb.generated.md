@@ -778,8 +778,21 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.23.2 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.1 -->
 The last 8 published releases, newest first, as users read them.
+
+### Server update - Safer support and security records (`server-2026.10.26.1`, 2026-10-26)
+
+Support security and privacy improvements are now live.
+
+- Security reports receive staff review, and automatic closure requires a clear resolved follow-up.
+- Automated replies use less private context and filter unsafe formatting and links.
+- Support image uploads validate actual image contents while retaining PNG, JPEG, GIF, and WebP support.
+- Added limited, privacy-conscious security records to help investigate abuse.
+
+Signup configuration and feed ownership are unchanged. No desktop update is required.
+
+Changes: https://github.com/doughknee/myscrollr/pull/521
 
 ### Server update - Stronger account and data protection (`server-2026.10.23.2`, 2026-10-23)
 
@@ -843,21 +856,3 @@ The staff console now brings users, support and analytics into one consistent wo
 - Start from an action-focused Home page, with System health and traffic organized into distinct views.
 
 This release updates the staff website and API. It does not change the desktop app version.
-
-### Scrollr 1.7.1 — GitHub, rebuilt (`desktop-v1.7.1`, 2026-10-03)
-
-#### Scrollr 1.7.1 — GitHub, rebuilt
-
-The GitHub widget is new from the ground up. It tells you what broke and what's waiting on you, by name, instead of a row of counts.
-
-**A page per repo.** Each repo you track gets its own page on the bar. The first cell is the repo itself, in two lines: is it broken (`deploy failed · 12m`, `apply running · 3m`, `all green · 1h`), and what needs you, named (`Review` + the pull request's title and who opened it, `Broke on` + the commit that broke the build, and `you` if it was yours). The rest of the page is that repo's next things, one per cell: reviews asked of you, changes requested on your PRs, failing checks and runs, new issues, and what merged today.
-
-**Reviews from everywhere.** A review someone asks of you shows up even in repos you don't track.
-
-**Choose what each repo watches.** In the widget, pick your repos, then for each one: which workflows to follow (any CI counts, not just GitHub Actions — a failing Vercel check turns it red too), pull requests (off, only the ones that need you, or all open) and issues (off, assigned to you, or every new one).
-
-**Works the moment you connect.** Press **Connect GitHub** and your two most recently pushed repos are on the bar straight away. Add or remove repos any time.
-
-**Off the edge.** GitHub is always a page now, never squeezed into the edge, which stays for your clocks, weather and timers.
-
-**Also:** when there's only one page on the bar, the edge's clocks and weather still rotate on their own.
