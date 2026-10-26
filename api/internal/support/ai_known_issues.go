@@ -273,3 +273,23 @@ func doJSON(req *http.Request) ([]byte, error) {
 	}
 	return raw, nil
 }
+
+// Public releases have a separate cache so private staff context cannot be reused.
+func publicReleaseNotes(ctx context.Context) string {
+	const key = "support:public_releases:v1"
+	if platform.Rdb != nil {
+		if cached, err := platform.Rdb.Get(ctx, key).Result(); err == nil {
+			return cached
+		}
+	}
+	var b strings.Builder
+	b.WriteString("PUBLIC RELEASE NOTES (not proof that this report was fixed)\n")
+	for _, r := range fetchRecentReleases(ctx, knownIssuesReleaseCount) {
+		fmt.Fprintf(&b, "\n%s (%s): %s\n", r.Name, r.Tag, truncate(r.Body, maxReleaseBodyChars))
+	}
+	block := b.String()
+	if platform.Rdb != nil {
+		_ = platform.Rdb.Set(ctx, key, block, knownIssuesTTL).Err()
+	}
+	return block
+}

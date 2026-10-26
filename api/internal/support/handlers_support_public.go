@@ -128,14 +128,12 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 		escapeHTML(redactIP(ip)),
 	)
 
-	recentSummaries := FetchRecentTicketSummaries(c.Context())
 	triage := triageTicket(c.Context(), TriageInput{
-		UserCategory:    req.Category,
-		UserEmail:       req.Email,
-		UserName:        fallbackName(req.Name, req.Email),
-		Subject:         subjectFull,
-		Body:            req.Message,
-		RecentSummaries: recentSummaries,
+		UserCategory: req.Category,
+		UserEmail:    req.Email,
+		UserName:     fallbackName(req.Name, req.Email),
+		Subject:      subjectFull,
+		Body:         req.Message,
 		// Anonymous path: no JWT, so no plan, no widgets, no diagnostics.
 		// "unknown" is the honest answer and the prompt says so out loud.
 		Context: TicketContext{Tier: "unknown"},

@@ -19,11 +19,11 @@ import (
 //	shouldClose == true (AI is closing the ticket on this reply)
 //	  ↳ "We're closing this ticket" + "Reply any time to reopen"
 //
-// The body is appended verbatim — the AI's draft already includes the
+// The body is sanitized at this final outbound boundary — the AI's draft already includes the
 // "Best Regards, Scrollr Support" sign-off (per the prompt) so we
 // don't double up.
 func decorateUserReplyHTML(body string, shouldClose bool) string {
-	body = strings.TrimSpace(body)
+	body = sanitizeReplyHTML(strings.TrimSpace(body))
 
 	footer := userReplyFooterContinue
 	if shouldClose {
@@ -46,7 +46,7 @@ func decorateUserReplyHTML(body string, shouldClose bool) string {
 }
 
 const userReplyFooterContinue = `<strong style="color:#111827;">Need more help?</strong> Just reply to this email and we'll keep working on it.<br>
-<strong style="color:#10b981;">All sorted?</strong> Reply with <em>"thanks"</em> or <em>"resolved"</em> and we'll close the ticket automatically.`
+<strong style="color:#10b981;">All sorted?</strong> Reply with <em>"resolved"</em> and we'll close the ticket automatically.`
 
 const userReplyFooterClose = `<strong style="color:#10b981;">✓ We're closing this ticket.</strong> Glad we got it sorted!<br>
 If anything else comes up, just reply to this email and we'll reopen the conversation.`

@@ -31,9 +31,6 @@ Widgets (2 added, 1 on the ticker):
   - sports (on the ticker)
   - finance (not on the ticker)
 
-RECENT TICKETS (for duplicate detection only):
-[{"ticket_number":"700001","category":"bug","summary":"scores stopped updating","created_at":"2026-09-01T00:00:00Z"}]
-
 THE TICKET:
 From: Someone <someone@example.com>
 Category the user picked: bug

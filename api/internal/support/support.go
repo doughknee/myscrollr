@@ -247,15 +247,13 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	// thus route to a different osTicket topic). Triage is best-effort:
 	// nil result falls through to the legacy flow.
 	originalBody := body.String()
-	recentSummaries := FetchRecentTicketSummaries(c.Context())
 	triage := triageTicket(c.Context(), TriageInput{
-		UserCategory:    req.Category,
-		UserEmail:       email,
-		UserName:        name,
-		Subject:         subject,
-		Body:            originalBody,
-		RecentSummaries: recentSummaries,
-		Widget:          req.Widget,
+		UserCategory: req.Category,
+		UserEmail:    email,
+		UserName:     name,
+		Subject:      subject,
+		Body:         originalBody,
+		Widget:       req.Widget,
 		Context: buildTicketContext(c.Context(), userID,
 			platform.TierFromRoles(platform.GetUserRoles(c)), req.Diagnostics),
 	})

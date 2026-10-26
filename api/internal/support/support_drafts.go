@@ -98,6 +98,10 @@ func insertSupportDraft(ctx context.Context, draft *SupportDraft, expectedDraft 
 		return nil, ErrNoDraftBody
 	}
 
+	draft.DraftBodyHTML = sanitizeReplyHTML(draft.DraftBodyHTML)
+	if draft.DraftBodyHTML == "" {
+		return nil, ErrNoDraftBody
+	}
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -348,6 +352,10 @@ func holdDraft(ctx context.Context, id int64) error {
 // empty string for other transitions. Empty editedBody is stored as
 // NULL via NULLIF($3,”).
 func markDraftDecided(ctx context.Context, id int64, newStatus string, editedBody string) error {
+	return markDraftDecidedWithPolicy(ctx, id, newStatus, editedBody, false)
+}
+
+func markDraftDecidedWithPolicy(ctx context.Context, id int64, newStatus string, editedBody string, automatic bool) error {
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
 		return err
@@ -368,8 +376,12 @@ func markDraftDecided(ctx context.Context, id int64, newStatus string, editedBod
 		UPDATE support_drafts
 		SET status = $2, edited_body_html = NULLIF($3,''), decided_at = NOW()
 		WHERE id = $1 AND status = 'pending'
-	`
-	tag, err := tx.Exec(ctx, q, id, newStatus, editedBody)
+          AND (NOT $4 OR (NOT intervened AND (
+            ($2='asked' AND disposition='auto_ask') OR
+            ($2='approved' AND disposition IN ('auto_send','auto_close') AND hold_until <= now())
+          )))
+    `
+	tag, err := tx.Exec(ctx, q, id, newStatus, editedBody, automatic)
 	if err != nil {
 		return fmt.Errorf("markDraftDecided: %w", err)
 	}
@@ -639,8 +651,8 @@ func SendPartnerNotification(ctx context.Context, draft *SupportDraft) error {
 		html.EscapeString(draft.AICategory),
 		html.EscapeString(draft.AIPriority),
 		html.EscapeString(draft.AIConfidence),
-		userMessageBlock,    // empty string when no user message available; otherwise the styled block
-		draft.DraftBodyHTML, // already HTML, don't double-escape
+		userMessageBlock,                       // empty string when no user message available; otherwise the styled block
+		sanitizeReplyHTML(draft.DraftBodyHTML), // saved/model HTML is untrusted
 		sendURL, editURL, skipURL,
 		html.EscapeString(draft.OriginalSubject),
 	)

@@ -164,6 +164,9 @@ func pruneUsage(ctx context.Context) {
 	if DBPool == nil {
 		return
 	}
+	if _, err := DBPool.Exec(ctx, `DELETE FROM security_request_audit WHERE hour < now() - interval '30 days'`); err != nil {
+		log.Print("[SecurityAudit] retention prune failed")
+	}
 	cutoff := time.Now().UTC().Add(-usageRetention)
 	runUsagePrunes(func() (int64, error) {
 		tag, err := DBPool.Exec(ctx, `DELETE FROM api_usage_daily WHERE day < $1`, cutoff)

@@ -97,6 +97,7 @@ func (s *Server) setupMiddleware() {
 	// and folds them in memory; see internal/platform/usage.go for the line it
 	// must not cross.
 	s.App.Use(platform.RecordUsage)
+	s.App.Use(platform.RecordSecurityRequest)
 
 	// Log slow (>1s) and 5xx /admin requests (SCROLLR-324).
 	s.App.Use("/admin", AdminTiming)
