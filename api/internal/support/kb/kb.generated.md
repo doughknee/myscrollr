@@ -778,8 +778,12 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.3 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.4 -->
 The last 8 published releases, newest first, as users read them.
+
+### Server isolation and safer deployments (`server-2026.10.26.4`, 2026-10-26)
+
+Scrollr’s server processes now run with fewer permissions and receive only the credentials they need. Deployment recovery restores the previous container settings as well as the previous software version. Signup, feeds and support remain available.
 
 ### Support upload safeguards (`server-2026.10.26.3`, 2026-10-26)
 
@@ -837,11 +841,3 @@ Bot protection is also enabled on sign-in and signup. This is a server update; n
 This update keeps sign-in navigation details out of crash reports and includes security updates for libraries used by Scrollr.
 
 Your widgets, feed selections, and ticker settings stay in place. Update to 1.7.2 to receive the desktop protections.
-
-### Server update — Safer RSS feeds (`server-2026.10.22.1`, 2026-10-22)
-
-Custom RSS fetching now checks destinations and redirects to prevent requests to internal services. An additional network safeguard blocks cloud metadata access.
-
-This server-side security update is deployed; RSS ingestion is running normally. No desktop download is required.
-
-Changes: #511 and #512.
