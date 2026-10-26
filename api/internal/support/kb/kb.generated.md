@@ -778,8 +778,14 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.2 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.3 -->
 The last 8 published releases, newest first, as users read them.
+
+### Support upload safeguards (`server-2026.10.26.3`, 2026-10-26)
+
+Support uploads now reject oversized or malformed requests more safely while preserving normal screenshots and attachments. Unexpected upload failures no longer display internal server error details.
+
+PNG, JPEG, GIF and WebP uploads remain supported. The request limit accommodates the desktop support form’s five attachments of up to 10 MB each, including encoding overhead.
 
 ### Support security records improved (`server-2026.10.26.2`, 2026-10-26)
 
@@ -839,14 +845,3 @@ Custom RSS fetching now checks destinations and redirects to prevent requests to
 This server-side security update is deployed; RSS ingestion is running normally. No desktop download is required.
 
 Changes: #511 and #512.
-
-### Staff console 1.0.1 - Actionable support follow-ups (`admin-v1.0.1`, 2026-10-21)
-
-The support queue now explains what needs your attention and gives you a clear next step.
-
-- See the current reason a ticket needs you, with a direct link to its reply controls.
-- Write a reply to an unanswered follow-up and save it for review. Sending remains a separate, explicit action.
-- Fixed follow-up timestamps in the support integration and gave draft generation enough time to complete. Future drafting failures now appear in case history.
-- Reply controls are easier to reach on mobile, and saved edits no longer leave an incorrect unsaved-changes warning.
-
-Staff console and support integration update; no desktop application update is required.
