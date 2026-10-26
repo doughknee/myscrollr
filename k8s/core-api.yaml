@@ -27,31 +27,241 @@ spec:
         app: core-api
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: core-api
           image: registry.digitalocean.com/scrollr/core-api:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
                 name: core-config
-            - secretRef:
-                name: scrollr-secrets
           env:
-            # Required explicitly so a deploy cannot silently ship website
-            # signup analytics without its Logto application filter.
+            # Only keys core reads; channel/provider credentials stay out.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: DATABASE_URL
+            - name: DISCORD_APPLICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: DISCORD_APPLICATION_ID
+                  optional: true
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: DISCORD_BOT_TOKEN
+                  optional: true
+            - name: DISCORD_GUILD_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: DISCORD_GUILD_ID
+                  optional: true
+            - name: DISCORD_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: DISCORD_PUBLIC_KEY
+                  optional: true
+            - name: DISCORD_SUPPORT_CHANNEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: DISCORD_SUPPORT_CHANNEL_ID
+                  optional: true
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: ENCRYPTION_KEY
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: ENVIRONMENT
+                  optional: true
+            - name: GITHUB_APP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: GITHUB_APP_CLIENT_ID
+                  optional: true
+            - name: GITHUB_APP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: GITHUB_APP_CLIENT_SECRET
+                  optional: true
+            - name: GITHUB_APP_SLUG
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: GITHUB_APP_SLUG
+                  optional: true
+            - name: GITHUB_OPS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: GITHUB_OPS_TOKEN
+                  optional: true
+            - name: GITHUB_PR_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: GITHUB_PR_WEBHOOK_SECRET
+                  optional: true
+            - name: GIT_SHA
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: GIT_SHA
+                  optional: true
+            - name: LINEAR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: LINEAR_API_KEY
+                  optional: true
+            - name: LOGTO_EXTENSION_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: LOGTO_EXTENSION_APP_ID
+            - name: LOGTO_M2M_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: LOGTO_M2M_APP_ID
+            - name: LOGTO_M2M_APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: LOGTO_M2M_APP_SECRET
             - name: LOGTO_WEB_APP_ID
               valueFrom:
                 secretKeyRef:
                   name: scrollr-secrets
                   key: LOGTO_WEB_APP_ID
-            # Sentry — per-service DSN. SENTRY_USER_SALT, ENVIRONMENT,
-            # and GIT_SHA come from scrollr-secrets (via envFrom above)
-            # because they're shared across all services. DSNs are
-            # ingestion-only (not data-exfil) so inlining in git is
-            # acceptable; rotate via Sentry UI if compromised.
+            - name: OPS_RELEASE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: OPS_RELEASE_KEY
+                  optional: true
+            - name: OSTICKET_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: OSTICKET_API_KEY
+                  optional: true
+            - name: POSTHOG_DISTINCT_ID_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: POSTHOG_DISTINCT_ID_SALT
+                  optional: true
+            - name: POSTHOG_PERSONAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: POSTHOG_PERSONAL_API_KEY
+                  optional: true
+            - name: POSTHOG_PROJECT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: POSTHOG_PROJECT_KEY
+                  optional: true
+            - name: POSTHOG_QUERY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: POSTHOG_QUERY_API_KEY
+                  optional: true
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: REDIS_URL
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: RESEND_API_KEY
+                  optional: true
+            - name: RESEND_FROM_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: RESEND_FROM_EMAIL
+                  optional: true
+            - name: SCROLLR_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: SCROLLR_WEBHOOK_SECRET
+                  optional: true
+            - name: SENTRY_USER_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: SENTRY_USER_SALT
+            - name: SEQUIN_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: SEQUIN_WEBHOOK_SECRET
+                  optional: true
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: STRIPE_PUBLISHABLE_KEY
+                  optional: true
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: STRIPE_SECRET_KEY
+                  optional: true
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: STRIPE_WEBHOOK_SECRET
+                  optional: true
+            - name: SUPPORT_APPROVAL_HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: SUPPORT_APPROVAL_HMAC_SECRET
+                  optional: true
             - name: SENTRY_DSN
               value: "https://2cb3c4a8a71b52241c127bc46495a070@o4511384091033600.ingest.us.sentry.io/4511384381554688"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -91,6 +301,11 @@ spec:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 10"]
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Mi
 ---
 apiVersion: v1
 kind: Service

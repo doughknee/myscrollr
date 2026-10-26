@@ -16,6 +16,7 @@ on:
       - ".dockerignore"
       - "k8s/**"
       - ".github/workflows/deploy.yml"
+      - "scripts/doks-firewall*"
   # When a desktop release is published (drafts -> published), rebuild the
   # website so the download button picks up the new version. The site bakes
   # `LATEST_DESKTOP_VERSION` at build time from `releases/latest` (see
@@ -329,6 +330,11 @@ jobs:
   deploy:
     needs: [detect-changes, build]
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Serialize cluster writes and firewall leases; never cancel a live rollout.
+    concurrency:
+      group: scrollr-production-deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
         with:
@@ -339,8 +345,22 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Configure kubectl
-        run: doctl kubernetes cluster kubeconfig save scrollr-cluster
+      - name: Allow this deployment runner through the control-plane firewall
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        run: python3 scripts/doks-firewall.py grant --cluster 39e8d63f-7fae-4a3b-bbf2-10195fa13d79 --state "$RUNNER_TEMP/doks-firewall-lease.json"
+
+      - name: Configure kubectl and wait for firewall propagation
+        run: |
+          doctl kubernetes cluster kubeconfig save scrollr-cluster
+          for attempt in $(seq 1 36); do
+            if kubectl --request-timeout=5s get --raw=/readyz >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Cluster management access did not become ready"
+          exit 1
 
       - name: Validate PostHog production secrets
         run: |
@@ -368,9 +388,11 @@ jobs:
       - name: Record live image tags
         run: |
           : > /tmp/live-images.env
+          mkdir -p /tmp/live-templates
           for svc in core-api website finance-service sports-service rss-service; do
             img="$(kubectl get deployment/${svc} -n scrollr \
               -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+            kubectl get deployment/${svc} -n scrollr -o json | python3 -c 'import json,sys; d=json.load(sys.stdin); json.dump([{ "op":"replace", "path":"/spec/template", "value":d["spec"]["template"] }],sys.stdout)' > "/tmp/live-templates/${svc}.json"
             # Preserve anything that is not the `:latest` placeholder: the
             # `:sha-<commit>` tags this pipeline pushes, a `@sha256:` digest,
             # or a tag pinned by hand during an incident. An image with no
@@ -384,17 +406,13 @@ jobs:
           echo "Recorded pins:"; cat /tmp/live-images.env
 
       - name: Apply K8s config changes
+        id: apply
         if: needs.detect-changes.outputs.k8s == 'true'
         run: |
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/configmap-core.yaml
           kubectl apply -f k8s/configmap-channels.yaml
           kubectl apply -f k8s/cert-manager.yaml
-          kubectl apply -f k8s/finance-service.yaml
-          kubectl apply -f k8s/sports-service.yaml
-          kubectl apply -f k8s/rss-service.yaml
-          kubectl apply -f k8s/core-api.yaml
-          kubectl apply -f k8s/website.yaml
           kubectl apply -f k8s/ingress.yaml
           kubectl apply -f k8s/network-policies.yaml
 
@@ -416,6 +434,8 @@ jobs:
           echo "Set GIT_SHA=${SHA} in scrollr-secrets"
 
       - name: Roll out updated images
+        id: rollout
+        timeout-minutes: 42
         run: |
           SHA_TAG="${{ needs.detect-changes.outputs.image-tag }}"
           K8S_CHANGED="${{ needs.detect-changes.outputs.k8s }}"
@@ -471,38 +491,29 @@ jobs:
             local service=$1
             local image_changed=$2
 
+            pinned="$(sed -n "s|^${service}=||p" /tmp/live-images.env)"
             if [ "$image_changed" = "true" ]; then
-              echo "Rolling out ${service} with tag ${SHA_TAG}"
-              kubectl set image deployment/${service} \
-                ${service}="${REGISTRY}/${service}:${SHA_TAG}" \
-                -n scrollr
-              wait_for_rollout "$service"
-              return
+              target="${REGISTRY}/${service}:${SHA_TAG}"
+            else
+              target="$pinned"
             fi
 
             if [ "$K8S_CHANGED" = "true" ]; then
-              # `kubectl apply` just reset this service to `:latest`. Restore
-              # the tag it was actually running (recorded before the apply);
-              # that is itself a spec change, so it rolls the pods and picks
-              # up the config change we applied. Only fall back to a bare
-              # restart when there was no pinned tag to restore.
-              pinned=""
-              if [ -f /tmp/live-images.env ]; then
-                pinned="$(sed -n "s|^${service}=||p" /tmp/live-images.env)"
+              if [ -z "$target" ]; then
+                echo "::error::Cannot stage ${service} without an immutable image"
+                return 1
               fi
-
-              if [ -n "$pinned" ]; then
-                echo "Re-pinning ${service} to ${pinned} (apply had reset it to :latest)"
-                kubectl set image deployment/${service} \
-                  ${service}="${pinned}" \
-                  -n scrollr
-                # If the image already matched, no new rollout is triggered
-                # and the config change still needs a restart.
-                kubectl rollout restart deployment/${service} -n scrollr
-              else
-                echo "Restarting ${service} to pick up Kubernetes config changes"
+              # Apply each new template once with its final image: no :latest window,
+              # and no new permissions applied to an incompatible old image.
+              previous_template="$(kubectl get deployment/${service} -n scrollr -o jsonpath='{.spec.template}')"
+              sed "s|image: ${REGISTRY}/${service}:latest|image: ${target}|" "k8s/${service}.yaml" | kubectl apply -f -
+              if [ "$previous_template" = "$(kubectl get deployment/${service} -n scrollr -o jsonpath='{.spec.template}')" ]; then
+                # ConfigMap-only changes also need pods to reload their environment.
                 kubectl rollout restart deployment/${service} -n scrollr
               fi
+              wait_for_rollout "$service"
+            elif [ "$image_changed" = "true" ]; then
+              kubectl set image deployment/${service} ${service}="$target" -n scrollr
               wait_for_rollout "$service"
             fi
           }
@@ -520,6 +531,7 @@ jobs:
       # rather than a silently-degraded cluster.
       - name: Production-readiness smoke test
         id: smoke
+        timeout-minutes: 4
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq jq
@@ -529,7 +541,9 @@ jobs:
       # test simply stayed live, with nothing but a red workflow to show for
       # it. With ~200 users that is the wrong default.
       #
-      # This re-pins each deployment to the exact image it was running before
+      # Restore the previous complete pod template (image, env and permissions).
+      # The saved immutable image prevents the :latest rollback trap.
+      # This returns each deployment to the exact image it was running before
       # this deploy. It deliberately does not use `kubectl rollout undo`:
       # every manifest hardcodes `:latest`, so an apply rewrites both the old
       # and new ReplicaSets to `:latest` and `undo` resolves to the newest
@@ -539,8 +553,9 @@ jobs:
       # NOT covered: schema. Migrations run at core-api startup, so anything
       # destructive has already been applied by the time this fires. That is
       # what the additive-only guard in backend-tests.yml is for.
-      - name: Roll back on smoke-test failure
-        if: failure() && steps.smoke.outcome == 'failure'
+      - name: Restore pod templates on rollout or smoke-test failure
+        timeout-minutes: 30
+        if: failure() && (steps.apply.outcome == 'failure' || steps.rollout.outcome == 'failure' || steps.smoke.outcome == 'failure')
         run: |
           if [ ! -s /tmp/live-images.env ]; then
             echo "::error::Smoke test failed and no previous image tags were recorded — cannot roll back automatically. Roll back by hand."
@@ -565,7 +580,7 @@ jobs:
             svc="${line%%=*}"; img="${line#*=}"
             [ -n "$svc" ] && [ -n "$img" ] || continue
             echo "Restoring ${svc} -> ${img}"
-            kubectl set image deployment/"${svc}" "${svc}=${img}" -n scrollr
+            kubectl patch deployment/"${svc}" -n scrollr --type=json --patch-file="/tmp/live-templates/${svc}.json"
           done
 
           rc=0
@@ -587,3 +602,9 @@ jobs:
           # rolled-back release is how a broken deploy gets forgotten.
           echo "::error::Deploy failed its smoke test and was rolled back to the previous images."
           exit 1
+
+      - name: Remove this runner from the control-plane firewall
+        if: always()
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        run: python3 scripts/doks-firewall.py revoke --cluster 39e8d63f-7fae-4a3b-bbf2-10195fa13d79 --state "$RUNNER_TEMP/doks-firewall-lease.json"
