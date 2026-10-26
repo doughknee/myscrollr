@@ -26,6 +26,7 @@ RUN useradd -u 80 -g 33 -M -d /www/osticket -s /usr/sbin/nologin osticket \
  && rm -f /etc/nginx/sites-enabled/default
 
 COPY php.ini /usr/local/etc/php/conf.d/zz-osticket.ini
+COPY php-fpm-security.conf /usr/local/etc/php-fpm.d/zzz-scrollr-security.conf
 COPY nginx.conf /etc/nginx/sites-enabled/osticket.conf
 COPY start.sh /usr/local/bin/start-osticket
 
