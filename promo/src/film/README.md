@@ -28,3 +28,8 @@ cp -r ../desktop/public/fonts public/fonts && cp -r public/fonts fonts && cp -r 
 `public/logos` are the api-sports crests for the eight teams on the NFL page,
 captured once so a render needs no network. `public/shots` are two of the
 marketing captures from `myscrollr.com/screenshot-sources`.
+
+## The other cuts
+
+- `FilmPortrait` (1080x1920): same cue sheet and track, the camera closer and the titles stacked. `npx remotion render FilmPortrait out/B-9x16.mp4 --props=out/B.props.json ...`
+- `HeroLoop` (1920x640, 10.86s, silent, seamless): NFL with the score, the swap to stocks, the swap back on the last frame. For the site's hero: `npx remotion render HeroLoop out/hero-loop.mp4 ...`, then `ffmpeg -i out/hero-loop.mp4 -c:v libvpx-vp9 -b:v 0 -crf 30 -an out/hero-loop.webm` and a poster from frame 60.

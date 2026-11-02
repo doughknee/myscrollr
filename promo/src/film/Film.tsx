@@ -20,8 +20,14 @@ import { Bar, BAR_H, BAR_W, type BarState, type Tick } from "./Bar";
 import { CATALOG_FLY, THEMES, WIDGETS } from "./data";
 
 export const FPS = 30;
-const W = 1920;
-const H = 1080;
+/**
+ * Layout per aspect. Landscape is the master; portrait keeps the same
+ * world (the bar is still 1920 wide, overflowing the right edge) and the
+ * same cue sheet, with the camera closer and the titles stacked.
+ */
+interface Layout { W: number; H: number; titleLeft: number; titleSize: number; lowTop: number; midTop: number; highTop: number; end: number[]; endSize: number; chip: (i: number) => [number, number]; shots: [number, number, number, number, number, number] }
+const LAND: Layout = { W: 1920, H: 1080, titleLeft: 136, titleSize: 104, lowTop: 690, midTop: 330, highTop: 70, end: [272, 356, 404, 540, 706], endSize: 150, chip: (i) => [200 + (i % 4) * 175 + (i > 3 ? 70 : 0), 870 + Math.floor(i / 4) * 58], shots: [120, 130, 1180, 560, 180, 1240] };
+const PORT: Layout = { W: 1080, H: 1920, titleLeft: 64, titleSize: 66, lowTop: 1120, midTop: 640, highTop: 120, end: [560, 640, 690, 790, 930], endSize: 104, chip: (i) => [150 + (i % 4) * 210 + (i > 3 ? 60 : 0), 1700 + Math.floor(i / 4) * 58], shots: [40, 520, 1000, 120, 760, 1000] };
 
 /** The cue sheet, in seconds of film time. */
 export interface Cues {
@@ -57,6 +63,8 @@ export interface Cues {
 export interface Features { kick: number[]; snare: number[]; hat: number[]; rms: number[] }
 
 export type FilmProps = {
+  /** 9:16 for Shorts/Reels: the camera stays closer and the titles stack. */
+  portrait?: boolean;
   bpm: number;
   songStart?: number;
   song?: string;
@@ -116,10 +124,25 @@ function hit(f: number, at: number, punch = 0.09, dip = 0.012): number {
  * the hits sit on top of either.
  */
 type Key = [number, number, number, number, "drift" | "move"];
-function camera(f: number, E: E, kick: number): { s: number; x: number; y: number } {
+function camera(f: number, E: E, kick: number, portrait: boolean): { s: number; x: number; y: number } {
   const end = E.END[0];
-  // The band's left edge must stay on screen: x <= 960/s at every scale.
-  const keys: Key[] = [
+  // The band's left edge must stay on screen: x <= (W/2)/s at every scale.
+  const keys: Key[] = portrait ? [
+    [0, 2.5, 206, 100, "drift"],
+    [E.TO_STOCKS, 2.36, 222, 104, "drift"],
+    [E.TO_NEWS, 2.22, 238, 112, "drift"],
+    [E.PULL_OUT, 2.1, 250, 120, "move"],
+    [E.PULL_OUT + 36, 1.0, 540, 960, "drift"],
+    [E.HOP, 1.03, 536, 972, "move"],
+    [E.HOP + 25, 1.08, 540, 1000, "drift"],
+    [E.PUSH_IN, 1.1, 544, 1010, "move"],
+    [E.PUSH_IN + 32, 2.2, 240, 1832, "drift"],
+    [E.TO_GITHUB + 18, 2.15, 248, 1836, "move"],
+    [E.THEMES[0], 1.5, 340, 1850, "drift"],
+    [end - 24, 1.45, 350, 1846, "move"],
+    [end + 24, 1.0, 540, 960, "drift"],
+    [E.OUT, 1.02, 540, 966, "drift"],
+  ] : [
     // frame, scale, focusX, focusY, how we get to the NEXT key
     [0, 2.75, 318, 108, "drift"],
     [E.TO_STOCKS, 2.56, 366, 112, "drift"],
@@ -208,7 +231,9 @@ function pace(sec: number, peak: number, width: number): number {
   return 1.35 - 0.65 * Math.exp(-(((sec - peak) / width) ** 2));
 }
 
-export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
+export function Film({ bpm, songStart, song, cues, features, portrait = false }: FilmProps) {
+  const L = portrait ? PORT : LAND;
+  const { W, H } = L;
   const real = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const E = toFrames(cues ?? GRID, fps);
@@ -241,7 +266,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const fill = Math.min(1, Math.max(0, (f - state.since) / Math.max(1, nextSwap - state.since)));
   const arm = f < nextSwap ? r(f, nextSwap - 12, nextSwap - 1, Easing.in(Easing.quad)) : 0;
   const fadeIn = r(f, 0, 10, Easing.out(Easing.quad));
-  const cam = camera(f, E, kick);
+  const cam = camera(f, E, kick, portrait);
   const end = E.END[0];
   // The hop: a lift in the frames before (anticipation), then the drop.
   // The hop has the swap's shape: arm (glow builds, a lift), then the drop
@@ -293,10 +318,9 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
     const go = r(f, land - 11 * pc, land, Easing.in(Easing.cubic));
     const gone = f > land + 2;
     if (a <= 0 || gone) return null;
-    const sx = 200 + (i % 4) * 175 + (i > 3 ? 70 : 0);
-    const sy = 870 + Math.floor(i / 4) * 58;
+    const [sx, sy] = L.chip(i);
     const ex = 96;
-    const ey = 1016 + 20;
+    const ey = H - BAR_H + 20;
     const x = sx + (ex - sx) * go;
     const y = sy + (ey - sy) * go;
     const sc = (0.6 + 0.4 * a) * (1 - go * 0.55);
@@ -325,13 +349,13 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
       )}
       <div style={{ position: "absolute", inset: 0 }}>
         {/* World */}
-        <div style={{ position: "absolute", left: 0, top: 0, width: W, height: H, transform: `translate(${tx}px, ${ty}px) scale(${cam.s})`, transformOrigin: "0 0" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, width: Math.max(W, BAR_W), height: H, transform: `translate(${tx}px, ${ty}px) scale(${cam.s})`, transformOrigin: "0 0" }}>
           {/* Desktop */}
           <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 90% at 50% 10%, var(--color-surface-2, #181825) 0%, var(--color-surface, #0b0b13) 100%)", opacity: dimDesk }}>
             {/* The dot grid catches the hats. */}
             <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle, rgba(255,255,255,${(0.04 + 0.05 * hat).toFixed(3)}) 1px, transparent 1.2px)`, backgroundSize: "40px 40px" }} />
-            <Img src={staticFile("shots/sports.png")} style={{ position: "absolute", left: 120, top: 130, width: 1180, borderRadius: 12, boxShadow: "0 30px 90px rgba(0,0,0,.6)", opacity: 0.55 * shots }} />
-            <Img src={staticFile("shots/home.png")} style={{ position: "absolute", left: 560, top: 180, width: 1240, borderRadius: 12, boxShadow: "0 40px 110px rgba(0,0,0,.75)", opacity: shots }} />
+            <Img src={staticFile("shots/sports.png")} style={{ position: "absolute", left: L.shots[0], top: L.shots[1], width: L.shots[2], borderRadius: 12, boxShadow: "0 30px 90px rgba(0,0,0,.6)", opacity: 0.55 * shots }} />
+            <Img src={staticFile("shots/home.png")} style={{ position: "absolute", left: L.shots[3], top: L.shots[4], width: L.shots[5], borderRadius: 12, boxShadow: "0 40px 110px rgba(0,0,0,.75)", opacity: shots }} />
           </div>
           {/* The bar. Its glow is the kick. */}
           <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick + 40 * hopArm + 60 * landBloom)}px ${hex}${Math.round(30 + 70 * kick + 60 * hopArm + 90 * landBloom).toString(16).padStart(2, "0")}` }}>
@@ -343,15 +367,15 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
       </div>
 
       {/* Screen-space type */}
-      <Title f={f} at={10} out={E.TO_STOCKS - 8} line2At={E.TD_LINE2} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2="you already know." top={690} left={136} size={104} breathe={snare} pc={pc} />
-      <Title f={f} at={E.TO_STOCKS + 2} out={E.TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={690} left={136} size={104} breathe={snare} pc={pc} />
-      <Title f={f} at={E.TO_NEWS + 2} out={E.PULL_OUT + 20} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={690} left={136} size={104} breathe={snare} pc={pc} />
+      <Title f={f} at={10} out={E.TO_STOCKS - 8} line2At={E.TD_LINE2} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2="you already know." top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
+      <Title f={f} at={E.TO_STOCKS + 2} out={E.TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
+      <Title f={f} at={E.TO_NEWS + 2} out={E.PULL_OUT + 20} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
 
-      <Title f={f} at={E.DESK_TITLE} out={E.HOP - 16} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={330} align="center" size={112} scrim="center" breathe={snare} pc={pc} />
-      <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" breathe={snare} pc={pc} />
+      <Title f={f} at={E.DESK_TITLE} out={E.HOP - 16} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={L.midTop} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
+      <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={L.midTop + 30} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
 
-      <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
-      <Title f={f} at={E.GITHUB_TITLE} out={end - 12} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.GITHUB_TITLE} out={end - 12} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
 
       {/* End card: the site's hero, built hit by hit. Every element POPS on its hit (scale snap, two frames to full), nothing fades or slides. */}
       {f >= end && (() => {
@@ -363,22 +387,22 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
         return (
           <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
             <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--color-surface, #0b0b13) 92%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 60%, transparent) 100%)" }} />
-            <div style={{ position: "absolute", left: 0, right: 0, top: 272, display: "flex", justifyContent: "center", alignItems: "center", gap: 16, ...pop(0) }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: L.end[0], display: "flex", justifyContent: "center", alignItems: "center", gap: 16, ...pop(0) }}>
               <Img src={staticFile("logo.svg")} style={{ width: 60, height: 60 }} />
               <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 64, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
                 scrollr<span style={{ color: MINT }}>.</span>
               </span>
             </div>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 356, textAlign: "center", fontFamily: MONO, fontSize: 18, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, ...pop(1) }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: L.end[1], textAlign: "center", fontFamily: MONO, fontSize: 18, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, ...pop(1) }}>
               free · open source · macos / windows / linux
             </div>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 404, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, ...pop(2) }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: L.end[2], textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: L.endSize, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, ...pop(2) }}>
               Your live
             </div>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 540, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, ...pop(3) }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: L.end[3], textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: L.endSize, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, ...pop(3) }}>
               Desktop ticker
             </div>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 706, textAlign: "center", display: "flex", justifyContent: "center", gap: 16 }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: L.end[4], textAlign: "center", display: "flex", flexWrap: "wrap", padding: "0 40px", justifyContent: "center", gap: 16 }}>
               <span style={{ position: "relative", display: "inline-block", background: MINT, color: SURFACE, fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6, ...pop(4) }}>
                 Download Scrollr
                 <span style={{ position: "absolute", top: -12, right: -12, background: SURFACE, color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>

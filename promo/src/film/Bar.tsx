@@ -68,7 +68,7 @@ function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash =
           </span>
           {c && (
             <span className="flex shrink-0 items-center gap-[5px]">
-              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 ${3 + 4 * burst + 1.5 * pulse}px color-mix(in srgb, ${hue} ${Math.round((c.kind === "fresh" || c.kind === "needs" ? 25 : 22) + 40 * burst + 20 * pulse)}%, transparent)`, transform: `scale(${1 + 0.25 * burst + 0.05 * pulse})` }} />
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 ${3 + 3 * burst + 1.5 * pulse}px color-mix(in srgb, ${hue} ${Math.round((c.kind === "fresh" || c.kind === "needs" ? 25 : 22) + 40 * burst + 20 * pulse)}%, transparent)`, transform: `scale(${1 + 0.16 * burst + 0.05 * pulse})` }} />
               {c.count !== undefined && (
                 <span className="font-mono text-[11px] font-semibold leading-none tabular-nums" style={{ color: hue }}>
                   {c.count}
