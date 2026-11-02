@@ -107,39 +107,40 @@ function hit(f: number, at: number, punch = 0.09, dip = 0.012): number {
   return punch * interpolate(f, [at, at + 2, at + 30], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
 }
 
-/** Camera: scale and the world point at the frame's centre, piecewise with eased holds. */
+/**
+ * Camera: scale and the world point at the frame's centre.
+ *
+ * Two kinds of segment. A DRIFT is linear: a slow push or pan at constant
+ * speed, so the frame is never dead between events. A MOVE is eased: the
+ * big reframings (pull-out, hop, push-in, end). The punches and dips of
+ * the hits sit on top of either.
+ */
+type Key = [number, number, number, number, "drift" | "move"];
 function camera(f: number, E: E, kick: number): { s: number; x: number; y: number } {
   const end = E.END[0];
-  const keys: [number, number, number, number][] = [
-    // frame, scale, focusX, focusY
-    // Settle in, then hold DEAD STILL through the score: the one event
-    // reads because nothing else is moving when it lands.
-    [0, 2.75, 330, 110],
-    [24, 2.6, 350, 110],
-    [E.TD_RELEASE, 2.6, 350, 110],
-    // Never past x=360 at 2.6 or 410 at 2.3: the band's left edge stays in frame.
-    [E.TD_RELEASE + 24, 2.6, 360, 110],
-    // Hold through each widget change; move on the beat after it.
-    [E.TO_STOCKS + 12, 2.6, 360, 110],
-    [E.TO_STOCKS + 40, 2.3, 405, 130],
-    [E.TO_NEWS + 12, 2.3, 405, 130],
-    [E.TO_NEWS + 40, 2.1, 450, 150],
-    [E.PULL_OUT, 2.1, 450, 150],
-    [E.PULL_OUT + 36, 1, 960, 540],
-    [E.HOP, 1, 960, 540],
-    [E.HOP + 25, 1.08, 960, 600],
-    [E.PUSH_IN, 1.08, 960, 600],
-    [E.PUSH_IN + 32, 2.3, 340, 985],
-    [E.TO_GITHUB + 18, 2.3, 340, 985],
-    [E.THEMES[0], 1.6, 760, 1010],
-    [end - 24, 1.6, 760, 1010],
-    [end + 24, 1, 960, 540],
+  // The band's left edge must stay on screen: x <= 960/s at every scale.
+  const keys: Key[] = [
+    // frame, scale, focusX, focusY, how we get to the NEXT key
+    [0, 2.75, 318, 108, "drift"],
+    [E.TO_STOCKS, 2.56, 366, 112, "drift"],
+    [E.TO_NEWS, 2.36, 404, 128, "drift"],
+    [E.PULL_OUT, 2.2, 432, 140, "move"],
+    [E.PULL_OUT + 36, 1.0, 960, 540, "drift"],
+    [E.HOP, 1.04, 952, 556, "move"],
+    [E.HOP + 25, 1.1, 960, 600, "drift"],
+    [E.PUSH_IN, 1.13, 968, 616, "move"],
+    [E.PUSH_IN + 32, 2.3, 340, 985, "drift"],
+    [E.TO_GITHUB + 18, 2.24, 362, 990, "move"],
+    [E.THEMES[0], 1.6, 760, 1010, "drift"],
+    [end - 24, 1.55, 800, 1004, "move"],
+    [end + 24, 1.0, 960, 540, "drift"],
+    [E.OUT, 1.03, 960, 548, "drift"],
   ];
   let i = 0;
   while (i < keys.length - 2 && f >= keys[i + 1][0]) i++;
-  const [f0, s0, x0, y0] = keys[i];
+  const [f0, s0, x0, y0, how] = keys[i];
   const [f1, s1, x1, y1] = keys[i + 1];
-  const t = f1 === f0 ? 1 : r(f, f0, f1, INOUT);
+  const t = f1 === f0 ? 1 : how === "move" ? r(f, f0, f1, INOUT) : Math.min(1, Math.max(0, (f - f0) / (f1 - f0)));
   const punches = hit(f, E.TD) + hit(f, E.TO_STOCKS, 0.06) + hit(f, E.TO_NEWS, 0.06) + hit(f, E.TO_GITHUB, 0.06) + hit(f, end, 0.04, 0.01);
   // The kick is a slow breath here, a third of a percent; the bar's glow carries the beat.
   const breath = 0.0035 * kick;
@@ -219,18 +220,11 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const snare = 0;
 
   const state = barState(f, E);
-  // The page clock runs at half speed for a moment after every hit on the
-  // bar: the score (until the title's second line) and each swap.
-  const slow = (x: number) => {
-    let y = x;
-    if (x >= E.TD) y -= 0.5 * Math.min(E.TD_LINE2 - E.TD, x - E.TD);
-    for (const ev of [E.TO_STOCKS, E.TO_NEWS, E.TO_GITHUB]) if (x >= ev) y -= 0.5 * Math.min(10, x - ev);
-    return y;
-  };
-  // The dwell: the lit pill fills from the swap-in to the next swap and is
-  // full on that frame, as the app's own dwell works. GitHub's runs to the end card.
+  // The dwell: the lit pill fills from the swap-in to the next swap at a
+  // constant rate and is full on that frame, as the app's own dwell works.
+  // GitHub's runs to the end card.
   const nextSwap = [E.TO_STOCKS, E.TO_NEWS, E.TO_GITHUB, E.END[0]][state.widget];
-  const fill = Math.min(1, Math.max(0, (slow(f) - slow(state.since)) / Math.max(1, slow(nextSwap) - slow(state.since))));
+  const fill = Math.min(1, Math.max(0, (f - state.since) / Math.max(1, nextSwap - state.since)));
   const arm = f < nextSwap ? r(f, nextSwap - 12, nextSwap - 1, Easing.in(Easing.quad)) : 0;
   const fadeIn = r(f, 0, 10, Easing.out(Easing.quad));
   const cam = camera(f, E, kick);
