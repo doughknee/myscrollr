@@ -68,5 +68,9 @@ export const CATALOG_FLY = ["github", "finance_crypto", "sports_nba", "news_hack
   .filter((x): x is NonNullable<typeof x> => Boolean(x))
   .map((w) => ({ id: w.id, name: w.name, hex: w.color }));
 
-/** Every dark palette in the app's stylesheet, house first. */
-export const THEMES = ["scrollr-dark", "catppuccin-dark", "dracula-dark", "tokyo-night-dark", "nord-dark", "gruvbox-dark", "rose-pine-dark", "everforest-dark"];
+/**
+ * The palettes the film shows, house first and house last: four that are
+ * unmistakably different from each other (warm, light, cool, violet), so
+ * each flip changes the whole frame, then home for the end card.
+ */
+export const THEMES = ["scrollr-dark", "gruvbox-dark", "scrollr-light", "nord-dark", "rose-pine-dark", "scrollr-dark"];

@@ -131,8 +131,8 @@ function camera(f: number, E: E, kick: number): { s: number; x: number; y: numbe
     [E.PUSH_IN, 1.13, 968, 616, "move"],
     [E.PUSH_IN + 32, 2.3, 340, 985, "drift"],
     [E.TO_GITHUB + 18, 2.24, 362, 990, "move"],
-    [E.THEMES[0], 1.6, 760, 1010, "drift"],
-    [end - 24, 1.55, 800, 1004, "move"],
+    [E.THEMES[0], 1.6, 560, 1010, "drift"],
+    [end - 24, 1.55, 590, 1004, "move"],
     [end + 24, 1.0, 960, 540, "drift"],
     [E.OUT, 1.03, 960, 548, "drift"],
   ];
@@ -152,9 +152,10 @@ function camera(f: number, E: E, kick: number): { s: number; x: number; y: numbe
 
 const SANS = "Archivo, 'Plus Jakarta Sans', system-ui, sans-serif";
 const MONO = "'IBM Plex Mono', ui-monospace, monospace";
-const INK = "#e2e2ec";
-const MINT = "#34d399";
-const MUTE = "#9292a4";
+const INK = "var(--color-fg, #e2e2ec)";
+const MINT = "var(--color-accent, #34d399)";
+const MUTE = "var(--color-fg-3, #9292a4)";
+const SURFACE = "var(--color-surface, #0b0b13)";
 
 /**
  * The site's type system, not a generic promo's: a `// SEC 01 / NAME` mono
@@ -174,14 +175,14 @@ function Title({ f, at, out, line2At, label, hex = MINT, line1, line2, sub, top,
   if (a <= 0 || o <= 0) return null;
   const center = align === "center";
   const grad = scrim === "bottom"
-    ? "linear-gradient(to top, rgba(11,11,19,.96) 0%, rgba(11,11,19,.86) 45%, rgba(11,11,19,0) 100%)"
-    : "linear-gradient(to bottom, rgba(11,11,19,.96) 0%, rgba(11,11,19,.86) 45%, rgba(11,11,19,0) 100%)";
+    ? "linear-gradient(to top, color-mix(in srgb, var(--color-surface, #0b0b13) 96%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 86%, transparent) 45%, transparent 100%)"
+    : "linear-gradient(to bottom, color-mix(in srgb, var(--color-surface, #0b0b13) 96%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 86%, transparent) 45%, transparent 100%)";
   const line = (text: string, outline: boolean, k: number) => (
     <div style={{ fontFamily: SANS, fontWeight: 900, fontSize: size, lineHeight: 0.92, letterSpacing: "-0.02em", textTransform: "uppercase", color: outline ? "transparent" : INK, WebkitTextStroke: outline ? `3px ${MINT}` : undefined, whiteSpace: "nowrap", opacity: k, transform: `translateY(${(1 - k) * 18}px) scale(${1 + 0.006 * breathe})`, transformOrigin: center ? "50% 50%" : "0 50%" }}>{text}</div>
   );
   return (
     <div style={{ position: "absolute", inset: 0, opacity: a * o, pointerEvents: "none" }}>
-      {scrim === "center" && <div style={{ position: "absolute", inset: 0, background: "radial-gradient(62% 48% at 50% 46%, rgba(11,11,19,.94) 0%, rgba(11,11,19,.7) 60%, rgba(11,11,19,0) 100%)" }} />}
+      {scrim === "center" && <div style={{ position: "absolute", inset: 0, background: "radial-gradient(62% 48% at 50% 46%, color-mix(in srgb, var(--color-surface, #0b0b13) 94%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 70%, transparent) 60%, transparent 100%)" }} />}
       {(scrim === "top" || scrim === "bottom") && <div style={{ position: "absolute", left: 0, right: 0, [scrim]: 0, height: 520, background: grad }} />}
       <div style={{ position: "absolute", top, left: center ? 0 : left, right: center ? 0 : undefined, textAlign: center ? "center" : "left", transform: `translateY(${(1 - a) * 24}px)` }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 14, fontFamily: MONO, fontSize: 19, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, marginBottom: 22 }}>
@@ -232,7 +233,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const snare = 0;
   const pc = pace(real / fps, (cues ?? GRID).TO_GITHUB, 7);
 
-  const state = barState(f, E);
+  const state = { ...barState(f, E), dark: !THEMES[Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length)].endsWith("-light") };
   // The dwell: the lit pill fills from the swap-in to the next swap at a
   // constant rate and is full on that frame, as the app's own dwell works.
   // GitHub's runs to the end card.
@@ -253,6 +254,9 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const landBloom = f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
   const themeIdx = Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length);
   const theme = THEMES[themeIdx];
+  const dark = !theme.endsWith("-light");
+  // The app's windows are dark screenshots: they leave before the frame starts changing colour.
+  const shots = 1 - r(f, E.THEMES[0] - 12, E.THEMES[0] - 1);
   // A flash on each palette flip.
   const lastFlip = E.THEMES.filter((t) => f >= t).pop();
   const flipFlash = lastFlip === undefined ? 0 : interpolate(f - lastFlip, [0, 1, 6], [0, 0.1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -297,7 +301,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
     const y = sy + (ey - sy) * go;
     const sc = (0.6 + 0.4 * a) * (1 - go * 0.55);
     return (
-      <div key={c.id} style={{ position: "absolute", left: x, top: y, transform: `translate(-50%,-50%) scale(${sc})`, opacity: a * (1 - go * 0.6), display: "flex", alignItems: "center", gap: 8, padding: "7px 11px", borderRadius: 7, background: "#1c1c2c", border: "1px solid #303040", fontFamily: SANS, fontWeight: 700, fontSize: 15, color: "#e2e2ec", boxShadow: "0 10px 30px rgba(0,0,0,.5)", whiteSpace: "nowrap" }}>
+      <div key={c.id} style={{ position: "absolute", left: x, top: y, transform: `translate(-50%,-50%) scale(${sc})`, opacity: a * (1 - go * 0.6), display: "flex", alignItems: "center", gap: 8, padding: "7px 11px", borderRadius: 7, background: "var(--color-base-150, #1c1c2c)", border: "1px solid var(--color-edge, #303040)", fontFamily: SANS, fontWeight: 700, fontSize: 15, color: INK, boxShadow: "0 10px 30px rgba(0,0,0,.5)", whiteSpace: "nowrap" }}>
         <span style={{ width: 9, height: 9, borderRadius: 2, background: c.hex, display: "block" }} />
         {c.name}
       </div>
@@ -310,7 +314,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const step = (i: number, len = 10) => r(f, E.END[i], E.END[i] + len);
 
   return (
-    <AbsoluteFill style={{ background: "#0b0b13", overflow: "hidden" }}>
+    <AbsoluteFill id="app-shell" data-theme={theme} style={{ background: SURFACE, overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, background: "#0b0b13", opacity: 1 - fadeIn, zIndex: 10, pointerEvents: "none" }} />
       {song && songStart !== undefined && (
         <Audio
@@ -319,20 +323,20 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
           volume={(fr) => interpolate(fr, [0, 8, durationInFrames - 45, durationInFrames - 1], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
         />
       )}
-      <div id="app-shell" data-theme={theme} style={{ position: "absolute", inset: 0 }}>
+      <div style={{ position: "absolute", inset: 0 }}>
         {/* World */}
         <div style={{ position: "absolute", left: 0, top: 0, width: W, height: H, transform: `translate(${tx}px, ${ty}px) scale(${cam.s})`, transformOrigin: "0 0" }}>
           {/* Desktop */}
-          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 90% at 50% 10%, var(--color-surface-2, #181825) 0%, #0b0b13 100%)", opacity: dimDesk }}>
+          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 90% at 50% 10%, var(--color-surface-2, #181825) 0%, var(--color-surface, #0b0b13) 100%)", opacity: dimDesk }}>
             {/* The dot grid catches the hats. */}
             <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle, rgba(255,255,255,${(0.04 + 0.05 * hat).toFixed(3)}) 1px, transparent 1.2px)`, backgroundSize: "40px 40px" }} />
-            <Img src={staticFile("shots/sports.png")} style={{ position: "absolute", left: 120, top: 130, width: 1180, borderRadius: 12, boxShadow: "0 30px 90px rgba(0,0,0,.6)", opacity: 0.55 }} />
-            <Img src={staticFile("shots/home.png")} style={{ position: "absolute", left: 560, top: 180, width: 1240, borderRadius: 12, boxShadow: "0 40px 110px rgba(0,0,0,.75)" }} />
+            <Img src={staticFile("shots/sports.png")} style={{ position: "absolute", left: 120, top: 130, width: 1180, borderRadius: 12, boxShadow: "0 30px 90px rgba(0,0,0,.6)", opacity: 0.55 * shots }} />
+            <Img src={staticFile("shots/home.png")} style={{ position: "absolute", left: 560, top: 180, width: 1240, borderRadius: 12, boxShadow: "0 40px 110px rgba(0,0,0,.75)", opacity: shots }} />
           </div>
           {/* The bar. Its glow is the kick. */}
           <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick + 40 * hopArm + 60 * landBloom)}px ${hex}${Math.round(30 + 70 * kick + 60 * hopArm + 90 * landBloom).toString(16).padStart(2, "0")}` }}>
             <Bar frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} roll={Math.round(12 * pc)} />
-            {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: flipFlash, pointerEvents: "none" }} />}
+            {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: INK, opacity: flipFlash, pointerEvents: "none" }} />}
           </div>
           {chips}
         </div>
@@ -347,12 +351,12 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
       <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" breathe={snare} pc={pc} />
 
       <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
-      <Title f={f} at={E.GITHUB_TITLE} out={end - 4} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace("-dark", "").replace("-", " ")}` : undefined} top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.GITHUB_TITLE} out={end - 4} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
 
       {/* End card: the site's hero, built hit by hit. */}
       {f >= end && (
         <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
-          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, rgba(11,11,19,.92) 0%, rgba(11,11,19,.6) 100%)" }} />
+          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--color-surface, #0b0b13) 92%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 60%, transparent) 100%)" }} />
           <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${(0.9 + 0.1 * step(0, 14)) * (1 + 0.01 * kick)})` }}>
             <Img src={staticFile("logo.svg")} style={{ width: 72, height: 72 }} />
             <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 76, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
@@ -369,11 +373,11 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
             Desktop ticker
           </div>
           <div style={{ position: "absolute", left: 0, right: 0, top: 730, textAlign: "center" }}>
-            <span style={{ position: "relative", display: "inline-block", background: MINT, color: "#141420", fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6, opacity: step(4), transform: `translateY(${(1 - step(4)) * 16}px) scale(${1 + 0.1 * (1 - step(4, 8))})` }}>
+            <span style={{ position: "relative", display: "inline-block", background: MINT, color: SURFACE, fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6, opacity: step(4), transform: `translateY(${(1 - step(4)) * 16}px) scale(${1 + 0.1 * (1 - step(4, 8))})` }}>
               Download Scrollr
-              <span style={{ position: "absolute", top: -12, right: -12, background: "#0b0b13", color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>
+              <span style={{ position: "absolute", top: -12, right: -12, background: SURFACE, color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>
             </span>
-            <span style={{ display: "inline-block", marginLeft: 18, verticalAlign: "top", border: "1px solid #303040", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6, opacity: step(5), transform: `translateY(${(1 - step(5)) * 16}px)` }}>myscrollr.com</span>
+            <span style={{ display: "inline-block", marginLeft: 18, verticalAlign: "top", border: "1px solid var(--color-edge, #303040)", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6, opacity: step(5), transform: `translateY(${(1 - step(5)) * 16}px)` }}>myscrollr.com</span>
           </div>
         </div>
       )}
