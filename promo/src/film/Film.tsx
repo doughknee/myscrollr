@@ -164,13 +164,13 @@ const MUTE = "#9292a4";
  * never fights the window behind it. `line2At` lets the second line land
  * on its own hit.
  */
-function Title({ f, at, out, line2At, label, hex = MINT, line1, line2, sub, top, left, align = "left", size = 104, scrim = "bottom", breathe = 0 }: {
+function Title({ f, at, out, line2At, label, hex = MINT, line1, line2, sub, top, left, align = "left", size = 104, scrim = "bottom", breathe = 0, pc = 1 }: {
   f: number; at: number; out: number; line2At?: number; label: string; hex?: string; line1?: string; line2?: string; sub?: string;
-  top: number; left?: number; align?: "left" | "center"; size?: number; scrim?: "top" | "bottom" | "center" | "none"; breathe?: number;
+  top: number; left?: number; align?: "left" | "center"; size?: number; scrim?: "top" | "bottom" | "center" | "none"; breathe?: number; pc?: number;
 }) {
-  const a = r(f, at, at + 12);
-  const a2 = r(f, line2At ?? at + 6, (line2At ?? at + 6) + 12);
-  const o = 1 - r(f, out, out + 10, INOUT);
+  const a = r(f, at, at + 12 * pc);
+  const a2 = r(f, line2At ?? at + 6, (line2At ?? at + 6) + 12 * pc);
+  const o = 1 - r(f, out, out + 10 * pc, INOUT);
   if (a <= 0 || o <= 0) return null;
   const center = align === "center";
   const grad = scrim === "bottom"
@@ -198,6 +198,15 @@ function Title({ f, at, out, line2At, label, hex = MINT, line1, line2, sub, top,
   );
 }
 
+/**
+ * The film's pace: a bell over its length. Durations are multiplied by
+ * this, so the opening breathes, the GitHub landing and the palettes cut
+ * tight, and the end card slows down again. Peak and width in seconds.
+ */
+function pace(sec: number, peak: number, width: number): number {
+  return 1.35 - 0.65 * Math.exp(-(((sec - peak) / width) ** 2));
+}
+
 export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const real = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -221,6 +230,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   };
   const kick = smooth(features?.kick), hat = smooth(features?.hat, 2, 8);
   const snare = 0;
+  const pc = pace(real / fps, (cues ?? GRID).TO_GITHUB, 7);
 
   const state = barState(f, E);
   // The dwell: the lit pill fills from the swap-in to the next swap at a
@@ -276,7 +286,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
     const land = E.CHIPS[i] ?? E.TO_GITHUB;
     const pop = pops[i] ?? E.WIDGETS_TITLE + 4 + i * 4;
     const a = r(f, pop, pop + 12);
-    const go = r(f, land - 11, land, Easing.in(Easing.cubic));
+    const go = r(f, land - 11 * pc, land, Easing.in(Easing.cubic));
     const gone = f > land + 2;
     if (a <= 0 || gone) return null;
     const sx = 200 + (i % 4) * 175 + (i > 3 ? 70 : 0);
@@ -321,7 +331,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
           </div>
           {/* The bar. Its glow is the kick. */}
           <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick + 40 * hopArm + 60 * landBloom)}px ${hex}${Math.round(30 + 70 * kick + 60 * hopArm + 90 * landBloom).toString(16).padStart(2, "0")}` }}>
-            <Bar frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} />
+            <Bar frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} roll={Math.round(12 * pc)} />
             {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: flipFlash, pointerEvents: "none" }} />}
           </div>
           {chips}
@@ -329,17 +339,15 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
       </div>
 
       {/* Screen-space type */}
-      <Title f={f} at={10} out={E.TO_STOCKS - 8} line2At={E.TD_LINE2} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2="you already know." top={690} left={136} size={104} breathe={snare} />
-      <Title f={f} at={E.TO_STOCKS + 2} out={E.TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={690} left={136} size={104} breathe={snare} />
-      <Title f={f} at={E.TO_NEWS + 2} out={E.PULL_OUT + 20} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={690} left={136} size={104} breathe={snare} />
+      <Title f={f} at={10} out={E.TO_STOCKS - 8} line2At={E.TD_LINE2} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2="you already know." top={690} left={136} size={104} breathe={snare} pc={pc} />
+      <Title f={f} at={E.TO_STOCKS + 2} out={E.TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={690} left={136} size={104} breathe={snare} pc={pc} />
+      <Title f={f} at={E.TO_NEWS + 2} out={E.PULL_OUT + 20} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={690} left={136} size={104} breathe={snare} pc={pc} />
 
-      <Title f={f} at={E.DESK_TITLE} out={E.HOP - 16} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={330} align="center" size={112} scrim="center" breathe={snare} />
-      <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" breathe={snare} />
+      <Title f={f} at={E.DESK_TITLE} out={E.HOP - 16} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={330} align="center" size={112} scrim="center" breathe={snare} pc={pc} />
+      <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" breathe={snare} pc={pc} />
 
-      <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" breathe={snare} />
-      <Title f={f} at={E.GITHUB_TITLE} out={E.THEMES_TITLE} label="sec 04 / pick widgets" hex="#f97316" line1="Watch the bar" line2="change." top={70} left={136} size={104} scrim="top" breathe={snare} />
-
-      <Title f={f} at={E.THEMES_TITLE} out={end - 4} label="sec 05 / dress it" line1="20 palettes." sub={`${theme.replace("-dark", "").replace("-", " ")} · dark & light`} top={70} left={136} size={104} scrim="top" breathe={snare} />
+      <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.GITHUB_TITLE} out={end - 4} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace("-dark", "").replace("-", " ")}` : undefined} top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
 
       {/* End card: the site's hero, built hit by hit. */}
       {f >= end && (

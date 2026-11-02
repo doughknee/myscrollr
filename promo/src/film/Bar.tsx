@@ -50,9 +50,9 @@ function chipColor(kind: "live" | "open" | "fresh" | "needs", dark: boolean): st
 }
 
 /** PagedBar's Band, frame-driven: the label wipes up on a widget change, the edge bar only recolours. */
-function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0, arm = 0 }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number; arm?: number }) {
+function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0, arm = 0, roll = WIPE }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number; arm?: number; roll?: number }) {
   const bar = edgeBar(WIDGETS.length);
-  const t = Math.min(1, (frame - since) / WIPE);
+  const t = Math.min(1, (frame - since) / roll);
   const face = (x: FilmWidget, y: number, key: string) => {
     const c = x.chip;
     const hue = c ? chipColor(c.kind, dark) : "";
@@ -211,8 +211,10 @@ function Edge({ time, date }: { time: string; date: string }) {
   );
 }
 
-export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFlash = 0 }: {
+export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFlash = 0, roll = WIPE }: {
   frame: number;
+  /** Frames the roll takes; the film paces it. */
+  roll?: number;
   state: BarState;
   /** The lit pill's fill, 0..1: the widget's dwell, full on the swap frame. */
   fill: number;
@@ -228,10 +230,10 @@ export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFl
   const prev = state.prev === null ? null : WIDGETS[state.prev];
   // A widget change is ONE motion: the page rolls up with the band, on the
   // band's own wipe timing, then the columns settle. Nothing moves sideways.
-  const t = Math.min(1, (frame - state.since) / WIPE);
+  const t = Math.min(1, (frame - state.since) / roll);
   const e = EASE(t);
   // The columns settle over 14 frames once the roll has mostly landed.
-  const settle = prev ? Math.min(1, Math.max(0, (frame - state.since - 4) / 14)) : 1;
+  const settle = prev ? Math.min(1, Math.max(0, (frame - state.since - roll / 3) / (roll + 2))) : 1;
   // One beat of the incoming widget's colour across the whole bar on the hit.
   const change = prev ? interpolate(frame - state.since, [0, 1, 4, 14], [0, 0.55, 0.3, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
   // The band's dot bursts on the score and on every swap.
@@ -244,7 +246,7 @@ export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFl
   );
   return (
     <div className="flex items-stretch overflow-hidden bg-base-150" style={{ width: BAR_W, height: BAR_H, borderBottom: "1px solid color-mix(in srgb, var(--color-edge) 50%, transparent)" }}>
-      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} arm={arm} pulse={pulse} flash={bandFlash} burst={Math.max(swapBurst, scoreBurst)} />
+      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} arm={arm} pulse={pulse} flash={bandFlash} burst={Math.max(swapBurst, scoreBurst)} roll={roll} />
       <div className="relative min-w-0 flex-1 overflow-hidden">
         {prev && t < 1 && page(prev, -100 * e, "prev", 1)}
         {page(w, prev ? 100 * (1 - e) : 0, "cur", settle)}
