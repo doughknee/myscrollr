@@ -1,0 +1,28 @@
+{
+  "_what": "The film's story: which widgets, in what order, what the titles say, which chips fly in, which palettes flip, what the end card says. The set pieces (the score, the swaps, the pull-out, the hop, the push-in, the chip flight, the landing, the palettes, the end card) are code; this file is what they are played on. Times live in the cue sheet (song-*.json).",
+  "widgets": [
+    {
+      "tab": "sports_nfl", "code": "NFL", "kind": "sports", "chip": { "kind": "live", "count": 4 }, "pages": 3,
+      "title": { "label": "// live desktop ticker", "hex": "#013369", "line1": "The moment it happens,", "line2": "you already know." }
+    },
+    {
+      "tab": "finance_stocks", "code": "STOCKS", "kind": "finance", "chip": null, "pages": 3,
+      "title": { "label": "sec 01 / markets", "hex": "#7c3aed", "line1": "One page", "line2": "at a time." }
+    },
+    {
+      "tab": "news_bbc", "code": "BBC", "kind": "news", "chip": { "kind": "fresh", "count": 1 }, "pages": 2,
+      "title": { "label": "sec 02 / headlines", "hex": "#c8102e", "line1": "No tab", "line2": "to babysit." }
+    },
+    {
+      "tab": "github", "code": "GITHUB", "kind": "github", "chip": { "kind": "needs", "count": 2 }, "pages": 1
+    }
+  ],
+  "desk": { "label": "sec 03 / on your desktop", "line1": "One bar", "line2": "above your work.", "sub": "64 px · every monitor · always on top" },
+  "hop": { "label": "sec 03 / on your desktop", "line1": "Top or bottom.", "sub": "it's your bar. park it." },
+  "pick": { "label": "sec 04 / pick widgets", "hex": "#f97316", "line1": "56 widgets.", "sub": "& counting" },
+  "landing": { "line1": "Watch the bar", "line2": "change." },
+  "palettes": { "label": "sec 05 / dress it", "sub": "20 palettes" },
+  "chips": ["github", "finance_crypto", "sports_nba", "news_hackernews", "weather", "sports_premierleague", "sports_mlb", "news_npr"],
+  "themes": ["scrollr-dark", "nord-dark", "solarized-dark", "gruvbox-dark", "rose-pine-dark", "scrollr-dark"],
+  "end": { "tagline": "free · open source · macos / windows / linux", "line1": "Your live", "line2": "Desktop ticker", "button": "Download Scrollr", "tag": "FREE", "url": "myscrollr.com" }
+}

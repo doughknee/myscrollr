@@ -4,3 +4,12 @@ out/
 # Source clips are cut from the founder's screen recording and are large;
 # regenerate with the ffmpeg lines in src/scene/Desktop.tsx.
 public/clip-*.mp4
+/fonts/
+/fonts-archivo/
+# Generated: `python3 audio/music.py`
+audio/bed.wav
+# Copies of desktop/public/fonts and public/fonts-archivo that webpack resolves `url("/fonts/…")` against;
+# `public/shots` are copies of myscrollr.com/screenshot-sources. Recreate with promo/README.md's setup line.
+public/fonts/
+public/song/
+out/*.props.json

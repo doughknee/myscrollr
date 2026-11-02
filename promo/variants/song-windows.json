@@ -1,0 +1,30 @@
+{
+ "A-build": {
+  "songStart": 10.495,
+  "td": 11.98,
+  "bpm": 119.96,
+  "ends": 29.0,
+  "tdStrength": 10.2
+ },
+ "B-drop": {
+  "songStart": 48.994,
+  "td": 50.46,
+  "bpm": 120.26,
+  "ends": 67.5,
+  "tdStrength": 9.5
+ },
+ "C-peak": {
+  "songStart": 112.965,
+  "td": 114.47,
+  "bpm": 120.11,
+  "ends": 131.4,
+  "tdStrength": 4.6
+ },
+ "D-finale": {
+  "songStart": 142.478,
+  "td": 143.99,
+  "bpm": 120.19,
+  "ends": 160.9,
+  "tdStrength": 3.8
+ }
+}
