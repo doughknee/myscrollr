@@ -77,27 +77,48 @@ function camera(f: number): { s: number; x: number; y: number } {
 
 const SANS = "Archivo, 'Plus Jakarta Sans', system-ui, sans-serif";
 const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+const INK = "#e2e2ec";
+const MINT = "#34d399";
+const MUTE = "#9292a4";
 
-function Caption({ f, at, out, children, size = 92, top, left, right, align = "left", color = "#e2e2ec" }: {
-  f: number; at: number; out: number; children: React.ReactNode; size?: number; top: number; left?: number; right?: number; align?: "left" | "right" | "center"; color?: string;
+/**
+ * The site's type system, not a generic promo's: a `// SEC 01 / NAME` mono
+ * label with the band's edge-bar segment in the widget's colour, then an
+ * uppercase Archivo headline whose second line is outlined in mint, as the
+ * hero on myscrollr.com sets it. Every title sits on its own scrim so it
+ * never fights the window behind it.
+ */
+function Title({ f, at, out, label, hex = MINT, line1, line2, sub, top, left, align = "left", size = 104, scrim = "bottom" }: {
+  f: number; at: number; out: number; label: string; hex?: string; line1?: string; line2?: string; sub?: string;
+  top: number; left?: number; align?: "left" | "center"; size?: number; scrim?: "top" | "bottom" | "center" | "none";
 }) {
   const a = r(f, at, at + 14);
+  const a2 = r(f, at + 6, at + 20);
   const o = 1 - r(f, out, out + 10, INOUT);
   if (a <= 0 || o <= 0) return null;
+  const center = align === "center";
+  const grad = scrim === "bottom"
+    ? "linear-gradient(to top, rgba(11,11,19,.96) 0%, rgba(11,11,19,.86) 45%, rgba(11,11,19,0) 100%)"
+    : "linear-gradient(to bottom, rgba(11,11,19,.96) 0%, rgba(11,11,19,.86) 45%, rgba(11,11,19,0) 100%)";
   return (
-    <div style={{ position: "absolute", top, left, right, width: align === "center" ? "100%" : undefined, textAlign: align, fontFamily: SANS, fontWeight: 900, fontSize: size, letterSpacing: "-0.03em", lineHeight: 0.95, color, opacity: a * o, transform: `translateY(${(1 - a) * 28}px)`, textShadow: "0 8px 40px rgba(0,0,0,.6)", whiteSpace: "nowrap" }}>
-      {children}
-    </div>
-  );
-}
-
-function Label({ f, at, out, children, top, left, right, align = "left" }: { f: number; at: number; out: number; children: React.ReactNode; top: number; left?: number; right?: number; align?: "left" | "right" | "center" }) {
-  const a = r(f, at, at + 12);
-  const o = 1 - r(f, out, out + 8, INOUT);
-  if (a <= 0 || o <= 0) return null;
-  return (
-    <div style={{ position: "absolute", top, left, right, width: align === "center" ? "100%" : undefined, textAlign: align, fontFamily: MONO, fontSize: 20, letterSpacing: "0.22em", textTransform: "uppercase", color: "#9292a4", opacity: a * o }}>
-      {children}
+    <div style={{ position: "absolute", inset: 0, opacity: a * o, pointerEvents: "none" }}>
+      {scrim === "center" && <div style={{ position: "absolute", inset: 0, background: "radial-gradient(62% 48% at 50% 46%, rgba(11,11,19,.94) 0%, rgba(11,11,19,.7) 60%, rgba(11,11,19,0) 100%)" }} />}
+      {(scrim === "top" || scrim === "bottom") && <div style={{ position: "absolute", left: 0, right: 0, [scrim]: 0, height: 520, background: grad }} />}
+      <div style={{ position: "absolute", top, left: center ? 0 : left, right: center ? 0 : undefined, textAlign: center ? "center" : "left", transform: `translateY(${(1 - a) * 24}px)` }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 14, fontFamily: MONO, fontSize: 19, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, marginBottom: 22 }}>
+          <span style={{ display: "block", width: 5, height: 22, background: hex, borderRadius: 1 }} />
+          {label}
+        </div>
+        {line1 && (
+          <div style={{ fontFamily: SANS, fontWeight: 900, fontSize: size, lineHeight: 0.92, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, whiteSpace: "nowrap" }}>{line1}</div>
+        )}
+        {line2 && (
+          <div style={{ fontFamily: SANS, fontWeight: 900, fontSize: size, lineHeight: 0.92, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, whiteSpace: "nowrap", opacity: a2, transform: `translateY(${(1 - a2) * 18}px)` }}>{line2}</div>
+        )}
+        {sub && (
+          <div style={{ marginTop: 24, fontFamily: MONO, fontSize: 19, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTE, opacity: a2 }}>{sub}</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -111,8 +132,16 @@ export function Film() {
   const themeIdx = f < THEMES_AT ? 0 : Math.min(THEMES.length - 1, Math.floor((f - THEMES_AT) / 12));
   const theme = THEMES[themeIdx];
   const endIn = r(f, END, END + 40);
-  const dimDesk = (0.3 + 0.7 * r(f, PULL_OUT, PULL_OUT + 45)) * (1 - endIn * 0.82);
-  const mint = "#34d399";
+  // The desktop steps back whenever a title is up.
+  const dimDesk =
+    f < PULL_OUT ? 0.22
+    // Reveal the desktop clean, then step it back under the title; lift it for the hop.
+    : f < PULL_OUT + 28 ? 0.22 + 0.78 * r(f, PULL_OUT, PULL_OUT + 28)
+    : f < HOP - 8 ? 1 - 0.62 * r(f, PULL_OUT + 28, PULL_OUT + 44)
+    : f < HOP + 12 ? 0.38 + 0.62 * r(f, HOP - 8, HOP + 2)
+    : f < PUSH_IN ? 1 - 0.62 * r(f, HOP + 12, HOP + 26)
+    : f < END ? 1 - 0.5 * r(f, PUSH_IN, PUSH_IN + 35)
+    : 0.5 - 0.34 * endIn;
 
   // The world: 1920x1080, scaled about the camera's focus.
   const tx = W / 2 - cam.x * cam.s;
@@ -161,40 +190,44 @@ export function Film() {
       </div>
 
       {/* Screen-space type */}
-      <Label f={f} at={6} out={TD - 4} top={700} left={140}>// live desktop ticker</Label>
-      <Caption f={f} at={12} out={TD + 40} top={740} left={136} size={110}>The moment it happens,</Caption>
-      <Caption f={f} at={TD + 2} out={TO_STOCKS - 6} top={860} left={136} size={110} color={mint}>you already know.</Caption>
+      <Title f={f} at={10} out={TO_STOCKS - 8} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2={f >= TD ? "you already know." : undefined} top={690} left={136} size={104} />
+      <Title f={f} at={TO_STOCKS + 4} out={TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={690} left={136} size={104} />
+      <Title f={f} at={TO_NEWS + 4} out={PULL_OUT + 24} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={690} left={136} size={104} />
 
-      <Caption f={f} at={TO_STOCKS + 4} out={TO_NEWS - 4} top={780} left={136} size={120}>Markets.</Caption>
-      <Caption f={f} at={TO_NEWS + 4} out={PULL_OUT + 20} top={780} left={136} size={120}>Headlines.</Caption>
+      <Title f={f} at={PULL_OUT + 30} out={HOP - 4} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={330} align="center" size={112} scrim="center" />
+      <Title f={f} at={HOP + 10} out={PUSH_IN + 8} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" />
 
-      <Caption f={f} at={PULL_OUT + 30} out={HOP - 4} top={470} left={0} align="center" size={96}>One bar above your work.</Caption>
-      <Label f={f} at={PULL_OUT + 38} out={HOP - 4} top={580} left={0} align="center">64 px · every monitor · always on top</Label>
+      <Title f={f} at={PUSH_IN + 10} out={TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" />
+      <Title f={f} at={TO_GITHUB + 6} out={THEMES_AT + 10} label="sec 04 / pick widgets" hex="#f97316" line1="Watch the bar" line2="change." top={70} left={136} size={104} scrim="top" />
 
-      <Caption f={f} at={HOP + 10} out={PUSH_IN + 10} top={470} left={0} align="center" size={96}>Top or bottom.</Caption>
+      <Title f={f} at={THEMES_AT + 10} out={END - 6} label="sec 05 / dress it" line1="20 palettes." sub={`${theme.replace("-dark", "").replace("-", " ")} · dark & light`} top={70} left={136} size={104} scrim="top" />
 
-      <Caption f={f} at={PUSH_IN + 10} out={TO_GITHUB} top={120} left={136} size={100}>Pick widgets.</Caption>
-      <Caption f={f} at={TO_GITHUB + 6} out={THEMES_AT + 10} top={120} left={136} size={100} color={mint}>Watch the bar change.</Caption>
-
-      <Caption f={f} at={THEMES_AT + 10} out={END - 6} top={120} left={136} size={100}>20 palettes.</Caption>
-      <Label f={f} at={THEMES_AT + 16} out={END - 6} top={240} left={140}>{theme.replace("-dark", "").replace("-", " ")} · dark &amp; light</Label>
-
-      {/* End card */}
+      {/* End card: the site's hero, as it is. */}
       {f >= END && (
         <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 300, display: "flex", justifyContent: "center", alignItems: "center", gap: 26, transform: `scale(${0.9 + 0.1 * r(f, END, END + 30)})` }}>
-            <Img src={staticFile("logo.svg")} style={{ width: 128, height: 128 }} />
-            <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 140, letterSpacing: "-0.04em", color: "#e2e2ec", lineHeight: 1 }}>
-              scrollr<span style={{ color: mint }}>.</span>
+          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, rgba(11,11,19,.92) 0%, rgba(11,11,19,.6) 100%)" }} />
+          <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${0.92 + 0.08 * r(f, END, END + 30)})` }}>
+            <Img src={staticFile("logo.svg")} style={{ width: 72, height: 72 }} />
+            <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 76, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
+              scrollr<span style={{ color: MINT }}>.</span>
             </span>
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 500, textAlign: "center", fontFamily: SANS, fontWeight: 500, fontSize: 40, color: "#e2e2ec", opacity: r(f, END + 18, END + 40), transform: `translateY(${(1 - r(f, END + 18, END + 40)) * 16}px)` }}>
-            Free. Open source. <span style={{ color: "#9292a4" }}>macOS · Windows · Linux</span>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 330, textAlign: "center", fontFamily: MONO, fontSize: 19, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, opacity: r(f, END + 10, END + 24) }}>
+            free · open source · macos / windows / linux
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 600, textAlign: "center", opacity: r(f, END + 34, END + 56), transform: `translateY(${(1 - r(f, END + 34, END + 56)) * 16}px)` }}>
-            <span style={{ display: "inline-block", background: mint, color: "#141420", fontFamily: SANS, fontWeight: 800, fontSize: 34, padding: "20px 44px", borderRadius: 8 }}>Download Scrollr ↓</span>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 400, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, opacity: r(f, END + 14, END + 30), transform: `translateY(${(1 - r(f, END + 14, END + 30)) * 24}px)` }}>
+            Your live
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 740, textAlign: "center", fontFamily: MONO, fontSize: 30, letterSpacing: "0.22em", color: mint, opacity: r(f, END + 46, END + 66) }}>MYSCROLLR.COM</div>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 540, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, opacity: r(f, END + 22, END + 38), transform: `translateY(${(1 - r(f, END + 22, END + 38)) * 24}px)` }}>
+            Desktop ticker
+          </div>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 730, textAlign: "center", opacity: r(f, END + 40, END + 58), transform: `translateY(${(1 - r(f, END + 40, END + 58)) * 16}px)` }}>
+            <span style={{ position: "relative", display: "inline-block", background: MINT, color: "#141420", fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6 }}>
+              Download Scrollr
+              <span style={{ position: "absolute", top: -12, right: -12, background: "#0b0b13", color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>
+            </span>
+            <span style={{ display: "inline-block", marginLeft: 18, verticalAlign: "top", border: "1px solid #303040", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6 }}>myscrollr.com</span>
+          </div>
         </div>
       )}
     </AbsoluteFill>
