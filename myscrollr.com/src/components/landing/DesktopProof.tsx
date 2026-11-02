@@ -1,26 +1,65 @@
 /**
- * SEC 02 ／ ON YOUR DESKTOP — three pages of the real bar, rendered by the
- * app's own ticker code (`make marketing` shoots them from the same /bar/
- * build the live bar uses) and stacked, unedited, with a mono annotation
- * rail.
+ * SEC 02 ／ ON YOUR DESKTOP — the real bar in motion: an 11-second loop
+ * (1920x384) rendered by the app's own page cells (promo/, the HeroLoop composition;
+ * `hero-loop-{dark,light}.mp4` in public/marketing), with a mono
+ * annotation rail. A score lands, the dwell runs out, the page turns to
+ * stocks, and the loop closes on the swipe back. Reduced-motion visitors
+ * get the poster frame instead.
  */
 
+import { useEffect, useRef } from 'react'
 import { motion } from 'motion/react'
 import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
 import { useTheme } from '@/hooks/useTheme'
 
-// The shot follows the site color mode: light visitors see the light bar,
+// The loop follows the site color mode: light visitors see the light bar,
 // dark visitors the dark one.
-const srcset = (theme: 'dark' | 'light') =>
-  `/marketing/desktop-proof-${theme}@1x.png 1648w, /marketing/desktop-proof-${theme}@2x.png 3296w`
-const SIZES = '(max-width: 1023px) 100vw, 990px'
+const loopSrc = (theme: 'dark' | 'light') => `/marketing/hero-loop-${theme}.mp4`
+const posterSrc = (theme: 'dark' | 'light') =>
+  `/marketing/hero-loop-${theme}.jpg`
+const LOOP_ALT =
+  'The Scrollr ticker: the Bears score on the NFL page, the dwell pill fills, and the bar turns the page to live stock quotes'
 
 const ANNOTATIONS: ReadonlyArray<[string, string]> = [
   ['① A PAGE', 'one widget at a time, its games or quotes filling the width'],
   ['② THE EDGE', 'your local time, always; weather and GitHub sit here too'],
-  ['③ THE SWIPE', 'a college Saturday, a Sunday slate, your pull requests'],
+  [
+    '③ THE SWIPE',
+    'the dwell runs out and the bar turns the page: a score, then your stocks',
+  ],
 ]
+
+// React does not serialize `muted` into prerendered markup, and a video
+// that is not muted at the moment autoplay is decided will not autoplay.
+// Setting it on the element before play() covers hydration and theme
+// remounts alike.
+function LoopVideo({ theme }: { theme: 'dark' | 'light' }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.muted = true
+    el.play().catch(() => {})
+  }, [theme])
+  return (
+    <video
+      key={theme}
+      ref={ref}
+      src={loopSrc(theme)}
+      poster={posterSrc(theme)}
+      width={1920}
+      height={384}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-label={LOOP_ALT}
+      className="block h-auto w-full rounded-[8px] border border-hairline motion-reduce:hidden"
+    />
+  )
+}
 
 export function DesktopProof({
   // Segmented landing pages reorder their sections, so the SEC number
@@ -48,8 +87,9 @@ export function DesktopProof({
             <span className="text-primary">Not a mockup.</span>
           </h2>
           <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-content/60 [text-wrap:pretty]">
-            Three pages of the bar, drawn by the same code that runs on your
-            desktop. The bar at the edge of this page is that code too, live.
+            The bar, drawn by the same code that runs on your desktop: a score
+            lands, the page turns. The bar at the edge of this page is that code
+            too, live.
           </p>
         </motion.div>
         <div className="grid items-start gap-10 pb-14 pt-7 md:grid-cols-[220px_1fr]">
@@ -80,20 +120,19 @@ export function DesktopProof({
             viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 0.7, ease: EASE }}
           >
+            <LoopVideo theme={theme} />
             <img
-              src={`/marketing/desktop-proof-${theme}@1x.png`}
-              srcSet={srcset(theme)}
-              sizes={SIZES}
-              width={1648}
-              height={280}
+              src={posterSrc(theme)}
+              width={1920}
+              height={384}
               loading="lazy"
               decoding="async"
-              alt="Three pages of the Scrollr ticker: college football scores, NFL scores, and GitHub pull requests, each with the local time on the bar's edge"
-              className="block h-auto w-full rounded-[8px] border border-hairline"
+              alt={LOOP_ALT}
+              className="hidden h-auto w-full rounded-[8px] border border-hairline motion-reduce:block"
             />
             <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-content/45">
-              <span>FIG. 01 — THE BAR · THREE PAGES</span>
-              <span>NO EDITS</span>
+              <span>FIG. 01 — THE BAR · A SCORE, THEN THE SWIPE</span>
+              <span>LOOP · NO EDITS</span>
             </div>
           </motion.div>
         </div>

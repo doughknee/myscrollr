@@ -32,5 +32,6 @@ export const RemotionRoot: React.FC = () => (
     calculateMetadata={({ props }) => ({ durationInFrames: durationFor(props), props: { ...props, portrait: true } })}
   />
   <Composition id="HeroLoop" component={Hero} fps={HERO_FPS} width={HERO_W} height={HERO_H} durationInFrames={HERO_FRAMES} />
+  <Composition id="HeroLoopLight" component={Hero} fps={HERO_FPS} width={HERO_W} height={HERO_H} durationInFrames={HERO_FRAMES} defaultProps={{ theme: "scrollr-light" }} />
   </>
 );
