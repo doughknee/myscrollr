@@ -140,7 +140,10 @@ function camera(f: number, E: E, kick: number): { s: number; x: number; y: numbe
   while (i < keys.length - 2 && f >= keys[i + 1][0]) i++;
   const [f0, s0, x0, y0, how] = keys[i];
   const [f1, s1, x1, y1] = keys[i + 1];
-  const t = f1 === f0 ? 1 : how === "move" ? r(f, f0, f1, INOUT) : Math.min(1, Math.max(0, (f - f0) / (f1 - f0)));
+  // The pull-out settles with a small overshoot: the bar lands in place.
+  const SETTLE = Easing.bezier(0.2, 0.9, 0.3, 1.04);
+  const ease = f0 === E.PULL_OUT ? SETTLE : INOUT;
+  const t = f1 === f0 ? 1 : how === "move" ? r(f, f0, f1, ease) : Math.min(1, Math.max(0, (f - f0) / (f1 - f0)));
   const punches = hit(f, E.TD) + hit(f, E.TO_STOCKS, 0.06) + hit(f, E.TO_NEWS, 0.06) + hit(f, E.TO_GITHUB, 0.06) + hit(f, end, 0.04, 0.01);
   // The kick is a slow breath here, a third of a percent; the bar's glow carries the beat.
   const breath = 0.0035 * kick;
@@ -230,8 +233,14 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const cam = camera(f, E, kick);
   const end = E.END[0];
   // The hop: a lift in the frames before (anticipation), then the drop.
-  const lift = f < E.HOP ? -6 * r(f, E.HOP - 12, E.HOP - 2, INOUT) : 0;
-  const barTop = lift + interpolate(f, [E.HOP, E.HOP + 12], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.3, 0, 0.1, 1) });
+  // The hop has the swap's shape: arm (glow builds, a lift), then the drop
+  // lands on the hit with a two-frame settle and a bloom under the bar.
+  const hopArm = f < E.HOP ? r(f, E.HOP - 12, E.HOP - 1, Easing.in(Easing.quad)) : 0;
+  const lift = -8 * hopArm;
+  const drop = interpolate(f, [E.HOP, E.HOP + 10], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.5, 0, 0.2, 1) });
+  const settle = f >= E.HOP + 10 ? -5 * interpolate(f, [E.HOP + 10, E.HOP + 13, E.HOP + 20], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) }) : 0;
+  const barTop = lift + drop + settle;
+  const landBloom = f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
   const themeIdx = Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length);
   const theme = THEMES[themeIdx];
   // A flash on each palette flip.
@@ -241,7 +250,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   // The desktop steps back whenever a title is up.
   const dimDesk =
     f < E.PULL_OUT ? 0.22
-    : f < E.DESK_TITLE ? 0.22 + 0.78 * r(f, E.PULL_OUT, E.PULL_OUT + 24)
+    : f < E.DESK_TITLE ? 0.22 + 0.78 * r(f, E.PULL_OUT + 10, E.PULL_OUT + 34)
     : f < E.HOP - 8 ? 1 - 0.62 * r(f, E.DESK_TITLE, E.DESK_TITLE + 12)
     : f < E.HOP + 12 ? 0.38 + 0.62 * r(f, E.HOP - 8, E.HOP + 2)
     : f < E.PUSH_IN ? 1 - 0.62 * r(f, E.HOP + 12, E.HOP + 26)
@@ -255,9 +264,17 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
 
   // Catalog chips: each pops in during the widgets title, flies for a third
   // of a second and lands on the band on its own hit of the riser.
+  // Chips pop on the hats after the widgets title: the first eight frames
+  // past it where the hat envelope rises above 0.5, at least 3 frames apart.
+  const pops: number[] = [];
+  if (features?.hat) {
+    for (let k = E.WIDGETS_TITLE + 2; k < E.CHIPS[1] - 6 && pops.length < CATALOG_FLY.length; k++) {
+      if (features.hat[k] > 0.5 && (features.hat[k - 1] ?? 0) <= features.hat[k] && (pops.length === 0 || k - pops[pops.length - 1] >= 3)) pops.push(k);
+    }
+  }
   const chips = CATALOG_FLY.map((c, i) => {
     const land = E.CHIPS[i] ?? E.TO_GITHUB;
-    const pop = E.WIDGETS_TITLE + 4 + i * 4;
+    const pop = pops[i] ?? E.WIDGETS_TITLE + 4 + i * 4;
     const a = r(f, pop, pop + 12);
     const go = r(f, land - 11, land, Easing.in(Easing.cubic));
     const gone = f > land + 2;
@@ -303,7 +320,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
             <Img src={staticFile("shots/home.png")} style={{ position: "absolute", left: 560, top: 180, width: 1240, borderRadius: 12, boxShadow: "0 40px 110px rgba(0,0,0,.75)" }} />
           </div>
           {/* The bar. Its glow is the kick. */}
-          <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick)}px ${hex}${Math.round(30 + 70 * kick).toString(16).padStart(2, "0")}` }}>
+          <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick + 40 * hopArm + 60 * landBloom)}px ${hex}${Math.round(30 + 70 * kick + 60 * hopArm + 90 * landBloom).toString(16).padStart(2, "0")}` }}>
             <Bar frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} />
             {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: flipFlash, pointerEvents: "none" }} />}
           </div>
