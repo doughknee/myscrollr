@@ -11,7 +11,7 @@
  */
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 import { Bar, BAR_H, BAR_W, type BarState, type Tick } from "./Bar";
-import { WIDGETS } from "./data";
+import { DEFAULT } from "./story";
 
 export const HERO_W = 1920;
 export const HERO_H = 640;
@@ -51,13 +51,13 @@ export function Hero() {
   const y = BAR_H / 2 + 4 * Math.sin((4 * Math.PI * f) / HERO_FRAMES);
   const tx = HERO_W / 2 - x * s;
   const ty = HERO_H / 2 - y * s;
-  const hex = WIDGETS[state.widget].hex ?? "#34d399";
+  const hex = DEFAULT.widgets[state.widget].hex ?? "#34d399";
 
   return (
     <AbsoluteFill id="app-shell" data-theme="scrollr-dark" style={{ background: "radial-gradient(120% 120% at 50% 0%, var(--color-surface-2, #181825) 0%, var(--color-surface, #0b0b13) 100%)", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, color-mix(in srgb, var(--color-fg, #fff) 5%, transparent) 1px, transparent 1.2px)", backgroundSize: "40px 40px" }} />
       <div style={{ position: "absolute", left: 0, top: 0, width: BAR_W, height: BAR_H, transform: `translate(${tx}px, ${ty}px) scale(${s})`, transformOrigin: "0 0", boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(10 + 30 * arm)}px ${hex}${Math.round(40 + 90 * arm).toString(16).padStart(2, "0")}` }}>
-        <Bar frame={f} state={state} fill={fill} arm={arm} ticks={ticks} roll={12} />
+        <Bar widgets={DEFAULT.widgets} frame={f} state={state} fill={fill} arm={arm} ticks={ticks} roll={12} />
       </div>
     </AbsoluteFill>
   );

@@ -5,6 +5,10 @@
  * never cuts. The camera moves around it. The desktop behind it is the
  * app's own window, from the marketing screenshot set.
  *
+ * STORY. Which widgets, what the titles say, which chips and palettes,
+ * what the end card says: the story (story.ts, variants/story-*.json).
+ * This file is the set pieces that play it.
+ *
  * TIME. Every event is a second of film time in the variant's cue sheet
  * (`cues`), measured off the track's own onsets (audio/analyze.py), so a
  * cut is a number edit. With no cue sheet the film runs on a 120 BPM grid.
@@ -17,7 +21,8 @@
  */
 import { AbsoluteFill, Audio, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Bar, BAR_H, BAR_W, type BarState, type Tick } from "./Bar";
-import { CATALOG_FLY, THEMES, WIDGETS } from "./data";
+import { useMemo } from "react";
+import { DEFAULT, play, type Story } from "./story";
 
 export const FPS = 30;
 /**
@@ -29,35 +34,44 @@ interface Layout { W: number; H: number; titleLeft: number; titleSize: number; l
 const LAND: Layout = { W: 1920, H: 1080, titleLeft: 136, titleSize: 104, lowTop: 690, midTop: 330, highTop: 70, end: [196, 272, 322, 614, 790, 500], endSize: 150, chip: (i) => [200 + (i % 4) * 175 + (i > 3 ? 70 : 0), 870 + Math.floor(i / 4) * 58], shots: [120, 130, 1180, 560, 180, 1240] };
 const PORT: Layout = { W: 1080, H: 1920, titleLeft: 64, titleSize: 66, lowTop: 1120, midTop: 640, highTop: 120, end: [380, 450, 492, 760, 900, 640], endSize: 104, chip: (i) => [150 + (i % 4) * 210 + (i > 3 ? 60 : 0), 1700 + Math.floor(i / 4) * 58], shots: [40, 520, 1000, 120, 760, 1000] };
 
-/** The cue sheet, in seconds of film time. */
+/** The cue sheet, in seconds of film time. Keys name set pieces, not widgets. */
 export interface Cues {
-  /** The Bears score. */
-  TD: number;
-  /** Second line of the opening title. */
-  TD_LINE2: number;
-  /** The camera is released after the hit. */
-  TD_RELEASE: number;
-  TO_STOCKS: number;
-  /** Price ticks on the stocks page: [second, column, up?]. */
+  /** The score on the opening widget (sports only). Without it, nothing scores. */
+  SCORE?: number;
+  /** Second line of the opening title; six frames after the first when unset. */
+  SCORE_LINE2?: number;
+  /** One swap per widget after the first, in story order; the last is the landing. */
+  SWAPS: number[];
+  /** Price ticks on a finance page: [second, column, up?]. */
   TICKS: [number, number, boolean][];
-  TO_NEWS: number;
   PULL_OUT: number;
-  /** "One bar above your work." */
+  /** The desk title ("One bar above your work."). */
   DESK_TITLE: number;
   HOP: number;
   HOP_TITLE: number;
   PUSH_IN: number;
+  /** The pick title ("56 widgets."); the chips pop in after it. */
   WIDGETS_TITLE: number;
   /** When each catalog chip lands on the band, by chip index. */
   CHIPS: number[];
-  TO_GITHUB: number;
-  GITHUB_TITLE: number;
+  /** The landing title ("Watch the bar change."). */
+  LANDING_TITLE: number;
   /** Palette flips, one per entry. */
   THEMES: number[];
   THEMES_TITLE: number;
   /** End card: logo, label, line 1, line 2, button, url. */
   END: number[];
   OUT: number;
+}
+
+/** The first cut's keys, named for its widgets; still accepted. */
+interface LegacyCues extends Omit<Cues, "SCORE" | "SCORE_LINE2" | "SWAPS" | "LANDING_TITLE"> {
+  TD: number; TD_LINE2: number; TD_RELEASE?: number; TO_STOCKS: number; TO_NEWS: number; TO_GITHUB: number; GITHUB_TITLE: number;
+}
+export function normalize(c: Cues | LegacyCues): Cues {
+  if (!("TO_STOCKS" in c)) return c;
+  const { TD, TD_LINE2, TD_RELEASE: _r, TO_STOCKS, TO_NEWS, TO_GITHUB, GITHUB_TITLE, ...rest } = c;
+  return { ...rest, SCORE: TD, SCORE_LINE2: TD_LINE2, SWAPS: [TO_STOCKS, TO_NEWS, TO_GITHUB], LANDING_TITLE: GITHUB_TITLE };
 }
 
 export interface Features { kick: number[]; snare: number[]; hat: number[]; rms: number[] }
@@ -68,45 +82,44 @@ export type FilmProps = {
   bpm: number;
   songStart?: number;
   song?: string;
-  cues?: Cues;
+  cues?: Cues | LegacyCues;
   features?: Features;
+  /** The story to play; variants/story-B.json when unset. */
+  story?: Story;
 };
 
 /** The 120 BPM grid, as the film was first cut. */
 export const GRID: Cues = {
-  TD: 1.5, TD_LINE2: 1.57, TD_RELEASE: 2.23, TO_STOCKS: 3, TICKS: [[3.5, 0, true], [4, 1, true]], TO_NEWS: 4.5, PULL_OUT: 5, DESK_TITLE: 6, HOP: 7.5, HOP_TITLE: 7.83,
-  PUSH_IN: 9, WIDGETS_TITLE: 9.33, CHIPS: [10.5, 9.9, 10.03, 10.17, 10.3, 10.43, 10.57, 10.7], TO_GITHUB: 10.5, GITHUB_TITLE: 10.7,
+  SCORE: 1.5, SCORE_LINE2: 1.57, SWAPS: [3, 4.5, 10.5], TICKS: [[3.5, 0, true], [4, 1, true]], PULL_OUT: 5, DESK_TITLE: 6, HOP: 7.5, HOP_TITLE: 7.83,
+  PUSH_IN: 9, WIDGETS_TITLE: 9.33, CHIPS: [10.5, 9.9, 10.03, 10.17, 10.3, 10.43, 10.57, 10.7], LANDING_TITLE: 10.7,
   THEMES: [11.9, 12.3, 12.7, 13.1, 13.5, 13.9, 14.3], THEMES_TITLE: 11.83, END: [14, 14.33, 14.47, 14.73, 15.33, 15.53], OUT: 18.5,
 };
-export const durationFor = (p: FilmProps) => Math.round((p.cues ?? GRID).OUT * FPS * (p.cues ? 1 : 120 / p.bpm));
+export const durationFor = (p: FilmProps) => Math.round((p.cues ? normalize(p.cues) : GRID).OUT * FPS * (p.cues ? 1 : 120 / p.bpm));
 
 const OUT = Easing.bezier(0.16, 1, 0.3, 1);
 const INOUT = Easing.bezier(0.65, 0, 0.35, 1);
 const r = (f: number, a: number, b: number, e = OUT) => interpolate(f, [a, b], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: e });
 
 /** Frames of the cue sheet. */
-interface E { TD: number; TD_LINE2: number; TD_RELEASE: number; TO_STOCKS: number; TICKS: Tick[]; TO_NEWS: number; PULL_OUT: number; DESK_TITLE: number; HOP: number; HOP_TITLE: number; PUSH_IN: number; WIDGETS_TITLE: number; CHIPS: number[]; TO_GITHUB: number; GITHUB_TITLE: number; THEMES: number[]; THEMES_TITLE: number; END: number[]; OUT: number }
+interface E { SCORE?: number; SCORE_LINE2?: number; SWAPS: number[]; LANDING: number; TICKS: Tick[]; PULL_OUT: number; DESK_TITLE: number; HOP: number; HOP_TITLE: number; PUSH_IN: number; WIDGETS_TITLE: number; CHIPS: number[]; LANDING_TITLE: number; THEMES: number[]; THEMES_TITLE: number; END: number[]; OUT: number }
 function toFrames(c: Cues, fps: number): E {
   const s = (x: number) => Math.round(x * fps);
+  const SWAPS = c.SWAPS.map(s);
   return {
-    TD: s(c.TD), TD_LINE2: s(c.TD_LINE2), TD_RELEASE: s(c.TD_RELEASE), TO_STOCKS: s(c.TO_STOCKS), TICKS: c.TICKS.map(([t, cell, up]) => ({ at: s(t), cell, up })),
-    TO_NEWS: s(c.TO_NEWS), PULL_OUT: s(c.PULL_OUT), DESK_TITLE: s(c.DESK_TITLE), HOP: s(c.HOP), HOP_TITLE: s(c.HOP_TITLE), PUSH_IN: s(c.PUSH_IN), WIDGETS_TITLE: s(c.WIDGETS_TITLE),
-    CHIPS: c.CHIPS.map(s), TO_GITHUB: s(c.TO_GITHUB), GITHUB_TITLE: s(c.GITHUB_TITLE), THEMES: c.THEMES.map(s), THEMES_TITLE: s(c.THEMES_TITLE), END: c.END.map(s), OUT: s(c.OUT),
+    SCORE: c.SCORE === undefined ? undefined : s(c.SCORE), SCORE_LINE2: c.SCORE_LINE2 === undefined ? undefined : s(c.SCORE_LINE2),
+    SWAPS, LANDING: SWAPS[SWAPS.length - 1], TICKS: c.TICKS.map(([t, cell, up]) => ({ at: s(t), cell, up })),
+    PULL_OUT: s(c.PULL_OUT), DESK_TITLE: s(c.DESK_TITLE), HOP: s(c.HOP), HOP_TITLE: s(c.HOP_TITLE), PUSH_IN: s(c.PUSH_IN), WIDGETS_TITLE: s(c.WIDGETS_TITLE),
+    CHIPS: c.CHIPS.map(s), LANDING_TITLE: s(c.LANDING_TITLE), THEMES: c.THEMES.map(s), THEMES_TITLE: s(c.THEMES_TITLE), END: c.END.map(s), OUT: s(c.OUT),
   };
 }
 
 function barState(f: number, E: E): BarState {
-  const turns = [
-    { at: 0, w: 0 },
-    { at: E.TO_STOCKS, w: 1 },
-    { at: E.TO_NEWS, w: 2 },
-    { at: E.TO_GITHUB, w: 3 },
-  ];
+  const turns = [{ at: 0, w: 0 }, ...E.SWAPS.map((at, i) => ({ at, w: i + 1 }))];
   let cur = turns[0];
   let prev: number | null = null;
   for (const t of turns) if (f >= t.at) { prev = cur === t ? null : cur.w; cur = t; }
   if (cur.at === 0) prev = null;
-  return { widget: cur.w, since: cur.at, prev, scored: f >= E.TD, scoredAt: E.TD, dark: true };
+  return { widget: cur.w, since: cur.at, prev, scored: E.SCORE !== undefined && f >= E.SCORE, scoredAt: E.SCORE ?? -1, dark: true };
 }
 
 /** The dip before a hit and the punch on it: one shape for every big hit. */
@@ -124,36 +137,47 @@ function hit(f: number, at: number, punch = 0.09, dip = 0.012): number {
  * the hits sit on top of either.
  */
 type Key = [number, number, number, number, "drift" | "move"];
+type Pose = [number, number, number];
+/**
+ * The opening drift: a pose at frame 0, then one per swap before the
+ * pull-out, each a little wider and further along the bar. A story with
+ * more swaps than poses holds the last pose for the extra ones.
+ */
+const OPEN: Record<"land" | "port", { poses: Pose[]; pull: Pose }> = {
+  land: { poses: [[2.75, 318, 108], [2.56, 366, 112], [2.36, 404, 128]], pull: [2.2, 432, 140] },
+  port: { poses: [[2.5, 206, 100], [2.36, 222, 104], [2.22, 238, 112]], pull: [2.1, 250, 120] },
+};
 function camera(f: number, E: E, kick: number, portrait: boolean): { s: number; x: number; y: number } {
   const end = E.END[0];
+  const open = OPEN[portrait ? "port" : "land"];
+  const pose = (i: number): Pose => open.poses[Math.min(i, open.poses.length - 1)];
+  const opening: Key[] = [
+    [0, ...pose(0), "drift"],
+    ...E.SWAPS.slice(0, -1).map((at, i): Key => [at, ...pose(i + 1), "drift"]),
+    [E.PULL_OUT, ...open.pull, "move"],
+  ];
   // The band's left edge must stay on screen: x <= (W/2)/s at every scale.
   const keys: Key[] = portrait ? [
-    [0, 2.5, 206, 100, "drift"],
-    [E.TO_STOCKS, 2.36, 222, 104, "drift"],
-    [E.TO_NEWS, 2.22, 238, 112, "drift"],
-    [E.PULL_OUT, 2.1, 250, 120, "move"],
+    ...opening,
     [E.PULL_OUT + 36, 1.0, 540, 960, "drift"],
     [E.HOP, 1.03, 536, 972, "move"],
     [E.HOP + 25, 1.08, 540, 1000, "drift"],
     [E.PUSH_IN, 1.1, 544, 1010, "move"],
     [E.PUSH_IN + 32, 2.2, 240, 1832, "drift"],
-    [E.TO_GITHUB + 18, 2.15, 248, 1836, "move"],
+    [E.LANDING + 18, 2.15, 248, 1836, "move"],
     [E.THEMES[0], 1.5, 340, 1850, "drift"],
     [end - 18, 1.45, 350, 1846, "move"],
     [end, 1.0, 540, 960, "drift"],
     [E.OUT, 1.02, 540, 966, "drift"],
   ] : [
     // frame, scale, focusX, focusY, how we get to the NEXT key
-    [0, 2.75, 318, 108, "drift"],
-    [E.TO_STOCKS, 2.56, 366, 112, "drift"],
-    [E.TO_NEWS, 2.36, 404, 128, "drift"],
-    [E.PULL_OUT, 2.2, 432, 140, "move"],
+    ...opening,
     [E.PULL_OUT + 36, 1.0, 960, 540, "drift"],
     [E.HOP, 1.04, 952, 556, "move"],
     [E.HOP + 25, 1.1, 960, 600, "drift"],
     [E.PUSH_IN, 1.13, 968, 616, "move"],
     [E.PUSH_IN + 32, 2.3, 340, 985, "drift"],
-    [E.TO_GITHUB + 18, 2.24, 362, 990, "move"],
+    [E.LANDING + 18, 2.24, 362, 990, "move"],
     [E.THEMES[0], 1.6, 560, 1010, "drift"],
     [end - 18, 1.55, 590, 1004, "move"],
     [end, 1.0, 960, 540, "drift"],
@@ -168,7 +192,7 @@ function camera(f: number, E: E, kick: number, portrait: boolean): { s: number; 
   const ease = f0 === E.PULL_OUT ? SETTLE : INOUT;
   const t = f1 === f0 ? 1 : how === "move" ? r(f, f0, f1, ease) : Math.min(1, Math.max(0, (f - f0) / (f1 - f0)));
   // No punch on the end hit: the bar's glide is the event there.
-  const punches = hit(f, E.TD) + hit(f, E.TO_STOCKS, 0.06) + hit(f, E.TO_NEWS, 0.06) + hit(f, E.TO_GITHUB, 0.06);
+  const punches = (E.SCORE === undefined ? 0 : hit(f, E.SCORE)) + E.SWAPS.reduce((acc, at) => acc + hit(f, at, 0.06), 0);
   // The kick is a slow breath here, a third of a percent; the bar's glow carries the beat.
   const breath = 0.0035 * kick;
   return { s: (s0 + (s1 - s0) * t) * (1 + punches + breath), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
@@ -232,9 +256,12 @@ function pace(sec: number, peak: number, width: number): number {
   return 1.35 - 0.65 * Math.exp(-(((sec - peak) / width) ** 2));
 }
 
-export function Film({ bpm, songStart, song, cues, features, portrait = false }: FilmProps) {
+export function Film({ bpm, songStart, song, cues: rawCues, features, story, portrait = false }: FilmProps) {
   const L = portrait ? PORT : LAND;
   const { W, H } = L;
+  const S = useMemo(() => (story ? play(story) : DEFAULT), [story]);
+  const THEMES = S.themes;
+  const cues = rawCues ? normalize(rawCues) : undefined;
   const real = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const E = toFrames(cues ?? GRID, fps);
@@ -257,13 +284,14 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
   };
   const kick = smooth(features?.kick), hat = smooth(features?.hat, 2, 8);
   const snare = 0;
-  const pc = pace(real / fps, (cues ?? GRID).TO_GITHUB, 7);
+  const landing = (cues ?? GRID).SWAPS;
+  const pc = pace(real / fps, landing[landing.length - 1], 7);
 
   const state = { ...barState(f, E), dark: !THEMES[Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length)].endsWith("-light") };
   // The dwell: the lit pill fills from the swap-in to the next swap at a
   // constant rate and is full on that frame, as the app's own dwell works.
   // GitHub's runs to the end card.
-  const nextSwap = [E.TO_STOCKS, E.TO_NEWS, E.TO_GITHUB, E.END[0]][state.widget];
+  const nextSwap = [...E.SWAPS, E.END[0]][state.widget];
   const fill = Math.min(1, Math.max(0, (f - state.since) / Math.max(1, nextSwap - state.since)));
   const arm = f < nextSwap ? r(f, nextSwap - 12, nextSwap - 1, Easing.in(Easing.quad)) : 0;
   const fadeIn = r(f, 0, 10, Easing.out(Easing.quad));
@@ -308,7 +336,7 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
   // The world: 1920x1080, scaled about the camera's focus.
   const tx = W / 2 - cam.x * cam.s;
   const ty = H / 2 - cam.y * cam.s;
-  const hex = WIDGETS[state.widget].hex ?? MINT;
+  const hex = S.widgets[state.widget].hex ?? MINT;
 
   // Catalog chips: each pops in during the widgets title, flies for a third
   // of a second and lands on the band on its own hit of the riser.
@@ -316,12 +344,12 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
   // past it where the hat envelope rises above 0.5, at least 3 frames apart.
   const pops: number[] = [];
   if (features?.hat) {
-    for (let k = E.WIDGETS_TITLE + 2; k < E.CHIPS[1] - 6 && pops.length < CATALOG_FLY.length; k++) {
+    for (let k = E.WIDGETS_TITLE + 2; k < Math.min(...E.CHIPS) - 6 && pops.length < S.flyers.length; k++) {
       if (features.hat[k] > 0.5 && (features.hat[k - 1] ?? 0) <= features.hat[k] && (pops.length === 0 || k - pops[pops.length - 1] >= 3)) pops.push(k);
     }
   }
-  const chips = CATALOG_FLY.map((c, i) => {
-    const land = E.CHIPS[i] ?? E.TO_GITHUB;
+  const chips = S.flyers.map((c, i) => {
+    const land = E.CHIPS[i] ?? E.LANDING;
     const pop = pops[i] ?? E.WIDGETS_TITLE + 4 + i * 4;
     const a = r(f, pop, pop + 12);
     const go = r(f, land - 11 * pc, land, Easing.in(Easing.cubic));
@@ -368,7 +396,7 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
           </div>
           {/* The bar. Its glow is the kick. */}
           <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick + 40 * hopArm + 60 * landBloom)}px ${hex}${Math.round(30 + 70 * kick + 60 * hopArm + 90 * landBloom).toString(16).padStart(2, "0")}` }}>
-            <Bar frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} roll={Math.round(12 * pc)} />
+            <Bar widgets={S.widgets} frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} roll={Math.round(12 * pc)} />
             {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: INK, opacity: flipFlash, pointerEvents: "none" }} />}
           </div>
           {chips}
@@ -376,15 +404,16 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
       </div>
 
       {/* Screen-space type */}
-      <Title f={f} at={10} out={E.TO_STOCKS - 8} line2At={E.TD_LINE2} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2="you already know." top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
-      <Title f={f} at={E.TO_STOCKS + 2} out={E.TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
-      <Title f={f} at={E.TO_NEWS + 2} out={E.PULL_OUT + 20} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
+      {/* One title per widget before the landing: the opener from frame 10, each swap's two frames after its hit; each leaves before the next hit, the last with the pull-out. */}
+      {S.widgets.slice(0, -1).map((w, i) => w.title && (
+        <Title key={w.tab} f={f} at={i === 0 ? 10 : E.SWAPS[i - 1] + 2} out={i < E.SWAPS.length - 1 ? E.SWAPS[i] - (i === 0 ? 8 : 4) : E.PULL_OUT + 20} line2At={i === 0 ? E.SCORE_LINE2 : undefined} {...w.title} hex={w.title.hex ?? w.hex} top={L.lowTop} left={L.titleLeft} size={L.titleSize} breathe={snare} pc={pc} />
+      ))}
 
-      <Title f={f} at={E.DESK_TITLE} out={E.HOP - 16} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={L.midTop} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
-      <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={L.midTop + 30} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
+      <Title f={f} at={E.DESK_TITLE} out={E.HOP - 16} {...S.desk} top={L.midTop} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
+      <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} {...S.hop} top={L.midTop + 30} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
 
-      <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
-      <Title f={f} at={E.GITHUB_TITLE} out={end - 5} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.WIDGETS_TITLE} out={E.LANDING} {...S.pick} top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.LANDING_TITLE} out={end - 5} {...S.landing} label={themeIdx > 0 ? S.palettes.label : S.pick.label} hex={themeIdx > 0 ? MINT : S.pick.hex} sub={themeIdx > 0 ? `${S.palettes.sub} · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
 
       {/* End card: the site's hero, built hit by hit. Every element POPS on its hit (scale snap, two frames to full), nothing fades or slides. */}
       {f >= end && (() => {
@@ -403,20 +432,20 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
               </span>
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, top: L.end[1], textAlign: "center", fontFamily: MONO, fontSize: 18, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, ...pop(1) }}>
-              free · open source · macos / windows / linux
+              {S.end.tagline}
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, top: L.end[2], textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: L.endSize, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, ...pop(2) }}>
-              Your live
+              {S.end.line1}
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, top: L.end[3], textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: L.endSize, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, ...pop(3) }}>
-              Desktop ticker
+              {S.end.line2}
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, top: L.end[4], textAlign: "center", display: "flex", flexWrap: "wrap", padding: "0 40px", justifyContent: "center", gap: 16 }}>
               <span style={{ position: "relative", display: "inline-block", background: MINT, color: SURFACE, fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6, ...pop(4) }}>
-                Download Scrollr
-                <span style={{ position: "absolute", top: -12, right: -12, background: SURFACE, color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>
+                {S.end.button}
+                {S.end.tag && <span style={{ position: "absolute", top: -12, right: -12, background: SURFACE, color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>{S.end.tag}</span>}
               </span>
-              <span style={{ display: "inline-block", border: "1px solid var(--color-edge, #303040)", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6, ...pop(5) }}>myscrollr.com</span>
+              <span style={{ display: "inline-block", border: "1px solid var(--color-edge, #303040)", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6, ...pop(5) }}>{S.end.url}</span>
             </div>
           </div>
         );

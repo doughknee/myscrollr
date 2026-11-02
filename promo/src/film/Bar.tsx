@@ -15,7 +15,8 @@ import QuoteCell from "../../../desktop/src/components/pages/cells/QuoteCell";
 import RepoCell from "../../../desktop/src/components/pages/cells/RepoCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "../../../desktop/src/components/pages/cells/parts";
 import { BAND_W, edgeBar } from "../../../desktop/src/components/pages/pagePlan";
-import { BBC, FAVOURITE, GITHUB, NOW, STOCKS, WIDGETS, nflAt, type FilmWidget } from "./data";
+import { BBC, FAVOURITE, GITHUB, NOW, STOCKS, nflAt } from "./data";
+import type { FilmWidget } from "./story";
 
 export const BAR_W = 1920;
 export const BAR_H = 64;
@@ -30,7 +31,7 @@ const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 export interface Tick { at: number; cell: number; up: boolean }
 
 export interface BarState {
-  /** Index into WIDGETS now on screen. */
+  /** Index into the story's widgets now on screen. */
   widget: number;
   /** Frame the current widget swiped in at. */
   since: number;
@@ -50,8 +51,8 @@ function chipColor(kind: "live" | "open" | "fresh" | "needs", dark: boolean): st
 }
 
 /** PagedBar's Band, frame-driven: the label wipes up on a widget change, the edge bar only recolours. */
-function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0, arm = 0, roll = WIPE }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number; arm?: number; roll?: number }) {
-  const bar = edgeBar(WIDGETS.length);
+function Band({ widgets, w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0, arm = 0, roll = WIPE }: { widgets: FilmWidget[]; w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number; arm?: number; roll?: number }) {
+  const bar = edgeBar(widgets.length);
   const t = Math.min(1, (frame - since) / roll);
   const face = (x: FilmWidget, y: number, key: string) => {
     const c = x.chip;
@@ -104,7 +105,7 @@ function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash =
       {face(w, prev ? 100 * (1 - e) : 0, "cur")}
       {flash > 0 && <span aria-hidden className="pointer-events-none absolute inset-0 z-20" style={{ background: "var(--accent-ink)", opacity: 0.45 * flash }} />}
       <div className="absolute inset-y-0 left-0 z-10 flex w-1 flex-col" style={{ gap: bar.gap }}>
-        {WIDGETS.map((x) => {
+        {widgets.map((x) => {
           const on = x.tab === w.tab;
           const a = accentFor(x.hex, dark);
           return <span key={x.tab} className="block min-h-0" style={{ flexGrow: on ? bar.activeGrow : 1, flexBasis: 0, background: on ? inkFor(x.hex, dark) : `color-mix(in srgb, ${a} 32%, transparent)` }} />;
@@ -211,7 +212,9 @@ function Edge({ time, date }: { time: string; date: string }) {
   );
 }
 
-export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFlash = 0, roll = WIPE }: {
+export function Bar({ widgets, frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFlash = 0, roll = WIPE }: {
+  /** The story's widgets, in order; `state.widget` indexes them. */
+  widgets: FilmWidget[];
   frame: number;
   /** Frames the roll takes; the film paces it. */
   roll?: number;
@@ -226,8 +229,8 @@ export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFl
   /** A wash over the band, 0..1: a chip landing on it. */
   bandFlash?: number;
 }) {
-  const w = WIDGETS[state.widget];
-  const prev = state.prev === null ? null : WIDGETS[state.prev];
+  const w = widgets[state.widget];
+  const prev = state.prev === null ? null : widgets[state.prev];
   // A widget change is ONE motion: the page rolls up with the band, on the
   // band's own wipe timing, then the columns settle. Nothing moves sideways.
   const t = Math.min(1, (frame - state.since) / roll);
@@ -246,7 +249,7 @@ export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFl
   );
   return (
     <div className="flex items-stretch overflow-hidden bg-base-150" style={{ width: BAR_W, height: BAR_H, borderBottom: "1px solid color-mix(in srgb, var(--color-edge) 50%, transparent)" }}>
-      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} arm={arm} pulse={pulse} flash={bandFlash} burst={Math.max(swapBurst, scoreBurst)} roll={roll} />
+      <Band widgets={widgets} w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} arm={arm} pulse={pulse} flash={bandFlash} burst={Math.max(swapBurst, scoreBurst)} roll={roll} />
       <div className="relative min-w-0 flex-1 overflow-hidden">
         {prev && t < 1 && page(prev, -100 * e, "prev", 1)}
         {page(w, prev ? 100 * (1 - e) : 0, "cur", settle)}
