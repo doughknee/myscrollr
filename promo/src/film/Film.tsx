@@ -276,9 +276,15 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
   const lift = -8 * hopArm;
   const drop = interpolate(f, [E.HOP, E.HOP + 10], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.5, 0, 0.2, 1) });
   const settle = f >= E.HOP + 10 ? -5 * interpolate(f, [E.HOP + 10, E.HOP + 13, E.HOP + 20], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) }) : 0;
-  // On the end hit the bar glides up to the card's centre and keeps running: the product, at real size, framed by its own tagline.
-  const endGlide = f >= end ? interpolate(f, [end, end + 20], [0, 1], { extrapolateRight: "clamp", easing: Easing.bezier(0.3, 0, 0.15, 1) }) : 0;
-  const barTop = f >= end ? (H - BAR_H) + (L.end[5] - (H - BAR_H)) * endGlide : lift + drop + settle;
+  // From the start of the end zoom-out, the bar is placed in SCREEN space:
+  // it holds where it is while the frame widens around it, then moves the
+  // short distance to the card's centre, one monotonic motion. Its world
+  // position is derived from the camera each frame.
+  const zoomStart = end - 18;
+  const endGlide = f >= zoomStart ? interpolate(f, [end, end + 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.3, 0, 0.15, 1) }) : 0;
+  const screenAtZoomStart = (() => { const c = camera(zoomStart, E, 0, portrait); return H / 2 + (H - BAR_H - c.y) * c.s; })();
+  const screenY = screenAtZoomStart + (L.end[5] - screenAtZoomStart) * endGlide;
+  const barTop = f >= zoomStart ? cam.y + (screenY - H / 2) / cam.s : lift + drop + settle;
   const landBloom = f >= end ? interpolate(f, [end + 18, end + 21, end + 52], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
   const themeIdx = Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length);
   const theme = THEMES[themeIdx];
