@@ -102,9 +102,9 @@ function barState(f: number, E: E): BarState {
 }
 
 /** The dip before a hit and the punch on it: one shape for every big hit. */
-function hit(f: number, at: number, punch = 0.09, dip = 0.02): number {
-  if (f < at) return -dip * r(f, at - 9, at - 1, Easing.in(Easing.quad));
-  return punch * interpolate(f, [at, at + 2, at + 28], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+function hit(f: number, at: number, punch = 0.09, dip = 0.012): number {
+  if (f < at) return -dip * r(f, at - 14, at - 2, INOUT);
+  return punch * interpolate(f, [at, at + 2, at + 30], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
 }
 
 /** Camera: scale and the world point at the frame's centre, piecewise with eased holds. */
@@ -136,9 +136,9 @@ function camera(f: number, E: E, kick: number): { s: number; x: number; y: numbe
   const [f0, s0, x0, y0] = keys[i];
   const [f1, s1, x1, y1] = keys[i + 1];
   const t = f1 === f0 ? 1 : r(f, f0, f1, INOUT);
-  const punches = hit(f, E.TD) + hit(f, E.TO_GITHUB, 0.07) + hit(f, end, 0.05, 0.015) + hit(f, E.HOP, 0.03, 0.012);
-  // And the kick, every frame: a breath, not a bounce.
-  const breath = 0.014 * kick;
+  const punches = hit(f, E.TD) + hit(f, E.TO_GITHUB, 0.06) + hit(f, end, 0.04, 0.01);
+  // The kick is a slow breath here, a third of a percent; the bar's glow carries the beat.
+  const breath = 0.0035 * kick;
   return { s: (s0 + (s1 - s0) * t) * (1 + punches + breath), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
 }
 
@@ -196,8 +196,23 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const E = toFrames(cues ?? GRID, fps);
   // The virtual frame on the 120 BPM grid (identity with a cue sheet).
   const f = cues ? real : (real * bpm) / 120;
-  const at = (arr: number[] | undefined) => (arr ? arr[Math.min(arr.length - 1, Math.max(0, Math.round(real)))] ?? 0 : 0);
-  const kick = at(features?.kick), snare = at(features?.snare), hat = at(features?.hat);
+  // Envelopes are read through a short window so nothing jabs: ~3 frames
+  // to rise, ~12 to fall. The raw per-frame value is a transient, and a
+  // picture that follows transients twitches.
+  const smooth = (arr: number[] | undefined, rise = 3, fall = 12) => {
+    if (!arr) return 0;
+    const i = Math.min(arr.length - 1, Math.max(0, Math.round(real)));
+    let v = 0;
+    for (let k = 0; k <= fall; k++) {
+      const j = i - k;
+      if (j < 0) break;
+      const w = k < rise ? (k + 1) / rise : 1 - (k - rise) / (fall - rise + 1);
+      v = Math.max(v, (arr[j] ?? 0) * w);
+    }
+    return v;
+  };
+  const kick = smooth(features?.kick), hat = smooth(features?.hat, 2, 8);
+  const snare = 0;
 
   const state = barState(f, E);
   const dwell = 45;
@@ -208,13 +223,13 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const cam = camera(f, E, kick);
   const end = E.END[0];
   // The hop: a lift in the frames before (anticipation), then the drop.
-  const lift = f < E.HOP ? -10 * r(f, E.HOP - 8, E.HOP - 1, Easing.out(Easing.quad)) : 0;
+  const lift = f < E.HOP ? -6 * r(f, E.HOP - 12, E.HOP - 2, INOUT) : 0;
   const barTop = lift + interpolate(f, [E.HOP, E.HOP + 12], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.3, 0, 0.1, 1) });
   const themeIdx = Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length);
   const theme = THEMES[themeIdx];
   // A flash on each palette flip.
   const lastFlip = E.THEMES.filter((t) => f >= t).pop();
-  const flipFlash = lastFlip === undefined ? 0 : interpolate(f - lastFlip, [0, 1, 7], [0, 0.18, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const flipFlash = lastFlip === undefined ? 0 : interpolate(f - lastFlip, [0, 1, 6], [0, 0.1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const endIn = r(f, end, end + 30);
   // The desktop steps back whenever a title is up.
   const dimDesk =
@@ -256,7 +271,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   });
   // The band takes a hit as each chip lands.
   const lastLand = E.CHIPS.filter((t) => f >= t).sort((p, q) => q - p)[0];
-  const landFlash = lastLand === undefined ? 0 : interpolate(f - lastLand, [0, 1, 8], [0, 0.5, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const landFlash = lastLand === undefined ? 0 : interpolate(f - lastLand, [0, 1, 10], [0, 0.32, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   const step = (i: number, len = 10) => r(f, E.END[i], E.END[i] + len);
 
@@ -276,12 +291,12 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
           {/* Desktop */}
           <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 90% at 50% 10%, var(--color-surface-2, #181825) 0%, #0b0b13 100%)", opacity: dimDesk }}>
             {/* The dot grid catches the hats. */}
-            <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle, rgba(255,255,255,${(0.04 + 0.1 * hat).toFixed(3)}) 1px, transparent 1.2px)`, backgroundSize: "40px 40px" }} />
+            <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle, rgba(255,255,255,${(0.04 + 0.05 * hat).toFixed(3)}) 1px, transparent 1.2px)`, backgroundSize: "40px 40px" }} />
             <Img src={staticFile("shots/sports.png")} style={{ position: "absolute", left: 120, top: 130, width: 1180, borderRadius: 12, boxShadow: "0 30px 90px rgba(0,0,0,.6)", opacity: 0.55 }} />
             <Img src={staticFile("shots/home.png")} style={{ position: "absolute", left: 560, top: 180, width: 1240, borderRadius: 12, boxShadow: "0 40px 110px rgba(0,0,0,.75)" }} />
           </div>
           {/* The bar. Its glow is the kick. */}
-          <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 44 * kick)}px ${hex}${Math.round(30 + 80 * kick).toString(16).padStart(2, "0")}` }}>
+          <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick)}px ${hex}${Math.round(30 + 70 * kick).toString(16).padStart(2, "0")}` }}>
             <Bar frame={f} warp={warp} state={state} dwell={dwell} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} />
             {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: flipFlash, pointerEvents: "none" }} />}
           </div>
@@ -306,7 +321,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
       {f >= end && (
         <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
           <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, rgba(11,11,19,.92) 0%, rgba(11,11,19,.6) 100%)" }} />
-          <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${(0.9 + 0.1 * step(0, 14)) * (1 + 0.025 * kick)})` }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${(0.9 + 0.1 * step(0, 14)) * (1 + 0.01 * kick)})` }}>
             <Img src={staticFile("logo.svg")} style={{ width: 72, height: 72 }} />
             <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 76, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
               scrollr<span style={{ color: MINT }}>.</span>
