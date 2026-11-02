@@ -12,3 +12,4 @@ audio/bed.wav
 # `public/shots` are copies of myscrollr.com/screenshot-sources. Recreate with promo/README.md's setup line.
 public/fonts/
 public/song/
+out/*.props.json

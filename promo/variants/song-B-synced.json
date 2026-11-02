@@ -2,17 +2,70 @@
  "bpm": 120,
  "song": "song/final_hit.m4a",
  "songStart": 46.994,
- "events": {
-  "TD": 2.76,
-  "TO_STOCKS": 6.76,
-  "TO_NEWS": 8.76,
-  "PULL_OUT": 10.76,
-  "HOP": 13.26,
-  "PUSH_IN": 15.01,
-  "TO_GITHUB": 17.51,
-  "THEMES_AT": 19.26,
-  "THEMES_EVERY": 0.25,
-  "END": 21.26,
-  "OUT": 24.5
+ "cues": {
+  "TD": 2.95,
+  "TD_LINE2": 3.46,
+  "TD_RELEASE": 4.96,
+  "TO_STOCKS": 6.96,
+  "TICKS": [
+   [
+    7.46,
+    0,
+    true
+   ],
+   [
+    7.96,
+    1,
+    true
+   ],
+   [
+    8.21,
+    2,
+    false
+   ],
+   [
+    8.72,
+    3,
+    true
+   ]
+  ],
+  "TO_NEWS": 8.96,
+  "PULL_OUT": 10.95,
+  "DESK_TITLE": 11.96,
+  "HOP": 13.46,
+  "HOP_TITLE": 13.96,
+  "PUSH_IN": 14.96,
+  "WIDGETS_TITLE": 15.46,
+  "CHIPS": [
+   17.47,
+   16.96,
+   16.96,
+   17.08,
+   17.08,
+   17.21,
+   17.21,
+   17.34
+  ],
+  "TO_GITHUB": 17.47,
+  "GITHUB_TITLE": 17.96,
+  "THEMES": [
+   18.96,
+   19.22,
+   19.45,
+   19.71,
+   19.95,
+   20.22,
+   20.45
+  ],
+  "THEMES_TITLE": 18.96,
+  "END": [
+   20.95,
+   22.21,
+   22.96,
+   23.46,
+   23.96,
+   24.46
+  ],
+  "OUT": 26.5
  }
 }

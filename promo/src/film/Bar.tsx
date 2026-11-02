@@ -26,6 +26,9 @@ export const SWIPE = 18;
 const WIPE = 11;
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
 
+/** A price tick on the stocks page: at this frame, column `cell` moves up or down. */
+export interface Tick { at: number; cell: number; up: boolean }
+
 export interface BarState {
   /** Index into WIDGETS now on screen. */
   widget: number;
@@ -47,7 +50,7 @@ function chipColor(kind: "live" | "open" | "fresh" | "needs", dark: boolean): st
 }
 
 /** PagedBar's Band, frame-driven: the label wipes up on a widget change, the edge bar only recolours. */
-function Band({ w, frame, since, prev, dark, fill, burst = 0 }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number }) {
+function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0 }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number }) {
   const bar = edgeBar(WIDGETS.length);
   const t = Math.min(1, (frame - since) / WIPE);
   const face = (x: FilmWidget, y: number, key: string) => {
@@ -65,7 +68,7 @@ function Band({ w, frame, since, prev, dark, fill, burst = 0 }: { w: FilmWidget;
           </span>
           {c && (
             <span className="flex shrink-0 items-center gap-[5px]">
-              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 ${3 + 6 * burst}px color-mix(in srgb, ${hue} ${Math.round((c.kind === "fresh" || c.kind === "needs" ? 25 : 22) + 40 * burst)}%, transparent)`, transform: `scale(${1 + 0.35 * burst})` }} />
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 ${3 + 4 * burst + 2 * pulse}px color-mix(in srgb, ${hue} ${Math.round((c.kind === "fresh" || c.kind === "needs" ? 25 : 22) + 40 * burst + 20 * pulse)}%, transparent)`, transform: `scale(${1 + 0.25 * burst + 0.08 * pulse})` }} />
               {c.count !== undefined && (
                 <span className="font-mono text-[11px] font-semibold leading-none tabular-nums" style={{ color: hue }}>
                   {c.count}
@@ -89,6 +92,7 @@ function Band({ w, frame, since, prev, dark, fill, burst = 0 }: { w: FilmWidget;
     <div className="relative shrink-0 overflow-hidden" style={{ width: BAND_W }}>
       {prev && t < 1 && face(prev, -100 * e, "prev")}
       {face(w, prev ? 100 * (1 - e) : 0, "cur")}
+      {flash > 0 && <span aria-hidden className="pointer-events-none absolute inset-0 z-20" style={{ background: "var(--accent-ink)", opacity: 0.45 * flash }} />}
       <div className="absolute inset-y-0 left-0 z-10 flex w-1 flex-col" style={{ gap: bar.gap }}>
         {WIDGETS.map((x) => {
           const on = x.tab === w.tab;
@@ -114,7 +118,7 @@ function Columns({ children }: { children: ReactNode[] }) {
 }
 
 /** One page of a widget, laid out as the app lays it: equal columns at this bar's content width. */
-function Page({ w, frame, scored, scoredAt, dark }: { w: FilmWidget; frame: number; scored: boolean; scoredAt: number; dark: boolean }) {
+function Page({ w, frame, scored, scoredAt, dark, ticks }: { w: FilmWidget; frame: number; scored: boolean; scoredAt: number; dark: boolean; ticks: Tick[] }) {
   switch (w.kind) {
     case "sports": {
       const games = nflAt(scored);
@@ -134,11 +138,26 @@ function Page({ w, frame, scored, scoredAt, dark }: { w: FilmWidget; frame: numb
       );
     }
     case "finance":
+      // Each tick moves one quote and flashes its cell in the app's up/down colour.
       return (
         <Columns>
-          {STOCKS.map((t) => (
-            <QuoteCell key={t.symbol} trade={t} />
-          ))}
+          {STOCKS.map((t, i) => {
+            const mine = ticks.filter((k) => k.cell === i && frame >= k.at);
+            let trade = t;
+            for (const k of mine) {
+              const price = Number(trade.price) * (k.up ? 1.0007 : 0.9993);
+              const prev = Number(t.previous_close);
+              trade = { ...trade, price, price_change: price - prev, percentage_change: ((price - prev) / prev) * 100, sparkline: [...(trade.sparkline ?? []).slice(1), price] };
+            }
+            const last = mine[mine.length - 1];
+            const flash = last ? interpolate(frame - last.at, [0, 1, 12], [0, 0.35, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+            return (
+              <div key={t.symbol} className="relative h-full">
+                <QuoteCell trade={trade} />
+                {flash > 0 && <span aria-hidden className="pointer-events-none absolute inset-0" style={{ background: last?.up ? "var(--color-up)" : "var(--color-down)", opacity: flash }} />}
+              </div>
+            );
+          })}
         </Columns>
       );
     case "news":
@@ -173,7 +192,18 @@ function Edge({ time, date }: { time: string; date: string }) {
   );
 }
 
-export function Bar({ frame, warp = frame, state, dwell }: { frame: number; /** Frame for the dwell fill; the film slows it around the score. */ warp?: number; state: BarState; dwell: number }) {
+export function Bar({ frame, warp = frame, state, dwell, pulse = 0, ticks = [], bandFlash = 0 }: {
+  frame: number;
+  /** Frame for the dwell fill; the film slows it around the score. */
+  warp?: number;
+  state: BarState;
+  dwell: number;
+  /** The kick, 0..1: the LIVE dot's ring breathes with it. */
+  pulse?: number;
+  ticks?: Tick[];
+  /** A wash over the band, 0..1: a chip landing on it. */
+  bandFlash?: number;
+}) {
   const w = WIDGETS[state.widget];
   const prev = state.prev === null ? null : WIDGETS[state.prev];
   const t = Math.min(1, (frame - state.since) / SWIPE);
@@ -181,12 +211,12 @@ export function Bar({ frame, warp = frame, state, dwell }: { frame: number; /** 
   const fill = Math.min(1, Math.max(0, (warp - state.since) / dwell));
   const page = (x: FilmWidget, dx: number, key: string) => (
     <div key={key} className="absolute inset-0 flex" style={{ transform: `translateX(${dx}%)`, ...accentStyle(accentFor(x.hex, state.dark), inkFor(x.hex, state.dark)) }}>
-      <Page w={x} frame={frame} scored={state.scored} scoredAt={state.scoredAt} dark={state.dark} />
+      <Page w={x} frame={frame} scored={state.scored} scoredAt={state.scoredAt} dark={state.dark} ticks={ticks} />
     </div>
   );
   return (
     <div className="flex items-stretch overflow-hidden bg-base-150" style={{ width: BAR_W, height: BAR_H, borderBottom: "1px solid color-mix(in srgb, var(--color-edge) 50%, transparent)" }}>
-      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} burst={state.scored ? interpolate(frame - state.scoredAt, [0, 3, 30], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0} />
+      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} pulse={pulse} flash={bandFlash} burst={state.scored ? interpolate(frame - state.scoredAt, [0, 3, 30], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0} />
       <div className="relative min-w-0 flex-1 overflow-hidden">
         {prev && t < 1 && page(prev, -100 * e, "prev")}
         {page(w, prev ? 100 * (1 - e) : 0, "cur")}

@@ -2,7 +2,7 @@
 # Fast proxy: ./preview.sh variants/song-B-synced.json [startSec-endSec]
 # Half-res, light JPEG, optional second range. ~20-40s instead of ~3min.
 CHROME=${CHROME:-/opt/pw-browsers/chromium-1243/chrome-linux64/chrome}
-v=$1; range=$2; n=$(basename "$v" .json)
+v=$1; range=$2; n=$(basename "$v" .json); n=${n%.props}
 args=()
 if [ -n "$range" ]; then a=${range%-*}; b=${range#*-}; args+=(--frames=$(( ${a%.*} * 30 ))-$(( ${b%.*} * 30 ))); fi
 mkdir -p out/preview

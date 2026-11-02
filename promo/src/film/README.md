@@ -1,20 +1,30 @@
 # The film
 
-`Film` (Root.tsx): 18.5s, 1920x1080, 30fps. One continuous shot of the bar,
-built from the app's own page cells and fixtures. See the header of Film.tsx
-for the beat grid; `audio/music.py` writes the bed to the same grid.
+`Film` (Root.tsx): one continuous shot of the bar, built from the app's own
+page cells and fixtures, 1920x1080 at 30fps. Length comes from the cue sheet.
 
-Setup once per clone (webpack resolves the app's `url("/fonts/…")` against
-`promo/`, and the end card and desktop use assets kept elsewhere in the repo):
+## Cutting it to a track
+
+1. Put the track in `public/song/` (ignored by git).
+2. Measure the window you want:
+   `python3 audio/analyze.py public/song/track.wav 46.994 27 variants/features-B.json`
+   prints every onset in film seconds (strength, kick/snare/hat share) and
+   writes the per-frame envelopes the film breathes with.
+3. Write the cue sheet in `variants/song-<name>.json` (see `song-B-synced.json`):
+   every key is a second of film time, placed on an onset from step 2.
+4. `node mkprops.mjs variants/song-B-synced.json variants/features-B.json out/B.props.json`
+5. Preview: `./preview.sh out/B.props.json 14-22` (half-res, that range, ~30s).
+   Full: `npx remotion render Film out/B.mp4 --props=out/B.props.json --codec=h264 --crf=17 --image-format=jpeg --pixel-format=yuv420p`
+
+Audio is mixed in the render (`<Audio>` with a fade); no mux step.
+
+## Setup once per clone
 
 ```sh
 cd promo
 cp -r ../desktop/public/fonts public/fonts && cp -r public/fonts fonts && cp -r public/fonts-archivo fonts-archivo
-python3 audio/music.py
-npx remotion render Film out/film-video.mp4 --codec=h264 --crf=17 --image-format=jpeg --pixel-format=yuv420p
-ffmpeg -i out/film-video.mp4 -i audio/bed.wav -map 0:v -map 1:a -c:v copy -af loudnorm=I=-15:TP=-1.5:LRA=9 -c:a aac out/scrollr-film-1080p.mp4
 ```
 
 `public/logos` are the api-sports crests for the eight teams on the NFL page,
 captured once so a render needs no network. `public/shots` are two of the
-marketing captures from `myscrollr.com/screenshot-sources/darkmode`.
+marketing captures from `myscrollr.com/screenshot-sources`.
