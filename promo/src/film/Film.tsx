@@ -5,15 +5,29 @@
  * never cuts. The camera moves around it. The desktop behind it is the
  * app's own window, from the marketing screenshot set.
  *
- * 30fps. The music is 120 BPM, so a beat is 15 frames and every event
- * below sits on one.
+ * 30fps. The events below are written on a 120 BPM grid (a beat is 15
+ * frames). A track at another tempo is handled by running the film on a
+ * virtual clock: `bpm` scales the real frame onto that grid, so every cut
+ * still lands on a beat of the track. `songStart` is where in the track
+ * frame 0 begins; pick it on a beat so the touchdown (beat 3) lands on a
+ * hit.
  */
-import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Audio, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Bar, BAR_H, BAR_W, type BarState } from "./Bar";
 import { CATALOG_FLY, THEMES } from "./data";
 
 export const FPS = 30;
-export const DURATION = 555;
+/** Frames on the 120 BPM grid; the real length is this scaled by 120/bpm. */
+export const GRID_FRAMES = 555;
+export const durationFor = (bpm: number) => Math.ceil((GRID_FRAMES * 120) / bpm);
+
+export type FilmProps = {
+  /** The track's tempo. 120 renders the grid as written. */
+  bpm: number;
+  /** Seconds into the track where frame 0 starts; omit for no track. */
+  songStart?: number;
+  song?: string;
+};
 const W = 1920;
 const H = 1080;
 
@@ -127,8 +141,11 @@ function Title({ f, at, out, label, hex = MINT, line1, line2, sub, top, left, al
   );
 }
 
-export function Film() {
-  const f = useCurrentFrame();
+export function Film({ bpm, songStart, song }: FilmProps) {
+  const real = useCurrentFrame();
+  const { fps, durationInFrames } = useVideoConfig();
+  // The virtual frame on the 120 BPM grid.
+  const f = (real * bpm) / 120;
   const state = barState(f);
   const dwell = 45;
   // Half-speed for the half second after the score: the pill's fill and the
@@ -180,6 +197,13 @@ export function Film() {
   return (
     <AbsoluteFill style={{ background: "#0b0b13", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, background: "#0b0b13", opacity: 1 - fadeIn, zIndex: 10, pointerEvents: "none" }} />
+      {song && songStart !== undefined && (
+        <Audio
+          src={staticFile(song)}
+          startFrom={Math.round(songStart * fps)}
+          volume={(fr) => interpolate(fr, [0, 8, durationInFrames - 30, durationInFrames - 1], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
+        />
+      )}
       <div id="app-shell" data-theme={theme} style={{ position: "absolute", inset: 0 }}>
         {/* World */}
         <div style={{ position: "absolute", left: 0, top: 0, width: W, height: H, transform: `translate(${tx}px, ${ty}px) scale(${cam.s})`, transformOrigin: "0 0" }}>
