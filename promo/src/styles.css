@@ -53,3 +53,9 @@ body,
   padding: 0;
   background: transparent;
 }
+
+/* The film's display face: the website's own (myscrollr.com uses Archivo). */
+@font-face { font-family: Archivo; font-weight: 500; src: url("/fonts-archivo/archivo-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: Archivo; font-weight: 700; src: url("/fonts-archivo/archivo-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: Archivo; font-weight: 800; src: url("/fonts-archivo/archivo-latin-900-normal.woff2") format("woff2"); }
+@font-face { font-family: Archivo; font-weight: 900; src: url("/fonts-archivo/archivo-latin-900-normal.woff2") format("woff2"); }
