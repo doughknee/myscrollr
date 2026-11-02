@@ -28,13 +28,14 @@ function hit(f: number, at: number, punch = 0.07, dip = 0.012): number {
   return punch * interpolate(f, [at, at + 2, at + 30], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
 }
 
-export function Hero() {
+export function Hero({ theme = "scrollr-dark" }: { theme?: string }) {
   const f = useCurrentFrame();
+  const dark = !theme.endsWith("-light");
   // Two dwells; the second swap is the loop point, so the roll into NFL is in progress at frame 0.
   const onStocks = f >= SWAP;
   const state: BarState = onStocks
-    ? { widget: 1, since: SWAP, prev: 0, scored: true, scoredAt: TD, dark: true }
-    : { widget: 0, since: 0, prev: 1, scored: f >= TD, scoredAt: TD, dark: true };
+    ? { widget: 1, since: SWAP, prev: 0, scored: true, scoredAt: TD, dark }
+    : { widget: 0, since: 0, prev: 1, scored: f >= TD, scoredAt: TD, dark };
   const nextSwap = onStocks ? HERO_FRAMES : SWAP;
   const fill = Math.min(1, Math.max(0, (f - state.since) / (nextSwap - state.since)));
   const arm = r(f, nextSwap - 12, nextSwap - 1, Easing.in(Easing.quad));
@@ -47,14 +48,15 @@ export function Hero() {
   const tail = hit(f + HERO_FRAMES, HERO_FRAMES);
   const s = 2.2 * (1 + hit(f, TD, 0.09) + hit(f, SWAP) + hit(f, HERO_FRAMES) + tail);
   const drift = Math.sin((2 * Math.PI * f) / HERO_FRAMES);
-  const x = 420 + 36 * drift;
+  // The band's left edge stays on screen through the whole drift: x <= (W/2)/s = 436.
+  const x = 396 + 34 * drift;
   const y = BAR_H / 2 + 4 * Math.sin((4 * Math.PI * f) / HERO_FRAMES);
   const tx = HERO_W / 2 - x * s;
   const ty = HERO_H / 2 - y * s;
   const hex = DEFAULT.widgets[state.widget].hex ?? "#34d399";
 
   return (
-    <AbsoluteFill id="app-shell" data-theme="scrollr-dark" style={{ background: "radial-gradient(120% 120% at 50% 0%, var(--color-surface-2, #181825) 0%, var(--color-surface, #0b0b13) 100%)", overflow: "hidden" }}>
+    <AbsoluteFill id="app-shell" data-theme={theme} style={{ background: "radial-gradient(120% 120% at 50% 0%, var(--color-surface-2, #181825) 0%, var(--color-surface, #0b0b13) 100%)", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, color-mix(in srgb, var(--color-fg, #fff) 5%, transparent) 1px, transparent 1.2px)", backgroundSize: "40px 40px" }} />
       <div style={{ position: "absolute", left: 0, top: 0, width: BAR_W, height: BAR_H, transform: `translate(${tx}px, ${ty}px) scale(${s})`, transformOrigin: "0 0", boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(10 + 30 * arm)}px ${hex}${Math.round(40 + 90 * arm).toString(16).padStart(2, "0")}` }}>
         <Bar widgets={DEFAULT.widgets} frame={f} state={state} fill={fill} arm={arm} ticks={ticks} roll={12} />
