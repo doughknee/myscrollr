@@ -69,8 +69,9 @@ export const CATALOG_FLY = ["github", "finance_crypto", "sports_nba", "news_hack
   .map((w) => ({ id: w.id, name: w.name, hex: w.color }));
 
 /**
- * The palettes the film shows, house first and house last: four that are
- * unmistakably different from each other (warm, light, cool, violet), so
- * each flip changes the whole frame, then home for the end card.
+ * The palettes the film shows, house first and house last: four dark ones
+ * that are unmistakably different from each other (warm brown, deep teal,
+ * cool blue-grey, violet), so each flip changes the whole frame, then home
+ * for the end card. No light palettes: the film is a dark-mode piece.
  */
-export const THEMES = ["scrollr-dark", "gruvbox-dark", "scrollr-light", "nord-dark", "rose-pine-dark", "scrollr-dark"];
+export const THEMES = ["scrollr-dark", "gruvbox-dark", "solarized-dark", "nord-dark", "rose-pine-dark", "scrollr-dark"];

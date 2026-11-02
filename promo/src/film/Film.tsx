@@ -260,7 +260,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   // A flash on each palette flip.
   const lastFlip = E.THEMES.filter((t) => f >= t).pop();
   const flipFlash = lastFlip === undefined ? 0 : interpolate(f - lastFlip, [0, 1, 6], [0, 0.1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const endIn = r(f, end, end + 30);
+  const endIn = r(f, end, end + 4);
   // The desktop steps back whenever a title is up.
   const dimDesk =
     f < E.PULL_OUT ? 0.22
@@ -351,36 +351,43 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
       <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" breathe={snare} pc={pc} />
 
       <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
-      <Title f={f} at={E.GITHUB_TITLE} out={end - 4} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.GITHUB_TITLE} out={end - 12} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={70} left={136} size={104} scrim="top" breathe={snare} pc={pc} />
 
-      {/* End card: the site's hero, built hit by hit. */}
-      {f >= end && (
-        <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
-          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--color-surface, #0b0b13) 92%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 60%, transparent) 100%)" }} />
-          <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${(0.9 + 0.1 * step(0, 14)) * (1 + 0.01 * kick)})` }}>
-            <Img src={staticFile("logo.svg")} style={{ width: 72, height: 72 }} />
-            <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 76, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
-              scrollr<span style={{ color: MINT }}>.</span>
-            </span>
+      {/* End card: the site's hero, built hit by hit. Every element POPS on its hit (scale snap, two frames to full), nothing fades or slides. */}
+      {f >= end && (() => {
+        const pop = (i: number) => {
+          const k = r(f, E.END[i], E.END[i] + 6, Easing.bezier(0.2, 1.4, 0.4, 1));
+          const o = r(f, E.END[i], E.END[i] + 2);
+          return { opacity: o, transform: `scale(${0.82 + 0.18 * k})`, transformOrigin: "50% 50%" } as const;
+        };
+        return (
+          <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--color-surface, #0b0b13) 92%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 60%, transparent) 100%)" }} />
+            <div style={{ position: "absolute", left: 0, right: 0, top: 272, display: "flex", justifyContent: "center", alignItems: "center", gap: 16, ...pop(0) }}>
+              <Img src={staticFile("logo.svg")} style={{ width: 60, height: 60 }} />
+              <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 64, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
+                scrollr<span style={{ color: MINT }}>.</span>
+              </span>
+            </div>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 356, textAlign: "center", fontFamily: MONO, fontSize: 18, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, ...pop(1) }}>
+              free · open source · macos / windows / linux
+            </div>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 404, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, ...pop(2) }}>
+              Your live
+            </div>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 540, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, ...pop(3) }}>
+              Desktop ticker
+            </div>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 706, textAlign: "center", display: "flex", justifyContent: "center", gap: 16 }}>
+              <span style={{ position: "relative", display: "inline-block", background: MINT, color: SURFACE, fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6, ...pop(4) }}>
+                Download Scrollr
+                <span style={{ position: "absolute", top: -12, right: -12, background: SURFACE, color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>
+              </span>
+              <span style={{ display: "inline-block", border: "1px solid var(--color-edge, #303040)", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6, ...pop(5) }}>myscrollr.com</span>
+            </div>
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 330, textAlign: "center", fontFamily: MONO, fontSize: 19, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, opacity: step(1) }}>
-            free · open source · macos / windows / linux
-          </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 400, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, opacity: step(2), transform: `translateY(${(1 - step(2)) * 24}px) scale(${1 + 0.006 * snare})` }}>
-            Your live
-          </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 540, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, opacity: step(3), transform: `translateY(${(1 - step(3)) * 24}px) scale(${1 + 0.006 * snare})` }}>
-            Desktop ticker
-          </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 730, textAlign: "center" }}>
-            <span style={{ position: "relative", display: "inline-block", background: MINT, color: SURFACE, fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6, opacity: step(4), transform: `translateY(${(1 - step(4)) * 16}px) scale(${1 + 0.1 * (1 - step(4, 8))})` }}>
-              Download Scrollr
-              <span style={{ position: "absolute", top: -12, right: -12, background: SURFACE, color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>
-            </span>
-            <span style={{ display: "inline-block", marginLeft: 18, verticalAlign: "top", border: "1px solid var(--color-edge, #303040)", color: INK, fontFamily: SANS, fontWeight: 700, fontSize: 30, padding: "19px 36px", borderRadius: 6, opacity: step(5), transform: `translateY(${(1 - step(5)) * 16}px)` }}>myscrollr.com</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </AbsoluteFill>
   );
 }
