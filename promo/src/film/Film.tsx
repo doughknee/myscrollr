@@ -26,8 +26,8 @@ export const FPS = 30;
  * same cue sheet, with the camera closer and the titles stacked.
  */
 interface Layout { W: number; H: number; titleLeft: number; titleSize: number; lowTop: number; midTop: number; highTop: number; end: number[]; endSize: number; chip: (i: number) => [number, number]; shots: [number, number, number, number, number, number] }
-const LAND: Layout = { W: 1920, H: 1080, titleLeft: 136, titleSize: 104, lowTop: 690, midTop: 330, highTop: 70, end: [272, 356, 404, 540, 706], endSize: 150, chip: (i) => [200 + (i % 4) * 175 + (i > 3 ? 70 : 0), 870 + Math.floor(i / 4) * 58], shots: [120, 130, 1180, 560, 180, 1240] };
-const PORT: Layout = { W: 1080, H: 1920, titleLeft: 64, titleSize: 66, lowTop: 1120, midTop: 640, highTop: 120, end: [560, 640, 690, 790, 930], endSize: 104, chip: (i) => [150 + (i % 4) * 210 + (i > 3 ? 60 : 0), 1700 + Math.floor(i / 4) * 58], shots: [40, 520, 1000, 120, 760, 1000] };
+const LAND: Layout = { W: 1920, H: 1080, titleLeft: 136, titleSize: 104, lowTop: 690, midTop: 330, highTop: 70, end: [196, 272, 322, 614, 790, 500], endSize: 150, chip: (i) => [200 + (i % 4) * 175 + (i > 3 ? 70 : 0), 870 + Math.floor(i / 4) * 58], shots: [120, 130, 1180, 560, 180, 1240] };
+const PORT: Layout = { W: 1080, H: 1920, titleLeft: 64, titleSize: 66, lowTop: 1120, midTop: 640, highTop: 120, end: [380, 450, 492, 760, 900, 640], endSize: 104, chip: (i) => [150 + (i % 4) * 210 + (i > 3 ? 60 : 0), 1700 + Math.floor(i / 4) * 58], shots: [40, 520, 1000, 120, 760, 1000] };
 
 /** The cue sheet, in seconds of film time. */
 export interface Cues {
@@ -275,8 +275,10 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
   const lift = -8 * hopArm;
   const drop = interpolate(f, [E.HOP, E.HOP + 10], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.5, 0, 0.2, 1) });
   const settle = f >= E.HOP + 10 ? -5 * interpolate(f, [E.HOP + 10, E.HOP + 13, E.HOP + 20], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) }) : 0;
-  const barTop = lift + drop + settle;
-  const landBloom = f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
+  // On the end hit the bar glides up to the card's centre and keeps running: the product, at real size, framed by its own tagline.
+  const endGlide = f >= end ? interpolate(f, [end, end + 18], [0, 1], { extrapolateRight: "clamp", easing: Easing.bezier(0.2, 0.9, 0.3, 1.04) }) : 0;
+  const barTop = f >= end ? (H - BAR_H) + (L.end[5] - (H - BAR_H)) * endGlide : lift + drop + settle;
+  const landBloom = f >= end ? interpolate(f, [end + 16, end + 19, end + 50], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
   const themeIdx = Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length);
   const theme = THEMES[themeIdx];
   const dark = !theme.endsWith("-light");
@@ -294,7 +296,7 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
     : f < E.HOP + 12 ? 0.38 + 0.62 * r(f, E.HOP - 8, E.HOP + 2)
     : f < E.PUSH_IN ? 1 - 0.62 * r(f, E.HOP + 12, E.HOP + 26)
     : f < end ? 1 - 0.5 * r(f, E.PUSH_IN, E.PUSH_IN + 32)
-    : 0.5 - 0.34 * endIn;
+    : 0.5 - 0.5 * r(f, end, end + 20);
 
   // The world: 1920x1080, scaled about the camera's focus.
   const tx = W / 2 - cam.x * cam.s;
@@ -386,7 +388,7 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
         };
         return (
           <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--color-surface, #0b0b13) 92%, transparent) 0%, color-mix(in srgb, var(--color-surface, #0b0b13) 60%, transparent) 100%)" }} />
+
             <div style={{ position: "absolute", left: 0, right: 0, top: L.end[0], display: "flex", justifyContent: "center", alignItems: "center", gap: 16, ...pop(0) }}>
               <Img src={staticFile("logo.svg")} style={{ width: 60, height: 60 }} />
               <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 64, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
