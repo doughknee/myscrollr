@@ -140,7 +140,7 @@ function camera(f: number, E: E, kick: number): { s: number; x: number; y: numbe
   const [f0, s0, x0, y0] = keys[i];
   const [f1, s1, x1, y1] = keys[i + 1];
   const t = f1 === f0 ? 1 : r(f, f0, f1, INOUT);
-  const punches = hit(f, E.TD) + hit(f, E.TO_GITHUB, 0.06) + hit(f, end, 0.04, 0.01);
+  const punches = hit(f, E.TD) + hit(f, E.TO_STOCKS, 0.06) + hit(f, E.TO_NEWS, 0.06) + hit(f, E.TO_GITHUB, 0.06) + hit(f, end, 0.04, 0.01);
   // The kick is a slow breath here, a third of a percent; the bar's glow carries the beat.
   const breath = 0.0035 * kick;
   return { s: (s0 + (s1 - s0) * t) * (1 + punches + breath), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
@@ -219,10 +219,19 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
   const snare = 0;
 
   const state = barState(f, E);
-  const dwell = 45;
-  // Half-speed from the score to the title's second line: the pill's fill
-  // and the page clock stretch while the number lands.
-  const warp = f < E.TD ? f : f - 0.5 * Math.min(E.TD_LINE2 - E.TD, f - E.TD);
+  // The page clock runs at half speed for a moment after every hit on the
+  // bar: the score (until the title's second line) and each swap.
+  const slow = (x: number) => {
+    let y = x;
+    if (x >= E.TD) y -= 0.5 * Math.min(E.TD_LINE2 - E.TD, x - E.TD);
+    for (const ev of [E.TO_STOCKS, E.TO_NEWS, E.TO_GITHUB]) if (x >= ev) y -= 0.5 * Math.min(10, x - ev);
+    return y;
+  };
+  // The dwell: the lit pill fills from the swap-in to the next swap and is
+  // full on that frame, as the app's own dwell works. GitHub's runs to the end card.
+  const nextSwap = [E.TO_STOCKS, E.TO_NEWS, E.TO_GITHUB, E.END[0]][state.widget];
+  const fill = Math.min(1, Math.max(0, (slow(f) - slow(state.since)) / Math.max(1, slow(nextSwap) - slow(state.since))));
+  const arm = f < nextSwap ? r(f, nextSwap - 12, nextSwap - 1, Easing.in(Easing.quad)) : 0;
   const fadeIn = r(f, 0, 10, Easing.out(Easing.quad));
   const cam = camera(f, E, kick);
   const end = E.END[0];
@@ -301,7 +310,7 @@ export function Film({ bpm, songStart, song, cues, features }: FilmProps) {
           </div>
           {/* The bar. Its glow is the kick. */}
           <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: `0 12px 50px rgba(0,0,0,.55), 0 0 ${Math.round(8 + 34 * kick)}px ${hex}${Math.round(30 + 70 * kick).toString(16).padStart(2, "0")}` }}>
-            <Bar frame={f} warp={warp} state={state} dwell={dwell} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} />
+            <Bar frame={f} state={state} fill={fill} arm={arm} pulse={kick} ticks={E.TICKS} bandFlash={landFlash} />
             {flipFlash > 0 && <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: flipFlash, pointerEvents: "none" }} />}
           </div>
           {chips}

@@ -50,7 +50,7 @@ function chipColor(kind: "live" | "open" | "fresh" | "needs", dark: boolean): st
 }
 
 /** PagedBar's Band, frame-driven: the label wipes up on a widget change, the edge bar only recolours. */
-function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0 }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number }) {
+function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash = 0, arm = 0 }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number; pulse?: number; flash?: number; arm?: number }) {
   const bar = edgeBar(WIDGETS.length);
   const t = Math.min(1, (frame - since) / WIPE);
   const face = (x: FilmWidget, y: number, key: string) => {
@@ -80,7 +80,17 @@ function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash =
         <div className="flex h-[5px] shrink-0 items-stretch gap-[3px]">
           {Array.from({ length: x.pages }, (_, i) => (
             <span key={i} className="block min-w-[3px] flex-1 basis-0 overflow-hidden rounded-[3px]" style={{ background: mix(30) }}>
-              {i === 0 && <span className="block h-full" style={{ width: `${fill * 100}%`, background: mix(75) }} />}
+              {i === 0 && (
+                <span
+                  className="block h-full rounded-[3px]"
+                  style={{
+                    width: `${fill * 100}%`,
+                    // Arming: over the last frames of the dwell the fill turns to the ink and glows.
+                    background: arm > 0 ? `color-mix(in srgb, var(--accent-ink) ${Math.round(arm * 100)}%, ${mix(75)})` : mix(75),
+                    boxShadow: arm > 0 ? `0 0 ${Math.round(8 * arm)}px color-mix(in srgb, var(--accent-ink) ${Math.round(70 * arm)}%, transparent)` : undefined,
+                  }}
+                />
+              )}
             </span>
           ))}
         </div>
@@ -201,12 +211,13 @@ function Edge({ time, date }: { time: string; date: string }) {
   );
 }
 
-export function Bar({ frame, warp = frame, state, dwell, pulse = 0, ticks = [], bandFlash = 0 }: {
+export function Bar({ frame, state, fill, arm = 0, pulse = 0, ticks = [], bandFlash = 0 }: {
   frame: number;
-  /** Frame for the dwell fill; the film slows it around the score. */
-  warp?: number;
   state: BarState;
-  dwell: number;
+  /** The lit pill's fill, 0..1: the widget's dwell, full on the swap frame. */
+  fill: number;
+  /** 0..1 over the last frames before the swap: the pill arms. */
+  arm?: number;
   /** The kick, 0..1: the LIVE dot's ring breathes with it. */
   pulse?: number;
   ticks?: Tick[];
@@ -219,11 +230,13 @@ export function Bar({ frame, warp = frame, state, dwell, pulse = 0, ticks = [], 
   // band's own wipe timing, then the columns settle. Nothing moves sideways.
   const t = Math.min(1, (frame - state.since) / WIPE);
   const e = EASE(t);
-  const fill = Math.min(1, Math.max(0, (warp - state.since) / dwell));
   // The columns settle over 14 frames once the roll has mostly landed.
   const settle = prev ? Math.min(1, Math.max(0, (frame - state.since - 4) / 14)) : 1;
   // One beat of the incoming widget's colour across the whole bar on the hit.
-  const change = prev ? interpolate(frame - state.since, [0, 1, 8], [0, 0.28, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  const change = prev ? interpolate(frame - state.since, [0, 1, 4, 14], [0, 0.55, 0.3, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  // The band's dot bursts on the score and on every swap.
+  const swapBurst = prev ? interpolate(frame - state.since, [0, 3, 26], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  const scoreBurst = state.scored ? interpolate(frame - state.scoredAt, [0, 3, 30], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
   const page = (x: FilmWidget, dy: number, key: string, k: number) => (
     <div key={key} className="absolute inset-0 flex" style={{ transform: `translateY(${dy}%)`, ...accentStyle(accentFor(x.hex, state.dark), inkFor(x.hex, state.dark)) }}>
       <Page w={x} frame={frame} scored={state.scored} scoredAt={state.scoredAt} dark={state.dark} ticks={ticks} settle={k} />
@@ -231,7 +244,7 @@ export function Bar({ frame, warp = frame, state, dwell, pulse = 0, ticks = [], 
   );
   return (
     <div className="flex items-stretch overflow-hidden bg-base-150" style={{ width: BAR_W, height: BAR_H, borderBottom: "1px solid color-mix(in srgb, var(--color-edge) 50%, transparent)" }}>
-      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} pulse={pulse} flash={bandFlash} burst={state.scored ? interpolate(frame - state.scoredAt, [0, 3, 30], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0} />
+      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} arm={arm} pulse={pulse} flash={bandFlash} burst={Math.max(swapBurst, scoreBurst)} />
       <div className="relative min-w-0 flex-1 overflow-hidden">
         {prev && t < 1 && page(prev, -100 * e, "prev", 1)}
         {page(w, prev ? 100 * (1 - e) : 0, "cur", settle)}
