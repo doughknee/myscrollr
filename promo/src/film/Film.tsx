@@ -139,8 +139,8 @@ function camera(f: number, E: E, kick: number, portrait: boolean): { s: number; 
     [E.PUSH_IN + 32, 2.2, 240, 1832, "drift"],
     [E.TO_GITHUB + 18, 2.15, 248, 1836, "move"],
     [E.THEMES[0], 1.5, 340, 1850, "drift"],
-    [end - 24, 1.45, 350, 1846, "move"],
-    [end + 24, 1.0, 540, 960, "drift"],
+    [end - 18, 1.45, 350, 1846, "move"],
+    [end, 1.0, 540, 960, "drift"],
     [E.OUT, 1.02, 540, 966, "drift"],
   ] : [
     // frame, scale, focusX, focusY, how we get to the NEXT key
@@ -155,9 +155,9 @@ function camera(f: number, E: E, kick: number, portrait: boolean): { s: number; 
     [E.PUSH_IN + 32, 2.3, 340, 985, "drift"],
     [E.TO_GITHUB + 18, 2.24, 362, 990, "move"],
     [E.THEMES[0], 1.6, 560, 1010, "drift"],
-    [end - 24, 1.55, 590, 1004, "move"],
-    [end + 24, 1.0, 960, 540, "drift"],
-    [E.OUT, 1.03, 960, 548, "drift"],
+    [end - 18, 1.55, 590, 1004, "move"],
+    [end, 1.0, 960, 540, "drift"],
+    [E.OUT, 1.02, 960, 546, "drift"],
   ];
   let i = 0;
   while (i < keys.length - 2 && f >= keys[i + 1][0]) i++;
@@ -167,7 +167,8 @@ function camera(f: number, E: E, kick: number, portrait: boolean): { s: number; 
   const SETTLE = Easing.bezier(0.2, 0.9, 0.3, 1.04);
   const ease = f0 === E.PULL_OUT ? SETTLE : INOUT;
   const t = f1 === f0 ? 1 : how === "move" ? r(f, f0, f1, ease) : Math.min(1, Math.max(0, (f - f0) / (f1 - f0)));
-  const punches = hit(f, E.TD) + hit(f, E.TO_STOCKS, 0.06) + hit(f, E.TO_NEWS, 0.06) + hit(f, E.TO_GITHUB, 0.06) + hit(f, end, 0.04, 0.01);
+  // No punch on the end hit: the bar's glide is the event there.
+  const punches = hit(f, E.TD) + hit(f, E.TO_STOCKS, 0.06) + hit(f, E.TO_NEWS, 0.06) + hit(f, E.TO_GITHUB, 0.06);
   // The kick is a slow breath here, a third of a percent; the bar's glow carries the beat.
   const breath = 0.0035 * kick;
   return { s: (s0 + (s1 - s0) * t) * (1 + punches + breath), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
@@ -276,9 +277,9 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
   const drop = interpolate(f, [E.HOP, E.HOP + 10], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.5, 0, 0.2, 1) });
   const settle = f >= E.HOP + 10 ? -5 * interpolate(f, [E.HOP + 10, E.HOP + 13, E.HOP + 20], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) }) : 0;
   // On the end hit the bar glides up to the card's centre and keeps running: the product, at real size, framed by its own tagline.
-  const endGlide = f >= end ? interpolate(f, [end, end + 18], [0, 1], { extrapolateRight: "clamp", easing: Easing.bezier(0.2, 0.9, 0.3, 1.04) }) : 0;
+  const endGlide = f >= end ? interpolate(f, [end, end + 20], [0, 1], { extrapolateRight: "clamp", easing: Easing.bezier(0.3, 0, 0.15, 1) }) : 0;
   const barTop = f >= end ? (H - BAR_H) + (L.end[5] - (H - BAR_H)) * endGlide : lift + drop + settle;
-  const landBloom = f >= end ? interpolate(f, [end + 16, end + 19, end + 50], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
+  const landBloom = f >= end ? interpolate(f, [end + 18, end + 21, end + 52], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : f >= E.HOP + 10 ? interpolate(f, [E.HOP + 10, E.HOP + 12, E.HOP + 30], [0, 1, 0], { extrapolateRight: "clamp" }) : 0;
   const themeIdx = Math.min(THEMES.length - 1, E.THEMES.filter((t) => f >= t).length);
   const theme = THEMES[themeIdx];
   const dark = !theme.endsWith("-light");
@@ -377,7 +378,7 @@ export function Film({ bpm, songStart, song, cues, features, portrait = false }:
       <Title f={f} at={E.HOP_TITLE} out={E.PUSH_IN + 6} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={L.midTop + 30} align="center" size={L.titleSize + 8} scrim="center" breathe={snare} pc={pc} />
 
       <Title f={f} at={E.WIDGETS_TITLE} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
-      <Title f={f} at={E.GITHUB_TITLE} out={end - 12} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
+      <Title f={f} at={E.GITHUB_TITLE} out={end - 5} label={themeIdx > 0 ? "sec 05 / dress it" : "sec 04 / pick widgets"} hex={themeIdx > 0 ? MINT : "#f97316"} line1="Watch the bar" line2="change." sub={themeIdx > 0 ? `20 palettes · ${theme.replace(/-(dark|light)$/, (m) => " " + m.slice(1)).replace("-", " ")}` : undefined} top={L.highTop} left={L.titleLeft} size={L.titleSize} scrim="top" breathe={snare} pc={pc} />
 
       {/* End card: the site's hero, built hit by hit. Every element POPS on its hit (scale snap, two frames to full), nothing fades or slides. */}
       {f >= end && (() => {
