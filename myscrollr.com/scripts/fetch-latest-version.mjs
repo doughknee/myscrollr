@@ -60,8 +60,14 @@ async function fetchLatestReleaseFromGitHub() {
   if (process.env.GITHUB_TOKEN) {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
   }
+  // Not `releases/latest`: that is the newest release of any kind, and
+  // since the server releases (`server-YYYY.MM.DD.N`) started sharing
+  // this repo it is usually one of those. The list is newest first;
+  // the first published, non-prerelease `desktop-v*` entry is the one
+  // the download button should advertise (fetch-releases.mjs filters
+  // the same way for the releases page).
   const res = await fetch(
-    `https://api.github.com/repos/${REPO}/releases/latest`,
+    `https://api.github.com/repos/${REPO}/releases?per_page=50`,
     {
       headers,
       signal: AbortSignal.timeout(10_000),
@@ -70,13 +76,20 @@ async function fetchLatestReleaseFromGitHub() {
   if (!res.ok) {
     throw new Error(`GitHub API returned ${res.status} ${res.statusText}`)
   }
-  const data = await res.json()
-  if (
-    typeof data.tag_name !== 'string' ||
-    !data.tag_name.startsWith('desktop-v')
-  ) {
+  const list = await res.json()
+  if (!Array.isArray(list)) {
+    throw new Error('GitHub API did not return a release list')
+  }
+  const data = list.find(
+    (r) =>
+      typeof r?.tag_name === 'string' &&
+      r.tag_name.startsWith('desktop-v') &&
+      r.draft !== true &&
+      r.prerelease !== true,
+  )
+  if (!data) {
     throw new Error(
-      `release tag_name not in expected form, got "${data.tag_name}"`,
+      `no published desktop-v* release among the ${list.length} newest releases`,
     )
   }
   const sizes = {}
