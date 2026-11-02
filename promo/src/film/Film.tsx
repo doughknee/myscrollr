@@ -50,7 +50,11 @@ function barState(f: number): BarState {
 function camera(f: number): { s: number; x: number; y: number } {
   const keys: [number, number, number, number][] = [
     // frame, scale, focusX, focusY
-    [0, 2.6, 330, 110],
+    // Settle in, then hold DEAD STILL through the score: the one event
+    // reads because nothing else is moving when it lands.
+    [0, 2.75, 330, 110],
+    [24, 2.6, 350, 110],
+    [TD + 22, 2.6, 350, 110],
     [60, 2.6, 400, 110],
     [TO_STOCKS, 2.3, 420, 130],
     [TO_NEWS, 2.1, 450, 150],
@@ -71,8 +75,8 @@ function camera(f: number): { s: number; x: number; y: number } {
   const [f1, s1, x1, y1] = keys[i + 1];
   const t = f1 === f0 ? 1 : r(f, f0, f1, INOUT);
   // A punch on the score: in over 3 frames, back over 20.
-  const punch = f < TD ? 0 : interpolate(f, [TD, TD + 3, TD + 24], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
-  return { s: (s0 + (s1 - s0) * t) * (1 + 0.06 * punch), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
+  const punch = f < TD ? 0 : interpolate(f, [TD, TD + 2, TD + 28], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  return { s: (s0 + (s1 - s0) * t) * (1 + 0.09 * punch), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
 }
 
 const SANS = "Archivo, 'Plus Jakarta Sans', system-ui, sans-serif";
@@ -127,6 +131,10 @@ export function Film() {
   const f = useCurrentFrame();
   const state = barState(f);
   const dwell = 45;
+  // Half-speed for the half second after the score: the pill's fill and the
+  // page clock stretch while the number lands.
+  const warp = f < TD ? f : f - 0.5 * Math.min(15, f - TD);
+  const fadeIn = r(f, 0, 10, Easing.out(Easing.quad));
   const cam = camera(f);
   const barTop = interpolate(f, [HOP, HOP + 14], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: OUT });
   const themeIdx = f < THEMES_AT ? 0 : Math.min(THEMES.length - 1, Math.floor((f - THEMES_AT) / 12));
@@ -171,6 +179,7 @@ export function Film() {
 
   return (
     <AbsoluteFill style={{ background: "#0b0b13", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, background: "#0b0b13", opacity: 1 - fadeIn, zIndex: 10, pointerEvents: "none" }} />
       <div id="app-shell" data-theme={theme} style={{ position: "absolute", inset: 0 }}>
         {/* World */}
         <div style={{ position: "absolute", left: 0, top: 0, width: W, height: H, transform: `translate(${tx}px, ${ty}px) scale(${cam.s})`, transformOrigin: "0 0" }}>
@@ -183,7 +192,7 @@ export function Film() {
           </div>
           {/* The bar */}
           <div style={{ position: "absolute", left: 0, top: barTop, width: BAR_W, height: BAR_H, boxShadow: "0 12px 50px rgba(0,0,0,.55)" }}>
-            <Bar frame={f} state={state} dwell={dwell} />
+            <Bar frame={f} warp={warp} state={state} dwell={dwell} />
           </div>
           {chips}
         </div>

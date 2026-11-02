@@ -57,7 +57,7 @@ const hex = (id: string) => cat(id)?.color;
 
 export const WIDGETS: FilmWidget[] = [
   { tab: "sports_nfl", code: "NFL", hex: hex("sports_nfl"), kind: "sports", chip: { kind: "live", count: 4 }, pages: 3 },
-  { tab: "finance_stocks", code: "STOCKS", hex: hex("finance_stocks"), kind: "finance", chip: { kind: "open" }, pages: 3 },
+  { tab: "finance_stocks", code: "STOCKS", hex: hex("finance_stocks"), kind: "finance", chip: null, pages: 3 },
   { tab: "news_bbc", code: "BBC", hex: hex("news_bbc"), kind: "news", chip: { kind: "fresh", count: 1 }, pages: 2 },
   { tab: "github", code: "GITHUB", hex: hex("github"), kind: "github", chip: { kind: "needs", count: 2 }, pages: 1 },
 ];

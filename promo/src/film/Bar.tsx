@@ -47,7 +47,7 @@ function chipColor(kind: "live" | "open" | "fresh" | "needs", dark: boolean): st
 }
 
 /** PagedBar's Band, frame-driven: the label wipes up on a widget change, the edge bar only recolours. */
-function Band({ w, frame, since, prev, dark, fill }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number }) {
+function Band({ w, frame, since, prev, dark, fill, burst = 0 }: { w: FilmWidget; frame: number; since: number; prev: FilmWidget | null; dark: boolean; fill: number; burst?: number }) {
   const bar = edgeBar(WIDGETS.length);
   const t = Math.min(1, (frame - since) / WIPE);
   const face = (x: FilmWidget, y: number, key: string) => {
@@ -65,7 +65,7 @@ function Band({ w, frame, since, prev, dark, fill }: { w: FilmWidget; frame: num
           </span>
           {c && (
             <span className="flex shrink-0 items-center gap-[5px]">
-              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 3px color-mix(in srgb, ${hue} ${c.kind === "fresh" || c.kind === "needs" ? 25 : 22}%, transparent)` }} />
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: hue, boxShadow: `0 0 0 ${3 + 6 * burst}px color-mix(in srgb, ${hue} ${Math.round((c.kind === "fresh" || c.kind === "needs" ? 25 : 22) + 40 * burst)}%, transparent)`, transform: `scale(${1 + 0.35 * burst})` }} />
               {c.count !== undefined && (
                 <span className="font-mono text-[11px] font-semibold leading-none tabular-nums" style={{ color: hue }}>
                   {c.count}
@@ -119,7 +119,9 @@ function Page({ w, frame, scored, scoredAt, dark }: { w: FilmWidget; frame: numb
     case "sports": {
       const games = nflAt(scored);
       const colW = CONTENT_W / games.length;
-      const flash = scored ? interpolate(frame - scoredAt, [0, 4, 30], [0, 0.28, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+      // The app's own score flash is a green wash. Here it is the film's one
+      // event: a hard hit that decays over a second.
+      const flash = scored ? interpolate(frame - scoredAt, [0, 2, 10, 36], [0, 0.6, 0.3, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
       return (
         <Columns>
           {games.map((g, i) => (
@@ -171,12 +173,12 @@ function Edge({ time, date }: { time: string; date: string }) {
   );
 }
 
-export function Bar({ frame, state, dwell }: { frame: number; state: BarState; dwell: number }) {
+export function Bar({ frame, warp = frame, state, dwell }: { frame: number; /** Frame for the dwell fill; the film slows it around the score. */ warp?: number; state: BarState; dwell: number }) {
   const w = WIDGETS[state.widget];
   const prev = state.prev === null ? null : WIDGETS[state.prev];
   const t = Math.min(1, (frame - state.since) / SWIPE);
   const e = EASE(t);
-  const fill = Math.min(1, Math.max(0, (frame - state.since) / dwell));
+  const fill = Math.min(1, Math.max(0, (warp - state.since) / dwell));
   const page = (x: FilmWidget, dx: number, key: string) => (
     <div key={key} className="absolute inset-0 flex" style={{ transform: `translateX(${dx}%)`, ...accentStyle(accentFor(x.hex, state.dark), inkFor(x.hex, state.dark)) }}>
       <Page w={x} frame={frame} scored={state.scored} scoredAt={state.scoredAt} dark={state.dark} />
@@ -184,12 +186,12 @@ export function Bar({ frame, state, dwell }: { frame: number; state: BarState; d
   );
   return (
     <div className="flex items-stretch overflow-hidden bg-base-150" style={{ width: BAR_W, height: BAR_H, borderBottom: "1px solid color-mix(in srgb, var(--color-edge) 50%, transparent)" }}>
-      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} />
+      <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} burst={state.scored ? interpolate(frame - state.scoredAt, [0, 3, 30], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0} />
       <div className="relative min-w-0 flex-1 overflow-hidden">
         {prev && t < 1 && page(prev, -100 * e, "prev")}
         {page(w, prev ? 100 * (1 - e) : 0, "cur")}
       </div>
-      <Edge time="1:40 PM" date="Sat, Oct 4" />
+      <Edge time="1:40 PM" date="Sun, Oct 4" />
     </div>
   );
 }

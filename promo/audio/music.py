@@ -57,7 +57,8 @@ for (b0,b1,root,fs) in chords:
 add(kick(.9),0)
 for b in range(0,6):
     for h in (0,0.5):
-        if b*B+h*B<1.5 or b>=3: add(bass(A1 if b<3 else A1,.42),(b+h)*B)
+        # Nothing in the half second before the hit: the silence is the wind-up.
+        if (b+h)*B<1.0 or b>=3: add(bass(A1,.42),(b+h)*B)
 # TD hit: riser + boom + crash
 rn=at(.8); add(.12*hp1(rng.normal(0,1,rn),800)*np.linspace(0,1,rn)**2,1.5-.8)
 add(kick(1.4),1.5)
