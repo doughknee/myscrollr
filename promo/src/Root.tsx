@@ -9,14 +9,14 @@ import "./styles.css";
 import { FPS, Film, durationFor, type FilmProps } from "./film/Film";
 
 export const RemotionRoot: React.FC = () => (
-  <Composition<Record<string, unknown>, FilmProps>
+  <Composition
     id="Film"
     component={Film}
     fps={FPS}
     width={1920}
     height={1080}
-    durationInFrames={durationFor(120)}
+    durationInFrames={durationFor({ bpm: 120 })}
     defaultProps={{ bpm: 120 }}
-    calculateMetadata={({ props }) => ({ durationInFrames: durationFor(props.bpm) })}
+    calculateMetadata={({ props }) => ({ durationInFrames: durationFor(props) })}
   />
 );

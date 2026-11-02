@@ -18,8 +18,7 @@ import { CATALOG_FLY, THEMES } from "./data";
 
 export const FPS = 30;
 /** Frames on the 120 BPM grid; the real length is this scaled by 120/bpm. */
-export const GRID_FRAMES = 555;
-export const durationFor = (bpm: number) => Math.ceil((GRID_FRAMES * 120) / bpm);
+export const durationFor = (p: FilmProps) => (p.events ? Math.round(p.events.OUT * FPS) : Math.ceil((GRID.OUT * 120) / p.bpm));
 
 export type FilmProps = {
   /** The track's tempo. 120 renders the grid as written. */
@@ -27,6 +26,8 @@ export type FilmProps = {
   /** Seconds into the track where frame 0 starts; omit for no track. */
   songStart?: number;
   song?: string;
+  /** Event times in SECONDS of film time; overrides the grid (bpm is then 120). */
+  events?: Record<keyof Events, number>;
 };
 const W = 1920;
 const H = 1080;
@@ -35,53 +36,52 @@ const OUT = Easing.bezier(0.16, 1, 0.3, 1);
 const INOUT = Easing.bezier(0.65, 0, 0.35, 1);
 const r = (f: number, a: number, b: number, e = OUT) => interpolate(f, [a, b], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: e });
 
-// ── Beats ──────────────────────────────────────────────────
-const TD = 45; // the Bears score
-const TO_STOCKS = 90;
-const TO_NEWS = 135;
-const PULL_OUT = 150;
-const HOP = 225; // bar to the bottom
-const PUSH_IN = 270;
-const TO_GITHUB = 315;
-const THEMES_AT = 345;
-const END = 420;
+// ── Events ─────────────────────────────────────────────────
+/** Frames at which each event lands. The default is the 120 BPM grid. */
+export interface Events {
+  TD: number; TO_STOCKS: number; TO_NEWS: number; PULL_OUT: number; HOP: number; PUSH_IN: number; TO_GITHUB: number; THEMES_AT: number; THEMES_EVERY: number; END: number; OUT: number;
+}
+export const GRID: Events = { TD: 45, TO_STOCKS: 90, TO_NEWS: 135, PULL_OUT: 150, HOP: 225, PUSH_IN: 270, TO_GITHUB: 315, THEMES_AT: 345, THEMES_EVERY: 12, END: 420, OUT: 555 };
+/** Seconds → frames, for events given in the track's time. */
+export const eventsFromSeconds = (e: Record<keyof Events, number>, fps: number): Events =>
+  Object.fromEntries(Object.entries(e).map(([k, v]) => [k, Math.round(v * fps)])) as unknown as Events;
 
-function barState(f: number): BarState {
+function barState(f: number, E: Events): BarState {
   const turns = [
     { at: 0, w: 0 },
-    { at: TO_STOCKS, w: 1 },
-    { at: TO_NEWS, w: 2 },
-    { at: TO_GITHUB, w: 3 },
+    { at: E.TO_STOCKS, w: 1 },
+    { at: E.TO_NEWS, w: 2 },
+    { at: E.TO_GITHUB, w: 3 },
   ];
   let cur = turns[0];
   let prev: number | null = null;
   for (const t of turns) if (f >= t.at) { prev = cur === t ? null : cur.w; cur = t; }
   if (cur.at === 0) prev = null;
-  return { widget: cur.w, since: cur.at, prev, scored: f >= TD, scoredAt: TD, dark: true };
+  return { widget: cur.w, since: cur.at, prev, scored: f >= E.TD, scoredAt: E.TD, dark: true };
 }
 
 /** Camera: scale and the world point at the frame's centre, piecewise with eased holds. */
-function camera(f: number): { s: number; x: number; y: number } {
+function camera(f: number, E: Events): { s: number; x: number; y: number } {
   const keys: [number, number, number, number][] = [
     // frame, scale, focusX, focusY
     // Settle in, then hold DEAD STILL through the score: the one event
     // reads because nothing else is moving when it lands.
     [0, 2.75, 330, 110],
     [24, 2.6, 350, 110],
-    [TD + 22, 2.6, 350, 110],
-    [60, 2.6, 400, 110],
-    [TO_STOCKS, 2.3, 420, 130],
-    [TO_NEWS, 2.1, 450, 150],
-    [PULL_OUT, 2.1, 450, 150],
-    [PULL_OUT + 45, 1, 960, 540],
-    [HOP, 1, 960, 540],
-    [HOP + 25, 1.08, 960, 600],
-    [PUSH_IN, 1.08, 960, 600],
-    [PUSH_IN + 35, 2.3, 340, 985],
-    [TO_GITHUB + 20, 2.3, 340, 985],
-    [THEMES_AT + 20, 1.6, 760, 1010],
-    [END - 30, 1.6, 760, 1010],
-    [END + 30, 1, 960, 540],
+    [E.TD + 22, 2.6, 350, 110],
+    [E.TD + 40, 2.6, 400, 110],
+    [E.TO_STOCKS, 2.3, 420, 130],
+    [E.TO_NEWS, 2.1, 450, 150],
+    [E.PULL_OUT, 2.1, 450, 150],
+    [E.PULL_OUT + 45, 1, 960, 540],
+    [E.HOP, 1, 960, 540],
+    [E.HOP + 25, 1.08, 960, 600],
+    [E.PUSH_IN, 1.08, 960, 600],
+    [E.PUSH_IN + 35, 2.3, 340, 985],
+    [E.TO_GITHUB + 20, 2.3, 340, 985],
+    [E.THEMES_AT + 20, 1.6, 760, 1010],
+    [E.END - 30, 1.6, 760, 1010],
+    [E.END + 30, 1, 960, 540],
   ];
   let i = 0;
   while (i < keys.length - 2 && f >= keys[i + 1][0]) i++;
@@ -89,7 +89,7 @@ function camera(f: number): { s: number; x: number; y: number } {
   const [f1, s1, x1, y1] = keys[i + 1];
   const t = f1 === f0 ? 1 : r(f, f0, f1, INOUT);
   // A punch on the score: in over 3 frames, back over 20.
-  const punch = f < TD ? 0 : interpolate(f, [TD, TD + 2, TD + 28], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  const punch = f < E.TD ? 0 : interpolate(f, [E.TD, E.TD + 2, E.TD + 28], [0, 1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   return { s: (s0 + (s1 - s0) * t) * (1 + 0.09 * punch), x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
 }
 
@@ -141,31 +141,32 @@ function Title({ f, at, out, label, hex = MINT, line1, line2, sub, top, left, al
   );
 }
 
-export function Film({ bpm, songStart, song }: FilmProps) {
+export function Film({ bpm, songStart, song, events }: FilmProps) {
   const real = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  // The virtual frame on the 120 BPM grid.
-  const f = (real * bpm) / 120;
-  const state = barState(f);
+  const E = events ? eventsFromSeconds(events, fps) : GRID;
+  // The virtual frame on the 120 BPM grid (identity when events are given).
+  const f = events ? real : (real * bpm) / 120;
+  const state = barState(f, E);
   const dwell = 45;
   // Half-speed for the half second after the score: the pill's fill and the
   // page clock stretch while the number lands.
-  const warp = f < TD ? f : f - 0.5 * Math.min(15, f - TD);
+  const warp = f < E.TD ? f : f - 0.5 * Math.min(15, f - E.TD);
   const fadeIn = r(f, 0, 10, Easing.out(Easing.quad));
-  const cam = camera(f);
-  const barTop = interpolate(f, [HOP, HOP + 14], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: OUT });
-  const themeIdx = f < THEMES_AT ? 0 : Math.min(THEMES.length - 1, Math.floor((f - THEMES_AT) / 12));
+  const cam = camera(f, E);
+  const barTop = interpolate(f, [E.HOP, E.HOP + 14], [0, H - BAR_H], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: OUT });
+  const themeIdx = f < E.THEMES_AT ? 0 : Math.min(THEMES.length - 1, Math.floor((f - E.THEMES_AT) / E.THEMES_EVERY));
   const theme = THEMES[themeIdx];
-  const endIn = r(f, END, END + 40);
+  const endIn = r(f, E.END, E.END + 40);
   // The desktop steps back whenever a title is up.
   const dimDesk =
-    f < PULL_OUT ? 0.22
+    f < E.PULL_OUT ? 0.22
     // Reveal the desktop clean, then step it back under the title; lift it for the hop.
-    : f < PULL_OUT + 28 ? 0.22 + 0.78 * r(f, PULL_OUT, PULL_OUT + 28)
-    : f < HOP - 8 ? 1 - 0.62 * r(f, PULL_OUT + 28, PULL_OUT + 44)
-    : f < HOP + 12 ? 0.38 + 0.62 * r(f, HOP - 8, HOP + 2)
-    : f < PUSH_IN ? 1 - 0.62 * r(f, HOP + 12, HOP + 26)
-    : f < END ? 1 - 0.5 * r(f, PUSH_IN, PUSH_IN + 35)
+    : f < E.PULL_OUT + 28 ? 0.22 + 0.78 * r(f, E.PULL_OUT, E.PULL_OUT + 28)
+    : f < E.HOP - 8 ? 1 - 0.62 * r(f, E.PULL_OUT + 28, E.PULL_OUT + 44)
+    : f < E.HOP + 12 ? 0.38 + 0.62 * r(f, E.HOP - 8, E.HOP + 2)
+    : f < E.PUSH_IN ? 1 - 0.62 * r(f, E.HOP + 12, E.HOP + 26)
+    : f < E.END ? 1 - 0.5 * r(f, E.PUSH_IN, E.PUSH_IN + 35)
     : 0.5 - 0.34 * endIn;
 
   // The world: 1920x1080, scaled about the camera's focus.
@@ -174,9 +175,9 @@ export function Film({ bpm, songStart, song }: FilmProps) {
 
   // Chips flying into the band (f 285..320), then gone.
   const chips = CATALOG_FLY.map((c, i) => {
-    const at = PUSH_IN + 12 + i * 4;
+    const at = E.PUSH_IN + 12 + i * 4;
     const a = r(f, at, at + 16);
-    const go = r(f, TO_GITHUB - 8 + (i === 0 ? 0 : 6), TO_GITHUB + 10 + (i === 0 ? 0 : 6), INOUT);
+    const go = r(f, E.TO_GITHUB - 8 + (i === 0 ? 0 : 6), E.TO_GITHUB + 10 + (i === 0 ? 0 : 6), INOUT);
     if (a <= 0 || go >= 1) return null;
     // Start scattered above the band in world space, converge on the band.
     const sx = 200 + (i % 4) * 175 + (i > 3 ? 70 : 0);
@@ -201,7 +202,7 @@ export function Film({ bpm, songStart, song }: FilmProps) {
         <Audio
           src={staticFile(song)}
           startFrom={Math.round(songStart * fps)}
-          volume={(fr) => interpolate(fr, [0, 8, durationInFrames - 30, durationInFrames - 1], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
+          volume={(fr) => interpolate(fr, [0, 8, durationInFrames - 45, durationInFrames - 1], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
         />
       )}
       <div id="app-shell" data-theme={theme} style={{ position: "absolute", inset: 0 }}>
@@ -223,38 +224,38 @@ export function Film({ bpm, songStart, song }: FilmProps) {
       </div>
 
       {/* Screen-space type */}
-      <Title f={f} at={10} out={TO_STOCKS - 8} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2={f >= TD ? "you already know." : undefined} top={690} left={136} size={104} />
-      <Title f={f} at={TO_STOCKS + 4} out={TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={690} left={136} size={104} />
-      <Title f={f} at={TO_NEWS + 4} out={PULL_OUT + 24} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={690} left={136} size={104} />
+      <Title f={f} at={10} out={E.TO_STOCKS - 8} label="// live desktop ticker" hex="#013369" line1="The moment it happens," line2={f >= E.TD ? "you already know." : undefined} top={690} left={136} size={104} />
+      <Title f={f} at={E.TO_STOCKS + 4} out={E.TO_NEWS - 4} label="sec 01 / markets" hex="#7c3aed" line1="One page" line2="at a time." top={690} left={136} size={104} />
+      <Title f={f} at={E.TO_NEWS + 4} out={E.PULL_OUT + 24} label="sec 02 / headlines" hex="#c8102e" line1="No tab" line2="to babysit." top={690} left={136} size={104} />
 
-      <Title f={f} at={PULL_OUT + 30} out={HOP - 4} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={330} align="center" size={112} scrim="center" />
-      <Title f={f} at={HOP + 10} out={PUSH_IN + 8} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" />
+      <Title f={f} at={E.PULL_OUT + 30} out={E.HOP - 16} label="sec 03 / on your desktop" line1="One bar" line2="above your work." sub="64 px · every monitor · always on top" top={330} align="center" size={112} scrim="center" />
+      <Title f={f} at={E.HOP + 10} out={E.PUSH_IN + 8} label="sec 03 / on your desktop" line1="Top or bottom." sub="it's your bar. park it." top={360} align="center" size={112} scrim="center" />
 
-      <Title f={f} at={PUSH_IN + 10} out={TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" />
-      <Title f={f} at={TO_GITHUB + 6} out={THEMES_AT + 10} label="sec 04 / pick widgets" hex="#f97316" line1="Watch the bar" line2="change." top={70} left={136} size={104} scrim="top" />
+      <Title f={f} at={E.PUSH_IN + 10} out={E.TO_GITHUB} label="sec 04 / pick widgets" hex="#f97316" line1="56 widgets." sub="& counting" top={70} left={136} size={104} scrim="top" />
+      <Title f={f} at={E.TO_GITHUB + 6} out={E.THEMES_AT + 10} label="sec 04 / pick widgets" hex="#f97316" line1="Watch the bar" line2="change." top={70} left={136} size={104} scrim="top" />
 
-      <Title f={f} at={THEMES_AT + 10} out={END - 6} label="sec 05 / dress it" line1="20 palettes." sub={`${theme.replace("-dark", "").replace("-", " ")} · dark & light`} top={70} left={136} size={104} scrim="top" />
+      <Title f={f} at={E.THEMES_AT + 10} out={E.END - 6} label="sec 05 / dress it" line1="20 palettes." sub={`${theme.replace("-dark", "").replace("-", " ")} · dark & light`} top={70} left={136} size={104} scrim="top" />
 
       {/* End card: the site's hero, as it is. */}
-      {f >= END && (
+      {f >= E.END && (
         <div style={{ position: "absolute", inset: 0, opacity: endIn }}>
           <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 60% at 50% 45%, rgba(11,11,19,.92) 0%, rgba(11,11,19,.6) 100%)" }} />
-          <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${0.92 + 0.08 * r(f, END, END + 30)})` }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 200, display: "flex", justifyContent: "center", alignItems: "center", gap: 20, transform: `scale(${0.92 + 0.08 * r(f, E.END, E.END + 30)})` }}>
             <Img src={staticFile("logo.svg")} style={{ width: 72, height: 72 }} />
             <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 76, letterSpacing: "-0.04em", color: INK, lineHeight: 1 }}>
               scrollr<span style={{ color: MINT }}>.</span>
             </span>
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 330, textAlign: "center", fontFamily: MONO, fontSize: 19, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, opacity: r(f, END + 10, END + 24) }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 330, textAlign: "center", fontFamily: MONO, fontSize: 19, letterSpacing: "0.22em", textTransform: "uppercase", color: MUTE, opacity: r(f, E.END + 10, E.END + 24) }}>
             free · open source · macos / windows / linux
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 400, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, opacity: r(f, END + 14, END + 30), transform: `translateY(${(1 - r(f, END + 14, END + 30)) * 24}px)` }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 400, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: INK, opacity: r(f, E.END + 14, E.END + 30), transform: `translateY(${(1 - r(f, E.END + 14, E.END + 30)) * 24}px)` }}>
             Your live
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 540, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, opacity: r(f, END + 22, END + 38), transform: `translateY(${(1 - r(f, END + 22, END + 38)) * 24}px)` }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 540, textAlign: "center", fontFamily: SANS, fontWeight: 900, fontSize: 150, lineHeight: 0.9, letterSpacing: "-0.02em", textTransform: "uppercase", color: "transparent", WebkitTextStroke: `3px ${MINT}`, opacity: r(f, E.END + 22, E.END + 38), transform: `translateY(${(1 - r(f, E.END + 22, E.END + 38)) * 24}px)` }}>
             Desktop ticker
           </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 730, textAlign: "center", opacity: r(f, END + 40, END + 58), transform: `translateY(${(1 - r(f, END + 40, END + 58)) * 16}px)` }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 730, textAlign: "center", opacity: r(f, E.END + 40, E.END + 58), transform: `translateY(${(1 - r(f, E.END + 40, E.END + 58)) * 16}px)` }}>
             <span style={{ position: "relative", display: "inline-block", background: MINT, color: "#141420", fontFamily: SANS, fontWeight: 800, fontSize: 30, padding: "20px 40px", borderRadius: 6 }}>
               Download Scrollr
               <span style={{ position: "absolute", top: -12, right: -12, background: "#0b0b13", color: MINT, border: `1px solid ${MINT}`, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "4px 7px", borderRadius: 4 }}>FREE</span>

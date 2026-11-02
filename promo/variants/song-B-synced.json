@@ -1,0 +1,18 @@
+{
+ "bpm": 120,
+ "song": "song/final_hit.m4a",
+ "songStart": 46.994,
+ "events": {
+  "TD": 2.76,
+  "TO_STOCKS": 6.76,
+  "TO_NEWS": 8.76,
+  "PULL_OUT": 10.76,
+  "HOP": 13.26,
+  "PUSH_IN": 15.01,
+  "TO_GITHUB": 17.51,
+  "THEMES_AT": 19.26,
+  "THEMES_EVERY": 0.25,
+  "END": 21.26,
+  "OUT": 24.5
+ }
+}
