@@ -104,21 +104,30 @@ function Band({ w, frame, since, prev, dark, fill, burst = 0, pulse = 0, flash =
   );
 }
 
-function Columns({ children }: { children: ReactNode[] }) {
+/**
+ * Equal columns. After a widget change the columns settle one after another
+ * (two frames apart) so the new page reads left to right instead of
+ * arriving as one block.
+ */
+function Columns({ children, settle = 1 }: { children: ReactNode[]; settle?: number }) {
   return (
     <div className="grid h-full min-w-0 flex-1" style={{ gridTemplateColumns: `repeat(${children.length}, minmax(0, 1fr))` }}>
-      {children.map((c, i) => (
-        <div key={i} className="relative min-w-0">
-          {i > 0 && <Rule />}
-          {c}
-        </div>
-      ))}
+      {children.map((c, i) => {
+        const k = Math.min(1, Math.max(0, settle * (children.length + 1) - i));
+        const e = EASE(k);
+        return (
+          <div key={i} className="relative min-w-0" style={{ opacity: e, transform: `translateX(${(1 - e) * 10}px)` }}>
+            {i > 0 && <Rule />}
+            {c}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 /** One page of a widget, laid out as the app lays it: equal columns at this bar's content width. */
-function Page({ w, frame, scored, scoredAt, dark, ticks }: { w: FilmWidget; frame: number; scored: boolean; scoredAt: number; dark: boolean; ticks: Tick[] }) {
+function Page({ w, frame, scored, scoredAt, dark, ticks, settle = 1 }: { w: FilmWidget; frame: number; scored: boolean; scoredAt: number; dark: boolean; ticks: Tick[]; settle?: number }) {
   switch (w.kind) {
     case "sports": {
       const games = nflAt(scored);
@@ -127,7 +136,7 @@ function Page({ w, frame, scored, scoredAt, dark, ticks }: { w: FilmWidget; fram
       // event: a hard hit that decays over a second.
       const flash = scored ? interpolate(frame - scoredAt, [0, 2, 10, 36], [0, 0.6, 0.3, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
       return (
-        <Columns>
+        <Columns settle={settle}>
           {games.map((g, i) => (
             <div key={g.id} className="relative h-full">
               <GameCell game={g} width={colW} mine={g.home_team_name === FAVOURITE || g.away_team_name === FAVOURITE} now={NOW} />
@@ -140,7 +149,7 @@ function Page({ w, frame, scored, scoredAt, dark, ticks }: { w: FilmWidget; fram
     case "finance":
       // Each tick moves one quote and flashes its cell in the app's up/down colour.
       return (
-        <Columns>
+        <Columns settle={settle}>
           {STOCKS.map((t, i) => {
             const mine = ticks.filter((k) => k.cell === i && frame >= k.at);
             let trade = t;
@@ -162,7 +171,7 @@ function Page({ w, frame, scored, scoredAt, dark, ticks }: { w: FilmWidget; fram
       );
     case "news":
       return (
-        <Columns>
+        <Columns settle={settle}>
           {BBC.map((r) => (
             <NewsCell key={r.id} item={r} width={CONTENT_W / BBC.length} now={NOW} />
           ))}
@@ -170,7 +179,7 @@ function Page({ w, frame, scored, scoredAt, dark, ticks }: { w: FilmWidget; fram
       );
     case "github":
       return (
-        <Columns>
+        <Columns settle={settle}>
           {GITHUB.map((c) => (
             <RepoCell key={c.id} chip={c} dark={dark} />
           ))}
@@ -206,20 +215,27 @@ export function Bar({ frame, warp = frame, state, dwell, pulse = 0, ticks = [], 
 }) {
   const w = WIDGETS[state.widget];
   const prev = state.prev === null ? null : WIDGETS[state.prev];
-  const t = Math.min(1, (frame - state.since) / SWIPE);
+  // A widget change is ONE motion: the page rolls up with the band, on the
+  // band's own wipe timing, then the columns settle. Nothing moves sideways.
+  const t = Math.min(1, (frame - state.since) / WIPE);
   const e = EASE(t);
   const fill = Math.min(1, Math.max(0, (warp - state.since) / dwell));
-  const page = (x: FilmWidget, dx: number, key: string) => (
-    <div key={key} className="absolute inset-0 flex" style={{ transform: `translateX(${dx}%)`, ...accentStyle(accentFor(x.hex, state.dark), inkFor(x.hex, state.dark)) }}>
-      <Page w={x} frame={frame} scored={state.scored} scoredAt={state.scoredAt} dark={state.dark} ticks={ticks} />
+  // The columns settle over 14 frames once the roll has mostly landed.
+  const settle = prev ? Math.min(1, Math.max(0, (frame - state.since - 4) / 14)) : 1;
+  // One beat of the incoming widget's colour across the whole bar on the hit.
+  const change = prev ? interpolate(frame - state.since, [0, 1, 8], [0, 0.28, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  const page = (x: FilmWidget, dy: number, key: string, k: number) => (
+    <div key={key} className="absolute inset-0 flex" style={{ transform: `translateY(${dy}%)`, ...accentStyle(accentFor(x.hex, state.dark), inkFor(x.hex, state.dark)) }}>
+      <Page w={x} frame={frame} scored={state.scored} scoredAt={state.scoredAt} dark={state.dark} ticks={ticks} settle={k} />
     </div>
   );
   return (
     <div className="flex items-stretch overflow-hidden bg-base-150" style={{ width: BAR_W, height: BAR_H, borderBottom: "1px solid color-mix(in srgb, var(--color-edge) 50%, transparent)" }}>
       <Band w={w} frame={frame} since={state.since} prev={prev} dark={state.dark} fill={fill} pulse={pulse} flash={bandFlash} burst={state.scored ? interpolate(frame - state.scoredAt, [0, 3, 30], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0} />
       <div className="relative min-w-0 flex-1 overflow-hidden">
-        {prev && t < 1 && page(prev, -100 * e, "prev")}
-        {page(w, prev ? 100 * (1 - e) : 0, "cur")}
+        {prev && t < 1 && page(prev, -100 * e, "prev", 1)}
+        {page(w, prev ? 100 * (1 - e) : 0, "cur", settle)}
+        {change > 0 && <span aria-hidden className="pointer-events-none absolute inset-0 z-20" style={{ background: accentFor(w.hex, state.dark), opacity: change }} />}
       </div>
       <Edge time="1:40 PM" date="Sun, Oct 4" />
     </div>

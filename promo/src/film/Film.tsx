@@ -117,9 +117,13 @@ function camera(f: number, E: E, kick: number): { s: number; x: number; y: numbe
     [0, 2.75, 330, 110],
     [24, 2.6, 350, 110],
     [E.TD_RELEASE, 2.6, 350, 110],
-    [E.TD_RELEASE + 24, 2.6, 400, 110],
-    [E.TO_STOCKS, 2.3, 420, 130],
-    [E.TO_NEWS, 2.1, 450, 150],
+    // Never past x=360 at 2.6 or 410 at 2.3: the band's left edge stays in frame.
+    [E.TD_RELEASE + 24, 2.6, 360, 110],
+    // Hold through each widget change; move on the beat after it.
+    [E.TO_STOCKS + 12, 2.6, 360, 110],
+    [E.TO_STOCKS + 40, 2.3, 405, 130],
+    [E.TO_NEWS + 12, 2.3, 405, 130],
+    [E.TO_NEWS + 40, 2.1, 450, 150],
     [E.PULL_OUT, 2.1, 450, 150],
     [E.PULL_OUT + 36, 1, 960, 540],
     [E.HOP, 1, 960, 540],
