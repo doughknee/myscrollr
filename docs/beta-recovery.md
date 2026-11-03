@@ -2,7 +2,7 @@
 
 Choosing **Stable** in Settings → Updates stops future Beta offers. It does not replace the installed app. A newer installed Beta can remain installed until a newer Stable release is available.
 
-The new **Return to Stable** action is being prepared for a future build. It is not present in the published 1.8.0-beta.1. It will only offer a tested source/target pair and installer. A separate confirmation shows the versions before any download or installation.
+The new **Return to Stable** action is being prepared in the unpublished 1.8.0-beta.2 candidate. It is not present in the published 1.8.0-beta.1. A separate confirmation shows the versions before any download or installation. Beta 2 must pass the qualification below before publication; its provisional source entry is not proof of a successful recovery.
 
 ## If a Beta will not open
 
@@ -25,3 +25,9 @@ The initial package set is NSIS on Windows x64, the app bundle on Apple Silicon 
 Before adding any source version (including the next Beta that ships this UI), run the signed source → target installation rehearsal and review changes to preferences, authentication, storage, app identifier and package layout. The exact published cohort is tested by `desktop-update-rehearsal.yml` with `recovery=true`. This verifies native replacement, signatures, packaged restart and synthetic preferences on disposable hosted runners. The test never installs on a developer's machine or copies a real profile. Record run IDs and limitations in the PR. Build/transport tests do not prove live login, physical displays or sleep/wake behavior.
 
 Do not broaden the allowlist automatically when bumping a version. Keep published releases immutable. A new Beta needs its own signed candidate and qualification before publication; this PR does not publish a build or change feeds.
+
+### Beta 2 candidate qualification
+
+The 1.8.0-beta.2 source entry is provisional until its final signed build passes on all three supported packages. Published Stable 1.7.3 assets, signatures and build run `41688396593` stay fixed. The existing rehearsal's protected-main verification job can read the Beta 2 draft; branch recovery jobs remain read-only and limited to the published Beta 1 pair.
+
+After the candidate build succeeds, run the existing `desktop-update-rehearsal.yml` on main in both directions: Stable 1.7.3 → Beta 2 with `recovery=false`, then Beta 2 → Stable 1.7.3 with `recovery=true`. Bind both runs to the same final candidate build ID and use `from_version` matching the installed source. Review signature verification, actual replacement, packaged restart and synthetic preference retention. A candidate rebuild invalidates previous qualification evidence and needs both runs again. Keep the draft unpublished and feeds unchanged until qualification and Windows hands-on review pass.

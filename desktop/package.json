@@ -1,6 +1,6 @@
 {
   "name": "scrollr-desktop",
-  "version": "1.8.0-beta.1",
+  "version": "1.8.0-beta.2",
   "private": true,
   "description": "Scrollr desktop app â€” pinned always-on-top ticker for sports, finance, RSS, and Yahoo Fantasy. Tauri + React.",
   "author": "Brandon Ruth <brandon@myscrollr.com>",

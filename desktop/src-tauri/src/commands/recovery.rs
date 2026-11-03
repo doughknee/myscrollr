@@ -44,33 +44,35 @@ mod tests {
     #[test]
     fn only_qualified_pairs_and_signed_artifacts_are_accepted() {
         let p = policy();
-        for target in ["windows-x86_64-nsis", "darwin-aarch64", "linux-x86_64"] {
-            let artifact = &p["platforms"][target];
-            assert!(matches_artifact(
-                "1.8.0-beta.1",
-                "1.7.3",
-                target,
-                artifact["url"].as_str().unwrap(),
-                artifact["signature"].as_str().unwrap()
-            ));
-            assert!(!matches_artifact(
-                "1.8.0-beta.1",
-                "1.7.3",
-                target,
-                "https://example.com/old.exe",
-                artifact["signature"].as_str().unwrap()
-            ));
-            assert!(!matches_artifact(
-                "1.8.0-beta.1",
-                "1.7.3",
-                target,
-                artifact["url"].as_str().unwrap(),
-                "different signed bytes"
-            ));
+        for source in ["1.8.0-beta.1", "1.8.0-beta.2"] {
+            for target in ["windows-x86_64-nsis", "darwin-aarch64", "linux-x86_64"] {
+                let artifact = &p["platforms"][target];
+                assert!(matches_artifact(
+                    source,
+                    "1.7.3",
+                    target,
+                    artifact["url"].as_str().unwrap(),
+                    artifact["signature"].as_str().unwrap()
+                ));
+                assert!(!matches_artifact(
+                    source,
+                    "1.7.3",
+                    target,
+                    "https://example.com/old.exe",
+                    artifact["signature"].as_str().unwrap()
+                ));
+                assert!(!matches_artifact(
+                    source,
+                    "1.7.3",
+                    target,
+                    artifact["url"].as_str().unwrap(),
+                    "different signed bytes"
+                ));
+            }
         }
         for (source, target) in [
             ("1.8.0", "1.7.3"),
-            ("1.8.0-beta.2", "1.7.3"),
+            ("1.8.0-beta.3", "1.7.3"),
             ("1.8.0-beta.1", "1.7.2"),
             ("1.8.0-beta.1", "1.9.0"),
         ] {
