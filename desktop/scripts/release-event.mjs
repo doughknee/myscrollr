@@ -52,6 +52,8 @@ export async function verifyDesktopEffects(release, deps) {
     assert.equal(await deps.readTag(selected.tag), selected.evidence.source, 'Selected feed tag moved');
   }
   await deps.verifyFeeds({ stable: Buffer.from(plan.stable.manifestText), beta: Buffer.from(plan.beta.manifestText) });
+  // Publication/withdrawal can advance the branch while CDN checks wait.
+  assert.deepEqual(await deps.readRegistry(), registry, 'Approval registry changed during readiness verification; retry');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

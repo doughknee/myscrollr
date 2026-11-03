@@ -24,10 +24,10 @@ those remain the finalizer's job. Failures throw before `eligible=true` is writt
 Workflow tokens gain read-only Actions permission for build status. Public-byte
 checks retain their bounded seven-minute deadline; effect jobs allow twenty minutes.
 
-Local validation: all **50 Node fixtures passed** in a network-disabled Node22
+Local validation: all **51 Node fixtures passed** in a network-disabled Node22
 container; Go ops tests and actionlint for changed workflows passed. New negative
 cases cover missing/changed proof, changed installers, failed/untrusted build,
-moved tag, missing/withdrawn approval, registry failure and public-feed failure.
+moved tag, missing/withdrawn approval, registry failure, public-feed failure and withdrawal during public verification.
 No live workflow or OS upgrade was used to test refusal paths.
 
 SCROLLR-429 (progress subscriptions) and SCROLLR-430 (existing website selection)

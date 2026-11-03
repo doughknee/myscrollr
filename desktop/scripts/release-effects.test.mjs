@@ -50,6 +50,13 @@ for (const [name, mutate, message] of [
   const f = fixture(); mutate(f);
   await assert.rejects(verifyDesktopEffects(f.release, f.deps), message);
 });
+test('a withdrawal during public verification blocks the pending follow-up', async () => {
+  const f = fixture();
+  f.deps.verifyFeeds = async () => {
+    f.deps.readRegistry = async () => ({ ...f.registry, releases: [{ ...f.entry, withdrawn: true }] });
+  };
+  await assert.rejects(verifyDesktopEffects(f.release, f.deps), /registry changed/);
+});
 test('disabled feeds still require verified publication but no nonexistent registry', async () => {
   const f = fixture(); f.deps.feedsEnabled = false;
   f.deps.readRegistry = async () => { throw new Error('must not read'); };
