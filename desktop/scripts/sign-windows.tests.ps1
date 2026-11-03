@@ -89,7 +89,7 @@ try {
   $artifactVerifier = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "verify-windows-artifacts.ps1")
   Assert-True ($artifactVerifier.Contains('FromBase64String([System.IO.File]::ReadAllText($signatureFile).Trim())')) "Tauri base64 updater signatures must be decoded before minisign verification"
   Assert-True ($releaseWorkflow.Contains("windows-signing-test:")) "release workflow must expose a non-publishing branch test job"
-  Assert-True ($releaseWorkflow.Contains("if: needs.preflight.outputs.proceed == 'true' && github.ref == 'refs/heads/main'")) "release-mutating builds must be main-only"
+  Assert-True ($releaseWorkflow.Contains("if: needs.preflight.outputs.proceed == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7')")) "release-mutating builds must use an approved source branch"
   Assert-True ($releaseWorkflow.Contains("inputs.platform == 'windows' || inputs.platform == 'all'")) "every non-main dispatch containing Windows must use the test job"
   Assert-True ($releaseWorkflow.Contains("if: matrix.platform != 'windows-latest'")) "tauri-action must never upload Windows before verification"
   Assert-True ($releaseWorkflow -match 'permissions:\r?\n\s+contents: read') "workflow permissions must default to read-only"
@@ -104,7 +104,9 @@ try {
   Assert-True ($releaseWorkflow.Contains("Re-verify staged Windows bytes")) "staged release bytes must be verified again before GitHub Release upload"
   Assert-True ($releaseWorkflow.Contains('any(.assets[]; .name == "latest.json")')) "a missing updater manifest must be confirmed before initializing one"
   Assert-True (-not $releaseWorkflow.Contains('|| echo "missing"')) "release lookup failures must not be treated as a missing release"
-  Assert-True ($releaseWorkflow.Contains("grep -q 'HTTP 404'")) "only an explicit 404 may be treated as a missing release"
+  Assert-True ($releaseWorkflow.Contains('node desktop/scripts/release-lookup.mjs "$GITHUB_REPOSITORY" "$TAG" "$GITHUB_SHA"')) "preflight must use the tested authenticated release lookup and exact draft source guard"
+  & node --test (Join-Path $PSScriptRoot "release-lookup.test.mjs")
+  Assert-True ($LASTEXITCODE -eq 0) "release lookup must reject non-404 failures and preserve draft source binding"
   Assert-True ($releaseWorkflow.Contains("Failed to download the existing updater manifest.")) "existing updater manifest download failures must stop publishing"
   Assert-True ($releaseWorkflow -match '(?s)fix-appimage-signature:.*?permissions:\s+contents: write') "AppImage signature repair must retain release upload permission"
 

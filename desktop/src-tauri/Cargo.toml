@@ -137,6 +137,11 @@ windows-sys = { version = "0.59", features = [
 # nvidia-smi isn't available for AMD/Intel GPUs).
 wmi = "0.14"
 
+[dev-dependencies]
+# Native updater transport rehearsals use a mock window runtime, never a
+# production endpoint override or the user's installed app.
+tauri = { version = "2", default-features = false, features = ["test"] }
+
 [profile.release]
 lto = true
 strip = "debuginfo"

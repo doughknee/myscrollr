@@ -7,6 +7,7 @@ import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import semver from 'semver';
+import { validateSource } from './release-source.mjs';
 export { gh, ghJSON } from './release-lookup.mjs';
 
 export const targets = ['windows-x86_64', 'darwin-aarch64', 'linux-x86_64'];
@@ -31,13 +32,13 @@ export function validateRelease(release, { draft } = {}) {
   return identity;
 }
 
-export function validateRun(run, sha, repo, completed = false) {
+export function validateRun(run, sha, repo, completed = false, version) {
   assert(/^[a-f0-9]{40}$/.test(sha), 'Resolved source SHA required');
   assert.equal(run.path, '.github/workflows/desktop-release.yml', 'Wrong build workflow');
   assert.equal(run.repository?.full_name, repo, 'Wrong build repository');
   assert.equal(run.head_repository?.full_name, repo, 'Fork builds cannot publish');
   assert.equal(run.head_sha, sha, 'Build source does not match release tag');
-  assert.equal(run.head_branch, 'main', 'Only main is qualified for public builds');
+  validateSource(run.head_branch, version);
   assert(['push', 'workflow_dispatch'].includes(run.event), 'Unapproved build event');
   if (completed) {
     assert.equal(run.status, 'completed', 'Build still running');
@@ -118,7 +119,7 @@ export async function recordProof(root, target, dir, env) {
 // Only the bound build run's proof files are trusted; a release-uploaded proof is not.
 export async function validateArtifacts({ release, run, sha, repo, dir, proofs, publicKey, verifySignature }) {
   const { version } = validateRelease(release);
-  validateRun(run, sha, repo, true);
+  validateRun(run, sha, repo, true, version);
   const names = release.assets.map(a => a.name);
   assert.equal(new Set(names).size, names.length, 'Duplicate release asset');
   const hashes = new Map();

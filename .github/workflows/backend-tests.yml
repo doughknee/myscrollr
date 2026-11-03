@@ -2,7 +2,7 @@ name: Backend Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, release/desktop-1.7]
     paths:
       - "api/**"
       - "scripts/osticket-plugin/**"
@@ -37,7 +37,7 @@ on:
       - "docs/ROADMAP.md"
       - "docs/support/**"
   pull_request:
-    branches: [main]
+    branches: [main, release/desktop-1.7]
     paths:
       - "api/**"
       - "scripts/osticket-plugin/**"
