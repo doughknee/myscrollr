@@ -1,6 +1,6 @@
 [package]
 name = "scrollr-desktop"
-version = "1.8.0-beta.1"
+version = "1.7.3"
 edition = "2021"
 # Updater 2.13.3 requires 1.90 (also includes the Windows home_dir fix from 1.85).
 rust-version = "1.90"

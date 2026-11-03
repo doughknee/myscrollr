@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.8.0-beta.1**.
+Current desktop version: **1.7.3**.
 
-<!-- source: desktop/package.json @ 026f1df4b66a -->
+<!-- source: desktop/package.json @ 70fc2e50dce6 -->
 
 ## Policies
 
@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fa8d32e9a379 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 7785b9630a71 -->
+<!-- source: desktop/src/components/settings/rows.ts @ 2c9141b65bc6 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -246,6 +246,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ### Settings › Updates
 
+- Settings › Updates › Update channel: Choose Stable or Beta updates for this device. Switching does not install anything.
 - Settings › Updates › Check for updates: Scrollr also checks each time it launches.
 - Settings › Updates › Release history: What shipped in every version
 
