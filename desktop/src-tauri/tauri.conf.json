@@ -1,6 +1,6 @@
 {
   "productName": "Scrollr",
-  "version": "1.7.2",
+  "version": "1.8.0-beta.1",
   "identifier": "com.scrollr.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,6 +19,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": { "wix": { "version": "1.8.0.1" } },
     "macOS": {
       "minimumSystemVersion": "10.15",
       "exceptionDomain": "",
