@@ -4,7 +4,56 @@ import { MAX_PINS, togglePin } from "../../preferences";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL, NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
-import { edgeBudget, edgeCanHold, fitsEdge, pinRefusal, pinWidth, stepBack, type EdgeRoom } from "./edgeRule";
+import { edgeBudget, edgeCanHold, fitsEdge, gridHeaderPlan, pinRefusal, pinWidth, stepBack, type EdgeRoom } from "./edgeRule";
+import { displayGeometry, FILL_CONTROLS_W } from "../../lib/tickerDisplay";
+
+describe("Fill header capacity", () => {
+  const tabs = ["sports_nfl", "finance_stocks", "news_bbc", "clock", "weather"];
+  it.each([[3440, 1440], [1920, 360], [800, 480], [720, 1280], [1080, 1920]])(
+    "%ix%i shares one bounded header at every reading size",
+    (width, height) => {
+      for (const reading of [100, 125, 150]) {
+        const geometry = displayGeometry(width, height, "grid", reading);
+        const pins = [nfl(1), news(1), nfl(2), news(2)];
+        const header = gridHeaderPlan(geometry.width, 5, tabs, pins);
+        const placed = stepBack(pins, header.room);
+        expect(header.utilitiesWidth + 1 + (placed.length ? 1 : 0) + placed.reduce((sum, p) => sum + pinWidth(p.widget), 0) + 192 + FILL_CONTROLS_W).toBeLessThanOrEqual(geometry.width / header.scale + 0.01);
+        expect(header.utilitiesWidth).toBeGreaterThanOrEqual(140);
+        expect(fitsEdge(placed, header.room)).toBe(true);
+        if (placed.length < pins.length) {
+          const next = pins[placed.length];
+          expect(pinRefusal(placed, { ...next, label: "Next" }, header.room)).not.toBeNull();
+          expect(fitsEdge([...placed, next], header.room)).toBe(false);
+        }
+      }
+    },
+  );
+  it("portrait reclaims the unusable pin area for both utilities without changing admission", () => {
+    const header = gridHeaderPlan(420, 2, tabs, [nfl(1)]);
+    expect(stepBack([nfl(1)], header.room)).toHaveLength(0);
+    expect(header.utilitiesWidth).toBe(283);
+    expect(header.room).toEqual(gridHeaderPlan(420, 2, tabs).room);
+    const wide = gridHeaderPlan(800, 2, tabs, [nfl(1)]);
+    expect(stepBack([nfl(1)], wide.room)).toHaveLength(1);
+    expect(wide.utilitiesWidth).toBe(280);
+    expect(gridHeaderPlan(420, 0, tabs).utilitiesWidth).toBe(0);
+  });
+  it("ignores inactive/utility pins in admission and restores saved overflow after widening", () => {
+    const pins = [nfl(1), news(1), nfl(2)];
+    const narrow = gridHeaderPlan(420, 2, tabs).room;
+    const wide = gridHeaderPlan(1800, 2, tabs).room;
+    expect(stepBack(pins, narrow)).toHaveLength(0);
+    expect(stepBack(pins, wide)).toEqual(pins);
+    expect(fitsEdge([pin("clock", "local"), pin("sports_mlb", "Cubs"), ...pins], wide)).toBe(fitsEdge(pins, wide));
+    expect(pinRefusal([], { ...nfl(1), label: "Bears" }, narrow)).toBe("Not enough header space for Bears at this reading size");
+  });
+  it("only promises an unpin when that removal really makes room", () => {
+    const header = gridHeaderPlan(600, 2, tabs).room;
+    const add = { ...news(2), label: "BBC" };
+    expect(pinRefusal([nfl(1)], add, header)).toContain("unpin Team 1 first");
+    expect(pinRefusal([nfl(1), nfl(2), nfl(3)], add, header)).toBe("Header pin area is full — unpin some items first");
+  });
+});
 
 const pin = (widget: string, subject: string): WidgetPin => ({ widget, subject, side: "right" });
 const nfl = (i: number) => pin("sports_nfl", `Team ${i}`);

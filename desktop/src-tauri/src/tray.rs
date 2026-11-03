@@ -52,10 +52,7 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .menu(&menu)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "open" => {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                let _ = crate::commands::window::show_app_window(app.clone());
             }
             "show_ticker" => {
                 // JS owns prefs.ticker.showTicker — emit and let it toggle.
@@ -65,10 +62,7 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 let _ = app.emit("toggle-ticker", ());
             }
             "report_bug" => {
-                if let Some(main) = app.get_webview_window("main") {
-                    let _ = main.show();
-                    let _ = main.set_focus();
-                }
+                let _ = crate::commands::window::show_app_window(app.clone());
                 let _ = app.emit("navigate-to", "/support");
             }
             "quit" => {
@@ -84,10 +78,7 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } = event
             {
-                if let Some(w) = tray.app_handle().get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                let _ = crate::commands::window::show_app_window(tray.app_handle().clone());
             }
         })
         .build(app)?;

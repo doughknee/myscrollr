@@ -25,6 +25,7 @@
 import { memo, useLayoutEffect, useRef, type Ref } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
+import { Pin } from "lucide-react";
 import type {
   ClockChipData,
   DashboardResponse,
@@ -48,6 +49,7 @@ import GameCell, { gameMinCol } from "./cells/GameCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { Rule, accentFor, accentStyle, inkFor } from "./cells/parts";
+import { eligibleEdgePins, pinWidth } from "./edgeRule";
 
 const UTILITIES = ["clock", "timer", "weather", "sysmon", "uptime"] as const;
 type Utility = (typeof UTILITIES)[number];
@@ -143,9 +145,7 @@ export function buildEdge(
     }
   }
   const out: EdgePin[] = [];
-  for (const p of pins) {
-    // A pinned utility is already on the edge; pins of widgets off the ticker do not show.
-    if (!activeTabs.includes(p.widget) || (UTILITIES as readonly string[]).includes(p.widget)) continue;
+  for (const p of eligibleEdgePins(pins, activeTabs)) {
     const source = sourceForWidget(p.widget);
     const raw = source ? dashboard?.data?.[source] : undefined;
     const ctx = { tab: p.widget, source, dashboard } as TickerContext;
@@ -174,6 +174,15 @@ export function edgeTabs(edge: Edge): string[] {
 }
 
 const EASE = [0.32, 0.72, 0, 1] as const;
+
+/** Count each utility's appearances, so grouped slots cannot skip its items. */
+export function utilityTurns(count: number, requested: number, tick: number) {
+  const visible = Math.min(count, Math.max(1, requested));
+  return Array.from({ length: visible }, (_, offset) => {
+    const visit = tick * visible + offset;
+    return { index: ((visit % count) + count) % count, tick: Math.floor(visit / count) };
+  });
+}
 
 function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
   return (
@@ -209,14 +218,14 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
 }
 
 /** One utility: every item sized in, the one for this turn shown, rolled in with the swipe. */
-const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string) => void }) {
+const Slot = memo(function Slot({ u, tick, reduced, onClick, stretch = false }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string) => void; stretch?: boolean }) {
   const at = ((tick % u.items.length) + u.items.length) % u.items.length;
   const it = u.items[at];
   const roll = reduced
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.4, ease: "linear" as const } }
     : { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: 0.45, ease: EASE } };
   return (
-    <button type="button" onClick={() => onClick?.(it.id)} data-chip="" className="relative grid h-full max-w-[180px] shrink-0 overflow-hidden">
+    <button type="button" onClick={() => onClick?.(it.id)} data-chip="" className={clsx("relative grid h-full shrink-0 overflow-hidden", stretch ? "w-full" : "max-w-[180px]")}>
       {u.items.map((x) => (
         <SlotFace key={x.id} it={x} sizer />
       ))}
@@ -243,8 +252,13 @@ function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipCli
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick }: {
+export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth, utilitySlotWidth = 180, stretchUtilities = false, stretchPins = false, reservedPins }: {
   edge: Edge;
+  stretchPins?: boolean;
+  stretchUtilities?: boolean;
+  reservedPins?: readonly WidgetPin[];
+  maxUtilitiesWidth?: number;
+  utilitySlotWidth?: number;
   /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
   onUtilWidth?: (w: number) => void;
   /** The page turn's seq: the slots step on it. */
@@ -254,7 +268,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
   edgeRef?: Ref<HTMLDivElement>;
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
 }) {
-  const empty = edge.utilities.length === 0 && edge.pins.length === 0;
+  const empty = edge.utilities.length === 0 && edge.pins.length === 0 && !reservedPins?.length;
   const strip = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = strip.current;
@@ -269,26 +283,38 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
     };
   }, [onUtilWidth, empty]);
   if (empty) return null;
+  const slots = maxUtilitiesWidth === undefined ? edge.utilities.length : Math.max(1, Math.floor(maxUtilitiesWidth / utilitySlotWidth));
+  const utilities = utilityTurns(edge.utilities.length, slots, tick);
+  const pinSlots = reservedPins
+    ? reservedPins.map(saved => ({
+      key: JSON.stringify([saved.widget, saved.subject]), width: pinWidth(saved.widget),
+      pin: edge.pins.find(p => p.widget === saved.widget && JSON.parse(p.pin).subject === saved.subject),
+    }))
+    : edge.pins.map(pin => ({ key: pin.pin, width: pin.width, pin }));
   return (
-    <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
+    <div ref={edgeRef} data-edge="" className={clsx("relative flex h-full border-l border-edge", stretchPins ? "min-w-0 flex-1" : "ml-auto shrink-0")}>
       <div ref={strip} data-edge-utils="" className="flex h-full">
-        {edge.utilities.map((u, i) => (
-          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark))}>
+        {utilities.map(({ index, tick: itemTick }, i) => {
+          const u = edge.utilities[index];
+          return (
+          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={{ ...accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark)), width: maxUtilitiesWidth === undefined ? undefined : stretchUtilities ? maxUtilitiesWidth / utilities.length : 180 }}>
             {i > 0 && <Rule />}
-            <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
+            <Slot u={u} tick={itemTick} reduced={reduced} stretch={stretchUtilities} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>
-        ))}
+          );
+        })}
       </div>
-      {edge.pins.map((p, i) => (
+      {pinSlots.map(({ key, width, pin: p }, i) => p ? (
         <div
-          key={p.pin}
+          key={key}
           className="relative h-full shrink-0"
           data-widget={p.widget}
           data-pin-subject={p.pin}
-          style={{ ...accentStyle(accentFor(p.hex, dark), inkFor(p.hex, dark)), width: p.width }}
+          style={{ ...accentStyle(accentFor(p.hex, dark), inkFor(p.hex, dark)), width, flexGrow: stretchPins ? 1 : undefined }}
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
           <PinCell p={p} tick={tick} onChipClick={onChipClick} />
+          {stretchPins && <span role="img" aria-label="Pinned" title="Pinned — stays visible while pages change" data-pin-indicator="" className="pointer-events-none absolute left-[3px] top-[6px] text-fg-3"><Pin size={10} aria-hidden /></span>}
           {/* The dashed line on top marks it as pinned (canvas "Pins"); dashed, so it is not
               read as the solid line a page draws over your team's game (SCROLLR-296). */}
           <span
@@ -298,7 +324,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
             style={{ backgroundImage: "repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 10px)" }}
           />
         </div>
-      ))}
+      ) : <div key={key} data-pin-reserved="" aria-hidden="true" className="h-full shrink-0" style={{ width, flexGrow: stretchPins ? 1 : undefined }} />)}
     </div>
   );
 }

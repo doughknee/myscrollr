@@ -15,6 +15,7 @@ import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
 import { dwellFor } from "./pagePlan";
+import { displayGeometry } from "../../lib/tickerDisplay";
 import { ALSO_TAB, buildPageWidgets, chip, followPage, newNav, nextTurn, planAll, stepTurn, usMarketOpen, type PageWidget, type Turn } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;
@@ -24,6 +25,23 @@ const NOW = Date.parse(fixture._captured_at);
 vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
 afterAll(() => vi.useRealTimers());
 const TABS = (fixture.widgets as { widget_type: string }[]).map((w) => w.widget_type);
+
+it("independent grid cursors reach every selected item on different display shapes", () => {
+  const widgets = buildPageWidgets(dash, TABS, NOW);
+  for (const [width, height] of [[1920, 360], [1920, 1080], [1080, 1920]]) {
+    const g = displayGeometry(width, height, "grid");
+    const plans = planAll(widgets, g.width, 0, g.height);
+    const nav = newNav();
+    const seen = new Set<string>();
+    let turn: Turn | null = null;
+    const visits = widgets.length * Math.max(...[...plans.values()].map(p => p.pages.length));
+    for (let i = 0; i < visits; i++) {
+      turn = nextTurn(turn, widgets, plans, nav);
+      if (turn) for (const item of plans.get(turn.tab)!.pages[turn.page]) seen.add(item.key);
+    }
+    for (const w of widgets) for (const item of w.items) expect(seen.has(item.key), `${width}x${height} ${w.tab} ${item.key}`).toBe(true);
+  }
+});
 
 describe("buildPageWidgets", () => {
   const widgets = buildPageWidgets(dash, ["clock", ...TABS], NOW);

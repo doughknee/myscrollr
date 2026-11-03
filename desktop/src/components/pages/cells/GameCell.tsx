@@ -128,6 +128,8 @@ interface GameCellProps {
   width: number;
   /** One of the user's favourite teams is playing: a 2px accent line on top. */
   mine?: boolean;
+  /** Shared full-display treatment; same values, reservations and click target. */
+  fill?: boolean;
   /** Clock for the countdown; tests and the dev gallery pin it. */
   now?: number;
   onClick?: () => void;
@@ -154,7 +156,7 @@ interface GameCellProps {
  * STATUS_WIDTH, and the live dot and both marks are always mounted. Names
  * sit in a minmax(0,1fr) track, so they truncate rather than push.
  */
-const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onClick }: GameCellProps) {
+const GameCell = memo(function GameCell({ game: g, width, mine = false, fill = false, now, onClick }: GameCellProps) {
   const flash = useScoreFlash(g.away_team_score, g.home_team_score, g.id);
   const r = reservationFor(g.league);
   const live = isLive(g);
@@ -166,18 +168,18 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
   const awayLeads = !scored || away >= home;
   const homeLeads = !scored || home >= away;
   const [top, bottom] = statusLines(g, now);
-  const wide = width >= WIDE_GAME_PX;
+  const wide = !fill && width >= WIDE_GAME_PX;
   const scoreN = Math.max(2, r.score);
   const scoreCh = `${scoreN}ch`;
-  const room = nameRoom(width, scoreN);
-  const px = wide ? NAME_PX.wide : NAME_PX.stacked;
+  const room = fill ? width - 32 - 32 - 16 - scoreN * 19.2 : nameRoom(width, scoreN);
+  const px = fill ? 18 : wide ? NAME_PX.wide : NAME_PX.stacked;
 
   const score = (side: "away" | "home", v: number | string, leads: boolean) => (
     <span
       data-part={`${side}-score`}
       className={clsx(
         "text-right font-mono leading-none tabular-nums",
-        wide ? "text-[22px]" : "text-[18px]",
+        fill ? "h-8 text-[32px]" : wide ? "text-[22px]" : "text-[18px]",
         leads ? "font-bold text-fg" : "font-medium text-fg-3",
       )}
       style={{ minWidth: scoreCh }}
@@ -187,7 +189,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
   );
   const name = (side: "away" | "home", n: string, leads: boolean, end?: boolean) => {
     const text = cellName(g.league, n, nameFits(teamShortName(g.league, n), room, px));
-    const size = wide ? "text-[15px]" : "text-[14.5px]";
+    const size = fill ? "text-[18px]" : wide ? "text-[15px]" : "text-[14.5px]";
     // A hidden bold copy holds the name's widest weight, so a game going
     // final (a weight change) never resizes the name or anything centred on it.
     return (
@@ -215,10 +217,11 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
     <span
       data-part="status"
       className={clsx(
-        "relative flex shrink-0 flex-col justify-center gap-[6px] whitespace-nowrap pl-[22px] font-mono text-[12px] leading-none",
-        wide ? "items-center pr-[22px]" : "items-start",
+        "relative flex shrink-0 whitespace-nowrap font-mono text-[12px] leading-none",
+        fill ? "h-8 w-full items-center justify-between border-t border-edge pl-3" : "flex-col justify-center gap-[6px] pl-[22px]",
+        !fill && (wide ? "items-center pr-[22px]" : "items-start"),
       )}
-      style={{ width: wide ? STATUS_WIDE : STATUS_WIDTH }}
+      style={{ width: fill ? undefined : wide ? STATUS_WIDE : STATUS_WIDTH }}
     >
       <span className={clsx("relative font-bold tracking-[0.02em]", live ? "text-live" : isFinal(g) ? "text-fg-3" : "text-fg-2")}>
         {/* Always mounted, in the box's own air so it takes no room from the text. */}
@@ -257,7 +260,28 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
         className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full"
         style={{ background: close ? "var(--accent)" : "transparent" }}
       />
-      {wide ? (
+      {fill ? (
+        <span className="grid h-full w-full min-w-0 grid-rows-[minmax(0,1fr)_minmax(0,1fr)_32px] py-3">
+          <span data-part="away-row" className="grid min-w-0 grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2">
+            <Crest src={g.away_team_logo} alt={g.away_team_name} size="xl" />
+            <span className="flex min-w-0 flex-col gap-1">
+              {name("away", g.away_team_name, awayLeads)}
+              <span data-part="away-record" className="h-3 truncate font-mono text-[12px] leading-none text-fg-3">{rec(g.away_standing)}</span>
+            </span>
+            {score("away", g.away_team_score, awayLeads)}
+          </span>
+          <span data-part="home-row" className="relative grid min-w-0 grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2">
+            <span className="absolute -left-3">{at}</span>
+            <Crest src={g.home_team_logo} alt={g.home_team_name} size="xl" />
+            <span className="flex min-w-0 flex-col gap-1">
+              {name("home", g.home_team_name, homeLeads)}
+              <span data-part="home-record" className="h-3 truncate font-mono text-[12px] leading-none text-fg-3">{rec(g.home_standing)}</span>
+            </span>
+            {score("home", g.home_team_score, homeLeads)}
+          </span>
+          {status}
+        </span>
+      ) : wide ? (
         // One scoreboard line, the clock between the scores where a
         // scoreboard keeps it: it cannot be read as the next game's.
         <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,max-content)_auto_auto_auto_minmax(0,max-content)] items-center justify-center gap-x-3">

@@ -56,6 +56,8 @@ interface QuoteCellProps {
   trade: Trade;
   /** A popular symbol topping up a short watchlist (SCROLLR-292), not one of the user's own. */
   fill?: boolean;
+  /** Full-height dedicated display cell; shares values and reservations with the bar. */
+  expanded?: boolean;
   onClick?: () => void;
 }
 
@@ -83,7 +85,7 @@ interface QuoteCellProps {
  * else. The line is the chips' own price history
  * (`pushPrice`), so pages and chips draw the same thing.
  */
-const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: QuoteCellProps) {
+const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, expanded = false, onClick }: QuoteCellProps) {
   const pct = Number(t.percentage_change);
   const text = changeText(t.percentage_change);
   const dir = text.startsWith("▲") ? "up" : text.startsWith("▼") ? "down" : "flat";
@@ -99,20 +101,23 @@ const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: Q
       onClick={onClick}
       data-chip=""
       data-item={t.symbol}
-      className="grid h-full w-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-3 px-3.5 text-left font-mono"
+      data-display-cell={expanded ? "quote" : undefined}
+      className={clsx("grid h-full w-full min-w-0 text-left font-mono", expanded
+        ? "grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-y-3 px-4 py-4"
+        : "grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-3 px-3.5")}
     >
-      <span className="flex min-w-0 flex-col items-start gap-[4px] leading-none">
+      <span className={expanded ? "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 gap-y-2 leading-none" : "flex min-w-0 flex-col items-start gap-[4px] leading-none"}>
         <span data-part="symbol" className="relative flex min-w-0 max-w-full text-[14px] font-bold text-fg-2">
           {/* Hung in the gutter (outside the truncating box, so it is not clipped): a fill's symbol starts where everyone's does. */}
           {fill && <span aria-label="popular" className="absolute right-full mr-px text-fg-3">+</span>}
           <span className="min-w-0 truncate">{t.symbol.replace("/USD", "")}</span>
         </span>
-        <span data-part="price" className="text-[20px] font-bold text-fg tabular-nums" style={{ minWidth: `${reserve}ch` }}>
+        <span data-part="price" className={clsx("font-bold text-fg tabular-nums", expanded ? "col-span-2 row-start-2 text-[26px]" : "text-[20px]")} style={{ minWidth: `${reserve}ch` }}>
           {Number.isFinite(price) ? formatPriceBare(price) : ""}
         </span>
         <span
           data-part="change"
-          className={clsx("text-[12px] font-semibold tabular-nums", dir === "up" ? "text-up" : dir === "down" ? "text-down" : "text-fg-3")}
+          className={clsx("text-[12px] font-semibold tabular-nums", expanded && "col-start-2 row-start-1", dir === "up" ? "text-up" : dir === "down" ? "text-down" : "text-fg-3")}
           style={{ minWidth: `${CHANGE_CH}ch` }}
         >
           {/* The arrow is not in IBM Plex Mono: the fallback font draws it at a
@@ -127,10 +132,10 @@ const QuoteCell = memo(function QuoteCell({ trade: t, fill = false, onClick }: Q
         </span>
       </span>
       {/* 31 + 4 + 3 + 4 + 12 = 54, the price zone's height: the low and high share the change's baseline. */}
-      <span className="grid min-w-0 grid-rows-[31px_3px_12px] gap-y-[4px]">
+      <span className={expanded ? "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_3px_12px] gap-y-2" : "grid min-w-0 grid-rows-[31px_3px_12px] gap-y-[4px]"}>
         {/* The day's line, across the zone, quieter than the numbers. */}
-        <span data-part="spark" className="flex min-w-0 opacity-70">
-          <Sparkline points={series} height={30} className={pct < 0 ? "text-down" : "text-up"} />
+        <span data-part="spark" className="flex min-h-0 min-w-0 opacity-70">
+          <Sparkline points={series} height={expanded ? "100%" : 30} className={pct < 0 ? "text-down" : "text-up"} />
         </span>
         {/* Where the price sits in the day; with no range the track stays empty rather than guess. */}
         <span data-part="range-rail" className="relative min-w-0 rounded-[2px] bg-fg-3/25">

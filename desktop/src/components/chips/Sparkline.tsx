@@ -13,7 +13,7 @@ import { clsx } from "clsx";
 
 interface SparklineProps {
   points: number[];
-  height?: number;
+  height?: number | string;
   className?: string;
 }
 

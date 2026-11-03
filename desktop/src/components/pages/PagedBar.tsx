@@ -18,12 +18,12 @@
  *    pointer that rests 5 s releases it; moving again grabs it back. Reduced motion (the OS setting,
  *    read directly: main.tsx pins Motion's own flag off for the marquee)
  *    turns the swipe and the wipe into crossfades.
- *  - One clock for every ticker window. App renders once per window
- *    (AGENTS.md), so the primary ticker (`isPrimaryTicker`) runs the page
- *    clock and broadcasts each turn; the others follow it and report their
+ *  - One clock for docked ticker windows. App renders once per window
+ *    (AGENTS.md), so the elected docked leader runs the page
+ *    clock and broadcasts each turn; the docked followers report their
  *    hover back, so every monitor shows the same widget and swipes on the
  *    same beat. A window of a different width maps the leader's page onto
- *    its own pages (`followPage`).
+ *    its own pages (`followPage`). Filled displays paginate independently.
  *  - The fixed edge zone (EdgeZone, SCROLLR-273) sits on the right: clocks,
  *    weather and the other utilities, then pins. Its slots step on the
  *    turn's seq, so they change only while a page swipes. Its measured
@@ -37,7 +37,7 @@
  *    (Settings › Ticker, or the bar's right-click menu) hides the keypad only:
  *    the band's width and everything else stay.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import clsx from "clsx";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
@@ -51,10 +51,11 @@ import type { GitHubThing } from "../../widgets/github/types";
 import { financeMarketOptions } from "../../api/queries";
 import { sourceForWidget } from "../../marketplace";
 import { isPrimaryTicker } from "../../lib/windowRole";
+import { FILL_CONTROLS_W } from "../../lib/tickerDisplay";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { BAND_W, PILLS_MAX, columnsFor, contentWidth, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
+import { BAND_W, DISPLAY_HEADER_H, PILLS_MAX, columnsFor, contentWidth, displayGrid, displayPageRows, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
 import {
   ALSO_TAB,
   buildPageWidgets,
@@ -78,7 +79,7 @@ import RepoCell from "./cells/RepoCell";
 import ThingCell from "./cells/ThingCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
-import { stepBack } from "./edgeRule";
+import { stepBack, eligibleEdgePins, gridHeaderPlan, GRID_UTILITY_W } from "./edgeRule";
 import { useActiveHover } from "./activeHover";
 
 /** The swipe (canvas "Motion"): 0.6 s on a soft ease. */
@@ -122,6 +123,10 @@ interface Props {
   empty?: ReactNode;
   /** The band's hover keypad (`prefs.ticker.pageControls`, SCROLLR-301, SCROLLR-303). Off: nothing appears on hover; the band's width is the same. */
   pageControls?: boolean;
+  /** Fullscreen grid height in the shared cells' logical coordinates. */
+  fillHeight?: number;
+  independent?: boolean;
+  pageLeader?: boolean;
 }
 
 /** The page as it was frozen at swipe-in. */
@@ -132,6 +137,8 @@ interface Shown {
   index: number;
   count: number;
   colW: number;
+  /** Fill row lengths are frozen with the page, never recomputed from live data. */
+  gridRows: number[];
   /** Columns a full page has at this width, the widget's items over all its pages, and what it could have shown (the browser checks read all three). */
   cols: number;
   total: number;
@@ -371,25 +378,28 @@ function watchTheme(onChange: () => void) {
   return () => mo.disconnect();
 }
 
-function Cell({ widget, item, colW, dark, onChipClick }: {
+// Utility clock ticks should not repaint unchanged cells or replace their click
+// closures. Fresh data arrives through a new item prop and still renders in place.
+const Cell = memo(function Cell({ widget, item, colW, dark, onChipClick, fill = false }: {
   widget: PageWidget;
   item: PageItem;
   colW: number;
   dark: boolean;
+  fill?: boolean;
   onChipClick?: Props["onChipClick"];
 }) {
   switch (widget.kind) {
     case "sports": {
       const g = item.data as Game;
-      return <GameCell game={g} width={colW} mine={item.mine} onClick={() => onChipClick?.("sports", g.id, chipUrlForSports(g))} />;
+      return <GameCell game={g} width={colW} mine={item.mine} fill={fill} onClick={() => onChipClick?.("sports", g.id, chipUrlForSports(g))} />;
     }
     case "news": {
       const r = item.data as RssItem;
-      return <NewsCell item={r} width={colW} onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
+      return <NewsCell item={r} width={colW} expanded={fill} onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
     }
     case "finance": {
       const t = item.data as Trade;
-      return <QuoteCell trade={t} fill={item.fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
+      return <QuoteCell trade={t} fill={item.fill} expanded={fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
     }
     case "github": {
       if (item.fill) {
@@ -404,7 +414,7 @@ function Cell({ widget, item, colW, dark, onChipClick }: {
       return <AlsoCell code={a.code} text={a.text} hex={a.hex} dark={dark} onClick={() => onChipClick?.(a.tab, a.tab)} />;
     }
   }
-}
+});
 
 export default function PagedBar({
   dashboard,
@@ -415,8 +425,11 @@ export default function PagedBar({
   onDisplayedWidgetsChange,
   empty,
   pageControls = true,
+  fillHeight,
+  independent = false,
+  pageLeader,
 }: Props) {
-  const leader = useMemo(() => isPrimaryTicker(), []);
+  const leader = independent || (pageLeader ?? isPrimaryTicker());
   const label = useMemo(() => getCurrentWindow().label, []);
   const reduced = useOsReducedMotion();
   const dark = useSyncExternalStore(watchTheme, themeIsDark, () => true);
@@ -426,8 +439,16 @@ export default function PagedBar({
   // that no longer fit step back onto their pages (they stay in prefs).
   const [utilW, setUtilW] = useState(0);
   useEdgeMeasures();
-  const room = useEdgeRoom();
-  const onEdge = useMemo(() => (room ? stepBack(pins, room) : pins), [pins, room]);
+  const sharedRoom = useEdgeRoom();
+  const [localWidth, setLocalWidth] = useState(0);
+  const grid = fillHeight !== undefined;
+  const utilities = useMemo(() => buildEdge(widgetData, [], dashboard, activeTabs).utilities, [widgetData, dashboard, activeTabs]);
+  const header = useMemo(() => gridHeaderPlan(localWidth, utilities.length, activeTabs, pins), [localWidth, utilities.length, activeTabs, pins]);
+  const room = useMemo(() => grid ? header.room : independent ? { bar: localWidth, util: utilW } : sharedRoom, [independent, grid, header, localWidth, utilW, sharedRoom]);
+  const onEdge = useMemo(() => {
+    const eligible = grid ? eligibleEdgePins(pins, activeTabs) : pins;
+    return room ? stepBack(eligible, room) : eligible;
+  }, [pins, room, grid, activeTabs]);
 
   // Live width for the NEXT page; the page on screen keeps the width it froze with.
   const widthRef = useRef(0);
@@ -435,7 +456,7 @@ export default function PagedBar({
 
   // The whole market's quotes, only while a watchlist is shorter than a page
   // (its empty columns fill with popular symbols, SCROLLR-292).
-  const quoteCols = columnsFor(contentWidth(width, 0), QUOTE_MIN_COL);
+  const quoteCols = grid ? displayGrid(width, fillHeight, QUOTE_MIN_COL).capacity : columnsFor(contentWidth(width, 0), QUOTE_MIN_COL);
   const shortWatchlist = activeTabs.some((tab) => {
     if (sourceForWidget(tab) !== "finance") return false;
     const symbols = (dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as { symbols?: unknown } | undefined)?.symbols;
@@ -455,24 +476,28 @@ export default function PagedBar({
   widgetsRef.current = widgets;
 
   const [bar, setBar] = useState<HTMLDivElement | null>(null);
-  usePublishEdge(label, width, utilW);
+  usePublishEdge(label, independent ? 0 : width, utilW);
   useEffect(() => {
     if (!bar) return;
     const read = () => {
-      widthRef.current = bar.clientWidth;
-      setWidth(bar.clientWidth);
+      // Preserve fractional logical pixels under Fill's CSS zoom. clientWidth
+      // rounds up on some reading sizes and can push the last header slot out.
+      const measured = grid ? parseFloat(getComputedStyle(bar).width) : bar.clientWidth;
+      widthRef.current = measured;
+      setWidth(measured);
+      setLocalWidth(measured);
     };
     const ro = new ResizeObserver(read);
     ro.observe(bar);
     read();
     return () => ro.disconnect();
-  }, [bar]);
+  }, [bar, grid]);
 
   // The edge zone's width, read when a page is planned (not via a
   // ResizeObserver: that fires after the effect that plans the first page,
   // which would then be planned against an edge with no pins yet).
   const edgeEl = useRef<HTMLDivElement>(null);
-  const edgeW = () => edgeEl.current?.offsetWidth ?? 0;
+  const edgeW = () => grid ? 0 : (edgeEl.current?.offsetWidth ?? 0);
 
   const [turn, setTurn] = useState<Turn | null>(null);
   const turnRef = useRef<Turn | null>(null);
@@ -503,31 +528,39 @@ export default function PagedBar({
   }, []);
 
   const broadcast = useCallback(() => {
+    if (independent) return;
     const t = turnRef.current;
     if (t) emit(TURN_EVENT, { ...t, held: heldRef.current } satisfies TurnMsg).catch(() => {});
-  }, []);
+  }, [independent]);
 
   // ── Leader: the page clock ──────────────────────────────────────
   const advance = useCallback(() => {
     const ws = widgetsRef.current;
-    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW()), nav.current));
+    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW(), fillHeight), nav.current));
     broadcast();
-  }, [show, broadcast]);
+  }, [show, broadcast, fillHeight]);
 
   /** A manual move on the leader: a new turn, so the clock below restarts the page's dwell. */
   const stepHere = useCallback((move: Move) => {
     const ws = widgetsRef.current;
-    const t = stepTurn(turnRef.current, move, ws, planAll(ws, widthRef.current, edgeW()), nav.current);
+    const t = stepTurn(turnRef.current, move, ws, planAll(ws, widthRef.current, edgeW(), fillHeight), nav.current);
     if (!t) return;
     show(t);
     broadcast();
-  }, [show, broadcast]);
+  }, [show, broadcast, fillHeight]);
 
   useEffect(() => {
     // The ref, not the state: StrictMode runs this twice before the first
     // turn renders, and the second run must not skip page one.
     if (leader && !turnRef.current && widgets.length > 0 && width > 0 && !awaitingMarket) advance();
   }, [leader, turn, widgets.length, width, awaitingMarket, advance]);
+
+  // Real display geometry changes must fit immediately. Data-only updates still freeze.
+  useEffect(() => {
+    if (independent && turnRef.current && width > 0) {
+      show({ ...turnRef.current, seq: turnRef.current.seq + 1 });
+    }
+  }, [independent, width, fillHeight, show]);
 
   // The clock restarts only on a new turn, never on a data update, and
   // stands still while the page is held.
@@ -555,21 +588,30 @@ export default function PagedBar({
   }, [broadcast]);
 
   useTauriListener<{ label: string; on: boolean }>(HOVER_EVENT, (e) => {
-    if (!leader || e.payload.label === label) return;
+    if (independent || !leader || e.payload.label === label) return;
     if (e.payload.on) remoteHover.current.add(e.payload.label);
     else remoteHover.current.delete(e.payload.label);
+    updateHold();
+  });
+  useTauriListener<string[]>("ticker-windows-changed", (e) => {
+    if (independent || !leader) return;
+    // A native window destroyed on disconnect cannot reliably run React cleanup.
+    const live = new Set(e.payload);
+    for (const label of remoteHover.current) {
+      if (!live.has(label)) remoteHover.current.delete(label);
+    }
     updateHold();
   });
   useTauriListener(HELLO_EVENT, () => {
     if (leader) broadcast();
   });
   useTauriListener<Move>(STEP_EVENT, (e) => {
-    if (leader) stepHere(e.payload);
+    if (leader && !independent) stepHere(e.payload);
   });
 
   // ── Followers: take the leader's turns ─────────────────────────
   useTauriListener<TurnMsg>(TURN_EVENT, (e) => {
-    if (leader) return;
+    if (leader || independent) return;
     const { held: h, ...t } = e.payload;
     if (turnRef.current?.seq !== t.seq || turnRef.current.tab !== t.tab) show(t);
     heldRef.current = h;
@@ -638,7 +680,7 @@ export default function PagedBar({
   }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── The frozen page ─────────────────────────────────────────────
-  const plans = useMemo(() => planAll(widgets, planWidth, planEdge), [widgets, planWidth, planEdge]);
+  const plans = useMemo(() => planAll(widgets, planWidth, planEdge, fillHeight), [widgets, planWidth, planEdge, fillHeight]);
   const shown = useRef<Shown | null>(null);
   if (turn && shown.current?.seq !== turn.seq) {
     const w = widgets.find((x) => x.tab === turn.tab);
@@ -657,7 +699,8 @@ export default function PagedBar({
         page: freezePage(items, keyOf),
         index,
         count: plan.pages.length,
-        colW: contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        colW: grid ? planWidth / displayGrid(planWidth, fillHeight, w.minCol).columns : contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        gridRows: grid ? displayPageRows(planWidth, fillHeight, w.minCol, items.length) : [],
         short,
         cols: plan.cols,
         total: plan.pages.reduce((n, p) => n + p.length, 0),
@@ -704,6 +747,47 @@ export default function PagedBar({
 
   // A clock or a pin on the edge is something to show: the bar stays.
   if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
+
+  if (grid) {
+    const rows = cur?.gridRows ?? [];
+    const tick = turn ? turn.seq : wallTick;
+    const chromeScale = header.scale;
+    return (
+      <div ref={setBar} data-pages="" data-display-grid="" data-header-utilities={utilities.length} data-motion-style={reduced ? "fade" : "swipe"}
+        className="ticker-container group/bar relative flex w-full shrink-0 flex-col overflow-hidden bg-base-150"
+        style={{ height: fillHeight }} onMouseEnter={hover.move} onMouseMove={hover.move} onMouseLeave={hover.leave}>
+        <div data-display-header="" className="relative shrink-0 overflow-hidden border-b border-edge/50" style={{ height: DISPLAY_HEADER_H }}>
+          <div className="absolute inset-y-0 left-0 flex h-16" style={{ zoom: chromeScale, width: Math.max(0, width / chromeScale - FILL_CONTROLS_W) }}>
+            {cur && <Band cur={cur} live={live ?? cur.widget} widgets={widgets} turn={turn} held={held} dark={dark} keypad={pageControls} reduced={reduced} onMove={step} wipe={wipe} fade={fade} />}
+            {onEdge.length > 0 && <div data-display-pins="" className="flex min-w-0 flex-1 overflow-hidden">
+              <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} stretchPins reservedPins={onEdge} onChipClick={onChipClick} />
+            </div>}
+            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={header.utilitiesWidth} utilitySlotWidth={GRID_UTILITY_W} stretchUtilities onChipClick={onChipClick} />
+          </div>
+        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <AnimatePresence initial={false} custom={cur?.back}>
+            {cur && <motion.div key={cur.seq} custom={cur.back} data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`} data-visit={cur.seq}
+              data-cols={cur.cols} data-total={cur.total} data-avail={cur.avail} data-grid-columns={Math.max(1, ...rows)} data-grid-rows={rows.length}
+              className="absolute inset-0 grid"
+              style={{ ...accentStyle(accent, ink), gridTemplateRows: `repeat(${Math.max(1, rows.length)}, minmax(0, 1fr))` }} {...(reduced ? fade : swipe)}>
+              {rows.map((columns, row) => {
+                const start = rows.slice(0, row).reduce((a, b) => a + b, 0);
+                return <div key={row} data-display-row="" className="grid min-h-0 min-w-0" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                  {items.slice(start, start + columns).map((item) => <div key={item.key} data-widget={cur.widget.tab} data-pin-subject={item.pin}
+                    className="flex min-h-0 min-w-0 items-center overflow-hidden border-b border-r border-edge/50">
+                    <div className={["sports", "finance", "news"].includes(cur.widget.kind) ? "h-full w-full min-w-0" : "h-16 w-full min-w-0"}>
+                      <Cell widget={cur.widget} item={item} colW={planWidth / columns} dark={dark} fill onChipClick={onChipClick} />
+                    </div>
+                  </div>)}
+                </div>;
+              })}
+            </motion.div>}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -753,7 +837,7 @@ export default function PagedBar({
         </>
       )}
       {/* The fixed edge: outside the page block, so it shows with no page at all. */}
-      <EdgeZone edge={edge} tick={turn ? turn.seq : wallTick} reduced={reduced} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} onChipClick={onChipClick} />
+      <EdgeZone edge={edge} tick={turn ? turn.seq : wallTick} reduced={reduced} dark={dark} edgeRef={edgeEl} onUtilWidth={setUtilW} maxUtilitiesWidth={independent ? width * 0.25 : undefined} onChipClick={onChipClick} />
     </div>
   );
 }

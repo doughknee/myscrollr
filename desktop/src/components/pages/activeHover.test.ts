@@ -41,4 +41,20 @@ describe("active hover (SCROLLR-291)", () => {
     h.leave();
     expect(seen).toEqual([true, false]);
   });
+
+  it("unmounting releases a remote hold and cancels its pending timer", () => {
+    const seen: boolean[] = [];
+    const h = createActiveHover((a) => seen.push(a));
+    h.move();
+    h.dispose();
+    h.dispose();
+    vi.advanceTimersByTime(HOVER_IDLE_MS * 2);
+    expect(seen).toEqual([true, false]);
+    expect(vi.getTimerCount()).toBe(0);
+    // React StrictMode may reuse the hook after an effect cleanup.
+    h.move();
+    expect(seen).toEqual([true, false, true]);
+    vi.advanceTimersByTime(HOVER_IDLE_MS);
+    expect(seen).toEqual([true, false, true, false]);
+  });
 });

@@ -27,6 +27,7 @@ interface NewsCellProps {
   now?: number;
   /** One line of headline with the feed's name beneath: a pin on the edge. */
   line?: boolean;
+  expanded?: boolean;
   onClick?: () => void;
 }
 
@@ -43,7 +44,7 @@ interface NewsCellProps {
  * 426-584px, so the old 560px switch to 15px almost never fired), the meta
  * line at 12px.
  */
-const NewsCell = memo(function NewsCell({ item, now, line, onClick }: NewsCellProps) {
+const NewsCell = memo(function NewsCell({ item, now, line, expanded = false, onClick }: NewsCellProps) {
   const summary = plainText(item.description);
   return (
     <button
@@ -51,21 +52,24 @@ const NewsCell = memo(function NewsCell({ item, now, line, onClick }: NewsCellPr
       onClick={onClick}
       data-chip=""
       data-item={String(item.id)}
+      data-display-cell={expanded ? "news" : undefined}
       className={clsx(
-        "grid h-full w-full min-w-0 content-center gap-y-[3px] px-4 text-left",
-        line ? "grid-rows-[19px_15px]" : "grid-rows-[38px_15px]",
+        "grid h-full w-full min-w-0 px-4 text-left",
+        expanded ? "grid-rows-[66px_minmax(0,1fr)] gap-y-3 py-4" : "content-center gap-y-[3px]",
+        !expanded && (line ? "grid-rows-[19px_15px]" : "grid-rows-[38px_15px]"),
       )}
     >
       <span
         data-part="headline"
         className={clsx(
-          "min-w-0 self-start text-left font-sans text-[15px] font-semibold leading-[19px] text-fg",
-          line ? "truncate" : "line-clamp-2",
+          "min-w-0 self-start text-left font-sans font-semibold text-fg",
+          expanded ? "line-clamp-3 text-[18px] leading-[22px]" : "text-[15px] leading-[19px]",
+          !expanded && (line ? "truncate" : "line-clamp-2"),
         )}
       >
         {plainText(item.title)}
       </span>
-      <span className="flex min-w-0 items-baseline gap-2 text-[12px] leading-[15px]">
+      <span className="flex min-h-0 min-w-0 items-baseline gap-2 overflow-hidden text-[12px] leading-[15px]">
         <span
           data-part="age"
           className="shrink-0 font-mono font-semibold text-fg-3 tabular-nums"
@@ -73,7 +77,7 @@ const NewsCell = memo(function NewsCell({ item, now, line, onClick }: NewsCellPr
         >
           {age(item, now)}
         </span>
-        <span data-part="summary" className="min-w-0 truncate text-left font-sans text-fg-3">
+        <span data-part="summary" className={clsx("min-w-0 text-left font-sans text-fg-3", expanded ? "line-clamp-3" : "truncate")}>
           {(!line && summary) || item.source_name}
         </span>
       </span>

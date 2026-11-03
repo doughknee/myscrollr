@@ -677,12 +677,16 @@ unsafe extern "system" fn appbar_subclass_proc(
     if msg == APPBAR_CALLBACK_MSG {
         use windows_sys::Win32::UI::Shell::ABN_FULLSCREENAPP;
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            ShowWindow, SW_HIDE, SW_SHOWNOACTIVATE,
+            ShowWindow, GetForegroundWindow, GetWindowThreadProcessId, SW_HIDE, SW_SHOWNOACTIVATE,
         };
         if wparam as u32 == ABN_FULLSCREENAPP {
             let entering = lparam != 0;
             let should_hide = HIDE_ON_FULLSCREEN.load(Ordering::Relaxed);
             if entering {
+                let mut pid = 0;
+                GetWindowThreadProcessId(GetForegroundWindow(), &mut pid);
+                // Our filled display must not hide docked tickers on other screens.
+                if pid == std::process::id() { return 0; }
                 if should_hide {
                     ShowWindow(hwnd, SW_HIDE);
                     log::info!("[AppBar] fullscreen app entered — hiding ticker");

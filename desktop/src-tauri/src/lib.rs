@@ -34,6 +34,27 @@ fn launched_by_autostart(args: impl IntoIterator<Item = String>) -> bool {
     args.into_iter().any(|a| a == AUTOSTART_ARG)
 }
 
+/// SCROLLR-399: WebView2's DirectComposition path can leave the visible
+/// cursor frozen in Fill while keyboard, wheel and pointer events keep arriving.
+/// Use the alternate presentation path on Windows, retaining the shared slide
+/// animations. A process-local WebView2 override covers every webview, including
+/// later ticker/identify windows, while preserving Wry's default arguments.
+/// No user or machine environment settings are written.
+/// Compatibility workaround: revalidate when the WebView2 runtime changes.
+#[cfg(target_os = "windows")]
+fn configure_windows_rendering() {
+    const ENV: &str = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+    const ARG: &str = "--disable-direct-composition";
+    let mut args = std::env::var_os(ENV).unwrap_or_default();
+    if !args.to_string_lossy().split_whitespace().any(|arg| arg == ARG) {
+        if !args.is_empty() {
+            args.push(" ");
+        }
+        args.push(ARG);
+        std::env::set_var(ENV, args);
+    }
+}
+
 #[tauri::command]
 fn set_crash_reports(enabled: bool) {
     CRASH_REPORTS.store(enabled, Ordering::Relaxed);
@@ -129,6 +150,10 @@ fn init_sentry() -> sentry::ClientInitGuard {
 }
 
 pub fn run() {
+    // Before Sentry, plugins or webviews start: apply only to this process.
+    #[cfg(target_os = "windows")]
+    configure_windows_rendering();
+
     // Sentry init MUST happen before any plugin or async runtime starts.
     // The returned guard flushes events on Drop — keep it alive for the
     // whole function.
@@ -186,10 +211,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Focus the main window when a second instance is attempted
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            let _ = commands::window::show_app_window(app.clone());
         }));
 
     // MCP bridge is opt-in (feature `dev-mcp-bridge`), dev-only, and
@@ -219,6 +241,7 @@ pub fn run() {
         })))
         .invoke_handler(tauri::generate_handler![
             commands::window::position_ticker,
+            commands::window::ticker_display,
             commands::window::list_monitors,
             commands::window::sync_ticker_windows,
             commands::window::identify_monitors,
@@ -321,8 +344,8 @@ pub fn run() {
             // dock show it.
             if launched_by_autostart(std::env::args()) {
                 log::info!("launched at login: keeping the main window hidden");
-            } else if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
+            } else {
+                let _ = commands::window::show_app_window(app.handle().clone());
             }
 
             // An autostart entry written by an older build has no
@@ -371,10 +394,7 @@ pub fn run() {
                 ..
             } = event
             {
-                if let Some(w) = app_handle.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                let _ = commands::window::show_app_window(app_handle.clone());
             }
         }
         // Windows AppBar cleanup. MUST call ABM_REMOVE on every

@@ -26,6 +26,7 @@ default; Continuous is a Settings option. Pick the sections that match what you 
 |---|---|
 | §0 vocabulary, §1 invariants | Both |
 | **§P Pages** (P.0 to P.15) | Pages only: the bar, the band, columns, visit rule, timings, freeze, cells, edge zone, pins, Also page |
+| **§P.16 Fill this display** | Dedicated monitor canvas; explicit exceptions to docked geometry and cross-window coordination (lands with SCROLLR-398) |
 | §2 to §7 | Continuous chips only (anatomy, geometry, reservations, text, detail row, colour). Page cells reuse the helpers named in §P.9 |
 | §8.0, §8.5 rules 1 to 3 and 5, §8.7 words | Both: what is eligible, the feed-page-versus-ticker rule, what a pin is, what an empty widget says |
 | §8.1 slots, §8.2 to §8.4, §8.5 zone, §8.6 | Continuous only: slots, rotation, the off-screen rule, the fixed zone, the status chip |
@@ -756,6 +757,115 @@ your team from the fixture is drawn and marked), a lap of at most 60 s (never ra
 
 ---
 
+
+### P.16 Fill this display (lands with SCROLLR-398)
+
+The 64px bar, single row, shared page clock and narrowest-window pin budget above
+describe **Docked**. A device-local `window.tickerDisplays[monitorName]` chooses
+Docked (the migration default), Page grid, or Ticker strip for each selected monitor.
+Fill uses the existing native ticker window, data subscriptions, selectors and cells.
+No copied renderer, custom playlist, manual row count or extra connection.
+
+- **Page grid is the Fill default**, explicitly using Pages even when the docked
+  preference is Continuous. Ticker strip uses the saved Pages/Continuous preference.
+  Exiting Fill retains the docked top/bottom, scale and always-on-top preferences.
+- `lib/tickerDisplay.ts` scales the shared logical canvas uniformly from the actual
+  viewport. Auto/Larger/Largest reading sizes are 100/125/150%; larger text reduces
+  capacity. Grid keeps at least 420 logical pixels wide and 272 high. Strip keeps
+  at least 780 logical pixels of content plus its 84px controls, and 64 high;
+  on tall screens it is centered with
+  background space. These are layout reservations, not a hardware allowlist or a
+  claim that arbitrarily small physical displays remain readable.
+- The canvas uses CSS layout zoom, not a composited `transform: scale` layer.
+  The latter froze the visible Windows cursor while pointer input continued
+  in native testing (SCROLLR-399); layout zoom passed the same hover/click case.
+- Windows also uses an app-local WebView2 presentation workaround,
+  `--disable-direct-composition`, configured before any webview is built and
+  inherited by later ticker windows. Native testing still reproduced a frozen
+  visible cursor after keyboard/wheel paging with layout zoom; this alternate
+  rendering path passed with the original slide/wipe animations retained.
+  It applies to all Scrollr webviews sharing the Windows profile, including
+  Docked and the main window. No system-wide graphics setting changes.
+  This runtime flag is a compatibility workaround, not a stable WebView2 API:
+  revalidate cursor behavior and rendering performance on runtime updates and
+  the customer's hardware before release. Other platforms keep their renderer.
+- Grid uses one 48px heading (the existing 64px band, pin cells and utilities at
+  75%). There is no footer: the remaining height belongs to the main grid. The
+  band stays left, compact data pins fill the middle, and utilities stay right.
+  `gridHeaderPlan` reserves the band and up to a third of the remaining width for
+  140px utility slots (at least one when utilities exist); pins use the remainder
+  after a fixed 84px action slot in the header's 64px coordinates. Settings and
+  Exit use labeled icon buttons in that slot, never over a pin or utility.
+  Both admission and rendering use this plan and active data-pin eligibility.
+  After placing pins, spare width can show additional utilities; when no pin fits,
+  utilities share all space after the band. This does not reduce admission capacity:
+  adding a pin can return utilities to grouped rotation. Saved missing-data pins
+  still reserve their slots and do not surrender their space to utilities.
+  Pin cells grow into spare header width but never below their family minimum.
+  Each Fill header pin has a small pin glyph in its existing left gutter, in
+  addition to the dashed rule. It does not reserve another row or cover values.
+  Eligible saved pins keep their width reservation when data is temporarily absent;
+  pin data changes cannot alter the main grid height. Refusal names the header,
+  and suggests a specific unpin only when that removal actually creates room.
+  `displayGrid` takes each family's existing minimum column and a 160px minimum
+  row. Capacity is columns × rows. Selection and pagination use that capacity;
+  rendering balances the frozen items into the fewest complete rows, with row
+  counts differing by at most one (seven items at 3×3 capacity become 3/2/2).
+  All rows have equal height, and cells in each row have equal width. Sparse
+  pages use fewer rows/columns without duplicating content or enlarging type.
+  Row assignments and widths remain frozen through live updates.
+  A short, wide display naturally has one row; portrait has fewer columns. No
+  item is duplicated to occupy spare cells. Sports uses the same `GameCell`, with
+  two equal-height team rows, 32px crests and reserved scores, 18px names and
+  always-reserved 12px team records. A fixed 32px status row sits below the teams;
+  game phase and clock occupy opposite ends. The composition uses the row height
+  without increasing type indefinitely on taller screens. Quotes use the shared
+  `QuoteCell` expanded presentation: symbol and reserved change across the top,
+  a 26px reserved price beneath, and the existing sparkline/range across the
+  remaining cell width and height. Its amplitude calculation and missing-data
+  behavior stay unchanged. News uses the shared `NewsCell`: a reserved 66px,
+  three-line headline at 18px/22px, then age and up to three lines of summary
+  (or the feed name). Other cells retain their 64px grammar centered in the row.
+  Family minimum columns and docked cells are unchanged.
+  The shared empty state uses the grid canvas too: recovery text and source
+  buttons wrap within the available width, with vertical scrolling if needed.
+- The pool, tier ordering, source eligibility, reservations, frozen identities,
+  visits and dwell remain those of Pages. Each filled window owns its own cursor,
+  dwell, hover and manual steps; it neither sends nor consumes docked page turns.
+  Docked windows elect the first **docked** ticker as their page leader. Shared
+  SSE ownership remains independent of this election. Real viewport changes replan
+  immediately; data changes update values in place until the next page.
+- Filled windows withdraw from `edge:measure`. Grid fits pins locally in its
+  single-row header; a Pages strip applies the 40% budget locally. Overflow pins step back onto
+  that window's pages and remain saved. Utilities have 140px slots in the compact
+  grid header and 180px slots in a strip, rotating groups
+  when they cannot all fit. Each utility advances its items on its own appearances,
+  so grouping cannot skip configured zones or locations. Docked windows retain
+  their shared narrowest budget.
+  A Continuous strip measures its actual pin chips against a local 40% budget;
+  overflow joins that window's tape using the same pinned renderer (including
+  its horizon bypass), without changing saved pins or duplicating their subjects
+  in normal rotation pools.
+- Pointer activity holds Pages for at most five idle seconds as before. A filled
+  Continuous strip keeps moving regardless of the docked hover preference. Fill
+  controls remain visible in their reserved slot with muted ink after five idle
+  seconds; pointer activity or keyboard focus restores full ink. Their geometry
+  never changes on idle or focus. Strip places the action slot beside its 64px
+  content rather than on top of it. The
+  native cursor stays visible. Escape in the focused ticker exits Fill for that monitor.
+- Native Fill releases AppBar space, moves to the selected physical monitor bounds
+  and enters fullscreen. It is not always-on-top, so the main window can be reached.
+  Settings, tray and second-launch opening size the main window down for short
+  monitors. If every explicitly selected monitor is missing and any was filled,
+  suspend the ticker rather than fill the primary. Reconnect uses the OS monitor
+  name; unstable/ambiguous OS identities still require reselection.
+
+Validation: `tickerDisplay.test.ts`, the grid traversal case in `widgetPages.test.ts`,
+`e2e/ticker/fill.spec.ts`, and the game/quote/news display reservation cases in
+`cells.spec.ts` (including quote digit-boundary crossings).
+Browser evidence does not prove native taskbar, hotplug, sleep/wake or DPI behavior.
+Windows, macOS and Wayland need their own native checks before platform parity is
+advertised; a customer strip-monitor pilot remains a release gate.
 
 ## 2. Files and contracts
 
@@ -1625,7 +1735,7 @@ needs both until Continuous is retired.
 
 ### 13A. Page cells, the edge zone, anything on Pages
 
-- [ ] One 64px bar; the cell fills it; no density branch; no card shell.
+- [ ] Docked: one 64px bar; the cell fills it; no density branch; no card shell. Fill: the shared canvas and grid reservations in §P.16.
 - [ ] **Nothing on a page moves while it is up:** no value changes its box, no item re-sorts, appears or vanishes on the page in view; `cells.spec.ts` measures every part across every state.
 - [ ] The cell's detail line is not derivable from its top line (§1.3).
 - [ ] The family exports its own minimum column, measured in the gallery; `columnsFor` is called with it and nothing else holds a width.
@@ -1642,7 +1752,7 @@ needs both until Continuous is retired.
 - [ ] An active pointer (moved within 5 s) holds the page and the lit pill's fill, a resting one does not (`hover.spec.ts`); reduced motion is a crossfade; dwell is 6 to 12 s; swipe is 0.6 s.
 - [ ] Colour only through `--accent` and `mix()`, text in the widget's colour only through `--accent-ink`; red only live or urgent.
 - [ ] Contrast (§P.13): no opacity on text, no `fg-4` text, `pages-themes.spec.ts` green in all 20 palettes.
-- [ ] Process-wide work (page clock, hover, manual steps) runs in the primary window only; followers follow.
+- [ ] Docked page clock/hover/manual steps belong to the elected docked leader; followers follow. Filled windows paginate independently (§P.16). Process-wide data ownership remains unchanged.
 - [ ] The band (§P.2) is `BAND_W` and nothing changes it (not the keypad, not Page controls); nothing to read at rest but the name and a chip's count (and `x/y` past 24 pages); the keypad shows only on hover or focus and only the keys that can act; ‹ › stay in the widget, ˄ ˅ change it; a move is a turn (fresh dwell, cursor past it) and reaches every window (`paging.spec.ts`).
 - [ ] No template-literal classes; served CSS checked.
 - [ ] Verified in the shim at 1280 and 1920 with `?pages=1&live=1`; `npm run test:browser` green.

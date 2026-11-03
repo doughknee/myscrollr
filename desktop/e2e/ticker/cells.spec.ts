@@ -17,8 +17,11 @@ import { test, expect, type Page } from "@playwright/test";
 const PARTS: Record<string, [string, "box" | "left" | "right"][]> = {
   "game-stacked": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["mine", "box"], ["close", "box"], ["away-name", "left"], ["home-name", "left"]],
   "game-wide": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "right"], ["home-name", "left"]],
+  "game-fill": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "left"], ["home-name", "left"]],
   quote: [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-rail", "box"], ["range-low", "left"], ["range-high", "right"]],
+  "quote-display": [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-rail", "box"], ["range-low", "left"], ["range-high", "right"]],
   news: [["age", "box"], ["headline", "box"], ["summary", "left"]],
+  "news-display": [["age", "box"], ["headline", "box"], ["summary", "left"]],
 };
 
 async function edges(page: Page, strip: string) {
@@ -41,16 +44,32 @@ async function edges(page: Page, strip: string) {
 test.describe("page cells hold still", () => {
   test.use({ viewport: { width: 1920, height: 1000 } });
 
+  test("Fill sports rows and records hold their vertical positions across states", async ({ page }) => {
+    await page.goto("/ticker-shim.html?cells=1");
+    const cells = page.locator('[data-strip="game-fill"] [data-state]');
+    await cells.first().waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    const positions = await cells.evaluateAll(nodes => nodes.map(cell => {
+      const origin = cell.getBoundingClientRect();
+      return ["away-name", "away-score", "away-record", "home-name", "home-score", "home-record", "status"].map(part => {
+        const rect = cell.querySelector(`[data-part="${part}"]`)!.getBoundingClientRect();
+        return [part, (rect.top - origin.top).toFixed(1), rect.height.toFixed(1)];
+      });
+    }));
+    expect(positions.length).toBeGreaterThan(1);
+    for (const next of positions.slice(1)) expect(next).toEqual(positions[0]);
+  });
+
   // SCROLLR-296 round 6: the price reserves its length plus one at mount, so a
   // digit-boundary crossing while the page is up, either way, moves nothing.
   test("quote: a price crossing a digit boundary, up or down, moves nothing", async ({ page }) => {
     const parts: [string, "box" | "left" | "right"][] = [["price", "box"], ["change", "box"], ["spark", "box"], ["range-rail", "box"], ["range-low", "left"], ["range-high", "right"]];
     await page.goto("/ticker-shim.html?cells=1");
-    await page.locator('[data-strip="quote-cross"] [data-state]').first().waitFor();
+    await page.locator('[data-strip="quote-cross-display"] [data-state]').first().waitFor();
     await page.evaluate(() => document.fonts.ready);
     const read = () =>
       page.evaluate((parts) =>
-        [...document.querySelectorAll('[data-strip="quote-cross"] [data-state]')].map((cell) => {
+        [...document.querySelectorAll('[data-strip^="quote-cross"] [data-state]')].map((cell) => {
           const origin = cell.getBoundingClientRect().left;
           const out: Record<string, string> = { text: cell.querySelector('[data-part="price"]')!.textContent! };
           for (const [part, how] of parts) {

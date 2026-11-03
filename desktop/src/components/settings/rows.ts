@@ -94,7 +94,7 @@ export const SETTINGS_ROWS = {
     tickerMonitors: {
       label: "Monitors",
       description: "Which screens show the ticker",
-      keywords: "display screen second dual multi monitor identify",
+      keywords: "display screen second dual multi monitor identify fullscreen fill page grid strip reading size",
     },
     screenEdge: {
       label: "Screen edge",

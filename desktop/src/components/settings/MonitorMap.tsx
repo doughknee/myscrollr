@@ -13,11 +13,18 @@
  * Screens are numbered in `list_monitors` order, and "Identify" flashes
  * that number on each screen so the user can match switch to glass.
  */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTauriListener } from "../../hooks/useTauriListener";
-import { RowList, SettingsButton, ToggleRow } from "./SettingsControls";
+import {
+  RowList,
+  SegmentedRow,
+  SettingsButton,
+  ToggleRow,
+} from "./SettingsControls";
+import { DEFAULT_DISPLAY } from "../../lib/tickerDisplay";
 import { Row } from "./pages/Row";
+import type { DisplayPreference } from "../../lib/tickerDisplay";
 
 /** One `list_monitors` entry. `x/y/width/height` are logical (that
  *  screen's own scale); `physical*` are the OS's shared plane. */
@@ -42,7 +49,10 @@ export const monitorLabel = (i: number, m: MonitorInfo) =>
 /** The attached monitors, re-listed when one is plugged or unplugged. */
 export function useMonitors(): MonitorInfo[] {
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-  const refresh = () => invoke<MonitorInfo[]>("list_monitors").then(setMonitors).catch(() => {});
+  const refresh = () =>
+    invoke<MonitorInfo[]>("list_monitors")
+      .then(setMonitors)
+      .catch(() => {});
   useEffect(() => {
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,7 +92,9 @@ export function MonitorMap({
           <g
             key={m.name}
             data-monitor={m.name}
-            onClick={onToggle && !locked ? () => onToggle(m.name, !checked) : undefined}
+            onClick={
+              onToggle && !locked ? () => onToggle(m.name, !checked) : undefined
+            }
             className={onToggle && !locked ? "cursor-pointer" : undefined}
           >
             <rect
@@ -93,7 +105,11 @@ export function MonitorMap({
               rx={m.physicalWidth * 0.015}
               vectorEffect="non-scaling-stroke"
               strokeWidth={1.5}
-              className={checked ? "fill-accent/25 stroke-accent" : "fill-base-250/50 stroke-edge"}
+              className={
+                checked
+                  ? "fill-accent/25 stroke-accent"
+                  : "fill-base-250/50 stroke-edge"
+              }
             />
             <text
               x={m.physicalX + m.physicalWidth / 2}
@@ -115,7 +131,9 @@ export function MonitorMap({
 /** Flashes each screen's number on it, so switch matches glass. */
 export function IdentifyButton() {
   return (
-    <SettingsButton onClick={() => void invoke("identify_monitors").catch(() => {})}>
+    <SettingsButton
+      onClick={() => void invoke("identify_monitors").catch(() => {})}
+    >
       Identify
     </SettingsButton>
   );
@@ -130,16 +148,24 @@ export function IdentifyButton() {
 export function MonitorsRows({
   chosen,
   onChange,
+  displays = {},
+  onDisplayChange,
 }: {
   chosen: string[];
   onChange: (names: string[]) => void;
+  displays?: Record<string, DisplayPreference>;
+  onDisplayChange?: (name: string, pref: DisplayPreference) => void;
 }) {
   const monitors = useMonitors();
   if (monitors.length === 0) return null;
 
   const primary = monitors.find((m) => m.isPrimary) ?? monitors[0];
   const on = new Set(chosen.filter((n) => monitors.some((m) => m.name === n)));
-  if (on.size === 0) on.add(primary.name);
+  if (
+    on.size === 0 &&
+    !chosen.some((n) => displays[n]?.mode && displays[n].mode !== "docked")
+  )
+    on.add(primary.name);
 
   // Save in detection order so the first ticker window's screen is
   // stable no matter which switch was flipped last.
@@ -159,16 +185,75 @@ export function MonitorsRows({
         <RowList>
           {monitors.map((m, i) => {
             const locked = on.size === 1 && on.has(m.name);
+            const pref = displays[m.name] ?? DEFAULT_DISPLAY;
             return (
-              <ToggleRow
-                key={m.name}
-                label={monitorLabel(i, m)}
-                badge={m.isPrimary ? "Primary" : undefined}
-                checked={on.has(m.name)}
-                disabled={locked}
-                title={locked ? "Keep at least one" : undefined}
-                onChange={(v) => toggle(m.name, v)}
-              />
+              <Fragment key={m.name}>
+                <ToggleRow
+                  key={m.name}
+                  label={monitorLabel(i, m)}
+                  badge={m.isPrimary ? "Primary" : undefined}
+                  checked={on.has(m.name)}
+                  disabled={locked}
+                  title={locked ? "Keep at least one" : undefined}
+                  onChange={(v) => toggle(m.name, v)}
+                />
+                {on.has(m.name) && onDisplayChange && (
+                  <>
+                    <SegmentedRow
+                      label={`Display ${i + 1} mode`}
+                      description="Fill this display for a dedicated screen."
+                      value={pref.mode === "docked" ? "docked" : "fill"}
+                      options={[
+                        { value: "docked", label: "Docked" },
+                        { value: "fill", label: "Fill this display" },
+                      ]}
+                      onChange={(v) =>
+                        onDisplayChange(m.name, {
+                          ...pref,
+                          mode: v === "docked" ? "docked" : "grid",
+                        })
+                      }
+                    />
+                    {pref.mode !== "docked" && (
+                      <>
+                        <SegmentedRow
+                          label={`Display ${i + 1} layout`}
+                          description="Page grid adapts to the screen. Ticker strip uses your scroll mode."
+                          value={pref.mode}
+                          options={[
+                            { value: "grid", label: "Page grid" },
+                            { value: "strip", label: "Ticker strip" },
+                          ]}
+                          onChange={(v) =>
+                            onDisplayChange(m.name, {
+                              ...pref,
+                              mode: v === "strip" ? "strip" : "grid",
+                            })
+                          }
+                        />
+                        <SegmentedRow
+                          label={`Display ${i + 1} reading size`}
+                          description="Larger text shows fewer items at once."
+                          value={String(pref.readingSize)}
+                          options={[
+                            { value: "100", label: "Auto" },
+                            { value: "125", label: "Larger" },
+                            { value: "150", label: "Largest" },
+                          ]}
+                          onChange={(v) =>
+                            onDisplayChange(m.name, {
+                              ...pref,
+                              readingSize: Number(
+                                v,
+                              ) as DisplayPreference["readingSize"],
+                            })
+                          }
+                        />
+                      </>
+                    )}
+                  </>
+                )}
+              </Fragment>
             );
           })}
         </RowList>

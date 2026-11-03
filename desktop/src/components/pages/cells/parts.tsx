@@ -69,9 +69,9 @@ export function Rule() {
  * is missing or fails, which would pull the name sideways; the box keeps the
  * name where it was.
  */
-export function Crest({ src, alt, size }: { src: string; alt: string; size: "md" | "lg" }) {
+export function Crest({ src, alt, size }: { src: string; alt: string; size: "md" | "lg" | "xl" }) {
   return (
-    <span className={size === "lg" ? "inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center" : "inline-flex h-4 w-4 shrink-0 items-center justify-center"}>
+    <span className={size === "xl" ? "inline-flex h-8 w-8 shrink-0 items-center justify-center" : size === "lg" ? "inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center" : "inline-flex h-4 w-4 shrink-0 items-center justify-center"}>
       <TeamLogo src={src} alt={alt} size={size} />
     </span>
   );

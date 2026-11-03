@@ -159,13 +159,16 @@ function CrossingStrip() {
       <Strip name="quote-cross" width={QUOTE_MIN_COL}>
         {CROSSINGS.map(([s, a, b]) => [s, <QuoteCell trade={{ ...aapl, price: ticked ? b : a }} />])}
       </Strip>
+      <Strip name="quote-cross-display" width={QUOTE_MIN_COL} height={160}>
+        {CROSSINGS.map(([s, a, b]) => [s, <QuoteCell trade={{ ...aapl, price: ticked ? b : a }} expanded />])}
+      </Strip>
     </div>
   );
 }
 
-function Strip({ name, width, children }: { name: string; width: number; children: [string, ReactNode][] }) {
+function Strip({ name, width, height = 64, children }: { name: string; width: number; height?: number; children: [string, ReactNode][] }) {
   return (
-    <div className="flex h-16 shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={accentStyle(accentFor("#0b2265", dark), inkFor("#0b2265", dark))}>
+    <div className="flex shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={{ ...accentStyle(accentFor("#0b2265", dark), inkFor("#0b2265", dark)), height }}>
       <Columns width={width}>
         {children.map(([state, node]) => (
           <div key={state} className="h-full" data-state={state}>{node}</div>
@@ -294,10 +297,13 @@ function Gallery() {
 
       <div className="px-1 pt-3 font-mono text-[10px] tracking-[0.06em] text-fg-4">ONE ITEM IN EVERY STATE · SAME COLUMN WIDTH · NOTHING MAY MOVE</div>
       <Strip name="game-stacked" width={gameMinCol("NFL")}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} mine now={NOW} />])}</Strip>
+      <Strip name="game-fill" width={gameMinCol("NFL")} height={140}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} fill mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
       <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <Strip name="quote-display" width={QUOTE_MIN_COL} height={160}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} expanded />])}</Strip>
       <CrossingStrip />
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
+      <Strip name="news-display" width={420} height={160}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} expanded />])}</Strip>
       <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}
       <div aria-hidden />

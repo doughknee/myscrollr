@@ -45,7 +45,8 @@ function refresh(now = Date.now()) {
 }
 
 export function recordEdge(m: Measure, now = Date.now()) {
-  seen.set(m.label, { ...m, at: now });
+  if (m.bar <= 0) seen.delete(m.label);
+  else seen.set(m.label, { ...m, at: now });
   refresh(now);
 }
 
@@ -68,14 +69,17 @@ export function useEdgeMeasures() {
 /** A pages bar: publish this window's measure now, on every change, and on each beat. */
 export function usePublishEdge(label: string, bar: number, util: number) {
   const send = useCallback(() => {
-    if (bar <= 0) return;
     recordEdge({ label, bar, util });
     emit(MEASURE, { label, bar, util } satisfies Measure).catch(() => {});
   }, [label, bar, util]);
   useEffect(() => {
     send();
     const id = window.setInterval(send, BEAT_MS);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      recordEdge({ label, bar: 0, util: 0 });
+      emit(MEASURE, { label, bar: 0, util: 0 }).catch(() => {});
+    };
   }, [send]);
   useTauriListener(ASK, send);
 }
