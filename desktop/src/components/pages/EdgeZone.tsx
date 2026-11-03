@@ -25,6 +25,7 @@
 import { memo, useLayoutEffect, useRef, type Ref } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
+import { Pin } from "lucide-react";
 import type {
   ClockChipData,
   DashboardResponse,
@@ -251,12 +252,13 @@ function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipCli
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth, stretchUtilities = false, stretchPins = false, reservedPins }: {
+export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth, utilitySlotWidth = 180, stretchUtilities = false, stretchPins = false, reservedPins }: {
   edge: Edge;
   stretchPins?: boolean;
   stretchUtilities?: boolean;
   reservedPins?: readonly WidgetPin[];
   maxUtilitiesWidth?: number;
+  utilitySlotWidth?: number;
   /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
   onUtilWidth?: (w: number) => void;
   /** The page turn's seq: the slots step on it. */
@@ -281,7 +283,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
     };
   }, [onUtilWidth, empty]);
   if (empty) return null;
-  const slots = maxUtilitiesWidth === undefined ? edge.utilities.length : Math.max(1, Math.floor(maxUtilitiesWidth / 180));
+  const slots = maxUtilitiesWidth === undefined ? edge.utilities.length : Math.max(1, Math.floor(maxUtilitiesWidth / utilitySlotWidth));
   const utilities = utilityTurns(edge.utilities.length, slots, tick);
   const pinSlots = reservedPins
     ? reservedPins.map(saved => ({
@@ -312,6 +314,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
           <PinCell p={p} tick={tick} onChipClick={onChipClick} />
+          {stretchPins && <span role="img" aria-label="Pinned" title="Pinned — stays visible while pages change" data-pin-indicator="" className="pointer-events-none absolute left-[3px] top-[6px] text-fg-3"><Pin size={10} aria-hidden /></span>}
           {/* The dashed line on top marks it as pinned (canvas "Pins"); dashed, so it is not
               read as the solid line a page draws over your team's game (SCROLLR-296). */}
           <span

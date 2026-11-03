@@ -772,7 +772,8 @@ No copied renderer, custom playlist, manual row count or extra connection.
 - `lib/tickerDisplay.ts` scales the shared logical canvas uniformly from the actual
   viewport. Auto/Larger/Largest reading sizes are 100/125/150%; larger text reduces
   capacity. Grid keeps at least 420 logical pixels wide and 272 high. Strip keeps
-  at least 780 logical pixels wide and 64 high; on tall screens it is centered with
+  at least 780 logical pixels of content plus its 84px controls, and 64 high;
+  on tall screens it is centered with
   background space. These are layout reservations, not a hardware allowlist or a
   claim that arbitrarily small physical displays remain readable.
 - The canvas uses CSS layout zoom, not a composited `transform: scale` layer.
@@ -792,18 +793,27 @@ No copied renderer, custom playlist, manual row count or extra connection.
   75%). There is no footer: the remaining height belongs to the main grid. The
   band stays left, compact data pins fill the middle, and utilities stay right.
   `gridHeaderPlan` reserves the band and up to a third of the remaining width for
-  180px utility slots (at least one when utilities exist); pins use the remainder.
+  140px utility slots (at least one when utilities exist); pins use the remainder
+  after a fixed 84px action slot in the header's 64px coordinates. Settings and
+  Exit use labeled icon buttons in that slot, never over a pin or utility.
   Both admission and rendering use this plan and active data-pin eligibility.
   After placing pins, spare width can show additional utilities; when no pin fits,
   utilities share all space after the band. This does not reduce admission capacity:
   adding a pin can return utilities to grouped rotation. Saved missing-data pins
   still reserve their slots and do not surrender their space to utilities.
   Pin cells grow into spare header width but never below their family minimum.
+  Each Fill header pin has a small pin glyph in its existing left gutter, in
+  addition to the dashed rule. It does not reserve another row or cover values.
   Eligible saved pins keep their width reservation when data is temporarily absent;
   pin data changes cannot alter the main grid height. Refusal names the header,
   and suggests a specific unpin only when that removal actually creates room.
   `displayGrid` takes each family's existing minimum column and a 160px minimum
-  row. Capacity is columns × rows.
+  row. Capacity is columns × rows. Selection and pagination use that capacity;
+  rendering balances the frozen items into the fewest complete rows, with row
+  counts differing by at most one (seven items at 3×3 capacity become 3/2/2).
+  All rows have equal height, and cells in each row have equal width. Sparse
+  pages use fewer rows/columns without duplicating content or enlarging type.
+  Row assignments and widths remain frozen through live updates.
   A short, wide display naturally has one row; portrait has fewer columns. No
   item is duplicated to occupy spare cells. Sports uses the same `GameCell`, with
   two equal-height team rows, 32px crests and reserved scores, 18px names and
@@ -827,7 +837,8 @@ No copied renderer, custom playlist, manual row count or extra connection.
   immediately; data changes update values in place until the next page.
 - Filled windows withdraw from `edge:measure`. Grid fits pins locally in its
   single-row header; a Pages strip applies the 40% budget locally. Overflow pins step back onto
-  that window's pages and remain saved. Utilities have 180px slots, rotating groups
+  that window's pages and remain saved. Utilities have 140px slots in the compact
+  grid header and 180px slots in a strip, rotating groups
   when they cannot all fit. Each utility advances its items on its own appearances,
   so grouping cannot skip configured zones or locations. Docked windows retain
   their shared narrowest budget.
@@ -837,8 +848,10 @@ No copied renderer, custom playlist, manual row count or extra connection.
   in normal rotation pools.
 - Pointer activity holds Pages for at most five idle seconds as before. A filled
   Continuous strip keeps moving regardless of the docked hover preference. Fill
-  controls disappear after five idle seconds and stop intercepting clicks;
-  keyboard focus keeps them available and pointer movement wakes them. The
+  controls remain visible in their reserved slot with muted ink after five idle
+  seconds; pointer activity or keyboard focus restores full ink. Their geometry
+  never changes on idle or focus. Strip places the action slot beside its 64px
+  content rather than on top of it. The
   native cursor stays visible. Escape in the focused ticker exits Fill for that monitor.
 - Native Fill releases AppBar space, moves to the selected physical monitor bounds
   and enters fullscreen. It is not always-on-top, so the main window can be reached.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayGeometry, sanitizeDisplays } from "./tickerDisplay";
+import { displayGeometry, sanitizeDisplays, FILL_CONTROLS_W } from "./tickerDisplay";
 import { displayGrid } from "../components/pages/pagePlan";
 
 describe("dedicated display geometry", () => {
@@ -23,7 +23,7 @@ describe("dedicated display geometry", () => {
         expect((g.height - 48) / shape.rows).toBeGreaterThanOrEqual(160 - 0.001);
         const strip = displayGeometry(width, height, "strip", reading);
         expect(strip.grid).toBe(false);
-        expect(strip.width).toBeGreaterThanOrEqual(780 - 0.001);
+        expect(strip.width - FILL_CONTROLS_W).toBeGreaterThanOrEqual(780 - 0.001);
         expect(64 * strip.scale).toBeLessThanOrEqual(height);
       });
     }

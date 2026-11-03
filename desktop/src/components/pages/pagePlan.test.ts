@@ -4,6 +4,8 @@ import {
   TIER,
   columnsFor,
   contentWidth,
+  displayGrid,
+  displayPageRows,
   dwellFor,
   edgeBar,
   freezePage,
@@ -18,6 +20,32 @@ import {
 // The cell families' minimums (cells/*: quote, game US-pro, game other, also, news).
 const MINS = [172, 212, 244, 300, 400];
 const range = (n: number) => [...Array(n).keys()];
+
+describe("Fill page rows", () => {
+  it("balances seven items into 3/2/2, with fewer rows for smaller pages", () => {
+    expect(displayPageRows(950, 535, 264, 7)).toEqual([3, 2, 2]);
+    expect(displayPageRows(950, 535, 264, 4)).toEqual([2, 2]);
+    expect(displayPageRows(950, 535, 264, 2)).toEqual([2]);
+    expect(displayPageRows(950, 535, 264, 0)).toEqual([]);
+  });
+  it("never exceeds capacity or minimum widths, and never creates an empty row", () => {
+    for (const [width, height] of [[420, 746], [1493, 280], [950, 535], [1200, 650]]) {
+      for (const min of [264, 276, 300, 400]) {
+        const max = displayGrid(width, height, min);
+        for (let count = 1; count <= max.capacity; count++) {
+          const rows = displayPageRows(width, height, min, count);
+          expect(rows.reduce((a, b) => a + b, 0)).toBe(count);
+          expect(rows.length).toBeLessThanOrEqual(max.rows);
+          expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(1);
+          for (const columns of rows) {
+            expect(columns).toBeGreaterThan(0);
+            expect(width / columns).toBeGreaterThanOrEqual(min);
+          }
+        }
+      }
+    }
+  });
+});
 
 describe("columns", () => {
   it("come from the content width and the family's minimum", () => {

@@ -24,6 +24,10 @@ import { gameMinCol } from "./cells/GameCell";
 import { NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { BAND_W, DISPLAY_HEADER_H } from "./pagePlan";
+import { FILL_CONTROLS_W } from "../../lib/tickerDisplay";
+
+/** Compact Fill utility slots still hold the clock's full reserved value. */
+export const GRID_UTILITY_W = 140;
 
 /** The most of the bar the edge may take. */
 export const EDGE_SHARE = 0.4;
@@ -51,15 +55,15 @@ export function eligibleEdgePins(pins: readonly WidgetPin[], activeTabs: readonl
 /** Fixed-height header: reserve utilities first, then reclaim spare pin width for them. */
 export function gridHeaderPlan(width: number, utilityCount: number, activeTabs: readonly string[] = [], pins: readonly WidgetPin[] = []) {
   const scale = DISPLAY_HEADER_H / 64;
-  const available = Math.max(0, width / scale - BAND_W);
-  const slots = Math.min(utilityCount, Math.max(1, Math.floor(available / 3 / 180)));
-  const room: EdgeRoom = { bar: width, util: 0, budget: Math.max(0, available - slots * 180 - (slots ? EDGE_BORDER : 0)), region: "header", activeTabs };
+  const available = Math.max(0, width / scale - BAND_W - FILL_CONTROLS_W);
+  const slots = Math.min(utilityCount, Math.max(1, Math.floor(available / 3 / GRID_UTILITY_W)));
+  const room: EdgeRoom = { bar: width, util: 0, budget: Math.max(0, available - slots * GRID_UTILITY_W - (slots ? EDGE_BORDER : 0)), region: "header", activeTabs };
   // Admission keeps the minimum utility reservation. Once pins are placed,
   // utilities reclaim unusable pin space without making the next pin harder to add.
   const placed = stepBack(eligibleEdgePins(pins, activeTabs), room);
   const spare = Math.max(0, available - (placed.length ? used(placed, room) : 0) - (slots ? EDGE_BORDER : 0));
   const utilitiesWidth = utilityCount === 0 ? 0 : placed.length === 0
-    ? spare : Math.min(utilityCount, Math.max(slots, Math.floor(spare / 180))) * 180;
+    ? spare : Math.min(utilityCount, Math.max(slots, Math.floor(spare / GRID_UTILITY_W))) * GRID_UTILITY_W;
   return { scale, utilitiesWidth, room };
 }
 

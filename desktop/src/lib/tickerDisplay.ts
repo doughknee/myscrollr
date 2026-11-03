@@ -1,5 +1,7 @@
 /** Device-local display presentation. Content selections remain shared. */
 export type DisplayMode = "docked" | "grid" | "strip";
+/** Two compact action buttons and their gutters, in the header's 64px coordinates. */
+export const FILL_CONTROLS_W = 84;
 export interface DisplayPreference {
   mode: DisplayMode;
   readingSize: 100 | 125 | 150;
@@ -55,12 +57,12 @@ export function displayGeometry(
       ? Math.min(w / (h > w ? 420 : 950), h / (wide ? 280 : 440))
       : wide
         ? h / 64
-        : Math.min(w / 780, h / 330)) *
+        : Math.min(w / (780 + FILL_CONTROLS_W), h / 330)) *
       readingSize) /
     100;
   const scale = Math.min(
     desired,
-    w / (grid ? 420 : 780),
+    w / (grid ? 420 : 780 + FILL_CONTROLS_W),
     h / (grid ? 272 : 64),
   );
   return { scale, width: w / scale, height: h / scale, grid };

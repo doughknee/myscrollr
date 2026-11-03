@@ -1,5 +1,71 @@
 import { test, expect } from "@playwright/test";
 
+test("sparse Fill rows occupy the canvas and keep their geometry during data refresh", async ({ page, context }) => {
+  await context.clock.install();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/ticker-shim.html?fixture=pages&pages=1&fill=grid&utils=clock,weather&weather=demo&pin=sports_nfl:Chicago Bears&pin=sports_nfl:Houston Texans&live=1');
+  const rows = page.locator('[data-page] [data-display-row]');
+  await expect(rows).toHaveCount(3);
+  await context.clock.runFor(1000);
+  const read = () => rows.evaluateAll(nodes => nodes.map(row => ({
+    count: row.children.length,
+    boxes: [...row.children].map(cell => {
+      const r = cell.getBoundingClientRect();
+      return [r.x, r.y, r.width, r.height].map(n => Math.round(n));
+    }),
+  })));
+  const before = await read();
+  expect(before.map(r => r.count)).toEqual([3, 2, 2]);
+  for (const row of before) {
+    expect(row.boxes[0][0]).toBe(0);
+    expect(row.boxes.at(-1)![0] + row.boxes.at(-1)![2]).toBe(1920);
+  }
+  const ids = await page.locator('[data-page] [data-item]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-item')));
+  expect(new Set(ids).size).toBe(7);
+  await page.evaluate(() => window.__shimDashboard?.(prev => ({ ...prev, data: { ...prev.data, sports: [] } })));
+  await context.clock.runFor(500);
+  expect(await read()).toEqual(before);
+});
+
+test("a single available game uses one row and one column without copies", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/ticker-shim.html?fixture=onegame&pages=1&fill=grid&utils=');
+  await expect(page.locator('[data-page]')).toHaveAttribute('data-grid-columns', '1');
+  await expect(page.locator('[data-page] [data-display-row]')).toHaveCount(1);
+  await expect(page.locator('[data-page] [data-chip]')).toHaveCount(1);
+});
+
+test("header pin markers leave content clear and controls do not move data on idle or focus", async ({ page, context }) => {
+  await context.clock.install();
+  await page.setViewportSize({ width: 1920, height: 360 });
+  await page.goto('/ticker-shim.html?fixture=pages&pages=1&fill=grid&utils=clock,weather&weather=demo&pin=sports_nfl:Chicago Bears&pin=finance_stocks:AAPL');
+  const markers = page.locator('[data-pin-indicator]');
+  await expect(markers).toHaveCount(2);
+  await context.clock.runFor(1000);
+  for (const marker of await markers.all()) {
+    expect(await marker.evaluate(el => {
+      const icon = el.getBoundingClientRect();
+      const cell = el.parentElement!;
+      return [...cell.querySelectorAll('[data-part$="-name"], [data-part="price"], [data-part="change"]')].every(part => {
+        const r = part.getBoundingClientRect();
+        return icon.right <= r.left || icon.left >= r.right || icon.bottom <= r.top || icon.top >= r.bottom;
+      });
+    })).toBe(true);
+  }
+  const controls = page.locator('[data-fill-controls]');
+  const header = page.locator('[data-display-header]');
+  const before = await header.boundingBox();
+  const actions = await controls.boundingBox();
+  await context.clock.runFor(5100);
+  expect(await header.boundingBox()).toEqual(before);
+  expect(await controls.boundingBox()).toEqual(actions);
+  await controls.getByRole('button', { name: 'Settings', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.__shimCalls.some(call => call.startsWith('show_app_window')))).toBe(true);
+  await controls.getByRole('button', { name: 'Exit full display', exact: true }).click();
+  await expect(page.locator('[data-fill-display]')).toHaveCount(0);
+});
+
 for (const height of [240, 360]) {
   for (const reading of [100, 150]) {
     test(`sports composition uses short display height ${height} at ${reading}% without overlap`, async ({ page }) => {
@@ -31,7 +97,7 @@ for (const height of [240, 360]) {
   }
 }
 
-test("Fill controls idle without hiding the native pointer and wake on movement or focus", async ({
+test("Fill controls remain reachable while idle and wake on movement or focus", async ({
   page,
   context,
 }) => {
@@ -40,16 +106,16 @@ test("Fill controls idle without hiding the native pointer and wake on movement 
   await expect(page.locator("[data-page]")).toHaveCount(1);
   await page.mouse.move(300, 200);
   const controls = page.locator("[data-fill-controls]");
-  await expect(controls).toHaveCSS("opacity", "1");
+  await expect(controls).toHaveAttribute("data-active", "");
   await context.clock.runFor(5100);
-  await expect(controls).toHaveCSS("opacity", "0");
-  await expect(controls).toHaveCSS("pointer-events", "none");
+  await expect(controls).not.toHaveAttribute("data-active");
+  await expect(controls).toHaveCSS("pointer-events", "auto");
   await expect(page.locator("[data-fill-display]")).not.toHaveCSS(
     "cursor",
     "none",
   );
   await page.mouse.move(301, 200);
-  await expect(controls).toHaveCSS("opacity", "1");
+  await expect(controls).toHaveAttribute("data-active", "");
   await controls.getByRole("button", { name: "Settings", exact: true }).focus();
   await context.clock.runFor(5100);
   await expect(controls).toHaveCSS("opacity", "1");
@@ -103,11 +169,12 @@ for (const [width, height] of [[3440, 1440], [1920, 360], [800, 480], [720, 1280
       await page.evaluate(() => document.fonts.ready);
       await expect(page.locator("[data-page]")).toHaveCount(1);
       const header = (await page.locator("[data-display-header]").boundingBox())!;
+      const controls = (await page.locator("[data-fill-controls]").boundingBox())!;
       expect(header.height).toBeLessThan(height * 0.25);
       for (const el of await page.locator('[data-display-header] [data-pin-subject], [data-display-header] [data-edge-utils] > [data-widget]').all()) {
         const box = (await el.boundingBox())!;
         expect(box.x).toBeGreaterThanOrEqual(-1);
-        expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+        expect(box.x + box.width).toBeLessThanOrEqual(controls.x + 1);
         expect(box.y + box.height).toBeLessThanOrEqual(header.height + 1);
       }
       const content = (await page.locator("[data-page]").boundingBox())!;
@@ -123,7 +190,7 @@ for (const [width, height] of [[3440, 1440], [1920, 360], [800, 480], [720, 1280
         const last = (await utilities.last().boundingBox())!;
         // The band is 192/560 of this portrait header. No phantom pin gap.
         expect(first.x / width).toBeCloseTo(192 / 560, 2);
-        expect(last.x + last.width).toBeCloseTo(width, 0);
+        expect(last.x + last.width).toBeCloseTo(controls.x, 0);
       }
     });
   }
@@ -295,7 +362,9 @@ for (const [width, height] of [
         .toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
       const bounds = await page.locator("[data-pages]").boundingBox();
       expect(bounds!.x).toBeCloseTo(0);
-      expect(bounds!.width).toBeCloseTo(width, 0);
+      const controls = (await page.locator("[data-fill-controls]").boundingBox())!;
+      expect(bounds!.width + (mode === "strip" ? controls.width : 0)).toBeCloseTo(width, 0);
+      if (mode === "strip") expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(controls.x + 1);
       expect(bounds!.height).toBeLessThanOrEqual(height + 1);
       if (mode === "grid") {
         expect(bounds!.height).toBeCloseTo(height, 0);
@@ -455,11 +524,7 @@ for (const fixture of ["busy", "longnames", "quiet"]) {
         ),
       )
       .toBe(1920);
-    await expect(page.locator("[data-fill-controls]")).toHaveCSS(
-      "opacity",
-      "0",
-      { timeout: 8000 },
-    );
+    await expect(page.locator("[data-fill-controls]")).not.toHaveAttribute("data-active", { timeout: 8000 });
     expect(errors).toEqual([]);
   });
 }

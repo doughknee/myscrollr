@@ -68,6 +68,15 @@ export function displayGrid(width: number, height: number, minCol: number) {
   return { columns, rows, capacity: columns * rows };
 }
 
+/** Balance only the frozen page's items. Capacity and selection remain unchanged. */
+export function displayPageRows(width: number, height: number, minCol: number, count: number): number[] {
+  if (count <= 0) return [];
+  const capacity = displayGrid(width, height, minCol);
+  const rows = Math.ceil(count / capacity.columns);
+  const perRow = Math.floor(count / rows);
+  return Array.from({ length: rows }, (_, i) => perRow + (i < count % rows ? 1 : 0));
+}
+
 /** Width left for columns once the band and the edge zone are taken. */
 export function contentWidth(barWidth: number, edgeWidth = 0): number {
   return Math.max(0, barWidth - BAND_W - edgeWidth);

@@ -5,7 +5,7 @@ import { gameMinCol } from "./cells/GameCell";
 import { NEWS_MIN_COL, NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { edgeBudget, edgeCanHold, fitsEdge, gridHeaderPlan, pinRefusal, pinWidth, stepBack, type EdgeRoom } from "./edgeRule";
-import { displayGeometry } from "../../lib/tickerDisplay";
+import { displayGeometry, FILL_CONTROLS_W } from "../../lib/tickerDisplay";
 
 describe("Fill header capacity", () => {
   const tabs = ["sports_nfl", "finance_stocks", "news_bbc", "clock", "weather"];
@@ -17,8 +17,8 @@ describe("Fill header capacity", () => {
         const pins = [nfl(1), news(1), nfl(2), news(2)];
         const header = gridHeaderPlan(geometry.width, 5, tabs, pins);
         const placed = stepBack(pins, header.room);
-        expect(header.utilitiesWidth + 1 + (placed.length ? 1 : 0) + placed.reduce((sum, p) => sum + pinWidth(p.widget), 0) + 192).toBeLessThanOrEqual(geometry.width / header.scale + 0.01);
-        expect(header.utilitiesWidth).toBeGreaterThanOrEqual(180);
+        expect(header.utilitiesWidth + 1 + (placed.length ? 1 : 0) + placed.reduce((sum, p) => sum + pinWidth(p.widget), 0) + 192 + FILL_CONTROLS_W).toBeLessThanOrEqual(geometry.width / header.scale + 0.01);
+        expect(header.utilitiesWidth).toBeGreaterThanOrEqual(140);
         expect(fitsEdge(placed, header.room)).toBe(true);
         if (placed.length < pins.length) {
           const next = pins[placed.length];
@@ -31,11 +31,11 @@ describe("Fill header capacity", () => {
   it("portrait reclaims the unusable pin area for both utilities without changing admission", () => {
     const header = gridHeaderPlan(420, 2, tabs, [nfl(1)]);
     expect(stepBack([nfl(1)], header.room)).toHaveLength(0);
-    expect(header.utilitiesWidth).toBe(367);
+    expect(header.utilitiesWidth).toBe(283);
     expect(header.room).toEqual(gridHeaderPlan(420, 2, tabs).room);
     const wide = gridHeaderPlan(800, 2, tabs, [nfl(1)]);
     expect(stepBack([nfl(1)], wide.room)).toHaveLength(1);
-    expect(wide.utilitiesWidth).toBe(360);
+    expect(wide.utilitiesWidth).toBe(280);
     expect(gridHeaderPlan(420, 0, tabs).utilitiesWidth).toBe(0);
   });
   it("ignores inactive/utility pins in admission and restores saved overflow after widening", () => {

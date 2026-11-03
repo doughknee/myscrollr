@@ -51,10 +51,11 @@ import type { GitHubThing } from "../../widgets/github/types";
 import { financeMarketOptions } from "../../api/queries";
 import { sourceForWidget } from "../../marketplace";
 import { isPrimaryTicker } from "../../lib/windowRole";
+import { FILL_CONTROLS_W } from "../../lib/tickerDisplay";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { BAND_W, DISPLAY_HEADER_H, PILLS_MAX, columnsFor, contentWidth, displayGrid, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
+import { BAND_W, DISPLAY_HEADER_H, PILLS_MAX, columnsFor, contentWidth, displayGrid, displayPageRows, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
 import {
   ALSO_TAB,
   buildPageWidgets,
@@ -78,7 +79,7 @@ import RepoCell from "./cells/RepoCell";
 import ThingCell from "./cells/ThingCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
 import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
-import { stepBack, eligibleEdgePins, gridHeaderPlan } from "./edgeRule";
+import { stepBack, eligibleEdgePins, gridHeaderPlan, GRID_UTILITY_W } from "./edgeRule";
 import { useActiveHover } from "./activeHover";
 
 /** The swipe (canvas "Motion"): 0.6 s on a soft ease. */
@@ -136,6 +137,8 @@ interface Shown {
   index: number;
   count: number;
   colW: number;
+  /** Fill row lengths are frozen with the page, never recomputed from live data. */
+  gridRows: number[];
   /** Columns a full page has at this width, the widget's items over all its pages, and what it could have shown (the browser checks read all three). */
   cols: number;
   total: number;
@@ -697,6 +700,7 @@ export default function PagedBar({
         index,
         count: plan.pages.length,
         colW: grid ? planWidth / displayGrid(planWidth, fillHeight, w.minCol).columns : contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        gridRows: grid ? displayPageRows(planWidth, fillHeight, w.minCol, items.length) : [],
         short,
         cols: plan.cols,
         total: plan.pages.reduce((n, p) => n + p.length, 0),
@@ -745,7 +749,7 @@ export default function PagedBar({
   if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
 
   if (grid) {
-    const shape = displayGrid(planWidth || width, fillHeight, cur?.widget.minCol ?? QUOTE_MIN_COL);
+    const rows = cur?.gridRows ?? [];
     const tick = turn ? turn.seq : wallTick;
     const chromeScale = header.scale;
     return (
@@ -753,26 +757,31 @@ export default function PagedBar({
         className="ticker-container group/bar relative flex w-full shrink-0 flex-col overflow-hidden bg-base-150"
         style={{ height: fillHeight }} onMouseEnter={hover.move} onMouseMove={hover.move} onMouseLeave={hover.leave}>
         <div data-display-header="" className="relative shrink-0 overflow-hidden border-b border-edge/50" style={{ height: DISPLAY_HEADER_H }}>
-          <div className="absolute inset-y-0 left-0 flex h-16" style={{ zoom: chromeScale, width: width / chromeScale }}>
+          <div className="absolute inset-y-0 left-0 flex h-16" style={{ zoom: chromeScale, width: Math.max(0, width / chromeScale - FILL_CONTROLS_W) }}>
             {cur && <Band cur={cur} live={live ?? cur.widget} widgets={widgets} turn={turn} held={held} dark={dark} keypad={pageControls} reduced={reduced} onMove={step} wipe={wipe} fade={fade} />}
             {onEdge.length > 0 && <div data-display-pins="" className="flex min-w-0 flex-1 overflow-hidden">
               <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} stretchPins reservedPins={onEdge} onChipClick={onChipClick} />
             </div>}
-            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={header.utilitiesWidth} stretchUtilities onChipClick={onChipClick} />
+            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={header.utilitiesWidth} utilitySlotWidth={GRID_UTILITY_W} stretchUtilities onChipClick={onChipClick} />
           </div>
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <AnimatePresence initial={false} custom={cur?.back}>
             {cur && <motion.div key={cur.seq} custom={cur.back} data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`} data-visit={cur.seq}
-              data-cols={cur.cols} data-total={cur.total} data-avail={cur.avail} data-grid-columns={shape.columns} data-grid-rows={shape.rows}
+              data-cols={cur.cols} data-total={cur.total} data-avail={cur.avail} data-grid-columns={Math.max(1, ...rows)} data-grid-rows={rows.length}
               className="absolute inset-0 grid"
-              style={{ ...accentStyle(accent, ink), gridTemplateColumns: `repeat(${shape.columns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${shape.rows}, minmax(0, 1fr))` }} {...(reduced ? fade : swipe)}>
-              {items.map((item) => <div key={item.key} data-widget={cur.widget.tab} data-pin-subject={item.pin}
-                className="flex min-h-0 min-w-0 items-center overflow-hidden border-b border-r border-edge/50">
-                <div className={["sports", "finance", "news"].includes(cur.widget.kind) ? "h-full w-full min-w-0" : "h-16 w-full min-w-0"}>
-                  <Cell widget={cur.widget} item={item} colW={cur.colW} dark={dark} fill onChipClick={onChipClick} />
-                </div>
-              </div>)}
+              style={{ ...accentStyle(accent, ink), gridTemplateRows: `repeat(${Math.max(1, rows.length)}, minmax(0, 1fr))` }} {...(reduced ? fade : swipe)}>
+              {rows.map((columns, row) => {
+                const start = rows.slice(0, row).reduce((a, b) => a + b, 0);
+                return <div key={row} data-display-row="" className="grid min-h-0 min-w-0" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                  {items.slice(start, start + columns).map((item) => <div key={item.key} data-widget={cur.widget.tab} data-pin-subject={item.pin}
+                    className="flex min-h-0 min-w-0 items-center overflow-hidden border-b border-r border-edge/50">
+                    <div className={["sports", "finance", "news"].includes(cur.widget.kind) ? "h-full w-full min-w-0" : "h-16 w-full min-w-0"}>
+                      <Cell widget={cur.widget} item={item} colW={planWidth / columns} dark={dark} fill onChipClick={onChipClick} />
+                    </div>
+                  </div>)}
+                </div>;
+              })}
             </motion.div>}
           </AnimatePresence>
         </div>
