@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "../config";
-import { compareVersions } from "../lib/releases";
+import { requiresUpdate } from "../lib/releases";
 
 interface UpdateGate {
   /** True when the server's minimum is newer than the installed version. */
@@ -49,10 +49,7 @@ export function useUpdateGate(appVersion: string): UpdateGate {
     };
   }, [appVersion]);
 
-  const updateRequired =
-    Boolean(appVersion) &&
-    Boolean(minVersion) &&
-    compareVersions(appVersion, minVersion) < 0;
+  const updateRequired = requiresUpdate(appVersion, minVersion);
 
   return { updateRequired, minVersion };
 }

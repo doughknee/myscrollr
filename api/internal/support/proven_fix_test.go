@@ -2,7 +2,9 @@ package support
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +35,7 @@ func stubLinearAndReleases(t *testing.T, issueState, mergedAt string, releases [
 		if mergedAt != "" {
 			attachments = append(attachments, map[string]interface{}{
 				"sourceType": "github",
+				"url":        "https://github.com/doughknee/myscrollr/pull/1",
 				"metadata":   map[string]interface{}{"status": "merged", "mergedAt": mergedAt},
 			})
 		}
@@ -46,25 +49,87 @@ func stubLinearAndReleases(t *testing.T, issueState, mergedAt string, releases [
 		})
 	}))
 	github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/download/") {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) != 4 {
+				http.NotFound(w, r)
+				return
+			}
+			data := testReleaseFiles(parts[2])[parts[3]]
+			if data == nil {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = w.Write(data)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/commits/refs/tags/") {
+			_ = json.NewEncoder(w).Encode(map[string]string{"sha": testReleaseSource(strings.TrimPrefix(r.URL.Path, "/commits/refs/tags/"))})
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/pulls/") {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"merged": true, "merged_at": mergedAt, "body": "Closes REL-253\nCloses REL-259\nCloses SCROLLR-419",
+				"merge_commit_sha": strings.Repeat("a", 40), "base": map[string]interface{}{"repo": map[string]string{"full_name": "doughknee/myscrollr"}}})
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/compare/") {
+			status := "ahead"
+			for _, rel := range releases {
+				if strings.HasSuffix(r.URL.Path, "..."+testReleaseSource(rel["tag_name"].(string))) && rel["contains"] == false {
+					status = "diverged"
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": status,
+				"base_commit": map[string]string{"sha": strings.Repeat("a", 40)}, "merge_base_commit": map[string]string{"sha": strings.Repeat("a", 40)}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(releases)
 	}))
 
-	oldLinear, oldGitHub := linearAPIURL, knownIssuesReleasesURL
+	oldLinear, oldGitHub, oldProof, oldDownload := linearAPIURL, knownIssuesReleasesURL, provenFixGitHubURL, provenFixDownloadURL
 	linearAPIURL = linear.URL
 	knownIssuesReleasesURL = github.URL + "?per_page=%d"
+	provenFixGitHubURL = github.URL
+	provenFixDownloadURL = github.URL + "/download"
 	t.Setenv("LINEAR_API_KEY", "test-key")
 	t.Cleanup(func() {
 		linearAPIURL, knownIssuesReleasesURL = oldLinear, oldGitHub
+		provenFixGitHubURL = oldProof
+		provenFixDownloadURL = oldDownload
 		linear.Close()
 		github.Close()
 	})
 }
 
+func testReleaseSource(tag string) string { return fmt.Sprintf("%x", sha256.Sum256([]byte(tag)))[:40] }
+
+func testReleaseFiles(tag string) map[string][]byte {
+	version := strings.TrimPrefix(tag, "desktop-v")
+	files := map[string][]byte{}
+	hashes := map[string]string{}
+	names := []string{"Scrollr_" + version + "_x64-setup.exe", "Scrollr_" + version + "_x64_en-US.msi", "Scrollr_" + version + "_aarch64.dmg", "Scrollr_aarch64.app.tar.gz", "Scrollr_" + version + "_amd64.AppImage"}
+	for _, name := range names {
+		files[name] = []byte(name)
+		hashes[name] = fmt.Sprintf("%x", sha256.Sum256(files[name]))
+	}
+	platforms := map[string]map[string]string{}
+	for target, name := range map[string]string{"windows-x86_64": names[1], "windows-x86_64-nsis": names[0], "darwin-aarch64": names[3], "linux-x86_64": names[4]} {
+		platforms[target] = map[string]string{"url": "https://github.com/doughknee/myscrollr/releases/download/" + tag + "/" + name, "signature": "fixture-signature-over-twenty-characters"}
+	}
+	files["latest.json"], _ = json.Marshal(map[string]interface{}{"version": version, "platforms": platforms})
+	hashes["latest.json"] = fmt.Sprintf("%x", sha256.Sum256(files["latest.json"]))
+	files["verification.json"], _ = json.Marshal(map[string]interface{}{"schema": 1, "version": version, "source": testReleaseSource(tag), "runId": "123", "assets": hashes})
+	return files
+}
+
 func release(tag, published string, prerelease bool) map[string]interface{} {
+	assets := []map[string]string{}
+	for name, data := range testReleaseFiles(tag) {
+		assets = append(assets, map[string]string{"name": name, "digest": fmt.Sprintf("sha256:%x", sha256.Sum256(data))})
+	}
 	return map[string]interface{}{
-		"tag_name": tag, "name": "Scrollr " + strings.TrimPrefix(tag, "desktop-v"),
-		"body": "notes", "draft": false, "prerelease": prerelease,
-		"published_at": published, "html_url": "https://example.invalid/" + tag,
+		"tag_name": tag, "name": "Scrollr " + strings.TrimPrefix(tag, "desktop-v"), "body": "notes", "draft": false, "prerelease": prerelease,
+		"published_at": published, "html_url": "https://github.com/doughknee/myscrollr/releases/tag/" + tag, "assets": assets,
 	}
 }
 
@@ -209,29 +274,6 @@ func TestCaseStaleDays_ReadsTheLastUserMessage(t *testing.T) {
 	}
 	if got := caseStaleDays(ctx, ticket); got < 39 || got > 41 {
 		t.Fatalf("caseStaleDays = %d after our own reply, want ~40", got)
-	}
-}
-
-// firstReleaseAfter is the whole "which version carried it" rule.
-func TestFirstReleaseAfter(t *testing.T) {
-	at := func(s string) time.Time {
-		ts, err := time.Parse(time.RFC3339, s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return ts
-	}
-	releases := []shippedRelease{
-		{Tag: "desktop-v1.6.0", PublishedAt: at("2026-08-20T12:00:00Z")},
-		{Tag: "desktop-v1.6.3", PublishedAt: at("2026-09-07T12:00:00Z")},
-		{Tag: "desktop-v1.6.2", PublishedAt: at("2026-09-02T12:00:00Z")},
-	}
-	got := firstReleaseAfter(releases, at("2026-09-01T10:00:00Z"))
-	if got == nil || got.Tag != "desktop-v1.6.2" {
-		t.Fatalf("got %+v, want desktop-v1.6.2", got)
-	}
-	if got := firstReleaseAfter(releases, at("2026-09-09T10:00:00Z")); got != nil {
-		t.Fatalf("got %+v, want nil when nothing has shipped since the merge", got)
 	}
 }
 

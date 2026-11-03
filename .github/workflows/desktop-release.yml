@@ -1,6 +1,8 @@
 name: Desktop Release
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       platform:
@@ -14,7 +16,7 @@ on:
           - macos
           - linux
   push:
-    branches: [main]
+    branches: [main, release/desktop-1.7]
     # Pattern order matters: a negated pattern after a positive match excludes
     # the path. The workflow still runs if at least one changed file survives
     # the net filter, so a push touching both a test file and a source file
@@ -37,6 +39,11 @@ on:
 permissions:
   contents: read
 
+# Serialize draft writes with the finalizer's verify-and-publish job.
+concurrency:
+  group: desktop-release-artifacts
+  cancel-in-progress: false
+
 env:
   # tauri-action@v0 still uses Node 20 internally
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -44,6 +51,27 @@ env:
   MOTION_PLUS_TOKEN: ${{ secrets.MOTION_PLUS_TOKEN }}
 
 jobs:
+  # Backend publications must not steal the legacy desktop updater URL.
+  legacy-update-link:
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+        working-directory: desktop
+      - run: sudo apt-get update && sudo apt-get install -y minisign
+      - name: Keep legacy desktop updater reachable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node desktop/scripts/repair-desktop-latest.mjs --apply
   # ── Guard: never touch a published release ─────────────────────
   # tauri-action does NOT create a new draft when the tag's release
   # already exists — it uploads into it, silently replacing the assets
@@ -53,36 +81,32 @@ jobs:
   # version's release is missing or still a draft; otherwise skip with
   # a warning — the fix is bumping the version in tauri.conf.json.
   preflight:
+    if: github.event_name != 'release' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7')
     runs-on: ubuntu-latest
+    # Draft listings require push access; this protected-source job only reads.
+    permissions:
+      contents: write
     outputs:
       proceed: ${{ steps.check.outputs.proceed }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v6
         with:
-          sparse-checkout: desktop/src-tauri/tauri.conf.json
+          sparse-checkout: |
+            desktop/src-tauri/tauri.conf.json
+            desktop/scripts/release-lookup.mjs
+            desktop/scripts/release-source.mjs
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
       - id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="desktop-v$(jq -r .version desktop/src-tauri/tauri.conf.json)"
-          set +e
-          RELEASE_LOOKUP=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .draft 2>&1)
-          LOOKUP_EXIT=$?
-          set -e
-          if [ "$LOOKUP_EXIT" -eq 0 ]; then
-            IS_DRAFT="$RELEASE_LOOKUP"
-          elif printf '%s\n' "$RELEASE_LOOKUP" | grep -q 'HTTP 404'; then
-            IS_DRAFT="missing"
-          else
-            echo "::error::Could not verify whether $TAG is already published. Refusing to build."
-            printf '%s\n' "$RELEASE_LOOKUP" >&2
-            exit "$LOOKUP_EXIT"
-          fi
-          if [ "$IS_DRAFT" = "false" ]; then
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::$TAG is already published — skipping the build so its assets are never overwritten. Bump the version in desktop/src-tauri/tauri.conf.json to cut a new release."
-            exit 0
-          fi
+          VERSION=$(jq -r .version desktop/src-tauri/tauri.conf.json)
+          node desktop/scripts/release-source.mjs "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$VERSION"
+          if [[ "$VERSION" == *-* ]]; then echo 'prerelease=true' >> "$GITHUB_OUTPUT"; else echo 'prerelease=false' >> "$GITHUB_OUTPUT"; fi
           # A push builds only when it changed the version (the cut itself). While
           # a draft is open, every later push touching desktop/ used to rebuild all
           # three platforms (19 min of runners) and overwrite the draft's assets
@@ -96,6 +120,13 @@ jobs:
               exit 0
             fi
           fi
+          RELEASE_LOOKUP=$(node desktop/scripts/release-lookup.mjs "$GITHUB_REPOSITORY" "$TAG" "$GITHUB_SHA")
+          IS_DRAFT=$(printf '%s' "$RELEASE_LOOKUP" | jq -r 'if . == null then "missing" else .draft end')
+          if [ "$IS_DRAFT" = "false" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::$TAG is already published — skipping so its assets are never overwritten."
+            exit 0
+          fi
           echo "proceed=true" >> "$GITHUB_OUTPUT"
           echo "$TAG release state: $IS_DRAFT (missing or draft) — proceeding."
 
@@ -103,6 +134,7 @@ jobs:
   # Push triggers and "all" both build every target. Selecting a single
   # platform via workflow_dispatch produces a one-entry matrix.
   matrix-setup:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
@@ -133,7 +165,7 @@ jobs:
   # ── Build ──────────────────────────────────────────────────────
   build:
     needs: [matrix-setup, preflight]
-    if: needs.preflight.outputs.proceed == 'true' && github.ref == 'refs/heads/main'
+    if: needs.preflight.outputs.proceed == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7')
     permissions:
       contents: write
     strategy:
@@ -160,7 +192,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb xdotool dbus-x11 scrot
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -194,7 +226,7 @@ jobs:
         run: |
           echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
           echo "Before workaround, cargo resolves to: $(command -v cargo || echo 'not found')"
-          echo "Real cargo at \$CARGO_HOME/bin/cargo: $($CARGO_HOME/bin/cargo --version)"
+          echo "Real cargo at \$CARGO_HOME/bin/cargo: $("$CARGO_HOME/bin/cargo" --version)"
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -208,6 +240,11 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Check release version identity
+        id: version
+        shell: bash
+        run: echo "version=$(node scripts/release-policy.mjs version)" >> "$GITHUB_OUTPUT"
 
       - name: Install pinned Windows signing tools
         if: matrix.platform == 'windows-latest'
@@ -368,13 +405,15 @@ jobs:
           tauriScript: npx tauri
           args: ${{ matrix.tauri_args }}
           tagName: desktop-v__VERSION__
+          releaseCommitish: ${{ github.sha }}
           releaseName: "Scrollr desktop-v__VERSION__"
           releaseBody: "See the [full changelog](https://github.com/brandon-relentnet/myscrollr/commits/desktop-v__VERSION__) for details."
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ needs.preflight.outputs.prerelease }}
 
       - name: Build signed Windows artifacts
         if: matrix.platform == 'windows-latest'
+        shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
@@ -405,8 +444,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scrollr-windows-release-${{ github.sha }}
+          overwrite: true
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
           path: |
             desktop/src-tauri/target/release/scrollr-desktop.exe
             desktop/src-tauri/target/release/bundle/nsis/*.exe
@@ -431,7 +471,7 @@ jobs:
           SENTRY_PROJECT: scrollr-desktop
         with:
           environment: production
-          version: scrollr-desktop@${{ github.ref_name }}
+          version: scrollr-desktop@${{ steps.version.outputs.version }}
 
       # ── Notarize and staple the macOS DMG ──────────────────────
       # tauri-action only notarizes the .app bundle inside the DMG, leaving
@@ -446,17 +486,12 @@ jobs:
       # returned "rejected, source=Unnotarized Developer ID" against
       # release Scrollr_1.0.9_aarch64.dmg before this step was added.
       #
-      # continue-on-error: true so a runner-network flake during this
-      # second notary submission (see run #25578604859 — NSURLErrorDomain
-      # -1009 mid-poll) doesn't block the pipeline. The .app inside and the
-      # updater stream are unaffected; users who download mid-flake see one
-      # extra Gatekeeper prompt that self-heals on the next push.
+      # A failed verification now blocks readiness; the draft remains unpublished.
       #
       # The DMG was already Developer ID-signed by tauri-action; stapling
       # attaches the notarization ticket without re-signing.
       - name: Notarize and staple DMG
         if: matrix.platform == 'macos-14'
-        continue-on-error: true
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -466,8 +501,8 @@ jobs:
           set -euo pipefail
           DMG=$(find src-tauri/target/release/bundle/dmg -name '*.dmg' | head -1)
           if [ -z "$DMG" ]; then
-            echo "::warning::No DMG found at src-tauri/target/release/bundle/dmg; skipping DMG notarization"
-            exit 0
+            echo "::error::Missing macOS DMG"
+            exit 1
           fi
 
           echo "Notarizing $DMG..."
@@ -481,6 +516,11 @@ jobs:
           echo "Stapling $DMG..."
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+          APP=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          codesign --verify --deep --strict "$APP"
+          spctl --assess --type execute --verbose=2 "$APP"
 
           echo "Re-uploading stapled DMG to release..."
           TAG="desktop-v$(jq -r .version src-tauri/tauri.conf.json)"
@@ -501,19 +541,62 @@ jobs:
             chmod +x "$APPIMAGE"
             "$APPIMAGE" --appimage-extract
             rm -f squashfs-root/usr/lib/libwayland-*.so.*
-            wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            curl --fail --location --retry 3 -o appimagetool-x86_64.AppImage https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+            echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool-x86_64.AppImage' | sha256sum --check --strict
             chmod +x appimagetool-x86_64.AppImage
             ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run squashfs-root "$APPIMAGE"
             rm -rf squashfs-root appimagetool-x86_64.AppImage
 
             gh release upload "$TAG" "$APPIMAGE" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            echo '::error::Missing AppImage'; exit 1
           fi
+
+      - name: Smoke test installed Windows package
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: ./scripts/smoke-release-windows.ps1
+
+      - name: Smoke test packaged macOS application
+        if: matrix.platform == 'macos-14'
+        run: bash scripts/smoke-release-unix.sh
+
+      - name: Smoke test packaged Linux application
+        if: matrix.platform == 'ubuntu-22.04'
+        run: xvfb-run -a dbus-run-session -- bash scripts/smoke-release-unix.sh
+
+      - name: Retain packaged startup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-smoke-${{ matrix.rust_target }}-${{ github.sha }}
+          path: desktop/package-smoke/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Record final platform bytes
+        id: proof
+        shell: bash
+        env:
+          TARGET: ${{ matrix.platform == 'windows-latest' && 'windows-x86_64' || matrix.platform == 'macos-14' && 'darwin-aarch64' || 'linux-x86_64' }}
+        run: |
+          node scripts/release-policy.mjs record "$TARGET" src-tauri/target/release/bundle proof.json
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+
+      - name: Retain build-bound release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-proof-${{ steps.proof.outputs.target }}-${{ github.sha }}
+          overwrite: true
+          path: desktop/proof.json
+          if-no-files-found: error
+          retention-days: 30
 
   # A branch dispatch with platform=windows proves the complete signing path
   # without creating or modifying a GitHub Release. This job deliberately uses
-  # read-only repository permission; public release builds remain main-only.
+  # read-only repository permission; drafts require an approved source branch.
   windows-signing-test:
-    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && (inputs.platform == 'windows' || inputs.platform == 'all')
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/release/desktop-1.7' && (inputs.platform == 'windows' || inputs.platform == 'all')
     runs-on: windows-latest
     timeout-minutes: 35
     permissions:
@@ -618,7 +701,7 @@ jobs:
   # This job re-verifies the staged bytes before any GitHub Release mutation.
   publish-windows:
     needs: [matrix-setup, preflight, build]
-    if: github.ref == 'refs/heads/main' && needs.preflight.outputs.proceed == 'true' && (inputs.platform == 'windows' || inputs.platform == 'all' || github.event_name == 'push')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7') && needs.preflight.outputs.proceed == 'true' && (inputs.platform == 'windows' || inputs.platform == 'all' || github.event_name == 'push')
     runs-on: windows-latest
     permissions:
       contents: write
@@ -659,7 +742,9 @@ jobs:
 
           $releaseIsDraft = gh release view $tag --json isDraft --jq .isDraft --repo $env:GITHUB_REPOSITORY 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --draft --title "Scrollr $tag" --notes "See the full changelog at https://github.com/$env:GITHUB_REPOSITORY/commits/$tag" --repo $env:GITHUB_REPOSITORY
+            $releaseArgs = @('release', 'create', $tag, '--draft', '--target', $env:GITHUB_SHA, '--title', "Scrollr $tag", '--notes', "See the full changelog at https://github.com/$env:GITHUB_REPOSITORY/commits/$tag", '--repo', $env:GITHUB_REPOSITORY)
+            if ($version.Contains('-')) { $releaseArgs += '--prerelease' }
+            & gh @releaseArgs
             if ($LASTEXITCODE -ne 0) { throw "Failed to create draft release $tag." }
           } elseif ($releaseIsDraft.Trim() -ne "true") {
             throw "Refusing to modify published release $tag."
@@ -713,13 +798,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          sparse-checkout: desktop/src-tauri/tauri.conf.json
 
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: 22
+
+      - name: Install locked signer and independent verifier
+        run: |
+          npm ci --ignore-scripts --prefix desktop
+          sudo apt-get update && sudo apt-get install -y minisign
 
       - name: Re-sign AppImage and patch latest.json
         env:
@@ -733,11 +821,12 @@ jobs:
           APPIMAGE=$(find /tmp -name '*.AppImage' | head -1)
 
           if [ -z "$APPIMAGE" ]; then
-            echo "No AppImage found on release, skipping"
-            exit 0
+            echo "::error::Missing AppImage on release"
+            exit 1
           fi
 
-          npx --yes @tauri-apps/cli signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" "$APPIMAGE"
+          ./desktop/node_modules/.bin/tauri signer sign "$APPIMAGE"
+          node desktop/scripts/release-policy.mjs verify-signature "$APPIMAGE"
 
           gh release upload "$TAG" "$APPIMAGE.sig" --clobber --repo "$GITHUB_REPOSITORY"
 

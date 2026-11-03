@@ -2,11 +2,16 @@ name: Frontend Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, release/desktop-1.7]
     paths:
       - "myscrollr.com/**"
       - "desktop/src/**"
       - "desktop/package*.json"
+      - "desktop/scripts/*release*.mjs"
+      - "desktop/scripts/repair-desktop-latest.mjs"
+      - ".github/workflows/desktop-update-feeds.yml"
+      - ".github/workflows/*release*.yml"
+      - ".github/workflows/support-kb-refresh.yml"
       - "desktop/vitest*.ts"
       - "desktop/e2e/**"
       - "desktop/playwright.config.ts"
@@ -19,11 +24,16 @@ on:
       # breakage ship silently in backend-tests).
       - ".github/workflows/frontend-tests.yml"
   pull_request:
-    branches: [main]
+    branches: [main, release/desktop-1.7]
     paths:
       - "myscrollr.com/**"
       - "desktop/src/**"
       - "desktop/package*.json"
+      - "desktop/scripts/*release*.mjs"
+      - "desktop/scripts/repair-desktop-latest.mjs"
+      - ".github/workflows/desktop-update-feeds.yml"
+      - ".github/workflows/*release*.yml"
+      - ".github/workflows/support-kb-refresh.yml"
       - "desktop/vitest*.ts"
       - "desktop/e2e/**"
       - "desktop/playwright.config.ts"
@@ -65,6 +75,10 @@ jobs:
       - run: npm ci
 
       - run: npm test
+
+      - name: Release safety policy fixtures
+        if: matrix.dir == 'desktop'
+        run: node --test scripts/release-policy.test.mjs scripts/release-lookup.test.mjs scripts/release-source.test.mjs scripts/release-channels.test.mjs scripts/release-channels-cli.test.mjs scripts/release-effects.test.mjs scripts/verify-release-feeds.test.mjs
 
       - name: Verify website event proxy
         if: matrix.dir == 'myscrollr.com'

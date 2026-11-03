@@ -218,6 +218,7 @@ pub fn run() {
             static_info: Mutex::new(None),
         })))
         .invoke_handler(tauri::generate_handler![
+            commands::updates::check_update_channel,
             commands::window::position_ticker,
             commands::window::list_monitors,
             commands::window::sync_ticker_windows,

@@ -335,6 +335,9 @@ func HandleGitHubReleasePublished(c *fiber.Ctx) error {
 			Error:  "missing version",
 		})
 	}
+	if !support.IsStableDesktopTag(ev.Version) {
+		return c.JSON(fiber.Map{"status": "ignored", "reason": "not a stable desktop release"})
+	}
 
 	go func(version, url string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

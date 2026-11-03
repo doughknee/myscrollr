@@ -35,7 +35,7 @@ import {
 import { captureWebsiteEvent } from './posthog'
 
 const REPO_URL = 'https://github.com/doughknee/myscrollr'
-export const FALLBACK_RELEASES_URL = `${REPO_URL}/releases/latest`
+export const FALLBACK_RELEASES_URL = `${REPO_URL}/releases/tag/desktop-v${LATEST_DESKTOP_VERSION}`
 
 export type DesktopPlatform = 'macos' | 'windows' | 'linux'
 export type LinuxFormat = 'appimage' | 'deb' | 'rpm'

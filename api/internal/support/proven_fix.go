@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,15 +31,12 @@ import (
 //     set by the File as bug button or the /link confirmation — never by the
 //     model, because a wrong link produces a confidently wrong "fixed in X"),
 //  2. that issue is in a completed state, and
-//  3. the pull request that closed it was merged before a published release.
+//  3. GitHub proves the closing merge is contained in a published stable desktop
+//     release with installers for the supported platforms.
 //
 // The answer goes into the drafting prompt as a FACT, never as something to
 // infer, and the disposition gate re-checks the finished reply against it.
 //
-// ponytail: (3) is "merged before the release was published", not "this commit
-// is an ancestor of that tag". Scrollr cuts releases from main, so the two
-// agree; if release branches ever appear, swap the timestamp compare for a
-// GitHub compare call against the tag.
 
 // ProvenFix is the record behind a permitted fix claim. A nil *ProvenFix is
 // the ordinary case and means exactly one thing: say nothing about a fix.
@@ -50,7 +48,7 @@ type ProvenFix struct {
 }
 
 const (
-	provenFixCachePrefix = "support:proven_fix:v1:"
+	provenFixCachePrefix = "support:proven_fix:v2:"
 	provenFixCacheTTL    = 10 * time.Minute
 	// provenFixReleaseCount is how far back we look for the release that
 	// carried a fix. Deep enough for a ticket that has been waiting months,
@@ -129,98 +127,94 @@ func provenFixForIssue(ctx context.Context, issueKey string) *ProvenFix {
 // merged. A zero time means "nothing to prove": the issue is not completed, or
 // it is completed with no merged PR behind it — something moved the issue and
 // we cannot say which release carried it.
-func linearClosingMerge(ctx context.Context, issueKey string) (time.Time, error) {
+func linearClosingMerge(ctx context.Context, issueKey string) (closingMerge, error) {
 	const q = `query($id: String!) {
 		issue(id: $id) {
+			identifier
 			state { type }
-			attachments { nodes { sourceType metadata } }
+			attachments { nodes { sourceType url metadata } }
 		}
 	}`
 	var out struct {
 		Issue *struct {
-			State struct {
+			Identifier string `json:"identifier"`
+			State      struct {
 				Type string `json:"type"`
 			} `json:"state"`
 			Attachments struct {
 				Nodes []struct {
 					SourceType string                 `json:"sourceType"`
+					URL        string                 `json:"url"`
 					Metadata   map[string]interface{} `json:"metadata"`
 				} `json:"nodes"`
 			} `json:"attachments"`
 		} `json:"issue"`
 	}
 	if err := linearGraphQL(ctx, q, map[string]interface{}{"id": issueKey}, &out); err != nil {
-		return time.Time{}, err
+		return closingMerge{}, err
 	}
 	if out.Issue == nil {
-		return time.Time{}, fmt.Errorf("no Linear issue %q", issueKey)
+		return closingMerge{}, fmt.Errorf("no Linear issue %q", issueKey)
 	}
 	if out.Issue.State.Type != "completed" {
-		return time.Time{}, nil
+		return closingMerge{}, nil
 	}
 
 	// The last merge wins: an issue reopened and fixed again shipped in the
 	// later release, and naming the earlier one would be a lie about a bug the
 	// user may still have.
-	var mergedAt time.Time
+	var merge closingMerge
 	for _, a := range out.Issue.Attachments.Nodes {
-		if a.SourceType != "github" || a.Metadata == nil {
+		if a.SourceType != "github" {
 			continue
 		}
-		if s, _ := a.Metadata["status"].(string); !strings.EqualFold(s, "merged") {
-			continue
+		link := a.URL
+		if link == "" {
+			link, _ = a.Metadata["url"].(string)
 		}
-		raw, _ := a.Metadata["mergedAt"].(string)
-		t, parseErr := time.Parse(time.RFC3339, raw)
-		if parseErr != nil {
-			continue
+		candidate, err := closingPull(ctx, link, issueKey, out.Issue.Identifier)
+		if err != nil {
+			return closingMerge{}, err
 		}
-		if t.After(mergedAt) {
-			mergedAt = t
+		if candidate.MergedAt.After(merge.MergedAt) {
+			merge = candidate
 		}
 	}
-	return mergedAt, nil
+	return merge, nil
 }
 
 // computeProvenFix does the three checks. (nil, nil) means "no fix on record",
 // which is a legitimate answer and gets cached; an error means we could not
 // find out, which does not.
 func computeProvenFix(ctx context.Context, issueKey string) (*ProvenFix, error) {
-	mergedAt, err := linearClosingMerge(ctx, issueKey)
+	merge, err := linearClosingMerge(ctx, issueKey)
 	if err != nil {
 		return nil, err
 	}
-	if mergedAt.IsZero() {
+	if merge.MergedAt.IsZero() {
 		return nil, nil // not done, or done with nothing merged behind it
 	}
-	rel := firstReleaseAfter(fetchRecentReleases(ctx, provenFixReleaseCount), mergedAt)
-	if rel == nil {
-		return nil, nil // fixed, but it has not shipped yet
+	releases := fetchRecentReleases(ctx, provenFixReleaseCount)
+	sort.Slice(releases, func(i, j int) bool { return releases[i].PublishedAt.Before(releases[j].PublishedAt) })
+	for _, rel := range releases {
+		contains, err := releaseContains(ctx, rel, merge)
+		if err != nil {
+			return nil, err
+		}
+		if contains {
+			return fixRecord(issueKey, rel, merge), nil
+		}
 	}
+	return nil, nil
+}
+
+func fixRecord(issueKey string, rel shippedRelease, merge closingMerge) *ProvenFix {
 	return &ProvenFix{
 		IssueKey:   issueKey,
 		Version:    releaseVersion(rel.Tag, rel.Name),
 		ReleaseURL: rel.URL,
-		MergedAt:   mergedAt,
-	}, nil
-}
-
-// firstReleaseAfter picks the earliest published, non-prerelease release that
-// went out after the fix was merged. Prereleases are excluded: telling
-// somebody their fix is in a build they cannot get is worse than saying
-// nothing.
-func firstReleaseAfter(releases []shippedRelease, mergedAt time.Time) *shippedRelease {
-	var best *shippedRelease
-	for i := range releases {
-		r := &releases[i]
-		if r.Prerelease || r.PublishedAt.IsZero() || !r.PublishedAt.After(mergedAt) {
-			continue
-		}
-		if best == nil || r.PublishedAt.Before(best.PublishedAt) {
-			best = r
-		}
+		MergedAt:   merge.MergedAt,
 	}
-	return best
 }
 
 // releaseVersion turns "desktop-v1.6.3" into "1.6.3", falling back to the

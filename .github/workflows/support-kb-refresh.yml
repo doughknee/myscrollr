@@ -35,6 +35,7 @@ on:
 permissions:
   # The push uses the deploy key; the token only reads releases for kbgen.
   contents: read
+  actions: read
 
 # Two releases published back to back must not race each other's push.
 concurrency:
@@ -44,7 +45,7 @@ jobs:
   refresh:
     name: Regenerate and commit the knowledge base
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       # `main`, not the release tag: the event's ref is the tag, and the KB is
       # only useful where CI and deploys read it from (SCROLLR-206).
@@ -54,18 +55,34 @@ jobs:
           fetch-depth: 0
           ssh-key: ${{ secrets.KB_DEPLOY_KEY }}
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+        working-directory: desktop
+      - name: Exclude drafts and prereleases on event and manual paths
+        id: policy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          CHANNEL_FEEDS_ENABLED: ${{ vars.DESKTOP_CHANNEL_FEEDS_ENABLED }}
+        run: node desktop/scripts/release-event.mjs kb
+
       - uses: actions/setup-go@v6
+        if: steps.policy.outputs.eligible == 'true'
         with:
           go-version-file: api/go.mod
           cache: true
           cache-dependency-path: api/go.sum
 
       - run: go run ./cmd/kbgen
+        if: steps.policy.outputs.eligible == 'true'
         working-directory: api
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Commit and push the regenerated knowledge base
+        if: steps.policy.outputs.eligible == 'true'
         id: push
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}

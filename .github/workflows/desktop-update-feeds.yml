@@ -1,0 +1,74 @@
+name: Reconcile Desktop Update Feeds
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published desktop tag to approve (blank for withdrawal/reconciliation)"
+        default: ""
+      run_id:
+        description: "Build run for approval; must match the release source"
+        default: ""
+      withdraw_tag:
+        description: "Previously approved tag to withdraw (separate from approval)"
+        default: ""
+      apply:
+        description: "Apply the reviewed plan to the protected metadata branch"
+        type: boolean
+        default: false
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  # Shares the finalizer/build lock so asset verification and feed selection cannot overlap.
+  group: desktop-release-artifacts
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      BUILD_RUN_ID: ${{ inputs.run_id }}
+      WITHDRAW_TAG: ${{ inputs.withdraw_tag }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+        working-directory: desktop
+      - name: Bind approved release
+        if: inputs.tag != ''
+        id: resolve
+        run: node desktop/scripts/finalize-release.mjs resolve
+      - name: Reverify approved release
+        if: inputs.tag != ''
+        env:
+          BUILD_RUN_ID: ${{ steps.resolve.outputs.run_id }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y minisign
+          node desktop/scripts/finalize-release.mjs verify
+      - name: Prepare or apply atomic channel plan
+        env:
+          CHANNEL_PLAN_DIR: ${{ runner.temp }}/channel-plan
+          BUILD_RUN_ID: ${{ steps.resolve.outputs.run_id }}
+          APPLY: ${{ inputs.apply }}
+          ENABLED: ${{ vars.DESKTOP_CHANNEL_FEEDS_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "$APPLY" = true ]; then
+            test "$ENABLED" = true
+            node desktop/scripts/release-channels.mjs --apply
+            node desktop/scripts/verify-release-feeds.mjs --expected-dir "$CHANNEL_PLAN_DIR"
+          else
+            node desktop/scripts/release-channels.mjs
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-channel-plan
+          path: ${{ runner.temp }}/channel-plan/*.json
+          if-no-files-found: ignore
+          retention-days: 30

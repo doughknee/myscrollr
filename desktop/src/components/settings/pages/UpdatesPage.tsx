@@ -1,351 +1,89 @@
-/**
- * Updates.
- *
- * The update state machine and the module-level download lock are
- * unchanged from UpdatesSettings. The lock stays module-level on
- * purpose: the startup auto-check and this manual flow must never
- * download at once — on Windows that re-runs the installer for an
- * already-installed version and crashes the app.
- *
- * State is component-local, so leaving the page resets it. That still
- * holds under the unified surface because only the active page is
- * mounted; switching rail entries unmounts this one.
- *
- * There is no auto-check toggle any more (REL-206): the startup check
- * always runs, this page is the manual one.
- */
-import { useCallback, useRef, useState } from "react";
-import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
-import { clsx } from "clsx";
-import {
-  isUpdateInProgress,
-  releaseUpdateLock,
-  tryAcquireUpdateLock,
-} from "../../../lib/updateState";
-import { RowList, SettingsButton, SettingsGroup } from "../SettingsControls";
+import { useEffect } from "react";
+import { prerelease, valid } from "semver";
+import { open } from "@tauri-apps/plugin-shell";
+import { updateController, useUpdateController } from "../../../lib/updateController";
+import { channelLocked, updateBusy } from "../../../lib/updateState";
+import { RowList, SettingsButton, SettingsGroup, SegmentedRow } from "../SettingsControls";
 import ReleaseNotes from "../ReleaseNotes";
 import PageHeader from "./PageHeader";
 import { Row } from "./Row";
 import { SETTINGS_ROWS } from "../rows";
+import type { UpdateSnapshot } from "../../../lib/updateState";
 
-const R = SETTINGS_ROWS.updates;
-
-type UpdateStatus =
-  | { step: "idle" }
-  | { step: "checking" }
-  | { step: "up-to-date" }
-  | { step: "available"; version: string; body: string }
-  | { step: "downloading"; downloaded: number; total: number }
-  | { step: "ready" }
-  | { step: "error"; message: string };
-
-interface UpdatesPageProps {
-  appVersion?: string;
-}
-
-export default function UpdatesPage({ appVersion }: UpdatesPageProps) {
-  const [status, setStatus] = useState<UpdateStatus>({ step: "idle" });
-  const pendingUpdate = useRef<Update | null>(null);
-
-  const handleCheckForUpdates = useCallback(async () => {
-    if (isUpdateInProgress()) {
-      setStatus({
-        step: "error",
-        message: "Another update is already in progress.",
-      });
-      return;
-    }
-    setStatus({ step: "checking" });
-    try {
-      const update = await check();
-      if (!update) {
-        pendingUpdate.current = null;
-        setStatus({ step: "up-to-date" });
-        return;
-      }
-      pendingUpdate.current = update;
-      setStatus({
-        step: "available",
-        version: update.version,
-        body: update.body ?? "",
-      });
-    } catch (err) {
-      setStatus({
-        step: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }, []);
-
-  const handleDownloadAndInstall = useCallback(async () => {
-    const update = pendingUpdate.current;
-    if (!update) {
-      setStatus({
-        step: "error",
-        message: "No update available. Try checking again.",
-      });
-      return;
-    }
-    if (!tryAcquireUpdateLock()) {
-      setStatus({
-        step: "error",
-        message: "Another update is already in progress.",
-      });
-      return;
-    }
-    setStatus({ step: "downloading", downloaded: 0, total: 0 });
-    try {
-      await update.downloadAndInstall((event) => {
-        if (event.event === "Started" && event.data.contentLength) {
-          setStatus((prev) =>
-            prev.step === "downloading"
-              ? { ...prev, total: event.data.contentLength ?? 0 }
-              : prev,
-          );
-        } else if (event.event === "Progress") {
-          setStatus((prev) =>
-            prev.step === "downloading"
-              ? {
-                  ...prev,
-                  downloaded: prev.downloaded + (event.data.chunkLength ?? 0),
-                }
-              : prev,
-          );
-        }
-      });
-      setStatus({ step: "ready" });
-    } catch (err) {
-      setStatus({
-        step: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      releaseUpdateLock();
-    }
-  }, []);
-
-  const handleRelaunch = useCallback(async () => {
-    try {
-      await relaunch();
-    } catch (err) {
-      setStatus({
-        step: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }, []);
-
-  const version = appVersion ? `v${appVersion}` : "—";
-
-  return (
-    <>
-      <PageHeader
-        title="Updates"
-        subtitle={<UpdateSubtitle status={status} version={version} />}
-      />
-
-      <SettingsGroup>
-        <RowList>
-          <Row id="checkNow">
-            <UpdateRow
-              status={status}
-              onCheck={handleCheckForUpdates}
-              onDownload={handleDownloadAndInstall}
-              onRelaunch={handleRelaunch}
-            />
-          </Row>
-        </RowList>
-      </SettingsGroup>
-
-      {/* ReleaseNotes owns its own heading so the sort menu can sit
-          beside it. */}
-      <div data-row="releaseHistory" className="mt-5">
-        <ReleaseNotes />
-      </div>
-    </>
-  );
-}
-
-// ── Subtitle ────────────────────────────────────────────────────
-
-function UpdateSubtitle({
-  status,
-  version,
-}: {
-  status: UpdateStatus;
-  version: string;
-}) {
-  const mono = <span className="font-mono text-accent">{version}</span>;
-
-  switch (status.step) {
-    case "available":
-      return (
-        <>
-          You're on {mono} —{" "}
-          <span className="text-accent">v{status.version} is available.</span>
-        </>
-      );
-    case "downloading":
-      return <>Downloading the update…</>;
-    case "ready":
-      return <>Update installed — restart to apply it.</>;
-    case "up-to-date":
-      return <>You're on {mono} — the latest version.</>;
-    case "checking":
-      return <>Checking for updates…</>;
-    // Idle has checked nothing, and error has just failed to check —
-    // neither is in a position to certify currency. Claiming it in both
-    // gave the page a header that argued with the row underneath it
-    // (most visibly: find an update, have the download fail, and the
-    // header would go back to insisting you were up to date).
-    case "idle":
-    case "error":
-    default:
-      return <>You're on {mono}.</>;
+export function updateDescription(s: UpdateSnapshot): string {
+  switch (s.phase) {
+    case "initializing": return "Loading update preferences…";
+    case "selecting": return "Saving update channel…";
+    case "checking": return "Checking for updates…";
+    case "available": return `Version ${s.version} is available.`;
+    case "downloading": return "Downloading and verifying update…";
+    case "installing": return "Installing update. Scrollr may close and reopen.";
+    case "restarting": return "Restarting Scrollr…";
+    case "ready": return "Update installed. Restart to apply it.";
+    case "current": return `You have the latest approved ${s.channel === "beta" ? "Beta channel" : "Stable"} release.`;
+    case "waiting": return `Your installed version is ahead of the ${s.channel === "beta" ? "Beta" : "Stable"} channel. Scrollr will wait for a newer release; it will not downgrade.`;
+    case "error": return "Could not complete the update. Your installed version has not been confirmed as current.";
+    default: return SETTINGS_ROWS.updates.checkNow.description;
   }
 }
 
-// ── Update row ──────────────────────────────────────────────────
-
-function UpdateRow({
-  status,
-  onCheck,
-  onDownload,
-  onRelaunch,
-}: {
-  status: UpdateStatus;
-  onCheck: () => void;
-  onDownload: () => void;
-  onRelaunch: () => void;
-}) {
-  const row = "flex items-center justify-between gap-4 px-4 py-3";
-
-  switch (status.step) {
-    case "idle":
-      return (
-        <div className={row}>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-ui-body font-medium text-fg">
-              {R.checkNow.label}
-            </span>
-            <span className="text-ui-meta text-fg-4">
-              {R.checkNow.description}
-            </span>
-          </div>
-          <SettingsButton onClick={onCheck}>Check now</SettingsButton>
-        </div>
-      );
-
-    case "checking":
-      return (
-        <div className={row}>
-          <span className="text-ui-body font-medium text-fg">
-            Checking for updates…
-          </span>
-          <div className="size-4 rounded-full border-2 border-fg-4 border-t-accent" />
-        </div>
-      );
-
-    case "up-to-date":
-      return (
-        <div className={row}>
-          <span className="text-ui-body font-medium text-accent">
-            You're on the latest version
-          </span>
-          <SettingsButton onClick={onCheck}>Check again</SettingsButton>
-        </div>
-      );
-
-    case "available":
-      return (
-        <div className="flex flex-col gap-2 px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-ui-body font-medium text-fg">
-              Update available:{" "}
-              <span className="font-semibold text-accent">
-                v{status.version}
-              </span>
-            </span>
-            <SettingsButton tone="accent" onClick={onDownload}>
-              Download &amp; install
-            </SettingsButton>
-          </div>
-          {status.body && (
-            <div className="max-h-32 overflow-y-auto scrollbar-thin rounded-md bg-base-200/50 px-2.5 py-2">
-              <p className="text-ui-meta leading-relaxed whitespace-pre-wrap">
-                {status.body}
-              </p>
+export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
+  const state = useUpdateController();
+  useEffect(() => { void updateController.initialize(); }, []);
+  const installed = state.currentVersion || appVersion || "";
+  const betaBuild = valid(installed) && prerelease(installed);
+  const busy = updateBusy(state);
+  const progress = state.total ? Math.min(100, Math.round(state.downloaded / state.total * 100)) : undefined;
+  return <>
+    <PageHeader title="Updates" subtitle={<>
+      Installed <span className="font-mono text-accent">{installed ? `v${installed}` : "—"}</span>
+      {betaBuild && <span className="ml-2 rounded bg-accent/10 px-2 py-0.5 text-accent">Beta build</span>}
+    </>} />
+    <SettingsGroup>
+      <RowList>
+        <Row id="releaseChannel">
+          <fieldset disabled={!state.initialized || channelLocked(state)} className="min-w-0 disabled:opacity-60">
+            <SegmentedRow label={SETTINGS_ROWS.updates.releaseChannel.label}
+              description="Choose updates for this device. Switching channels does not install anything."
+              value={state.channel} options={[{ value: "stable", label: "Stable" }, { value: "beta", label: "Beta" }]}
+              onChange={channel => { void updateController.selectChannel(channel); }} />
+          </fieldset>
+          <p className="px-4 pb-3 text-ui-meta leading-relaxed text-fg-3">
+            Beta includes early releases that may have bugs, plus newer stable releases. It uses your usual Scrollr account and data.
+            {state.channel === "beta" && " You can return to Stable here; Scrollr will wait until a newer stable version is available."}
+            {state.suggestBeta && " You installed a beta manually. Choose Beta above if you want future beta updates."}
+            {state.phase === "ready" && " Restart before changing channels."}
+          </p>
+        </Row>
+        <Row id="checkNow">
+          <div className="space-y-3 px-4 py-4" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-ui-body font-medium text-fg">{updateDescription(state)}</p>
+                {state.error && <p role="alert" className="mt-2 break-words text-ui-meta text-error">{state.error}</p>}
+              </div>
+              {!busy && (state.phase === "ready"
+                ? <SettingsButton tone="accent" onClick={() => { void updateController.restart(); }}>Restart now</SettingsButton>
+                : state.phase === "available"
+                  ? <SettingsButton tone="accent" onClick={() => { void updateController.install(state.offerId); }}>Download &amp; install</SettingsButton>
+                  : <SettingsButton onClick={() => { void updateController.check(); }}>{state.phase === "error" ? "Retry" : "Check now"}</SettingsButton>)}
             </div>
-          )}
-        </div>
-      );
-
-    case "downloading": {
-      const pct =
-        status.total > 0
-          ? Math.min(100, Math.round((status.downloaded / status.total) * 100))
-          : 0;
-      return (
-        <div className="flex flex-col gap-2 px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-ui-body font-medium text-fg">
-              Downloading update…
-            </span>
-            <span className="font-mono text-ui-chip tabular-nums">
-              {status.total > 0 ? `${pct}%` : "…"}
-            </span>
+            {state.phase === "downloading" && <>
+              <div role="progressbar" aria-label="Update download" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}
+                className="h-1 overflow-hidden rounded bg-base-300">
+                <div className="h-full rounded bg-accent" style={{ width: progress === undefined ? "30%" : `${progress}%` }} />
+              </div>
+              <p className="text-ui-meta text-fg-3">{(state.downloaded / 1_048_576).toFixed(1)} MB downloaded{progress !== undefined ? ` · ${progress}%` : ""}</p>
+            </>}
+            {state.phase === "available" && state.body && <p className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-ui-meta leading-relaxed text-fg-3">{state.body}</p>}
+            {(state.phase === "available" || state.phase === "error") && <SettingsButton onClick={() => {
+              const url = state.version ? `https://github.com/doughknee/myscrollr/releases/tag/desktop-v${encodeURIComponent(state.version)}` : "https://github.com/doughknee/myscrollr/releases";
+              void open(url).catch(() => {});
+            }}>View releases and installers</SettingsButton>}
           </div>
-          <div
-            role="progressbar"
-            aria-valuenow={pct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Download progress"
-            className="h-1 w-full overflow-hidden rounded-full bg-base-300"
-          >
-            <div
-              className={clsx(
-                "h-full rounded-full",
-                status.total > 0 ? "bg-accent" : "bg-accent/50",
-              )}
-              style={{ width: status.total > 0 ? `${pct}%` : "30%" }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    case "ready":
-      return (
-        <div className={row}>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-ui-body font-medium text-accent">
-              Update installed
-            </span>
-            <span className="text-ui-meta text-fg-4">
-              Restart to apply the update
-            </span>
-          </div>
-          <SettingsButton tone="accent" onClick={onRelaunch}>
-            Restart now
-          </SettingsButton>
-        </div>
-      );
-
-    case "error":
-      return (
-        <div className={row}>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-ui-body font-medium text-error">
-              Update failed
-            </span>
-            <span className="line-clamp-1 text-ui-meta text-fg-4">
-              {status.message}
-            </span>
-          </div>
-          <SettingsButton onClick={onCheck}>Retry</SettingsButton>
-        </div>
-      );
-  }
+        </Row>
+      </RowList>
+    </SettingsGroup>
+    <div data-row="releaseHistory" className="mt-5"><ReleaseNotes /></div>
+  </>;
 }

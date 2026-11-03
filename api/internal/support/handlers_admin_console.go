@@ -178,11 +178,11 @@ func explainFix(ctx context.Context, issueKey string) AdminFix {
 	mergedAt, err := linearClosingMerge(ctx, issueKey)
 	switch {
 	case err != nil:
-		f.Reason = fmt.Sprintf("%s is linked, but Linear could not be reached to check it (%v). An unreachable Linear is a reason to say nothing, never a reason to guess.", issueKey, err)
-	case mergedAt.IsZero():
+		f.Reason = fmt.Sprintf("%s is linked, but the release/issue evidence could not be checked (%v). Unavailable evidence is a reason to say nothing, never a reason to guess.", issueKey, err)
+	case mergedAt.MergedAt.IsZero():
 		f.Reason = fmt.Sprintf("%s is linked but is not in a completed state with a merged pull request behind it. Nothing is proven, so the reply may not name a version as the remedy.", issueKey)
 	default:
-		f.Reason = fmt.Sprintf("%s was fixed — merged %s — but no published release has gone out since, so there is still nothing for this user to update to.", issueKey, mergedAt.UTC().Format("2 Jan 2006"))
+		f.Reason = fmt.Sprintf("%s was fixed — merged %s — but a containing stable desktop release with verified installers has not been established. Do not claim the fix has shipped.", issueKey, mergedAt.MergedAt.UTC().Format("2 Jan 2006"))
 	}
 	return f
 }

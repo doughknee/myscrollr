@@ -81,9 +81,12 @@ type shippedRelease struct {
 	// URL, PublishedAt and Prerelease are read only by the proven-fix lookup
 	// (REL-259): which release carried a merged fix, and whether it is a build
 	// a user can actually be on.
-	URL         string
-	PublishedAt time.Time
-	Prerelease  bool
+	URL            string
+	PublishedAt    time.Time
+	Prerelease     bool
+	Assets         []string
+	Digests        map[string]string
+	VerifiedSource string
 }
 
 // buildKnownIssuesBlock renders the block. Pure, so the golden tests can pin
@@ -234,6 +237,10 @@ func fetchRecentReleases(ctx context.Context, count int) []shippedRelease {
 		Prerelease  bool   `json:"prerelease"`
 		HTMLURL     string `json:"html_url"`
 		PublishedAt string `json:"published_at"`
+		Assets      []struct {
+			Name   string `json:"name"`
+			Digest string `json:"digest"`
+		} `json:"assets"`
 	}
 	if err := json.Unmarshal(raw, &rels); err != nil {
 		log.Printf("[Triage] releases parse: %v", err)
@@ -249,9 +256,15 @@ func fetchRecentReleases(ctx context.Context, count int) []shippedRelease {
 			date = date[:10]
 		}
 		published, _ := time.Parse(time.RFC3339, r.PublishedAt)
+		var assets []string
+		digests := map[string]string{}
+		for _, asset := range r.Assets {
+			assets = append(assets, asset.Name)
+			digests[asset.Name] = asset.Digest
+		}
 		out = append(out, shippedRelease{
 			Tag: r.TagName, Name: r.Name, Date: date, Body: r.Body,
-			URL: r.HTMLURL, PublishedAt: published, Prerelease: r.Prerelease,
+			URL: r.HTMLURL, PublishedAt: published, Prerelease: r.Prerelease, Assets: assets, Digests: digests,
 		})
 	}
 	return out

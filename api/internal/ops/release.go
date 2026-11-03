@@ -155,12 +155,20 @@ func currentStep(ctx context.Context, runID int64) (string, error) {
 // button. Rename a step there, rename it here.
 func stepLabel(step string) string {
 	switch step {
-	case "Re-run the failed jobs and wait":
-		return "Rebuilding macOS…"
-	case "Check the draft has every platform", "Publish the release":
+	case "Complete the bound build":
+		return "Completing builds…"
+	case "Verify final bytes against this build's evidence":
+		return "Verifying installers…"
+	case "Publish verified release":
 		return "Publishing…"
-	case "Fire the publish-time workflows":
-		return "Announcing…"
+	case "Preserve highest Stable legacy Latest":
+		return "Checking legacy updates…"
+	case "Advance approved update channels":
+		return "Updating release channels…"
+	case "Verify public update channel bytes":
+		return "Checking public update feeds…"
+	case "Start stable announcement", "Start stable knowledge-base refresh", "Start website refresh":
+		return "Starting release follow-ups…"
 	default:
 		return "Starting…"
 	}

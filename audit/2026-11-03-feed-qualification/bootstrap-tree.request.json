@@ -1,0 +1,10 @@
+{
+  "tree": [
+    {
+      "path": "index.json",
+      "mode": "100644",
+      "type": "blob",
+      "content": "{\n  \"schema\": 1,\n  \"releases\": []\n}\n"
+    }
+  ]
+}

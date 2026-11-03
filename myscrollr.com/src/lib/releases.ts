@@ -19,6 +19,8 @@
  * interface inline (it must be self-contained), structurally identical.
  */
 
+import { compare, valid } from 'semver'
+
 export interface ReleaseEntry {
   /** Git tag, e.g. "desktop-v1.0.20". */
   tag: string
@@ -67,29 +69,16 @@ export function parseHeadline(name: string, body: string): string {
 }
 
 /**
- * Numeric segment-wise version compare ("1.0.20" > "1.0.3", which a
- * lexical compare gets wrong). Missing segments count as 0
- * ("1.0" === "1.0.0"); non-numeric segments fall back to a string
- * compare so weird tags still sort deterministically.
+ * SemVer precedence, including beta/rc/final. Historical partial numeric
+ * labels are padded; malformed display labels sort deterministically.
  * Returns <0 when a<b, 0 when equal, >0 when a>b.
  */
 export function compareVersions(a: string, b: string): number {
-  const as = a.split('.')
-  const bs = b.split('.')
-  const len = Math.max(as.length, bs.length)
-  for (let i = 0; i < len; i++) {
-    const sa = as[i] ?? '0'
-    const sb = bs[i] ?? '0'
-    const na = Number(sa)
-    const nb = Number(sb)
-    if (Number.isFinite(na) && Number.isFinite(nb)) {
-      if (na !== nb) return na - nb
-    } else {
-      const cmp = sa.localeCompare(sb)
-      if (cmp !== 0) return cmp
-    }
-  }
-  return 0
+  const normalize = (v: string) =>
+    /^\d+(\.\d+)?$/.test(v) ? `${v}${v.includes('.') ? '.0' : '.0.0'}` : v
+  const av = valid(normalize(a))
+  const bv = valid(normalize(b))
+  return av && bv ? compare(av, bv) : a.localeCompare(b)
 }
 
 export type SortKey = 'version' | 'date'
@@ -173,8 +162,7 @@ const generatedModules = import.meta.glob<{
 // The index access really can be undefined (the glob matches nothing
 // when the generated file is absent) — widen the type accordingly.
 const generatedModule = generatedModules['./releases.generated.ts'] as
-  | { RELEASES?: ReadonlyArray<ReleaseEntry> }
-  | undefined
+  { RELEASES?: ReadonlyArray<ReleaseEntry> } | undefined
 
 /** Releases baked in at build time; [] when the generated file is absent. */
 export const BUILD_TIME_RELEASES: ReadonlyArray<ReleaseEntry> =

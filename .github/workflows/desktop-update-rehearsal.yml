@@ -1,0 +1,97 @@
+name: Desktop Update Transport Rehearsal
+run-name: Rehearse signed updater transport for ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Exact signed draft or published desktop tag (no publication performed)"
+        required: true
+      run_id:
+        description: "Successful build run bound to this candidate"
+        required: true
+      from_version:
+        description: "Older version used by the test runtime; this is not an installed-app upgrade"
+        required: true
+        default: "1.7.2"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Authenticated draft visibility requires push access. Only read commands run.
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: desktop-release-artifacts
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      BUILD_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+        working-directory: desktop
+      - run: sudo apt-get update && sudo apt-get install -y minisign
+      - name: Verify source, proofs and final signed bytes without publishing
+        run: node desktop/scripts/finalize-release.mjs verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-transport-input
+          path: ${{ runner.temp }}/release-verify-${{ inputs.run_id }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  transport:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Prefer installed Rust over Homebrew stub
+        if: runner.os == 'macOS'
+        run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+          prefix-key: v1-rust-no-bin
+          cache-bin: "false"
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-transport-input
+          path: ${{ runner.temp }}/signed-updater-input
+      - name: Exercise real native downloader and signature failures
+        shell: bash
+        working-directory: desktop/src-tauri
+        env:
+          SCROLLR_REHEARSAL_DIR: ${{ runner.temp }}/signed-updater-input
+          SCROLLR_REHEARSAL_FROM_VERSION: ${{ inputs.from_version }}
+        run: |
+          set -euo pipefail
+          cargo test --locked --test update_transport -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/update-transport.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: update-transport-${{ runner.os }}
+          path: ${{ runner.temp }}/update-transport.log
+          if-no-files-found: warn
+          retention-days: 30
