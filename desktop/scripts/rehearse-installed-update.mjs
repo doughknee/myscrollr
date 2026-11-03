@@ -16,6 +16,7 @@ const json = file => JSON.parse(readFileSync(file, 'utf8'));
 const hash = file => createHash('sha256').update(readFileSync(file)).digest('hex');
 const run = (cmd, args, options = {}) => execFileSync(cmd, args, { encoding: 'utf8', timeout: 180_000, windowsHide: true, ...options }).trim();
 const ps = script => run('pwsh', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference = 'Stop'; ${script}`]);
+const recovering = process.env.SCROLLR_REHEARSAL_RECOVERY === 'true';
 const target = process.platform === 'win32' ? 'windows-x86_64-nsis' : process.platform === 'darwin' ? 'darwin-aarch64' : 'linux-x86_64';
 function verifiedPackage(directory, sourceOnly = false) {
   const resolved = path.resolve(directory);
@@ -104,7 +105,12 @@ if (process.argv[2] === 'prepare') {
   const source = verifiedPackage(process.env.SCROLLR_REHEARSAL_SOURCE_DIR, true);
   const destination = verifiedPackage(process.env.SCROLLR_REHEARSAL_DIR);
   const state = { source, destination, sourceVersion: source.version,
-    seed: { 'scrollr:store-migrated': true, 'scrollr:update-channel': 'beta', 'scrollr:rehearsal-marker': 'synthetic-profile-no-credentials' } };
+    seed: { 'scrollr:store-migrated': true, 'scrollr:update-channel': recovering ? 'stable' : 'beta', 'scrollr:rehearsal-marker': 'synthetic-profile-no-credentials' } };
+  if (recovering) {
+    assert.equal(source.version, '1.8.0-beta.1');
+    assert.equal(destination.version, '1.7.3');
+    state.seed['scrollr:settings'] = { appearance: { themeFamily: 'catppuccin', themeMode: 'dark' }, ticker: { scrollMode: 'pages' }, window: { tickerDisplays: { 'synthetic-disconnected-display': { mode: 'grid', readingSize: 125 } } } };
+  }
   if (process.platform === 'win32') {
     state.executable = path.join(process.env.LOCALAPPDATA, 'Scrollr/scrollr-desktop.exe');
     assert(!existsSync(state.executable), 'Runner must not have an existing installation');
@@ -147,7 +153,7 @@ if (process.argv[2] === 'prepare') {
   const result = { source: state.sourceVersion, target: state.destination.version, platform: process.platform,
     nativeInstaller: 'passed', packagedRestart: 'passed', syntheticPreferences: 'retained',
     limitation: 'Mock updater host with current locked plugin; not the source app controller, public HTTPS feeds, login or hardware testing.',
-    legacySource: state.source.legacy };
+    recovery: recovering, legacySource: state.source.legacy };
   writeFileSync(path.join(root, 'result.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 } else throw Error('Use prepare or finish');

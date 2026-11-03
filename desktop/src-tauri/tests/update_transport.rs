@@ -16,6 +16,21 @@ use std::time::Duration;
 use tauri::test::{mock_builder, mock_context, noop_assets};
 use tauri_plugin_updater::UpdaterExt;
 
+#[path = "../src/commands/recovery.rs"]
+mod recovery;
+
+fn recovering() -> bool {
+    std::env::var("SCROLLR_REHEARSAL_RECOVERY").as_deref() == Ok("true")
+}
+
+fn verify_recovery_input(current: &str, manifest: &Value, target: &str) {
+    if recovering() {
+        assert!(recovery::matches_artifact(current, manifest["version"].as_str().unwrap(), target,
+            manifest["platforms"][target]["url"].as_str().unwrap(),
+            manifest["platforms"][target]["signature"].as_str().unwrap()));
+    }
+}
+
 struct Server {
     address: std::net::SocketAddr,
     stop: Arc<AtomicBool>,
@@ -156,6 +171,7 @@ fn signed_native_transport() {
     let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
     let current =
         std::env::var("SCROLLR_REHEARSAL_FROM_VERSION").unwrap_or_else(|_| "1.7.2".into());
+    verify_recovery_input(&current, &manifest, target);
     let mut context = mock_context(noop_assets());
     context.package_info_mut().version = current.parse().unwrap();
     context.config_mut().identifier = "com.scrollr.updater-transport-test".into();
@@ -189,6 +205,10 @@ fn signed_native_transport() {
                     .unwrap()])
                 .unwrap()
                 .timeout(Duration::from_secs(30))
+                .version_comparator(move |current, release| {
+                    if recovering() { recovery::accepts(&current.to_string(), &release.version.to_string(), target) }
+                    else { release.version > current }
+                })
                 .build()
                 .unwrap();
             let result = updater.check().await;
@@ -292,6 +312,7 @@ fn signed_native_install() {
     assert!(!name.contains(['/', '\\']) && name != "." && name != "..");
     let package = Arc::new(std::fs::read(directory.join(name)).unwrap());
     let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    verify_recovery_input(state["sourceVersion"].as_str().unwrap(), &manifest, target);
     let mut context = mock_context(noop_assets());
     context.package_info_mut().version = state["sourceVersion"].as_str().unwrap().parse().unwrap();
     context.config_mut().identifier = "com.scrollr.updater-install-test".into();
@@ -318,6 +339,10 @@ fn signed_native_install() {
                 .unwrap()])
             .unwrap()
             .timeout(Duration::from_secs(30))
+            .version_comparator(move |current, release| {
+                if recovering() { recovery::accepts(&current.to_string(), &release.version.to_string(), target) }
+                else { release.version > current }
+            })
             .build()
             .unwrap()
             .check()

@@ -4,6 +4,10 @@ run-name: Rehearse signed updater transport for ${{ inputs.tag }}
 on:
   workflow_dispatch:
     inputs:
+      recovery:
+        description: "Rehearse only the pinned Beta-to-Stable pair; never publishes"
+        type: boolean
+        default: false
       tag:
         description: "Exact signed draft or published desktop tag (no publication performed)"
         required: true
@@ -26,7 +30,7 @@ permissions:
 
 jobs:
   verify:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || (inputs.recovery && inputs.tag == 'desktop-v1.7.3' && inputs.run_id == '41688396593' && inputs.source_tag == 'desktop-v1.8.0-beta.1' && inputs.source_run_id == '41622562602' && inputs.from_version == '1.8.0-beta.1')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Authenticated draft visibility requires push access. Only read commands run.
@@ -121,6 +125,7 @@ jobs:
         working-directory: desktop/src-tauri
         env:
           SCROLLR_REHEARSAL_DIR: ${{ runner.temp }}/signed-updater-input
+          SCROLLR_REHEARSAL_RECOVERY: ${{ inputs.recovery }}
           SCROLLR_REHEARSAL_FROM_VERSION: ${{ inputs.from_version }}
         run: |
           set -euo pipefail
@@ -137,6 +142,7 @@ jobs:
           SCROLLR_REHEARSAL_SOURCE_DIR: ${{ runner.temp }}/signed-updater-source
           SCROLLR_REHEARSAL_DIR: ${{ runner.temp }}/signed-updater-input
           SCROLLR_REHEARSAL_INSTALL: "true"
+          SCROLLR_REHEARSAL_RECOVERY: ${{ inputs.recovery }}
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
