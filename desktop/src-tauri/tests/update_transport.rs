@@ -1,5 +1,6 @@
 //! Opt-in native updater transport rehearsal against already verified artifacts.
-//! No installation, production feed writes, or production endpoint override.
+//! Transport runs never install. The separate install test requires disposable CI.
+//! No production feed writes or production endpoint override.
 //! Run with SCROLLR_REHEARSAL_DIR=<finalizer verification directory> and
 //! cargo test --test update_transport -- --ignored --nocapture.
 use serde_json::{json, Value};
@@ -34,11 +35,14 @@ impl Server {
                     thread::sleep(Duration::from_millis(5));
                     continue;
                 };
+                // macOS inherits O_NONBLOCK from the listener. A blocking
+                // write_all otherwise stops partway through a large package.
+                stream.set_nonblocking(false).unwrap();
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .unwrap();
                 stream
-                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .set_write_timeout(Some(Duration::from_secs(30)))
                     .unwrap();
                 // TCP may split even a tiny HTTP header across reads. Drain the
                 // complete request before responding/closing to avoid Windows RSTs.
@@ -85,15 +89,18 @@ impl Server {
                     changed[0] ^= 1;
                     let _ = stream.write_all(&changed);
                 } else if is_package && mode == "stall" {
+                    // Establish a body stream before stalling, so this checks
+                    // a transfer timeout rather than a header/connection race.
+                    let _ = stream.write_all(&body[..1]);
                     // Bounded independently of the updater timeout and test cleanup.
-                    for _ in 0..100 {
+                    for _ in 0..500 {
                         if stopped.load(Ordering::Relaxed) {
                             break;
                         }
                         thread::sleep(Duration::from_millis(10));
                     }
                 } else {
-                    let _ = stream.write_all(&body);
+                    stream.write_all(&body).unwrap();
                 }
                 let _ = stream.shutdown(std::net::Shutdown::Write);
             }
@@ -181,7 +188,7 @@ fn signed_native_transport() {
                     .parse()
                     .unwrap()])
                 .unwrap()
-                .timeout(Duration::from_secs(5))
+                .timeout(Duration::from_secs(30))
                 .build()
                 .unwrap();
             let result = updater.check().await;
@@ -192,7 +199,7 @@ fn signed_native_transport() {
                     .unwrap()
                     .expect("Target must be newer than the test source version");
                 if mode == "stall" {
-                    update.timeout = Some(Duration::from_millis(150));
+                    update.timeout = Some(Duration::from_millis(500));
                 }
                 let downloaded = update.download(|_, _| {}, || {}).await;
                 if mode == "valid" {
@@ -205,7 +212,7 @@ fn signed_native_transport() {
                         ("interrupted", tauri_plugin_updater::Error::Reqwest(_)) => {}
                         ("stall", tauri_plugin_updater::Error::Reqwest(cause))
                             if cause.is_timeout() => {}
-                        _ => panic!("Unexpected {mode} rejection: {error}"),
+                        _ => panic!("Unexpected {mode} rejection: {error:?}"),
                     }
                 }
             }
@@ -234,4 +241,94 @@ fn signed_native_transport() {
         }
     });
     println!("PASS signed download and rejection checks. No installation, relaunch or public-feed claim.");
+}
+
+#[test]
+#[ignore = "installs only into an explicitly prepared disposable GitHub runner"]
+fn signed_native_install() {
+    if std::env::var("SCROLLR_REHEARSAL_INSTALL").as_deref() != Ok("true") {
+        println!("Install rehearsal not requested; no installer launched.");
+        return;
+    }
+    assert!(cfg!(debug_assertions));
+    assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
+    assert_eq!(
+        std::env::var("RUNNER_ENVIRONMENT").as_deref(),
+        Ok("github-hosted")
+    );
+    let temp = PathBuf::from(std::env::var("RUNNER_TEMP").unwrap())
+        .canonicalize()
+        .unwrap();
+    let directory = PathBuf::from(std::env::var("SCROLLR_REHEARSAL_DIR").unwrap())
+        .canonicalize()
+        .unwrap();
+    assert!(directory.starts_with(&temp));
+    let state: Value =
+        serde_json::from_slice(&std::fs::read(temp.join("update-install/state.json")).unwrap())
+            .unwrap();
+    let executable = PathBuf::from(state["executable"].as_str().unwrap())
+        .canonicalize()
+        .unwrap();
+    if cfg!(target_os = "windows") {
+        let expected = PathBuf::from(std::env::var("LOCALAPPDATA").unwrap())
+            .join("Scrollr/scrollr-desktop.exe")
+            .canonicalize()
+            .unwrap();
+        assert_eq!(executable, expected);
+    } else {
+        assert!(executable.starts_with(temp.join("update-install")));
+    }
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(directory.join("latest.json")).unwrap()).unwrap();
+    let target = if cfg!(target_os = "windows") {
+        "windows-x86_64-nsis"
+    } else if cfg!(target_os = "macos") {
+        "darwin-aarch64"
+    } else {
+        "linux-x86_64"
+    };
+    let url = url::Url::parse(manifest["platforms"][target]["url"].as_str().unwrap()).unwrap();
+    let name = url.path_segments().unwrap().next_back().unwrap();
+    assert!(!name.contains(['/', '\\']) && name != "." && name != "..");
+    let package = Arc::new(std::fs::read(directory.join(name)).unwrap());
+    let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    let mut context = mock_context(noop_assets());
+    context.package_info_mut().version = state["sourceVersion"].as_str().unwrap().parse().unwrap();
+    context.config_mut().identifier = "com.scrollr.updater-install-test".into();
+    context.config_mut().plugins.0.insert(
+        "updater".into(),
+        json!({
+            "pubkey": config["plugins"]["updater"]["pubkey"],
+            "windows": { "installMode": "quiet" }
+        }),
+    );
+    let app = mock_builder()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .build(context)
+        .unwrap();
+    tauri::async_runtime::block_on(async {
+        let server = Server::start(manifest.clone(), package.clone(), "valid");
+        let update = app
+            .updater_builder()
+            .target(target)
+            .executable_path(executable)
+            .no_proxy()
+            .endpoints(vec![format!("http://{}/manifest", server.address)
+                .parse()
+                .unwrap()])
+            .unwrap()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .unwrap()
+            .check()
+            .await
+            .unwrap()
+            .expect("Target must be newer");
+        let downloaded = update.download(|_, _| {}, || {}).await.unwrap();
+        assert_eq!(downloaded, *package);
+        println!("Invoking native installer. External checks must verify replacement, restart and retained preferences.");
+        // Windows starts the signed installer and exits this test process. The
+        // workflow waits for the actual replacement instead of trusting exit 0.
+        update.install(downloaded).unwrap();
+    });
 }
