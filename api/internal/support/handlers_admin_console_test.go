@@ -504,7 +504,7 @@ func TestExplainFixSaysWhichCheckFailed(t *testing.T) {
 	if f.Proven {
 		t.Error("nothing may be proven when Linear cannot be reached")
 	}
-	if !strings.Contains(f.Reason, "could not be reached") {
+	if !strings.Contains(f.Reason, "could not be checked") {
 		t.Errorf("reason = %q, want it to say the lookup failed rather than that no fix exists", f.Reason)
 	}
 }

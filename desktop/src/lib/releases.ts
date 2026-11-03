@@ -18,6 +18,7 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import DOMPurify from "dompurify";
 import { Marked } from "marked";
+import { compare, valid } from "semver";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -102,21 +103,22 @@ export function extractHeadline(name: string, body: string): string {
 }
 
 /**
- * Numeric segment-wise semver compare (NOT lexical): "1.0.20" > "1.0.3".
- * Missing segments count as 0, so "1.1" === "1.1.0". Non-numeric
- * segments (e.g. a "beta" suffix segment) compare as 0.
+ * SemVer precedence, with partial historical display labels normalized.
+ * Malformed display labels have a deterministic string fallback; the
+ * compatibility gate below never uses that fallback.
  * Returns <0 / 0 / >0 like a standard comparator.
  */
 export function compareVersions(a: string, b: string): number {
-  const as = a.split(".");
-  const bs = b.split(".");
-  const len = Math.max(as.length, bs.length);
-  for (let i = 0; i < len; i++) {
-    const av = parseInt(as[i] ?? "0", 10) || 0;
-    const bv = parseInt(bs[i] ?? "0", 10) || 0;
-    if (av !== bv) return av - bv;
-  }
-  return 0;
+  // Historical display labels can omit patch/minor. Never coerce prereleases.
+  const normalize = (v: string) => /^\d+(\.\d+)?$/.test(v) ? `${v}${v.includes(".") ? ".0" : ".0.0"}` : v;
+  const av = valid(normalize(a));
+  const bv = valid(normalize(b));
+  return av && bv ? compare(av, bv) : a.localeCompare(b);
+}
+
+/** Compatibility decisions accept full SemVer only and fail open on bad policy. */
+export function requiresUpdate(installed: string, minimum: string): boolean {
+  return Boolean(valid(installed) && valid(minimum) && compare(installed, minimum) < 0);
 }
 
 /**

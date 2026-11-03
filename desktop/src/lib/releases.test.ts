@@ -14,6 +14,7 @@ import {
   parseVersionFromTag,
   extractHeadline,
   compareVersions,
+  requiresUpdate,
   mapRelease,
   formatReleaseDate,
   relativeTime,
@@ -81,6 +82,23 @@ describe("extractHeadline", () => {
 // ── compareVersions ─────────────────────────────────────────────
 
 describe("compareVersions", () => {
+  it.each([
+    ["1.8.0-beta.1", "1.8.0"],
+    ["1.8.0-beta.2", "1.8.0-beta.10"],
+    ["1.8.0-beta.9", "1.8.0-rc.1"],
+  ])("orders %s before %s", (a, b) => {
+    expect(compareVersions(a, b)).toBeLessThan(0);
+    expect(compareVersions(b, a)).toBeGreaterThan(0);
+  });
+  it("ignores build metadata and rejects malformed compatibility policy", () => {
+    expect(compareVersions("1.8.0+one", "1.8.0+two")).toBe(0);
+    expect(requiresUpdate("1.8.0-beta.1", "1.8.0")).toBe(true);
+    expect(requiresUpdate("1.8.0", "1.8.0-beta.9")).toBe(false);
+    for (const invalid of ["", "banana", "1.8", "1.8.0-beta.01", "999oops"]) {
+      expect(requiresUpdate("1.7.2", invalid)).toBe(false);
+      expect(requiresUpdate(invalid, "1.8.0")).toBe(false);
+    }
+  });
   it("compares numeric segments, not lexically", () => {
     // Lexical compare would say "1.0.3" > "1.0.20".
     expect(compareVersions("1.0.20", "1.0.3")).toBeGreaterThan(0);

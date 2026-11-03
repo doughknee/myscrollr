@@ -187,13 +187,13 @@ func TestFinishWhileRunningIs409(t *testing.T) {
 func TestStatus(t *testing.T) {
 	gh := &fakeGitHub{
 		runs: run("Finish Desktop Release", "completed", "failure") + "," + run("Finish desktop-v1.7.0", "in_progress", ""),
-		jobs: `{"jobs":[{"steps":[{"name":"Set up job","status":"completed"},{"name":"Re-run the failed jobs and wait","status":"in_progress"},{"name":"Publish the release","status":"queued"}]}]}`,
+		jobs: `{"jobs":[{"steps":[{"name":"Set up job","status":"completed"},{"name":"Complete the bound build","status":"in_progress"},{"name":"Publish verified release","status":"queued"}]}]}`,
 	}
 	app := setup(t, gh)
 	code, body, _ := do(t, app, http.MethodGet, "/ops/release/status?key="+testKey)
 	var s statusResponse
 	json.Unmarshal([]byte(body), &s)
-	if code != http.StatusOK || s.Status != "in_progress" || s.Step != "Re-run the failed jobs and wait" || s.Label != "Rebuilding macOS…" || s.URL == "" {
+	if code != http.StatusOK || s.Status != "in_progress" || s.Step != "Complete the bound build" || s.Label != "Completing builds…" || s.URL == "" {
 		t.Errorf("got %d %s", code, body)
 	}
 
@@ -206,13 +206,13 @@ func TestStatus(t *testing.T) {
 
 func TestStepLabel(t *testing.T) {
 	for step, want := range map[string]string{
-		"":                                   "Starting…",
-		"Set up job":                         "Starting…",
-		"Find the build run":                 "Starting…",
-		"Re-run the failed jobs and wait":    "Rebuilding macOS…",
-		"Check the draft has every platform": "Publishing…",
-		"Publish the release":                "Publishing…",
-		"Fire the publish-time workflows":    "Announcing…",
+		"":                                    "Starting…",
+		"Set up job":                          "Starting…",
+		"Bind draft and run before any rerun": "Starting…",
+		"Complete the bound build":            "Completing builds…",
+		"Verify final bytes against this build's evidence": "Verifying installers…",
+		"Publish verified release":                         "Publishing…",
+		"Start stable announcement":                        "Starting release follow-ups…",
 	} {
 		if got := stepLabel(step); got != want {
 			t.Errorf("stepLabel(%q) = %q, want %q", step, got, want)
@@ -228,7 +228,7 @@ func TestStepNamesMatchWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	wf := string(b)
-	for _, step := range []string{"Find the build run", "Re-run the failed jobs and wait", "Check the draft has every platform", "Publish the release", "Fire the publish-time workflows"} {
+	for _, step := range []string{"Bind draft and run before any rerun", "Complete the bound build", "Verify final bytes against this build's evidence", "Publish verified release", "Start stable announcement", "Start stable knowledge-base refresh", "Start website refresh"} {
 		if !strings.Contains(wf, "- name: "+step) {
 			t.Errorf("finish-release.yml has no step %q", step)
 		}
