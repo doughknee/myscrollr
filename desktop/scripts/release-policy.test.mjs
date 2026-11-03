@@ -117,6 +117,24 @@ test('tag must resolve to source; only an unpublished draft can have no tag yet'
   assert.throws(() => validateTagCommit('b'.repeat(40), sha, true));
 });
 
+test('explicit MSI numeric version stays bound to the semantic app version', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'scrollr-version-test-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, 'src-tauri'));
+  const version = '1.8.0-beta.1';
+  await writeFile(path.join(root, 'package.json'), JSON.stringify({ version }));
+  await writeFile(path.join(root, 'package-lock.json'), JSON.stringify({ version, packages: { '': { version } } }));
+  await writeFile(path.join(root, 'src-tauri/Cargo.toml'), `version = "${version}"\n`);
+  await writeFile(path.join(root, 'src-tauri/Cargo.lock'), `name = "scrollr-desktop"\nversion = "${version}"\n`);
+  const config = async numeric => writeFile(path.join(root, 'src-tauri/tauri.conf.json'), JSON.stringify({ version, bundle: { windows: { wix: { version: numeric } } } }));
+  await config('1.8.0.1');
+  assert.equal(await validateVersions(root), version);
+  for (const bad of ['1.7.2.1', '1x8x0x1', '1.8.0.65536', '1.8.0.beta']) {
+    await config(bad);
+    await assert.rejects(() => validateVersions(root));
+  }
+});
+
 test('updater URL rejects traversal, credentials, cross-release and cross-repository assets', () => {
   const prefix = `https://github.com/${repo}/releases/download/${stable.tag_name}/`;
   assert.equal(releaseAssetName(prefix+'file.msi',repo,stable.tag_name),'file.msi');

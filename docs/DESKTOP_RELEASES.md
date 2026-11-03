@@ -7,8 +7,8 @@ pipeline. There is no second app, backend, account, or entitlement system.
 
 ## Current implementation boundary
 
-The desktop version remains 1.7.2. Implementing this foundation does not publish
-a release or repair the live legacy update URL. The legacy repair below is a
+The first unpublished candidate is 1.8.0-beta.1. Preparing a candidate does not
+publish a release or repair the live legacy update URL. The legacy repair below is a
 separate production metadata change. No tester build is qualified by unit tests.
 
 The native updater is pinned to 2.13.3 and application configuration forbids
@@ -39,6 +39,19 @@ with the repository-locked Tauri CLI and independently checked with Minisign.
 Windows proof follows Authenticode verification; macOS proof follows app and DMG
 verification/stapling. Proof hashes use uploaded asset names, including Tauri
 Action's architecture suffix on the macOS updater archive.
+
+The candidate's MSI numeric version is explicitly `1.8.0.1`: the pinned WiX
+bundler cannot derive a numeric version from `beta.1`. App/package/Cargo/updater
+identity remains `1.8.0-beta.1`; the version guard rejects a numeric MSI override
+with different major/minor/patch. Qualify Beta-to-final MSI replacement before
+Stable promotion; installer numbering is not the updater's SemVer policy.
+
+The main build also runs bounded packaged startup smoke checks on disposable
+runners: signed NSIS install and native window on Windows, launch from the
+verified mounted DMG copy on macOS, and the final repackaged AppImage under Xvfb
+on Linux. Each must stay alive for 30 seconds. These checks do not prove login,
+rendered content, real update transport, physical Fill cursor behavior, sleep/wake,
+or monitor reconnect. Evidence is retained for 30 days beside build proofs.
 
 ## Finalize only after the release decision
 
