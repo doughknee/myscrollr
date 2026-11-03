@@ -78,7 +78,7 @@ jobs:
 
       - name: Release safety policy fixtures
         if: matrix.dir == 'desktop'
-        run: node --test scripts/release-policy.test.mjs scripts/release-channels.test.mjs
+        run: node --test scripts/release-policy.test.mjs scripts/release-channels.test.mjs scripts/release-channels-cli.test.mjs scripts/release-effects.test.mjs scripts/verify-release-feeds.test.mjs
 
       - name: Verify website event proxy
         if: matrix.dir == 'myscrollr.com'

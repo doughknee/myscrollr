@@ -1,0 +1,14 @@
+[
+  {
+    "file": "Scrollr_1.7.2_x64_en-US.msi",
+    "status": "Valid",
+    "publisher": "CN=\"Scrollr, LLC\", O=\"Scrollr, LLC\", L=Burbank, S=California, C=US",
+    "timestamped": true
+  },
+  {
+    "file": "Scrollr_1.7.2_x64-setup.exe",
+    "status": "Valid",
+    "publisher": "CN=\"Scrollr, LLC\", O=\"Scrollr, LLC\", L=Burbank, S=California, C=US",
+    "timestamped": true
+  }
+]
