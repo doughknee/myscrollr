@@ -1,5 +1,36 @@
 import { test, expect } from "@playwright/test";
 
+for (const height of [240, 360]) {
+  for (const reading of [100, 150]) {
+    test(`sports composition uses short display height ${height} at ${reading}% without overlap`, async ({ page }) => {
+      await page.setViewportSize({ width: 1920, height });
+      await page.goto(`/ticker-shim.html?fixture=pages&pages=1&fill=grid&reading=${reading}&theme=default-light`);
+      const games = page.locator('[data-page] [data-chip]').filter({ has: page.locator('[data-part="away-row"]') });
+      await expect(games.first()).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      for (const metrics of await games.evaluateAll(nodes => nodes.map(cell => {
+        const box = cell.getBoundingClientRect();
+        const rect = (part: string) => cell.querySelector(`[data-part="${part}"]`)!.getBoundingClientRect();
+        const away = rect("away-row"), home = rect("home-row"), status = rect("status");
+        return {
+          rowShare: (away.height + home.height) / box.height,
+          ordered: away.bottom <= home.top + 0.5 && home.bottom <= status.top + 0.5,
+          footerGap: (box.bottom - status.bottom) / box.height,
+          contained: ["away-name", "away-score", "away-record", "home-name", "home-score", "home-record", "status"].every(part => {
+            const r = rect(part);
+            return r.left >= box.left && r.right <= box.right + 0.5 && r.top >= box.top && r.bottom <= box.bottom + 0.5;
+          }),
+        };
+      }))) {
+        expect(metrics.rowShare).toBeGreaterThan(0.6);
+        expect(metrics.ordered).toBe(true);
+        expect(metrics.footerGap).toBeLessThan(0.1);
+        expect(metrics.contained).toBe(true);
+      }
+    });
+  }
+}
+
 test("Fill controls idle without hiding the native pointer and wake on movement or focus", async ({
   page,
   context,
@@ -84,7 +115,16 @@ for (const [width, height] of [[3440, 1440], [1920, 360], [800, 480], [720, 1280
       expect(content.y + content.height).toBeCloseTo(height, 0);
       const pins = page.locator('[data-display-header] [data-pin-subject]');
       if (width === 3440 && reading === 100) expect(await pins.count()).toBe(3);
-      if (width < height) expect(await pins.count()).toBe(0);
+      if (width < height) {
+        expect(await pins.count()).toBe(0);
+        const utilities = page.locator('[data-display-header] [data-edge-utils] > [data-widget]');
+        await expect(utilities).toHaveCount(2);
+        const first = (await utilities.first().boundingBox())!;
+        const last = (await utilities.last().boundingBox())!;
+        // The band is 192/560 of this portrait header. No phantom pin gap.
+        expect(first.x / width).toBeCloseTo(192 / 560, 2);
+        expect(last.x + last.width).toBeCloseTo(width, 0);
+      }
     });
   }
 }

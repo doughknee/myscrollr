@@ -44,6 +44,22 @@ async function edges(page: Page, strip: string) {
 test.describe("page cells hold still", () => {
   test.use({ viewport: { width: 1920, height: 1000 } });
 
+  test("Fill sports rows and records hold their vertical positions across states", async ({ page }) => {
+    await page.goto("/ticker-shim.html?cells=1");
+    const cells = page.locator('[data-strip="game-fill"] [data-state]');
+    await cells.first().waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    const positions = await cells.evaluateAll(nodes => nodes.map(cell => {
+      const origin = cell.getBoundingClientRect();
+      return ["away-name", "away-score", "away-record", "home-name", "home-score", "home-record", "status"].map(part => {
+        const rect = cell.querySelector(`[data-part="${part}"]`)!.getBoundingClientRect();
+        return [part, (rect.top - origin.top).toFixed(1), rect.height.toFixed(1)];
+      });
+    }));
+    expect(positions.length).toBeGreaterThan(1);
+    for (const next of positions.slice(1)) expect(next).toEqual(positions[0]);
+  });
+
   // SCROLLR-296 round 6: the price reserves its length plus one at mount, so a
   // digit-boundary crossing while the page is up, either way, moves nothing.
   test("quote: a price crossing a digit boundary, up or down, moves nothing", async ({ page }) => {

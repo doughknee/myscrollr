@@ -794,6 +794,10 @@ No copied renderer, custom playlist, manual row count or extra connection.
   `gridHeaderPlan` reserves the band and up to a third of the remaining width for
   180px utility slots (at least one when utilities exist); pins use the remainder.
   Both admission and rendering use this plan and active data-pin eligibility.
+  After placing pins, spare width can show additional utilities; when no pin fits,
+  utilities share all space after the band. This does not reduce admission capacity:
+  adding a pin can return utilities to grouped rotation. Saved missing-data pins
+  still reserve their slots and do not surrender their space to utilities.
   Pin cells grow into spare header width but never below their family minimum.
   Eligible saved pins keep their width reservation when data is temporarily absent;
   pin data changes cannot alter the main grid height. Refusal names the header,
@@ -802,7 +806,10 @@ No copied renderer, custom playlist, manual row count or extra connection.
   row. Capacity is columns × rows.
   A short, wide display naturally has one row; portrait has fewer columns. No
   item is duplicated to occupy spare cells. Sports uses the same `GameCell`, with
-  scores reserved at 26px and status below the teams. Quotes use the shared
+  two equal-height team rows, 32px crests and reserved scores, 18px names and
+  always-reserved 12px team records. A fixed 32px status row sits below the teams;
+  game phase and clock occupy opposite ends. The composition uses the row height
+  without increasing type indefinitely on taller screens. Quotes use the shared
   `QuoteCell` expanded presentation: symbol and reserved change across the top,
   a 26px reserved price beneath, and the existing sparkline/range across the
   remaining cell width and height. Its amplitude calculation and missing-data

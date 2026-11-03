@@ -217,14 +217,14 @@ function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
 }
 
 /** One utility: every item sized in, the one for this turn shown, rolled in with the swipe. */
-const Slot = memo(function Slot({ u, tick, reduced, onClick }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string) => void }) {
+const Slot = memo(function Slot({ u, tick, reduced, onClick, stretch = false }: { u: EdgeUtility; tick: number; reduced: boolean; onClick?: (id: string) => void; stretch?: boolean }) {
   const at = ((tick % u.items.length) + u.items.length) % u.items.length;
   const it = u.items[at];
   const roll = reduced
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.4, ease: "linear" as const } }
     : { initial: { y: "100%" }, animate: { y: "0%" }, exit: { y: "-100%" }, transition: { duration: 0.45, ease: EASE } };
   return (
-    <button type="button" onClick={() => onClick?.(it.id)} data-chip="" className="relative grid h-full max-w-[180px] shrink-0 overflow-hidden">
+    <button type="button" onClick={() => onClick?.(it.id)} data-chip="" className={clsx("relative grid h-full shrink-0 overflow-hidden", stretch ? "w-full" : "max-w-[180px]")}>
       {u.items.map((x) => (
         <SlotFace key={x.id} it={x} sizer />
       ))}
@@ -251,9 +251,10 @@ function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipCli
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth, stretchPins = false, reservedPins }: {
+export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth, stretchUtilities = false, stretchPins = false, reservedPins }: {
   edge: Edge;
   stretchPins?: boolean;
+  stretchUtilities?: boolean;
   reservedPins?: readonly WidgetPin[];
   maxUtilitiesWidth?: number;
   /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
@@ -294,9 +295,9 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
         {utilities.map(({ index, tick: itemTick }, i) => {
           const u = edge.utilities[index];
           return (
-          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={{ ...accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark)), width: maxUtilitiesWidth === undefined ? undefined : 180 }}>
+          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={{ ...accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark)), width: maxUtilitiesWidth === undefined ? undefined : stretchUtilities ? maxUtilitiesWidth / utilities.length : 180 }}>
             {i > 0 && <Rule />}
-            <Slot u={u} tick={itemTick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
+            <Slot u={u} tick={itemTick} reduced={reduced} stretch={stretchUtilities} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>
           );
         })}

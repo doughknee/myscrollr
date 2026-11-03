@@ -14,10 +14,10 @@ describe("Fill header capacity", () => {
     (width, height) => {
       for (const reading of [100, 125, 150]) {
         const geometry = displayGeometry(width, height, "grid", reading);
-        const header = gridHeaderPlan(geometry.width, 5, tabs);
         const pins = [nfl(1), news(1), nfl(2), news(2)];
+        const header = gridHeaderPlan(geometry.width, 5, tabs, pins);
         const placed = stepBack(pins, header.room);
-        expect(header.utilitiesWidth + 1 + (header.room.budget ?? 0) + 192).toBeCloseTo(geometry.width / header.scale);
+        expect(header.utilitiesWidth + 1 + (placed.length ? 1 : 0) + placed.reduce((sum, p) => sum + pinWidth(p.widget), 0) + 192).toBeLessThanOrEqual(geometry.width / header.scale + 0.01);
         expect(header.utilitiesWidth).toBeGreaterThanOrEqual(180);
         expect(fitsEdge(placed, header.room)).toBe(true);
         if (placed.length < pins.length) {
@@ -28,6 +28,16 @@ describe("Fill header capacity", () => {
       }
     },
   );
+  it("portrait reclaims the unusable pin area for both utilities without changing admission", () => {
+    const header = gridHeaderPlan(420, 2, tabs, [nfl(1)]);
+    expect(stepBack([nfl(1)], header.room)).toHaveLength(0);
+    expect(header.utilitiesWidth).toBe(367);
+    expect(header.room).toEqual(gridHeaderPlan(420, 2, tabs).room);
+    const wide = gridHeaderPlan(800, 2, tabs, [nfl(1)]);
+    expect(stepBack([nfl(1)], wide.room)).toHaveLength(1);
+    expect(wide.utilitiesWidth).toBe(360);
+    expect(gridHeaderPlan(420, 0, tabs).utilitiesWidth).toBe(0);
+  });
   it("ignores inactive/utility pins in admission and restores saved overflow after widening", () => {
     const pins = [nfl(1), news(1), nfl(2)];
     const narrow = gridHeaderPlan(420, 2, tabs).room;

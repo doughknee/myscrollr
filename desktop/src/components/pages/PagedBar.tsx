@@ -440,7 +440,7 @@ export default function PagedBar({
   const [localWidth, setLocalWidth] = useState(0);
   const grid = fillHeight !== undefined;
   const utilities = useMemo(() => buildEdge(widgetData, [], dashboard, activeTabs).utilities, [widgetData, dashboard, activeTabs]);
-  const header = useMemo(() => gridHeaderPlan(localWidth, utilities.length, activeTabs), [localWidth, utilities.length, activeTabs]);
+  const header = useMemo(() => gridHeaderPlan(localWidth, utilities.length, activeTabs, pins), [localWidth, utilities.length, activeTabs, pins]);
   const room = useMemo(() => grid ? header.room : independent ? { bar: localWidth, util: utilW } : sharedRoom, [independent, grid, header, localWidth, utilW, sharedRoom]);
   const onEdge = useMemo(() => {
     const eligible = grid ? eligibleEdgePins(pins, activeTabs) : pins;
@@ -758,7 +758,7 @@ export default function PagedBar({
             {onEdge.length > 0 && <div data-display-pins="" className="flex min-w-0 flex-1 overflow-hidden">
               <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} stretchPins reservedPins={onEdge} onChipClick={onChipClick} />
             </div>}
-            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={header.utilitiesWidth} onChipClick={onChipClick} />
+            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={header.utilitiesWidth} stretchUtilities onChipClick={onChipClick} />
           </div>
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden">
