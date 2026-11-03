@@ -140,6 +140,10 @@ export function installWebAdapter(label: Label): void {
     }
     return out;
   };
+  const displayPreference = () => {
+    const settings = parse(localStorage.getItem(`${STORE_PREFIX}scrollr.json:scrollr:settings`));
+    return settings?.window?.tickerDisplays?.Browser ?? { mode: "docked", readingSize: 100 };
+  };
   const storeChanged = (path: string, key: string, value: unknown) => {
     const rid = ridOf.get(path);
     if (rid !== undefined) {
@@ -367,6 +371,12 @@ export function installWebAdapter(label: Label): void {
 
       case "get_system_info":
         return { cpu_usage: 12, memory_used: 8e9, memory_total: 32e9, disk_used: 2e11, disk_total: 1e12 };
+      case "ticker_display": {
+        return { ...displayPreference(), monitor: "Browser", suspended: false, pageLeader: true };
+      }
+      case "sync_ticker_windows":
+        bus.postMessage({ event: "ticker-reposition", payload: null });
+        return ["ticker"];
       case "list_monitors": {
         const { width, height } = window.screen;
         const scaleFactor = window.devicePixelRatio;
@@ -402,7 +412,7 @@ export function installWebAdapter(label: Label): void {
         return null;
     }
 
-    if (cmd === "position_ticker") toPage({ height: args.height, position: args.position });
+    if (cmd === "position_ticker") toPage({ height: args.height, position: args.position, fill: displayPreference().mode !== "docked" });
     if (cmd === "set_ticker_visible") toPage({ visible: args.visible });
     if (
       noop.has(cmd) ||

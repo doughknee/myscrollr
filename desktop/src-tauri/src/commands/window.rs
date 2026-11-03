@@ -1,5 +1,8 @@
 use crate::commands::diagnostics::{monitors, pick_monitor, MonitorInfo};
 use crate::compositor::{self, Compositor};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use tauri::{Emitter, Manager};
 
@@ -26,6 +29,76 @@ pub fn list_monitors(app: tauri::AppHandle) -> Vec<MonitorInfo> {
 /// ticker positions itself from shared prefs and does not otherwise
 /// know which screen it was created for.
 static TICKER_MONITORS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+static DISPLAY_PREFS: Mutex<Option<HashMap<String, DisplayPreference>>> = Mutex::new(None);
+static SYNCED: AtomicBool = AtomicBool::new(false);
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum DisplayMode {
+    #[default]
+    Docked,
+    Grid,
+    Strip,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisplayPreference {
+    mode: DisplayMode,
+    #[serde(default = "default_reading_size")]
+    reading_size: u16,
+}
+fn default_reading_size() -> u16 {
+    100
+}
+impl Default for DisplayPreference {
+    fn default() -> Self {
+        Self {
+            mode: DisplayMode::Docked,
+            reading_size: 100,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TickerDisplay {
+    monitor: String,
+    mode: DisplayMode,
+    reading_size: u16,
+    suspended: bool,
+    page_leader: bool,
+}
+
+#[tauri::command]
+pub fn ticker_display(window: tauri::Window) -> TickerDisplay {
+    let assigned = monitor_for_label(window.label());
+    let prefs = DISPLAY_PREFS.lock().unwrap_or_else(|p| p.into_inner());
+    let pref_for = |name: &str| {
+        prefs
+            .as_ref()
+            .and_then(|p| p.get(name))
+            .cloned()
+            .unwrap_or_default()
+    };
+    let pref = assigned.as_deref().map(pref_for).unwrap_or_default();
+    let docked_leader = ticker_monitors()
+        .iter()
+        .find(|(_, name)| pref_for(name).mode == DisplayMode::Docked)
+        .map(|(label, _)| label.clone());
+    TickerDisplay {
+        suspended: SYNCED.load(Ordering::SeqCst) && assigned.is_none(),
+        monitor: assigned.unwrap_or_default(),
+        mode: pref.mode,
+        reading_size: if matches!(pref.reading_size, 125 | 150) {
+            pref.reading_size
+        } else {
+            100
+        },
+        page_leader: pref.mode != DisplayMode::Docked
+            || docked_leader.as_deref().unwrap_or("ticker") == window.label(),
+    }
+}
 
 fn ticker_monitors() -> MutexGuard<'static, Vec<(String, String)>> {
     TICKER_MONITORS.lock().unwrap_or_else(|p| p.into_inner())
@@ -71,7 +144,10 @@ fn monitors_changed(last: &mut Option<Vec<MonitorInfo>>, now: Vec<MonitorInfo>) 
 pub fn check_monitors() {
     let Some(app) = APP.get() else { return };
     let now = monitors(app);
-    let changed = monitors_changed(&mut LAST_MONITORS.lock().unwrap_or_else(|p| p.into_inner()), now);
+    let changed = monitors_changed(
+        &mut LAST_MONITORS.lock().unwrap_or_else(|p| p.into_inner()),
+        now,
+    );
     if changed {
         log::info!("[ticker] monitor set changed");
         let _ = app.emit("monitors-changed", ());
@@ -101,11 +177,19 @@ pub fn is_ticker_label(label: &str) -> bool {
 }
 
 fn ticker_label(i: usize) -> String {
-    if i == 0 { "ticker".into() } else { format!("ticker-{}", i + 1) }
+    if i == 0 {
+        "ticker".into()
+    } else {
+        format!("ticker-{}", i + 1)
+    }
 }
 
 fn ticker_title(i: usize) -> String {
-    if i == 0 { "Scrollr Ticker".into() } else { format!("Scrollr Ticker {}", i + 1) }
+    if i == 0 {
+        "Scrollr Ticker".into()
+    } else {
+        format!("Scrollr Ticker {}", i + 1)
+    }
 }
 
 /// The chosen monitors that are attached, in the chosen order, deduped;
@@ -122,6 +206,25 @@ fn choose_monitors(chosen: &[String], attached: &[MonitorInfo]) -> Vec<String> {
         out.extend(pick_monitor(attached, "").map(|m| m.name.clone()));
     }
     out
+}
+
+fn choose_display_monitors(
+    chosen: &[String],
+    attached: &[MonitorInfo],
+    displays: &HashMap<String, DisplayPreference>,
+) -> Vec<String> {
+    // A dedicated display disappearing must never fill the primary instead.
+    if !chosen.is_empty()
+        && !chosen.iter().any(|n| attached.iter().any(|m| &m.name == n))
+        && chosen.iter().any(|n| {
+            displays
+                .get(n)
+                .is_some_and(|p| p.mode != DisplayMode::Docked)
+        })
+    {
+        return Vec::new();
+    }
+    choose_monitors(chosen, attached)
 }
 
 /// One-time setup shared by the config-created `ticker` and the
@@ -144,14 +247,22 @@ pub fn prepare_ticker(win: &tauri::WebviewWindow) {
 /// `async` on purpose: a sync command runs on the main thread, and
 /// building a window from there deadlocks on Windows (Tauri docs).
 #[tauri::command]
-pub async fn sync_ticker_windows(app: tauri::AppHandle, monitors: Vec<String>) -> Result<Vec<String>, String> {
+pub async fn sync_ticker_windows(
+    app: tauri::AppHandle,
+    monitors: Vec<String>,
+    displays: Option<HashMap<String, DisplayPreference>>,
+) -> Result<Vec<String>, String> {
     let _serial = SYNC.lock().unwrap_or_else(|p| p.into_inner());
-    let wanted = choose_monitors(&monitors, &crate::commands::diagnostics::monitors(&app));
+    let attached = crate::commands::diagnostics::monitors(&app);
+    let displays = displays.unwrap_or_default();
+    let wanted = choose_display_monitors(&monitors, &attached, &displays);
+    *DISPLAY_PREFS.lock().unwrap_or_else(|p| p.into_inner()) = Some(displays);
     *ticker_monitors() = wanted
         .iter()
         .enumerate()
         .map(|(i, m)| (ticker_label(i), m.clone()))
         .collect();
+    SYNCED.store(true, Ordering::SeqCst);
 
     let template = app
         .config()
@@ -236,7 +347,11 @@ pub fn position_ticker(
     // is only empty before the first sync, when `ticker` positions
     // itself at launch.)
     let assigned = monitor_for_label(window.label());
-    if is_ticker_label(window.label()) && assigned.is_none() && !ticker_monitors().is_empty() {
+    if is_ticker_label(window.label()) && assigned.is_none() && SYNCED.load(Ordering::SeqCst) {
+        #[cfg(target_os = "windows")]
+        let _ = crate::commands::appbar_win::unregister(&window);
+        let _ = window.set_fullscreen(false);
+        let _ = window.hide();
         return Err(format!("{} is being removed", window.label()));
     }
 
@@ -256,6 +371,65 @@ pub fn position_ticker(
     let screen_height = target.height;
     let monitor_x = target.x;
     let monitor_y = target.y;
+
+    let display = ticker_display(window.clone());
+    if display.mode != DisplayMode::Docked {
+        #[cfg(target_os = "windows")]
+        crate::commands::appbar_win::unregister(&window)?;
+        let on_target = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .is_some_and(|m| m.name().map(String::as_str) == Some(target.name.as_str()));
+        if !window.is_fullscreen().unwrap_or(false) || !on_target {
+            window.set_fullscreen(false).map_err(|e| e.to_string())?;
+            match compositor::detect() {
+                Compositor::Hyprland => compositor::hyprland::position(
+                    &window,
+                    monitor_x,
+                    monitor_y,
+                    screen_width,
+                    screen_height,
+                )?,
+                Compositor::Sway => compositor::sway::position(
+                    &window,
+                    monitor_x,
+                    monitor_y,
+                    screen_width,
+                    screen_height,
+                )?,
+                Compositor::Kwin(qdbus) => compositor::kwin::position(
+                    &window,
+                    monitor_x,
+                    monitor_y,
+                    screen_width,
+                    screen_height,
+                    qdbus,
+                )?,
+                Compositor::Fallback => {
+                    window
+                        .set_position(tauri::PhysicalPosition::new(
+                            target.physical_x,
+                            target.physical_y,
+                        ))
+                        .map_err(|e| e.to_string())?;
+                    window
+                        .set_size(tauri::PhysicalSize::new(
+                            target.physical_width,
+                            target.physical_height,
+                        ))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            window
+                .set_fullscreen(true)
+                .map_err(|e| format!("fill display: {e}"))?;
+        }
+        return Ok(());
+    }
+    if window.is_fullscreen().unwrap_or(false) {
+        window.set_fullscreen(false).map_err(|e| e.to_string())?;
+    }
 
     // Use explicit height if provided; otherwise read from window.
     // On Wayland, a preceding set_size() may not have propagated yet,
@@ -427,6 +601,27 @@ pub fn pin_window(window: tauri::Window, pinned: bool) -> Result<(), String> {
 #[tauri::command]
 pub fn show_app_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("main") {
+        // A strip may be the only screen. Keep the shell's controls reachable.
+        if let Some(m) = w
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| app.primary_monitor().ok().flatten())
+        {
+            let width = m.size().width as f64 / m.scale_factor();
+            let height = m.size().height as f64 / m.scale_factor();
+            let usable_height = (height - 48.0).max(1.0);
+            let _ = w.set_min_size(Some(tauri::LogicalSize::new(
+                720.0_f64.min(width),
+                480.0_f64.min(usable_height),
+            )));
+            if let Ok(s) = w.outer_size() {
+                if s.width > m.size().width || s.height as f64 / m.scale_factor() > usable_height {
+                    let _ = w.set_size(tauri::LogicalSize::new(width.min(960.0), usable_height));
+                    let _ = w.set_position(*m.position());
+                }
+            }
+        }
         w.show().map_err(|e| format!("show failed: {e}"))?;
         w.set_focus().map_err(|e| format!("focus failed: {e}"))?;
     }
@@ -474,6 +669,36 @@ pub fn set_ticker_visible(_window: tauri::Window, _visible: bool) -> Result<(), 
 mod tests {
     use super::*;
 
+    #[test]
+    fn dedicated_display_disconnect_waits_for_reconnect() {
+        let attached = vec![mon("primary", true)];
+        let prefs = HashMap::from([(
+            "strip".into(),
+            DisplayPreference {
+                mode: DisplayMode::Grid,
+                reading_size: 100,
+            },
+        )]);
+        assert!(choose_display_monitors(&["strip".into()], &attached, &prefs).is_empty());
+        assert_eq!(
+            choose_display_monitors(&[], &attached, &prefs),
+            vec!["primary"]
+        );
+        assert_eq!(
+            choose_display_monitors(&["old-dock".into()], &attached, &prefs),
+            vec!["primary"]
+        );
+        assert_eq!(
+            choose_display_monitors(&["strip".into(), "primary".into()], &attached, &prefs),
+            vec!["primary"]
+        );
+        let reconnected = vec![mon("primary", true), mon("strip", false)];
+        assert_eq!(
+            choose_display_monitors(&["strip".into()], &reconnected, &prefs),
+            vec!["strip"]
+        );
+    }
+
     fn mon(name: &str, is_primary: bool) -> MonitorInfo {
         MonitorInfo::new(name.into(), (0, 0), (3440, 1440), 1.0, is_primary)
     }
@@ -483,9 +708,15 @@ mod tests {
         // 300 % screen right of the primary: the tile is 3× bigger and
         // sits at that screen's physical centre, not at 1/3 of it.
         let d3 = MonitorInfo::new("d3".into(), (3440, 0), (3840, 2160), 3.0, false);
-        assert_eq!(identify_tile(&d3), (3440 + 1920 - 330, 1080 - 330, 660, 660));
+        assert_eq!(
+            identify_tile(&d3),
+            (3440 + 1920 - 330, 1080 - 330, 660, 660)
+        );
         let d2 = MonitorInfo::new("d2".into(), (-3440, 0), (3440, 1440), 1.0, false);
-        assert_eq!(identify_tile(&d2), (-3440 + 1720 - 110, 720 - 110, 220, 220));
+        assert_eq!(
+            identify_tile(&d2),
+            (-3440 + 1720 - 110, 720 - 110, 220, 220)
+        );
     }
 
     #[test]
@@ -504,11 +735,24 @@ mod tests {
         let two = [r"\.\DISPLAY1".to_string(), r"\.\DISPLAY2".to_string()];
         assert_eq!(choose_monitors(&two, &attached), two.to_vec());
         // empty pref = primary = today's behaviour
-        assert_eq!(choose_monitors(&[], &attached), vec![r"\.\DISPLAY2".to_string()]);
+        assert_eq!(
+            choose_monitors(&[], &attached),
+            vec![r"\.\DISPLAY2".to_string()]
+        );
         // unplugged names drop out; duplicates collapse
-        let stale = ["gone".to_string(), r"\.\DISPLAY1".to_string(), r"\.\DISPLAY1".to_string()];
-        assert_eq!(choose_monitors(&stale, &attached), vec![r"\.\DISPLAY1".to_string()]);
-        assert_eq!(choose_monitors(&["gone".to_string()], &attached), vec![r"\.\DISPLAY2".to_string()]);
+        let stale = [
+            "gone".to_string(),
+            r"\.\DISPLAY1".to_string(),
+            r"\.\DISPLAY1".to_string(),
+        ];
+        assert_eq!(
+            choose_monitors(&stale, &attached),
+            vec![r"\.\DISPLAY1".to_string()]
+        );
+        assert_eq!(
+            choose_monitors(&["gone".to_string()], &attached),
+            vec![r"\.\DISPLAY2".to_string()]
+        );
         // nothing enumerable: no mapping, caller still keeps one window
         assert!(choose_monitors(&two, &[]).is_empty());
     }
@@ -518,8 +762,14 @@ mod tests {
         let two = vec![mon(r"\.\DISPLAY1", false), mon(r"\.\DISPLAY2", true)];
         let one = vec![mon(r"\.\DISPLAY2", true)];
         let mut last = None;
-        assert!(!monitors_changed(&mut last, two.clone()), "launch is not a hotplug");
-        assert!(!monitors_changed(&mut last, two.clone()), "same set, no event");
+        assert!(
+            !monitors_changed(&mut last, two.clone()),
+            "launch is not a hotplug"
+        );
+        assert!(
+            !monitors_changed(&mut last, two.clone()),
+            "same set, no event"
+        );
         assert!(monitors_changed(&mut last, one.clone()), "unplugged");
         assert!(monitors_changed(&mut last, two), "plugged back in");
         // primary moving counts too: the fallback screen follows it

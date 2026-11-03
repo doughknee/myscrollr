@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { setCrashReports } from "./sentry";
 import { open } from "@tauri-apps/plugin-shell";
@@ -18,6 +17,8 @@ import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
 import PagedBar from "./components/pages/PagedBar";
+import TickerSurface from "./components/TickerSurface";
+import { useTickerDisplay } from "./hooks/useTickerDisplay";
 import EmptyBar from "./components/EmptyBar";
 import { useToggleOnTicker } from "./hooks/useToggleOnTicker";
 import { isOnTicker } from "./utils/tickerMembership";
@@ -38,10 +39,9 @@ import {
   savePref,
   loadPrefs,
   savePrefs,
-  TICKER_HEIGHT,
   togglePin,
   isPinned,
-  } from "./preferences";
+} from "./preferences";
 import { currentEdgeRoom } from "./lib/edgeMeasure";
 import { edgeCanHold, pinRefusal } from "./components/pages/edgeRule";
 import type { SubscriptionTier } from "./auth";
@@ -52,11 +52,6 @@ import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
 import { useCatalog } from "./hooks/useCatalog";
 
-
-/** Ticker window height in px: the one bar height × scale. */
-function tickerHeight(p: AppPreferences): number {
-  return Math.round(TICKER_HEIGHT * (p.appearance.tickerScale / 100));
-}
 
 // ── App (Ticker Window) ─────────────────────────────────────────
 
@@ -335,28 +330,21 @@ export default function App() {
     return onStoreChange<AppPreferences>("scrollr:settings", (next) => {
       if (!next) return;
 
-      const prev = prefsRef.current;
       setPrefs(next);
-
-      // Side effects: pin toggle
-      if (next.window.pinned !== prev.window.pinned) {
-        invoke("pin_window", { pinned: next.window.pinned }).catch(() => {});
-      }
-
-      // Side effects: hide-on-fullscreen toggle (Windows AppBar)
-      if (next.window.hideOnFullscreen !== prev.window.hideOnFullscreen) {
-        invoke("set_hide_on_fullscreen", {
-          value: next.window.hideOnFullscreen,
-        }).catch(() => {});
-      }
-
-      // Side effects: ticker position
-      if (next.window.tickerPosition !== prev.window.tickerPosition) {
-        invoke("position_ticker", { position: next.window.tickerPosition, height: tickerHeight(next) }).catch(() => {});
-      }
-
     });
   }, []);
+
+  const { display, error: displayError } = useTickerDisplay(prefs);
+  const filled = display.mode !== "docked";
+  const exitFill = useCallback(() => {
+    if (!display.monitor) return;
+    const p = prefsRef.current;
+    const updated = { ...p, window: { ...p.window, tickerDisplays: {
+      ...p.window.tickerDisplays, [display.monitor]: { mode: "docked" as const, readingSize: display.readingSize },
+    } } };
+    setPrefs(updated);
+    savePrefs(updated);
+  }, [display.monitor, display.readingSize]);
 
   // ── Theme + UI scale (shared hook) ────────────────────────────
   // The ticker window uses its own `tickerScale` so resizing the
@@ -365,7 +353,7 @@ export default function App() {
     shellId: "desktop-shell",
     themeFamily: prefs.appearance.themeFamily,
     themeMode: prefs.appearance.themeMode,
-    uiScale: prefs.appearance.tickerScale,
+    uiScale: filled ? 100 : prefs.appearance.tickerScale,
     highContrast: prefs.appearance.highContrast,
   });
 
@@ -374,47 +362,6 @@ export default function App() {
   useEffect(() => {
     savePref("deliveryMode", deliveryMode);
   }, [deliveryMode]);
-
-  // ── Initial setup ────────────────────────────────────────────
-
-  useEffect(() => {
-    const tickerH = prefs.ticker.showTicker ? tickerHeight(prefs) : 0;
-    if (tickerH > 0) {
-      // position_ticker sets size + position atomically via compositor
-      invoke("position_ticker", {
-        position: prefs.window.tickerPosition,
-        height: tickerH,
-      })
-        .then(() => getCurrentWindow().show())
-        .catch(() => {});
-    }
-    invoke("pin_window", { pinned: prefs.window.pinned }).catch(() => {});
-    // Initial sync for the Windows AppBar hide-on-fullscreen behavior.
-    invoke("set_hide_on_fullscreen", {
-      value: prefs.window.hideOnFullscreen,
-    }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Resize ticker when row/mode prefs change ───────────────────
-  // position_ticker sets the full geometry (x, y, width, height)
-  // atomically via compositor-specific commands. This avoids the
-  // race condition where set_size() hasn't propagated before the
-  // position calculation reads the old height.
-
-  useEffect(() => {
-    const tickerH = prefs.ticker.showTicker ? tickerHeight(prefs) : 0;
-    if (tickerH > 0) {
-      invoke("position_ticker", {
-        position: prefs.window.tickerPosition,
-        height: tickerH,
-      }).catch(() => {});
-    }
-  }, [
-    prefs.appearance.tickerScale,
-    prefs.ticker.showTicker,
-    prefs.window.tickerPosition,
-  ]);
 
   // The tray's "Show ticker" checkmark mirrors the pref. Every window
   // that flips it (Ctrl+T in the main window, the settings row, the
@@ -425,38 +372,6 @@ export default function App() {
     invoke("sync_tray_ticker", { shown: prefs.ticker.showTicker }).catch(
       () => {},
     );
-  }, [prefs.ticker.showTicker]);
-
-  // ── Show/hide ticker window based on visibility ────────────────
-  //
-  // Also informs the Windows AppBar layer so the screen-space
-  // reservation is released when the ticker is hidden (otherwise
-  // maximized windows still respect a ticker that isn't there).
-  // The AppBar will be re-registered automatically on the next
-  // position_ticker invocation.
-
-  useEffect(() => {
-    const win = getCurrentWindow();
-    if (prefs.ticker.showTicker) {
-      // Show the window first, then re-apply position. Tauri's
-      // show() restores the window's saved geometry which would
-      // otherwise stomp the position the position_ticker effect
-      // just set (effect ordering: position runs before this one).
-      win.show()
-        .then(() => {
-          const h = tickerHeight(prefsRef.current);
-          if (h > 0) {
-            invoke("position_ticker", {
-              position: prefsRef.current.window.tickerPosition,
-              height: h,
-            }).catch(() => {});
-          }
-        })
-        .catch(() => {});
-    } else {
-      win.hide().catch(() => {});
-    }
-    invoke("set_ticker_visible", { visible: prefs.ticker.showTicker }).catch(() => {});
   }, [prefs.ticker.showTicker]);
 
   // ── Chip click → open external URL (or fall back to app) ───────
@@ -545,6 +460,15 @@ export default function App() {
 
   // ── Widget pin toggle (hover icon on consolidated chip) ─────────
 
+  const pinRoom = useCallback(() => {
+    if (!filled) return currentEdgeRoom();
+    const bar = document.querySelector<HTMLElement>("[data-pages]");
+    if (!bar) return null;
+    const grid = bar.hasAttribute("data-display-grid");
+    return { bar: grid ? bar.clientWidth / 0.4 : bar.clientWidth,
+      util: grid ? 0 : (bar.querySelector<HTMLElement>("[data-edge-utils]")?.offsetWidth ?? 0) };
+  }, [filled]);
+
   /**
    * Pin or unpin one subject, from the ticker's own right-click menu.
    *
@@ -555,12 +479,12 @@ export default function App() {
    */
   const handleTogglePin = useCallback((pin: PinTarget) => {
     setPrefs((prev) => {
-      const updated = togglePin(prev, { ...pin, side: "right" }, edgeCanHold(currentEdgeRoom()));
+      const updated = togglePin(prev, { ...pin, side: "right" }, edgeCanHold(pinRoom()));
       if (updated === prev) return prev;
       savePrefs(updated);
       return updated;
     });
-  }, []);
+  }, [pinRoom]);
 
   // ── Ticker position toggle ─────────────────────────────────────
 
@@ -573,7 +497,7 @@ export default function App() {
     };
     setPrefs(updated);
     savePrefs(updated);
-    invoke("position_ticker", { position: next, height: tickerHeight(updated) }).catch(() => {});
+
   }, []);
 
   // ── Toggle ticker visibility ─────────────────────────────────
@@ -597,17 +521,6 @@ export default function App() {
     if (isPrimaryTicker()) handleToggleTicker();
   });
 
-  // ── Monitor set changed → re-place this window ──────────────────
-  // The main window runs `sync_ticker_windows` on a tickerMonitors
-  // change; Rust rewrites its label → monitor map and then pokes each
-  // surviving ticker with this event. `position_ticker` without a
-  // `monitor` resolves the screen from that map by our own label.
-  useTauriListener("ticker-reposition", () => {
-    const p = prefsRef.current;
-    if (!p.ticker.showTicker) return;
-    invoke("position_ticker", { position: p.window.tickerPosition, height: tickerHeight(p) }).catch(() => {});
-  });
-
   const handleToggleWindowPin = useCallback(() => {
     const next = !prefsRef.current.window.pinned;
     const updated = {
@@ -616,7 +529,6 @@ export default function App() {
     };
     setPrefs(updated);
     savePrefs(updated);
-    invoke("pin_window", { pinned: next }).catch(() => {});
   }, []);
 
   // The pager at the bar's left end (SCROLLR-301): one click from the bar, as in Settings › Ticker.
@@ -655,7 +567,7 @@ export default function App() {
         // (SCROLLR-284); a native menu has no toast, so the item says it.
         const refusal = pinned
           ? null
-          : pinRefusal(prefsRef.current.widgets.pins, target, currentEdgeRoom());
+          : pinRefusal(prefsRef.current.widgets.pins, target, pinRoom());
         items.push(
           await MenuItem.new({
             // Refuse, never evict: a full zone says so instead of
@@ -670,6 +582,7 @@ export default function App() {
         items.push(await PredefinedMenuItem.new({ item: "Separator" }));
       }
 
+      if (filled) items.push(await MenuItem.new({ text: "Exit full display", action: exitFill }));
       // Open Scrollr — most common action, top of menu
       items.push(
         await MenuItem.new({
@@ -830,7 +743,7 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow, handleTogglePin, handleTogglePageControls]);
+  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow, handleTogglePin, handleTogglePageControls, filled, exitFill, pinRoom]);
 
   // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
@@ -847,8 +760,9 @@ export default function App() {
 
   return (
     <div id="desktop-shell">
-      {showTicker && (
-        <>
+      {showTicker && !display.suspended && (
+        <TickerSurface display={display} error={displayError} onExit={exitFill} onSettings={() => navigateMainWindow("/customize?page=ticker")}>
+          {(fillHeight) => <>
           {(() => {
             // Empty-state CTAs, both gated on "the ticker would otherwise
             // render nothing":
@@ -881,7 +795,7 @@ export default function App() {
             // Widget pages (SCROLLR-272), the default. They get the same two
             // empty states as the chips bar (SCROLLR-274); utilities and
             // pins sit on the fixed edge zone (SCROLLR-273).
-            if (prefs.ticker.scrollMode === "pages") {
+            if (display.mode === "grid" || prefs.ticker.scrollMode === "pages") {
               const emptyKind = showSourcelessCTA
                 ? "sourceless"
                 : showInstalledOffCTA && installedWidgetsMeta.length > 0
@@ -889,6 +803,10 @@ export default function App() {
                   : null;
               return (
                 <PagedBar
+                  key={`${display.mode}:${display.pageLeader}:${fillHeight !== undefined}`}
+                  fillHeight={fillHeight}
+                  independent={filled}
+                  pageLeader={display.pageLeader}
                   empty={
                     emptyKind && (
                       <EmptyBar
@@ -918,7 +836,7 @@ export default function App() {
                 onChipClick={handleChipClick}
                 pins={prefs.widgets.pins}
                 speed={prefs.ticker.tickerSpeed}
-                onHover={prefs.ticker.onHover}
+                onHover={filled ? "keep" : prefs.ticker.onHover}
                 widgetDisplay={prefs.widgetDisplay}
                 showSourcelessCTA={showSourcelessCTA}
                 onAddSources={handleAddSources}
@@ -929,7 +847,8 @@ export default function App() {
               />
             );
           })()}
-        </>
+        </>}
+        </TickerSurface>
       )}
     </div>
   );

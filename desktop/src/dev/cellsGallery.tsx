@@ -163,9 +163,9 @@ function CrossingStrip() {
   );
 }
 
-function Strip({ name, width, children }: { name: string; width: number; children: [string, ReactNode][] }) {
+function Strip({ name, width, height = 64, children }: { name: string; width: number; height?: number; children: [string, ReactNode][] }) {
   return (
-    <div className="flex h-16 shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={accentStyle(accentFor("#0b2265", dark), inkFor("#0b2265", dark))}>
+    <div className="flex shrink-0 items-stretch border-b border-edge/50 bg-base-150" data-strip={name} style={{ ...accentStyle(accentFor("#0b2265", dark), inkFor("#0b2265", dark)), height }}>
       <Columns width={width}>
         {children.map(([state, node]) => (
           <div key={state} className="h-full" data-state={state}>{node}</div>
@@ -294,6 +294,7 @@ function Gallery() {
 
       <div className="px-1 pt-3 font-mono text-[10px] tracking-[0.06em] text-fg-4">ONE ITEM IN EVERY STATE · SAME COLUMN WIDTH · NOTHING MAY MOVE</div>
       <Strip name="game-stacked" width={gameMinCol("NFL")}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} mine now={NOW} />])}</Strip>
+      <Strip name="game-fill" width={gameMinCol("NFL")} height={140}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} fill mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
       <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
       <CrossingStrip />

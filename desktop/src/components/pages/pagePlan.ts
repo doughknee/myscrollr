@@ -59,6 +59,13 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
  */
 export const BAND_W = 192;
 
+/** Fill mode uses the same family minimums, with capacity from both axes. */
+export function displayGrid(width: number, height: number, minCol: number) {
+  const columns = columnsFor(width, minCol);
+  const rows = Math.max(1, Math.floor(Math.max(140, height - 128) / 140));
+  return { columns, rows, capacity: columns * rows };
+}
+
 /** Width left for columns once the band and the edge zone are taken. */
 export function contentWidth(barWidth: number, edgeWidth = 0): number {
   return Math.max(0, barWidth - BAND_W - edgeWidth);

@@ -221,6 +221,7 @@
             userSub: "logto|ticker-shim",
           }],
           ["scrollr:settings", {
+            window: { tickerDisplays: { Shim: { mode: params.get("fill") === "grid" ? "grid" : params.get("fill") === "strip" ? "strip" : "docked", readingSize: Number(params.get("reading")) || 100 } } },
             appearance: themeQ ? { themeFamily: themeQ[1], themeMode: themeQ[2] } : undefined,
             ticker: {
               showTicker: true,
@@ -372,6 +373,7 @@
           if (cmd === "plugin:event|emit") { emitEvent(args.event, args.payload); return Promise.resolve(); }
           if (cmd === "plugin:event|emit_to") { emitEvent(args.event, args.payload, args.target && args.target.label); return Promise.resolve(); }
           if (cmd.indexOf("plugin:event|") === 0) return Promise.resolve(1);
+          if (cmd === "ticker_display") return Promise.resolve({ ...store.get("scrollr:settings").window.tickerDisplays.Shim, monitor: "Shim", suspended: false, pageLeader: params.get("leader") === "1" || label === "ticker" });
           if (noop.indexOf(cmd) !== -1) return Promise.resolve();
           // getAllWindows() maps each entry through `new Window(label)`:
           // the wire shape is a list of label strings.

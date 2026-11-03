@@ -113,6 +113,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
         <MonitorsRows
           chosen={window_.tickerMonitors}
           onChange={(v) => setWindow("tickerMonitors", v)}
+          displays={window_.tickerDisplays}
+          onDisplayChange={(name, pref) => setWindow("tickerDisplays", { ...window_.tickerDisplays, [name]: pref })}
         />
         <RowList>
           <Row id="screenEdge">

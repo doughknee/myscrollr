@@ -128,6 +128,8 @@ interface GameCellProps {
   width: number;
   /** One of the user's favourite teams is playing: a 2px accent line on top. */
   mine?: boolean;
+  /** Shared full-display treatment; same values, reservations and click target. */
+  fill?: boolean;
   /** Clock for the countdown; tests and the dev gallery pin it. */
   now?: number;
   onClick?: () => void;
@@ -154,7 +156,7 @@ interface GameCellProps {
  * STATUS_WIDTH, and the live dot and both marks are always mounted. Names
  * sit in a minmax(0,1fr) track, so they truncate rather than push.
  */
-const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onClick }: GameCellProps) {
+const GameCell = memo(function GameCell({ game: g, width, mine = false, fill = false, now, onClick }: GameCellProps) {
   const flash = useScoreFlash(g.away_team_score, g.home_team_score, g.id);
   const r = reservationFor(g.league);
   const live = isLive(g);
@@ -166,10 +168,10 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
   const awayLeads = !scored || away >= home;
   const homeLeads = !scored || home >= away;
   const [top, bottom] = statusLines(g, now);
-  const wide = width >= WIDE_GAME_PX;
+  const wide = !fill && width >= WIDE_GAME_PX;
   const scoreN = Math.max(2, r.score);
   const scoreCh = `${scoreN}ch`;
-  const room = nameRoom(width, scoreN);
+  const room = fill ? width - 32 - 22 - 16 - scoreN * 15.6 : nameRoom(width, scoreN);
   const px = wide ? NAME_PX.wide : NAME_PX.stacked;
 
   const score = (side: "away" | "home", v: number | string, leads: boolean) => (
@@ -177,7 +179,7 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
       data-part={`${side}-score`}
       className={clsx(
         "text-right font-mono leading-none tabular-nums",
-        wide ? "text-[22px]" : "text-[18px]",
+        fill ? "text-[26px]" : wide ? "text-[22px]" : "text-[18px]",
         leads ? "font-bold text-fg" : "font-medium text-fg-3",
       )}
       style={{ minWidth: scoreCh }}
@@ -257,7 +259,20 @@ const GameCell = memo(function GameCell({ game: g, width, mine = false, now, onC
         className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full"
         style={{ background: close ? "var(--accent)" : "transparent" }}
       />
-      {wide ? (
+      {fill ? (
+        <span className="flex w-full min-w-0 flex-col gap-2 py-3">
+          <span className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2">
+            <Crest src={g.away_team_logo} alt={g.away_team_name} size="lg" />
+            {name("away", g.away_team_name, awayLeads)}{score("away", g.away_team_score, awayLeads)}
+          </span>
+          <span className="relative grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2">
+            <span className="absolute -left-3">{at}</span>
+            <Crest src={g.home_team_logo} alt={g.home_team_name} size="lg" />
+            {name("home", g.home_team_name, homeLeads)}{score("home", g.home_team_score, homeLeads)}
+          </span>
+          <span className="mt-1">{status}</span>
+        </span>
+      ) : wide ? (
         // One scoreboard line, the clock between the scores where a
         // scoreboard keeps it: it cannot be read as the next game's.
         <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,max-content)_auto_auto_auto_minmax(0,max-content)] items-center justify-center gap-x-3">

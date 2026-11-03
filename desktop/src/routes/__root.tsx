@@ -117,9 +117,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { setCrashReports } from "../sentry";
 
 /** One ticker window per chosen-and-attached monitor; Rust resolves an
- *  empty list, or a list with nothing attached, to the primary. */
-const syncTickerWindows = (monitors: string[]) =>
-  invoke("sync_ticker_windows", { monitors }).catch((err) =>
+ *  empty list to the primary; a missing dedicated display is suspended. */
+const syncTickerWindows = (monitors: string[], displays: AppPreferences["window"]["tickerDisplays"]) =>
+  invoke("sync_ticker_windows", { monitors, displays }).catch((err) =>
     console.error("[Scrollr] sync_ticker_windows failed:", err),
   );
 
@@ -574,17 +574,16 @@ function RootLayout() {
   // the ticker the sync is about to destroy. Runs once at launch to
   // recreate the saved set, then whenever the pref changes. Rust
   // resolves an empty list to the primary monitor.
-  const tickerMonitorsKey = prefs.window.tickerMonitors.join("\n");
+  const tickerMonitorsKey = JSON.stringify([prefs.window.tickerMonitors, prefs.window.tickerDisplays]);
   useEffect(() => {
-    syncTickerWindows(prefs.window.tickerMonitors);
+    syncTickerWindows(prefs.window.tickerMonitors, prefs.window.tickerDisplays);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickerMonitorsKey]);
   // A monitor came or went (Rust polls, and Windows gets WM_DISPLAYCHANGE):
   // the pref is unchanged but which of its screens are attached is not.
   // Same owner, same call — Rust drops the vanished screen's window,
-  // gives a returning one its bar back, and falls back to the primary
-  // when none of the chosen screens is present.
-  useTauriListener("monitors-changed", () => syncTickerWindows(prefs.window.tickerMonitors));
+  // gives a returning one its bar back, and suspends missing dedicated displays.
+  useTauriListener("monitors-changed", () => syncTickerWindows(prefs.window.tickerMonitors, prefs.window.tickerDisplays));
   // The ticker just applied the first-run default widget (SCROLLR-257).
   useTauriListener("dashboard-invalidate", () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });

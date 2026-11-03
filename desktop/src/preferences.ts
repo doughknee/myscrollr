@@ -3,9 +3,11 @@
 // All prefs are persisted via Tauri plugin-store (disk-backed).
 
 import { getStore, removeStore, setStore } from "./lib/store";
+import { sanitizeDisplays } from "./lib/tickerDisplay";
 import { LS_CLOCK_FORMAT, LS_WEATHER_UNIT } from "./constants";
 import { GITHUB_DEFAULTS, migrateGitHub } from "./widgets/github/config";
 import type { GitHubWidgetConfig } from "./widgets/github/config";
+import type { DisplayPreference } from "./lib/tickerDisplay";
 
 export type { GitHubWidgetConfig };
 
@@ -210,6 +212,8 @@ export interface WindowPrefs {
    * no longer attached are ignored, never an error.
    */
   tickerMonitors: string[];
+  /** Device-local, keyed by the monitor name supplied by the OS. */
+  tickerDisplays: Record<string, DisplayPreference>;
 }
 
 // ── Per-widget config types ─────────────────────────────────────
@@ -481,6 +485,7 @@ const DEFAULT_WINDOW: WindowPrefs = {
   tickerPosition: "top",
   hideOnFullscreen: true,
   tickerMonitors: [],
+  tickerDisplays: {},
 };
 
 export const DEFAULT_TIMER_POMODORO: TimerPomodoroConfig = {
@@ -931,6 +936,7 @@ export function loadPrefs(): AppPreferences {
         tickerMonitors: Array.isArray(savedWindow.tickerMonitors)
           ? savedWindow.tickerMonitors.filter((m): m is string => typeof m === "string")
           : [],
+        tickerDisplays: sanitizeDisplays(savedWindow.tickerDisplays),
       },
       // No `taskbar`: the block was migrated, defaulted and reset for
       // years without a reader. Not carrying it here sheds it on save.

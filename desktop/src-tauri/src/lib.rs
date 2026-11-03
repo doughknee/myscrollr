@@ -186,10 +186,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Focus the main window when a second instance is attempted
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            let _ = commands::window::show_app_window(app.clone());
         }));
 
     // MCP bridge is opt-in (feature `dev-mcp-bridge`), dev-only, and
@@ -219,6 +216,7 @@ pub fn run() {
         })))
         .invoke_handler(tauri::generate_handler![
             commands::window::position_ticker,
+            commands::window::ticker_display,
             commands::window::list_monitors,
             commands::window::sync_ticker_windows,
             commands::window::identify_monitors,
@@ -321,8 +319,8 @@ pub fn run() {
             // dock show it.
             if launched_by_autostart(std::env::args()) {
                 log::info!("launched at login: keeping the main window hidden");
-            } else if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
+            } else {
+                let _ = commands::window::show_app_window(app.handle().clone());
             }
 
             // An autostart entry written by an older build has no
@@ -371,10 +369,7 @@ pub fn run() {
                 ..
             } = event
             {
-                if let Some(w) = app_handle.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                let _ = commands::window::show_app_window(app_handle.clone());
             }
         }
         // Windows AppBar cleanup. MUST call ABM_REMOVE on every

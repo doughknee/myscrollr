@@ -243,8 +243,9 @@ function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipCli
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick }: {
+export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth }: {
   edge: Edge;
+  maxUtilitiesWidth?: number;
   /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
   onUtilWidth?: (w: number) => void;
   /** The page turn's seq: the slots step on it. */
@@ -269,11 +270,14 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
     };
   }, [onUtilWidth, empty]);
   if (empty) return null;
+  const slots = maxUtilitiesWidth === undefined ? edge.utilities.length : Math.max(1, Math.floor(maxUtilitiesWidth / 180));
+  const utilities = maxUtilitiesWidth === undefined || edge.utilities.length <= slots ? edge.utilities
+    : Array.from({ length: slots }, (_, i) => edge.utilities[(tick * slots + i) % edge.utilities.length]);
   return (
     <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
       <div ref={strip} data-edge-utils="" className="flex h-full">
-        {edge.utilities.map((u, i) => (
-          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark))}>
+        {utilities.map((u, i) => (
+          <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={{ ...accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark)), width: maxUtilitiesWidth === undefined ? undefined : 180 }}>
             {i > 0 && <Rule />}
             <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>

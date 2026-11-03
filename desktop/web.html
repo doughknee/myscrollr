@@ -60,7 +60,7 @@
         // position_ticker / set_ticker_visible here.
         addEventListener("message", ({ origin, data }) => {
           if (origin !== location.origin || data?.scrollrWeb !== "ticker") return;
-          if (typeof data.height === "number") ticker.style.height = `${data.height}px`;
+          if (typeof data.height === "number") ticker.style.height = data.fill ? "60%" : `${data.height}px`;
           if (data.position) page.classList.toggle("bottom", data.position === "bottom");
           if (typeof data.visible === "boolean") ticker.style.display = data.visible ? "" : "none";
         });
