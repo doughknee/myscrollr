@@ -58,7 +58,15 @@ function verifyInstalled(state, version) {
 }
 function verifyPreferences(state) {
   const actual = json(state.preferences);
-  for (const [key, value] of Object.entries(state.seed)) assert.deepEqual(actual[key], value, `Lost preference ${key}`);
+  // Startup fills absent defaults. Compare every seeded leaf, allowing only
+  // additional keys; removal or alteration of a chosen value must still fail.
+  const verify = (saved, expected, key) => {
+    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
+      assert(saved && typeof saved === 'object', `Lost preference ${key}`);
+      for (const [child, value] of Object.entries(expected)) verify(saved[child], value, `${key}.${child}`);
+    } else assert.deepEqual(saved, expected, `Lost preference ${key}`);
+  };
+  for (const [key, value] of Object.entries(state.seed)) verify(actual[key], value, key);
 }
 async function launchAndStop(state, phase) {
   let executable = state.executable;

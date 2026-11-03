@@ -25,9 +25,13 @@ fn recovering() -> bool {
 
 fn verify_recovery_input(current: &str, manifest: &Value, target: &str) {
     if recovering() {
-        assert!(recovery::matches_artifact(current, manifest["version"].as_str().unwrap(), target,
+        assert!(recovery::matches_artifact(
+            current,
+            manifest["version"].as_str().unwrap(),
+            target,
             manifest["platforms"][target]["url"].as_str().unwrap(),
-            manifest["platforms"][target]["signature"].as_str().unwrap()));
+            manifest["platforms"][target]["signature"].as_str().unwrap()
+        ));
     }
 }
 
@@ -206,8 +210,15 @@ fn signed_native_transport() {
                 .unwrap()
                 .timeout(Duration::from_secs(30))
                 .version_comparator(move |current, release| {
-                    if recovering() { recovery::accepts(&current.to_string(), &release.version.to_string(), target) }
-                    else { release.version > current }
+                    if recovering() {
+                        recovery::accepts(
+                            &current.to_string(),
+                            &release.version.to_string(),
+                            target,
+                        )
+                    } else {
+                        release.version > current
+                    }
                 })
                 .build()
                 .unwrap();
@@ -340,8 +351,11 @@ fn signed_native_install() {
             .unwrap()
             .timeout(Duration::from_secs(30))
             .version_comparator(move |current, release| {
-                if recovering() { recovery::accepts(&current.to_string(), &release.version.to_string(), target) }
-                else { release.version > current }
+                if recovering() {
+                    recovery::accepts(&current.to_string(), &release.version.to_string(), target)
+                } else {
+                    release.version > current
+                }
             })
             .build()
             .unwrap()

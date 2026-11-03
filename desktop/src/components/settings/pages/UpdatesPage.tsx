@@ -80,7 +80,7 @@ export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
               <p className="text-ui-meta text-fg-3">{(state.downloaded / 1_048_576).toFixed(1)} MB downloaded{progress !== undefined ? ` · ${progress}%` : ""}</p>
             </>}
             {state.phase === "available" && state.body && <p className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-ui-meta leading-relaxed text-fg-3">{state.body}</p>}
-            {state.phase === "waiting" && state.recoveryVersion && <SettingsButton tone="accent" onClick={() => { void updateController.prepareRecovery(); }}>Return to Stable {state.recoveryVersion}�</SettingsButton>}
+            {state.phase === "waiting" && state.recoveryVersion && <SettingsButton tone="accent" onClick={() => { void updateController.prepareRecovery(); }}>Return to Stable {state.recoveryVersion}…</SettingsButton>}
             {betaBuild && state.channel === "stable" && !busy && state.phase !== "ready" && <div className="space-y-2">
               {state.phase === "waiting" && !state.recoveryVersion && <p className="text-ui-meta text-fg-3">In-app recovery is not verified for this version or installer. Recovery instructions cover the supported options.</p>}
               <SettingsButton onClick={() => { void open("https://github.com/doughknee/myscrollr/blob/main/docs/beta-recovery.md").catch(() => {}); }}>Beta recovery instructions</SettingsButton>

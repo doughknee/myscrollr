@@ -38,4 +38,14 @@ describe("release history tabs", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Stable" }));
     expect(screen.getByText("Approved for Beta")).toBeVisible();
   });
+  it("keeps tabs usable while loading and when notes are unavailable", async () => {
+    let finish!: (entries: ReleaseEntry[]) => void;
+    vi.mocked(fetchReleases).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<ReleaseNotes />);
+    expect(screen.getByLabelText("Loading releases")).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Beta" }));
+    await act(async () => finish([]));
+    expect(screen.getByText("Couldn't load release notes")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Beta" })).toHaveAttribute("aria-selected", "true");
+  });
 });

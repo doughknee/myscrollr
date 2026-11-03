@@ -14,8 +14,8 @@ import {
   type ReleaseEntry,
 } from "../../lib/releases";
 import { SelectMenu } from "../widget-bar/SelectMenu";
-import type { UpdateChannel } from "../../lib/updateState";
 import { CARD_SURFACE } from "./SettingsControls";
+import type { UpdateChannel } from "../../lib/updateState";
 
 // ── Sort state ──────────────────────────────────────────────────
 
@@ -27,15 +27,8 @@ function dateMs(iso: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-// Shared row grid — body and skeleton rows must agree on columns:
-// Version (+badges) | Headline | relative date | expand chevron.
-//
-// The calendar-date column and the clickable sort headers were dropped
-// when the surface narrowed to a 680px reading column: four columns of
-// content did not fit without truncating the headline to uselessness.
-// Sorting survives as a menu next to the heading — the version
-// comparator is version-aware (numeric segments, not lexical), which is
-// worth more than the header affordance was.
+// Headline gets a second line so version badges wrap on narrow windows.
+// Sorting remains independent of which tab is being browsed.
 const ROW_GRID =
   "grid grid-cols-[minmax(0,1fr)_auto_20px] items-center gap-x-3 gap-y-1";
 

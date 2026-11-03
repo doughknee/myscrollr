@@ -1,10 +1,10 @@
 //! The main window selects a channel, never an arbitrary endpoint or version comparator.
+use super::recovery;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Manager, Webview};
 use tauri_plugin_updater::UpdaterExt;
-use super::recovery;
 
 #[derive(Clone, Copy, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -58,7 +58,11 @@ pub async fn prepare_stable_recovery(webview: Webview) -> Result<ChannelCheck, S
     check(webview, UpdateChannel::Stable, true).await
 }
 
-async fn check(webview: Webview, channel: UpdateChannel, recovering: bool) -> Result<ChannelCheck, String> {
+async fn check(
+    webview: Webview,
+    channel: UpdateChannel,
+    recovering: bool,
+) -> Result<ChannelCheck, String> {
     if webview.label() != "main" {
         return Err("Updates are only available in the main window".into());
     }
@@ -99,14 +103,23 @@ async fn check(webview: Webview, channel: UpdateChannel, recovering: bool) -> Re
         .ok_or("The update feed returned no release metadata. Please retry later.")?;
     let version = &release.version;
     let recovery_version = if channel == UpdateChannel::Stable {
-        recovery_target.filter(|target| {
-            match (release.download_url(target), release.signature(target)) {
-                (Ok(url), Ok(signature)) => recovery::matches_artifact(
-                    &webview.app_handle().package_info().version.to_string(), &version.to_string(), target, url.as_str(), signature),
-                _ => false,
-            }
-        }).map(|_| version.to_string())
-    } else { None };
+        recovery_target
+            .filter(
+                |target| match (release.download_url(target), release.signature(target)) {
+                    (Ok(url), Ok(signature)) => recovery::matches_artifact(
+                        &webview.app_handle().package_info().version.to_string(),
+                        &version.to_string(),
+                        target,
+                        url.as_str(),
+                        signature,
+                    ),
+                    _ => false,
+                },
+            )
+            .map(|_| version.to_string())
+    } else {
+        None
+    };
     if recovering && (recovery_version.is_none() || update.is_none()) {
         return Err("No verified return to Stable is available for this version and package. Check for updates or use the recovery instructions.".into());
     }
@@ -114,8 +127,15 @@ async fn check(webview: Webview, channel: UpdateChannel, recovering: bool) -> Re
         return Err("The Stable feed returned a prerelease. No update was accepted.".into());
     }
     if let Some(ref update) = update {
-        if recovering && !recovery::matches_artifact(&update.current_version, &update.version,
-            recovery_target.unwrap(), update.download_url.as_str(), &update.signature) {
+        if recovering
+            && !recovery::matches_artifact(
+                &update.current_version,
+                &update.version,
+                recovery_target.unwrap(),
+                update.download_url.as_str(),
+                &update.signature,
+            )
+        {
             return Err("The recovery package does not match the verified signed release.".into());
         }
         let expected = format!(

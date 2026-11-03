@@ -18,12 +18,20 @@ pub fn package_target() -> Option<&'static str> {
 
 pub fn accepts(source: &str, version: &str, target: &str) -> bool {
     let policy = policy();
-    policy["sourceVersions"].as_array().is_some_and(|versions| versions.iter().any(|v| v == source))
+    policy["sourceVersions"]
+        .as_array()
+        .is_some_and(|versions| versions.iter().any(|v| v == source))
         && policy["version"] == version
         && policy["platforms"].get(target).is_some()
 }
 
-pub fn matches_artifact(source: &str, version: &str, target: &str, url: &str, signature: &str) -> bool {
+pub fn matches_artifact(
+    source: &str,
+    version: &str,
+    target: &str,
+    url: &str,
+    signature: &str,
+) -> bool {
     let policy = policy();
     accepts(source, version, target)
         && policy["platforms"][target]["url"] == url
@@ -38,11 +46,34 @@ mod tests {
         let p = policy();
         for target in ["windows-x86_64-nsis", "darwin-aarch64", "linux-x86_64"] {
             let artifact = &p["platforms"][target];
-            assert!(matches_artifact("1.8.0-beta.1", "1.7.3", target, artifact["url"].as_str().unwrap(), artifact["signature"].as_str().unwrap()));
-            assert!(!matches_artifact("1.8.0-beta.1", "1.7.3", target, "https://example.com/old.exe", artifact["signature"].as_str().unwrap()));
-            assert!(!matches_artifact("1.8.0-beta.1", "1.7.3", target, artifact["url"].as_str().unwrap(), "different signed bytes"));
+            assert!(matches_artifact(
+                "1.8.0-beta.1",
+                "1.7.3",
+                target,
+                artifact["url"].as_str().unwrap(),
+                artifact["signature"].as_str().unwrap()
+            ));
+            assert!(!matches_artifact(
+                "1.8.0-beta.1",
+                "1.7.3",
+                target,
+                "https://example.com/old.exe",
+                artifact["signature"].as_str().unwrap()
+            ));
+            assert!(!matches_artifact(
+                "1.8.0-beta.1",
+                "1.7.3",
+                target,
+                artifact["url"].as_str().unwrap(),
+                "different signed bytes"
+            ));
         }
-        for (source, target) in [("1.8.0", "1.7.3"), ("1.8.0-beta.2", "1.7.3"), ("1.8.0-beta.1", "1.7.2"), ("1.8.0-beta.1", "1.9.0")] {
+        for (source, target) in [
+            ("1.8.0", "1.7.3"),
+            ("1.8.0-beta.2", "1.7.3"),
+            ("1.8.0-beta.1", "1.7.2"),
+            ("1.8.0-beta.1", "1.9.0"),
+        ] {
             assert!(!accepts(source, target, "windows-x86_64-nsis"));
         }
         assert!(!accepts("1.8.0-beta.1", "1.7.3", "windows-x86_64-msi"));
