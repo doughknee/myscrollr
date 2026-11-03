@@ -7,6 +7,7 @@ import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import semver from 'semver';
+export { gh, ghJSON } from './release-lookup.mjs';
 
 export const targets = ['windows-x86_64', 'darwin-aarch64', 'linux-x86_64'];
 const binary = /(?:\.exe|\.msi|\.dmg|\.AppImage|\.deb|\.rpm|\.app\.tar\.gz)$/;
@@ -163,16 +164,6 @@ export async function validateArtifacts({ release, run, sha, repo, dir, proofs, 
   return { schema: 1, version, source: sha, runId: String(run.id), assets: Object.fromEntries(hashes) };
 }
 
-export function gh(...args) {
-  try {
-    return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
-      timeout: 180_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  } catch (error) {
-    // Avoid dumping entire API responses (or private release bodies) on failure.
-    throw new Error(`GitHub operation failed (${error.status ?? error.code}): ${String(error.stderr || '').slice(0,400)}`);
-  }
-}
-export const ghJSON = (...args) => JSON.parse(gh(...args));
 export async function minisign(file, signature, publicKey) {
   const sigPath = `${file}.verify.minisig`;
   const keyPath = `${file}.verify.pub`;
