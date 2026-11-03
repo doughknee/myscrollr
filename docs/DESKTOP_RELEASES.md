@@ -60,6 +60,13 @@ tag and, preferably, its build run ID. This workflow **publishes**; do not use i
 just to inspect a candidate. The underlying `finalize-release.mjs resolve` and
 `verify` commands are read-only and require GITHUB_REPOSITORY, TAG, BUILD_RUN_ID,
 GITHUB_OUTPUT (resolve), RUNNER_TEMP (verify), authenticated gh and Minisign.
+Use an identity with push access when inspecting drafts. GitHub's release-by-tag
+endpoint can return 404 for an unpublished draft; the shared read-only lookup
+falls back to authenticated, paginated release listings and re-reads the exact
+release ID. Missing Git tags are checked through the Git-ref endpoint, since the
+commits endpoint returns 422 for an absent draft tag. Authentication/network
+errors remain errors. Build preflight uses this same source-bound draft lookup
+on trusted main; unchanged-version pushes skip without rebuilding the draft.
 
 Before publication the finalizer checks:
 
