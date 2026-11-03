@@ -212,6 +212,7 @@ func TestStepLabel(t *testing.T) {
 		"Complete the bound build":            "Completing builds…",
 		"Verify final bytes against this build's evidence": "Verifying installers…",
 		"Publish verified release":                         "Publishing…",
+		"Advance approved update channels":                 "Updating release channels…",
 		"Start stable announcement":                        "Starting release follow-ups…",
 	} {
 		if got := stepLabel(step); got != want {
@@ -228,7 +229,7 @@ func TestStepNamesMatchWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	wf := string(b)
-	for _, step := range []string{"Bind draft and run before any rerun", "Complete the bound build", "Verify final bytes against this build's evidence", "Publish verified release", "Start stable announcement", "Start stable knowledge-base refresh", "Start website refresh"} {
+	for _, step := range []string{"Bind draft and run before any rerun", "Complete the bound build", "Verify final bytes against this build's evidence", "Publish verified release", "Advance approved update channels", "Start stable announcement", "Start stable knowledge-base refresh", "Start website refresh"} {
 		if !strings.Contains(wf, "- name: "+step) {
 			t.Errorf("finish-release.yml has no step %q", step)
 		}

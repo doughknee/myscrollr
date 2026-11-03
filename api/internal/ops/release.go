@@ -161,6 +161,8 @@ func stepLabel(step string) string {
 		return "Verifying installers…"
 	case "Publish verified release":
 		return "Publishing…"
+	case "Advance approved update channels":
+		return "Updating release channels…"
 	case "Start stable announcement", "Start stable knowledge-base refresh", "Start website refresh":
 		return "Starting release follow-ups…"
 	default:

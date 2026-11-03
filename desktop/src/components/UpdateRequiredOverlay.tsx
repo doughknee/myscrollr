@@ -1,20 +1,8 @@
-// ── Mandatory-update blocking overlay ───────────────────────────
-//
-// Rendered by the dashboard shell when useUpdateGate says the installed
-// version is older than the API's minimum (breaking deploy). Unlike the
-// startup toast (dismissible, user can disable it in Settings), this
-// covers the whole window until the update is installed — the app would
-// otherwise render broken data against the new API.
-//
-// The update flow reuses the exact plugin mechanics from the startup
-// check: shared lock, downloadAndInstall with progress, relaunch.
-
-import { useState } from "react";
-import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { useEffect } from "react";
 import { RefreshCw, Download } from "lucide-react";
 import { motion } from "motion/react";
-import { tryAcquireUpdateLock, releaseUpdateLock } from "../lib/updateState";
+import { updateBusy } from "../lib/updateState";
+import { updateController, useUpdateController } from "../lib/updateController";
 import {
   backdropMotion,
   overlaySurfaceMotion,
@@ -25,62 +13,18 @@ interface Props {
   minVersion: string;
 }
 
-type Phase =
-  | { kind: "idle" }
-  | { kind: "downloading"; detail: string }
-  | { kind: "ready" }
-  | { kind: "error"; message: string };
-
 export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-
+  const state = useUpdateController();
+  useEffect(() => {
+    updateController.setMinimum(minVersion);
+    return () => updateController.setMinimum(undefined);
+  }, [minVersion]);
   const runUpdate = async () => {
-    if (!tryAcquireUpdateLock()) {
-      setPhase({
-        kind: "error",
-        message: "Another update is already running. Try again in a moment.",
-      });
-      return;
-    }
-    setPhase({ kind: "downloading", detail: "Checking for the update…" });
-    try {
-      const update = await check();
-      if (!update) {
-        // Server minimum is ahead of the release feed (deploy ordering
-        // gap). Nothing to install yet — say so instead of spinning.
-        setPhase({
-          kind: "error",
-          message:
-            "The update isn't available yet. Please try again in a few minutes.",
-        });
-        return;
-      }
-      let downloaded = 0;
-      let total = 0;
-      await update.downloadAndInstall((event) => {
-        if (event.event === "Started" && event.data.contentLength) {
-          total = event.data.contentLength;
-        } else if (event.event === "Progress") {
-          downloaded += event.data.chunkLength ?? 0;
-          const mb = (n: number) => (n / 1024 / 1024).toFixed(1);
-          setPhase({
-            kind: "downloading",
-            detail: total
-              ? `Downloading… ${mb(downloaded)} / ${mb(total)} MB`
-              : "Downloading…",
-          });
-        }
-      });
-      setPhase({ kind: "ready" });
-    } catch (err) {
-      setPhase({
-        kind: "error",
-        message: `Update failed: ${String(err)}. You can also reinstall from myscrollr.com/download.`,
-      });
-    } finally {
-      releaseUpdateLock();
-    }
+    updateController.setMinimum(minVersion);
+    await updateController.check();
+    await updateController.install();
   };
+  const busy = updateBusy(state);
 
   return (
     <motion.div
@@ -109,10 +53,10 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
           widgets streaming — your data and settings carry over.
         </p>
 
-        {phase.kind === "ready" ? (
+        {state.phase === "ready" ? (
           <button
             type="button"
-            onClick={() => void relaunch()}
+            onClick={() => void updateController.restart()}
             className="btn btn-primary btn-sm w-full"
           >
             <RefreshCw size={14} />
@@ -122,19 +66,19 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
           <button
             type="button"
             onClick={() => void runUpdate()}
-            disabled={phase.kind === "downloading"}
+            disabled={busy}
             className="btn btn-primary btn-sm w-full"
           >
             <Download size={14} />
-            {phase.kind === "downloading" ? "Updating…" : "Update now"}
+            {busy ? "Updating…" : "Update now"}
           </button>
         )}
 
-        {phase.kind === "downloading" && (
-          <p className="mt-3 text-xs text-base-content/40">{phase.detail}</p>
+        {busy && (
+          <p className="mt-3 text-xs text-base-content/40">{state.phase === "checking" ? "Checking the selected update channel…" : "Updating Scrollr…"}</p>
         )}
-        {phase.kind === "error" && (
-          <p className="mt-3 text-xs text-error/70">{phase.message}</p>
+        {state.error && (
+          <p className="mt-3 text-xs text-error/70">{state.error}</p>
         )}
       </motion.div>
     </motion.div>
