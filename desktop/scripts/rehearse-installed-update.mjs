@@ -71,7 +71,7 @@ async function launchAndStop(state, phase) {
   // that exact path, then launch it explicitly for the restart check.
   if (process.platform === 'win32') {
     process.env.REHEARSAL_EXE = executable;
-    ps('Get-Process scrollr-desktop -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $env:REHEARSAL_EXE } | Stop-Process -Force');
+    ps("Get-Process | Where-Object { $_.ProcessName -eq 'scrollr-desktop' -and $_.Path -eq $env:REHEARSAL_EXE } | Stop-Process -Force");
   }
   const child = spawn(process.platform === 'linux' ? 'dbus-run-session' : executable,
     process.platform === 'linux' ? ['--', executable] : [],
