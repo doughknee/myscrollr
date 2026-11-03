@@ -35,11 +35,14 @@ impl Server {
                     thread::sleep(Duration::from_millis(5));
                     continue;
                 };
+                // macOS inherits O_NONBLOCK from the listener. A blocking
+                // write_all otherwise stops partway through a large package.
+                stream.set_nonblocking(false).unwrap();
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .unwrap();
                 stream
-                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .set_write_timeout(Some(Duration::from_secs(30)))
                     .unwrap();
                 // TCP may split even a tiny HTTP header across reads. Drain the
                 // complete request before responding/closing to avoid Windows RSTs.
@@ -97,7 +100,7 @@ impl Server {
                         thread::sleep(Duration::from_millis(10));
                     }
                 } else {
-                    let _ = stream.write_all(&body);
+                    stream.write_all(&body).unwrap();
                 }
                 let _ = stream.shutdown(std::net::Shutdown::Write);
             }
@@ -185,7 +188,7 @@ fn signed_native_transport() {
                     .parse()
                     .unwrap()])
                 .unwrap()
-                .timeout(Duration::from_secs(5))
+                .timeout(Duration::from_secs(30))
                 .build()
                 .unwrap();
             let result = updater.check().await;
