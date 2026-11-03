@@ -220,6 +220,11 @@ export const SETTINGS_ROWS = {
   },
 
   updates: {
+    releaseChannel: {
+      label: "Update channel",
+      description: "Choose Stable or Beta updates for this device. Switching does not install anything.",
+      keywords: "beta stable prerelease opt in early access release channel",
+    },
     checkNow: {
       label: "Check for updates",
       description: "Scrollr also checks each time it launches.",

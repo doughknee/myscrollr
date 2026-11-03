@@ -2,8 +2,8 @@
 
 The existing Desktop Release workflow builds Windows x64, macOS Apple Silicon,
 and Linux x64. Finish Desktop Release is the explicit publication boundary.
-This foundation does not add beta enrollment, channel manifests, a new app,
-or a second backend. Those are separate work under SCROLLR-299.
+Stable/Beta feeds and device-local enrollment extend this same app and release
+pipeline. There is no second app, backend, account, or entitlement system.
 
 ## Current implementation boundary
 
@@ -123,9 +123,87 @@ produce no automatic shipped-fix claim; staff can still assess them manually.
 Follow-ups remain ordinary pending support drafts and are never sent by this gate.
 
 SCROLLR-279 remains separate: suppressing Beta refresh events does not make KB
-facts read from main accurately describe an older released desktop app. Shared
-update-controller lifecycle, channel opt-in/exit, update timeouts and diagnostics
-also remain later work. No Stable user is enrolled in Beta by these changes.
+facts read from main accurately describe an older released desktop app.
+
+## Stable and Beta channels (SCROLLR-424)
+
+Settings → Updates selects Stable or Beta **for this device**. Selection never
+downloads or installs. Stable excludes prereleases. Beta selects the highest
+approved SemVer from Beta and Stable, so a final release supersedes its betas.
+The installed build label is independent of the saved channel preference.
+
+A fresh beta installation defaults to Beta. Existing explicit choices survive
+manual installs and updates. A manually installed beta over an existing install
+without a channel choice stays on Stable and offers opt-in. Leaving Beta stops
+beta offers; an installation ahead of Stable waits for a newer stable release.
+There are no automatic downgrades or same-version reinstall offers.
+
+The main window owns one controller for startup checks, Settings and the
+required-update overlay. Navigating away retains progress and installed/restart
+state. Channel changes invalidate unused offers and are disabled during checks,
+installation and pending restart. Failed restarts retry restart without download.
+Native manifest checks time out after 20 seconds (25-second outer cancellation);
+downloads have a 180-second native request deadline, including the response body.
+Failures remain distinct from a verified current version. These limits do not
+impose a timer on an OS installer after it has started.
+
+### Feed storage and publication
+
+The fixed native endpoints are `https://raw.githubusercontent.com/doughknee/myscrollr/desktop-updates/stable.json`
+and the corresponding `beta.json`. They do not use GitHub Latest or a fallback
+endpoint array. Missing feeds fail visibly; they do not certify currency.
+
+The `desktop-updates` metadata branch contains `index.json` (schema 1, approved
+release records with immutable manifest/proof bytes and withdrawal flags),
+`stable.json`, and `beta.json`. Each selection is a complete verified platform
+cohort. The publisher creates one Git tree/commit for all three files, then uses
+a non-force ref update against the observed parent. Concurrent changes fail with
+a non-fast-forward error; retry reads the new registry before recomputing. An old
+finalizer can add its release but cannot move a channel behind a newer approved
+one. Equivalent SemVer precedence with different build metadata is rejected.
+
+`release-channels.mjs` is dry-run by default and writes a local plan. It consumes
+the same run-bound verification output as the existing finalizer, then rechecks
+published status, source/tag and current GitHub asset digests. It refuses partial
+cohorts, changed approved bytes, automatic reinstatement of withdrawn releases,
+or removal of the last Stable baseline. Withdrawal changes future offers only;
+it cannot remove installed software. A broken installed version needs a newer fix.
+
+**Activation is a separate, explicit operation. Nothing in a code merge creates
+the metadata branch or enables publishing.** Before first use:
+
+1. Qualify a complete, signed Stable baseline using the existing finalizer. Old
+   releases without run-bound proofs cannot be silently grandfathered in. If
+   current proofs have expired, build a newly versioned Stable candidate after
+   release approval. A beta-only bootstrap is deliberately refused.
+2. Create the metadata branch with `index.json` containing
+   `{"schema":1,"releases":[]}`. Protect it against force pushes and deletion;
+   restrict changes to trusted release maintainers/workflows. The chosen protection
+   must allow the authorized contents-write workflow to fast-forward this branch
+   (not require an impossible GITHUB_TOKEN bypass of a pull-request rule). The
+   publisher refuses to create an unprotected branch or force a ref.
+3. Run **Reconcile Desktop Update Feeds** with the published Stable tag/build run
+   and `apply=false`. Review all three plan files and both selected versions.
+   Approval re-downloads the Actions proofs and independently verifies signatures.
+4. After approval, set repository variable `DESKTOP_CHANNEL_FEEDS_ENABLED=true`
+   and run the same reconciliation with `apply=true`. This is a live metadata
+   change. Verify both raw URLs without authentication, correct content and cache
+   behavior from supported hosts before distributing a client that uses them.
+5. Qualify actual signed upgrades on Windows, macOS and Linux: Stable→newer Stable,
+   Stable→Beta, Beta→newer Beta/Stable, leaving Beta while ahead, interrupted
+   download, invalid signature, restart failure, and preference retention. A
+   branch artifact installing successfully is not proof of version-to-version updates.
+
+Once enabled, Finish Desktop Release advances both feeds after publication and
+before release follow-ups. A feed failure leaves the published release intact,
+the old feeds available, and follow-ups blocked; rerun failed jobs after resolving
+it. The standalone reconciliation workflow can retry an approval, withdraw one
+tag, or recompute feeds. It defaults to dry-run and shares the build/finalizer
+artifact lock. Approval and withdrawal must be separate actions.
+
+The legacy Latest repair remains separate for already-installed older clients.
+Do not retire that route when channel feeds are enabled. Never use a test run to
+publish a release, enable the variable, write metadata, or enroll a tester.
 
 ## Local verification
 
