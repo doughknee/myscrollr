@@ -54,7 +54,7 @@ import { isPrimaryTicker } from "../../lib/windowRole";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { BAND_W, DISPLAY_HEADER_H, DISPLAY_PIN_H, PILLS_MAX, columnsFor, contentWidth, displayGrid, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
+import { BAND_W, DISPLAY_HEADER_H, PILLS_MAX, columnsFor, contentWidth, displayGrid, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
 import {
   ALSO_TAB,
   buildPageWidgets,
@@ -77,8 +77,8 @@ import AlsoCell from "./cells/AlsoCell";
 import RepoCell from "./cells/RepoCell";
 import ThingCell from "./cells/ThingCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
-import EdgeZone, { buildEdge, edgeTabs, eligibleEdgePins } from "./EdgeZone";
-import { stepBack } from "./edgeRule";
+import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
+import { stepBack, eligibleEdgePins, gridHeaderPlan } from "./edgeRule";
 import { useActiveHover } from "./activeHover";
 
 /** The swipe (canvas "Motion"): 0.6 s on a soft ease. */
@@ -439,14 +439,13 @@ export default function PagedBar({
   const sharedRoom = useEdgeRoom();
   const [localWidth, setLocalWidth] = useState(0);
   const grid = fillHeight !== undefined;
-  const room = useMemo(() => independent ? { bar: grid ? localWidth / 0.4 : localWidth, util: grid ? 0 : utilW } : sharedRoom, [independent, grid, localWidth, utilW, sharedRoom]);
+  const utilities = useMemo(() => buildEdge(widgetData, [], dashboard, activeTabs).utilities, [widgetData, dashboard, activeTabs]);
+  const header = useMemo(() => gridHeaderPlan(localWidth, utilities.length, activeTabs), [localWidth, utilities.length, activeTabs]);
+  const room = useMemo(() => grid ? header.room : independent ? { bar: localWidth, util: utilW } : sharedRoom, [independent, grid, header, localWidth, utilW, sharedRoom]);
   const onEdge = useMemo(() => {
     const eligible = grid ? eligibleEdgePins(pins, activeTabs) : pins;
     return room ? stepBack(eligible, room) : eligible;
   }, [pins, room, grid, activeTabs]);
-  // Saved pin placement determines the footer reservation. A data update
-  // cannot collapse it and move the page currently being read.
-  const footerHeight = grid && onEdge.length > 0 ? DISPLAY_PIN_H : 0;
 
   // Live width for the NEXT page; the page on screen keeps the width it froze with.
   const widthRef = useRef(0);
@@ -454,7 +453,7 @@ export default function PagedBar({
 
   // The whole market's quotes, only while a watchlist is shorter than a page
   // (its empty columns fill with popular symbols, SCROLLR-292).
-  const quoteCols = grid ? displayGrid(width, fillHeight, QUOTE_MIN_COL, footerHeight).capacity : columnsFor(contentWidth(width, 0), QUOTE_MIN_COL);
+  const quoteCols = grid ? displayGrid(width, fillHeight, QUOTE_MIN_COL).capacity : columnsFor(contentWidth(width, 0), QUOTE_MIN_COL);
   const shortWatchlist = activeTabs.some((tab) => {
     if (sourceForWidget(tab) !== "finance") return false;
     const symbols = (dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as { symbols?: unknown } | undefined)?.symbols;
@@ -478,15 +477,18 @@ export default function PagedBar({
   useEffect(() => {
     if (!bar) return;
     const read = () => {
-      widthRef.current = bar.clientWidth;
-      setWidth(bar.clientWidth);
-      setLocalWidth(bar.clientWidth);
+      // Preserve fractional logical pixels under Fill's CSS zoom. clientWidth
+      // rounds up on some reading sizes and can push the last header slot out.
+      const measured = grid ? parseFloat(getComputedStyle(bar).width) : bar.clientWidth;
+      widthRef.current = measured;
+      setWidth(measured);
+      setLocalWidth(measured);
     };
     const ro = new ResizeObserver(read);
     ro.observe(bar);
     read();
     return () => ro.disconnect();
-  }, [bar]);
+  }, [bar, grid]);
 
   // The edge zone's width, read when a page is planned (not via a
   // ResizeObserver: that fires after the effect that plans the first page,
@@ -531,18 +533,18 @@ export default function PagedBar({
   // ── Leader: the page clock ──────────────────────────────────────
   const advance = useCallback(() => {
     const ws = widgetsRef.current;
-    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW(), fillHeight, footerHeight), nav.current));
+    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW(), fillHeight), nav.current));
     broadcast();
-  }, [show, broadcast, fillHeight, footerHeight]);
+  }, [show, broadcast, fillHeight]);
 
   /** A manual move on the leader: a new turn, so the clock below restarts the page's dwell. */
   const stepHere = useCallback((move: Move) => {
     const ws = widgetsRef.current;
-    const t = stepTurn(turnRef.current, move, ws, planAll(ws, widthRef.current, edgeW(), fillHeight, footerHeight), nav.current);
+    const t = stepTurn(turnRef.current, move, ws, planAll(ws, widthRef.current, edgeW(), fillHeight), nav.current);
     if (!t) return;
     show(t);
     broadcast();
-  }, [show, broadcast, fillHeight, footerHeight]);
+  }, [show, broadcast, fillHeight]);
 
   useEffect(() => {
     // The ref, not the state: StrictMode runs this twice before the first
@@ -555,7 +557,7 @@ export default function PagedBar({
     if (independent && turnRef.current && width > 0) {
       show({ ...turnRef.current, seq: turnRef.current.seq + 1 });
     }
-  }, [independent, width, fillHeight, footerHeight, show]);
+  }, [independent, width, fillHeight, show]);
 
   // The clock restarts only on a new turn, never on a data update, and
   // stands still while the page is held.
@@ -675,7 +677,7 @@ export default function PagedBar({
   }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── The frozen page ─────────────────────────────────────────────
-  const plans = useMemo(() => planAll(widgets, planWidth, planEdge, fillHeight, footerHeight), [widgets, planWidth, planEdge, fillHeight, footerHeight]);
+  const plans = useMemo(() => planAll(widgets, planWidth, planEdge, fillHeight), [widgets, planWidth, planEdge, fillHeight]);
   const shown = useRef<Shown | null>(null);
   if (turn && shown.current?.seq !== turn.seq) {
     const w = widgets.find((x) => x.tab === turn.tab);
@@ -694,7 +696,7 @@ export default function PagedBar({
         page: freezePage(items, keyOf),
         index,
         count: plan.pages.length,
-        colW: grid ? planWidth / displayGrid(planWidth, fillHeight, w.minCol, footerHeight).columns : contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        colW: grid ? planWidth / displayGrid(planWidth, fillHeight, w.minCol).columns : contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
         short,
         cols: plan.cols,
         total: plan.pages.reduce((n, p) => n + p.length, 0),
@@ -743,17 +745,20 @@ export default function PagedBar({
   if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
 
   if (grid) {
-    const shape = displayGrid(planWidth || width, fillHeight, cur?.widget.minCol ?? QUOTE_MIN_COL, footerHeight);
+    const shape = displayGrid(planWidth || width, fillHeight, cur?.widget.minCol ?? QUOTE_MIN_COL);
     const tick = turn ? turn.seq : wallTick;
-    const chromeScale = DISPLAY_HEADER_H / 64;
+    const chromeScale = header.scale;
     return (
-      <div ref={setBar} data-pages="" data-display-grid="" data-motion-style={reduced ? "fade" : "swipe"}
+      <div ref={setBar} data-pages="" data-display-grid="" data-header-utilities={utilities.length} data-motion-style={reduced ? "fade" : "swipe"}
         className="ticker-container group/bar relative flex w-full shrink-0 flex-col overflow-hidden bg-base-150"
         style={{ height: fillHeight }} onMouseEnter={hover.move} onMouseMove={hover.move} onMouseLeave={hover.leave}>
         <div data-display-header="" className="relative shrink-0 overflow-hidden border-b border-edge/50" style={{ height: DISPLAY_HEADER_H }}>
-          <div className="absolute inset-y-0 left-0 flex h-16 w-full" style={{ zoom: chromeScale }}>
+          <div className="absolute inset-y-0 left-0 flex h-16" style={{ zoom: chromeScale, width: width / chromeScale }}>
             {cur && <Band cur={cur} live={live ?? cur.widget} widgets={widgets} turn={turn} held={held} dark={dark} keypad={pageControls} reduced={reduced} onMove={step} wipe={wipe} fade={fade} />}
-            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={Math.max(180, width / chromeScale - BAND_W)} onChipClick={onChipClick} />
+            {onEdge.length > 0 && <div data-display-pins="" className="flex min-w-0 flex-1 overflow-hidden">
+              <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} stretchPins reservedPins={onEdge} onChipClick={onChipClick} />
+            </div>}
+            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={header.utilitiesWidth} onChipClick={onChipClick} />
           </div>
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -771,9 +776,6 @@ export default function PagedBar({
             </motion.div>}
           </AnimatePresence>
         </div>
-        {footerHeight > 0 && <div data-display-pins="" className="flex shrink-0 items-center border-t border-edge/50" style={{ height: footerHeight }}>
-          <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} onChipClick={onChipClick} />
-        </div>}
       </div>
     );
   }

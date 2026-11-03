@@ -6,7 +6,8 @@ import fixture from "../../dev/__fixtures__/dashboard.pages.json";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
-import EdgeZone, { buildEdge, edgeTabs, eligibleEdgePins, reserveOf, utilityTurns, type Edge } from "./EdgeZone";
+import EdgeZone, { buildEdge, edgeTabs, reserveOf, utilityTurns, type Edge } from "./EdgeZone";
+import { eligibleEdgePins } from "./edgeRule";
 import { ALSO_TAB, buildPageWidgets } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;

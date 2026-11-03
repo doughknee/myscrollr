@@ -60,12 +60,11 @@ export type Tier = (typeof TIER)[keyof typeof TIER];
 export const BAND_W = 192;
 
 export const DISPLAY_HEADER_H = 48;
-export const DISPLAY_PIN_H = 64;
 
 /** Fill mode uses the same family minimums; chrome only reserves space it uses. */
-export function displayGrid(width: number, height: number, minCol: number, footerHeight = 0) {
+export function displayGrid(width: number, height: number, minCol: number) {
   const columns = columnsFor(width, minCol);
-  const rows = Math.max(1, Math.floor(Math.max(160, height - DISPLAY_HEADER_H - footerHeight) / 160));
+  const rows = Math.max(1, Math.floor(Math.max(160, height - DISPLAY_HEADER_H) / 160));
   return { columns, rows, capacity: columns * rows };
 }
 

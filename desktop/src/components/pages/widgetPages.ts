@@ -316,11 +316,11 @@ export interface PagePlan extends WidgetPlan<PageItem> {
  * (SCROLLR-292): the pool is topped up from the widget's fill until the last
  * page has a column for every item.
  */
-export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0, fillHeight?: number, footerHeight = 0): Map<string, PagePlan> {
+export function planAll(widgets: readonly PageWidget[], barWidth: number, edgeWidth = 0, fillHeight?: number): Map<string, PagePlan> {
   const content = contentWidth(barWidth, edgeWidth);
   return new Map(
     widgets.map((w) => {
-      const cols = fillHeight === undefined ? columnsFor(content, w.minCol) : displayGrid(barWidth, fillHeight, w.minCol, footerHeight).capacity;
+      const cols = fillHeight === undefined ? columnsFor(content, w.minCol) : displayGrid(barWidth, fillHeight, w.minCol).capacity;
       // Popular symbols fill a watchlist SHORTER than a page, never the tail of a long one
       // (10 symbols at 9 columns are two pages of 5, not 9 of yours and 1 of yours + 8 of theirs);
       if (w.kind === "github") return [w.tab, { pages: githubPages(w.items, w.fill, cols), cols, avail: w.items.length + w.fill.length }];

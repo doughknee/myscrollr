@@ -43,7 +43,7 @@ import {
   isPinned,
 } from "./preferences";
 import { currentEdgeRoom } from "./lib/edgeMeasure";
-import { edgeCanHold, pinRefusal } from "./components/pages/edgeRule";
+import { edgeCanHold, pinRefusal, gridHeaderPlan } from "./components/pages/edgeRule";
 import type { SubscriptionTier } from "./auth";
 import type { AppPreferences, TickerPosition } from "./preferences";
 import { catalogItemById, getCatalogItems, sourceForWidget } from "./marketplace";
@@ -208,6 +208,11 @@ export default function App() {
   }, [prefs.privacy.sendCrashReports]);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
+
+  const activeTabs = useMemo(
+    () => [...widgetTabs, ...prefs.widgets.widgetsOnTicker],
+    [widgetTabs, prefs.widgets.widgetsOnTicker],
+  );
 
   const measuredWidgetIds = useMemo(
     () => [...new Set([...widgetTabs, ...prefs.widgets.widgetsOnTicker.filter((id) => prefs.widgets.enabledWidgets.includes(id))])],
@@ -465,9 +470,9 @@ export default function App() {
     const bar = document.querySelector<HTMLElement>("[data-pages]");
     if (!bar) return null;
     const grid = bar.hasAttribute("data-display-grid");
-    return { bar: grid ? bar.clientWidth / 0.4 : bar.clientWidth,
-      util: grid ? 0 : (bar.querySelector<HTMLElement>("[data-edge-utils]")?.offsetWidth ?? 0) };
-  }, [filled]);
+    if (grid) return gridHeaderPlan(parseFloat(getComputedStyle(bar).width), Number(bar.dataset.headerUtilities) || 0, activeTabs).room;
+    return { bar: bar.clientWidth, util: bar.querySelector<HTMLElement>("[data-edge-utils]")?.offsetWidth ?? 0 };
+  }, [filled, activeTabs]);
 
   /**
    * Pin or unpin one subject, from the ticker's own right-click menu.
@@ -744,12 +749,6 @@ export default function App() {
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
   }, [toggleOnTicker, handleTogglePosition, navigateMainWindow, handleTogglePin, handleTogglePageControls, filled, exitFill, pinRoom]);
-
-  // ── Merge widget + widget tabs ──────────────────────────────
-  const activeTabs = useMemo(
-    () => [...widgetTabs, ...prefs.widgets.widgetsOnTicker],
-    [widgetTabs, prefs.widgets.widgetsOnTicker],
-  );
 
   // ── Widget ticker data (local polling for clock/weather/sysmon) ──
   const widgetData = useWidgetTickerData(prefs.widgets, prefs.appearance.units);

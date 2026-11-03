@@ -48,6 +48,7 @@ import GameCell, { gameMinCol } from "./cells/GameCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { Rule, accentFor, accentStyle, inkFor } from "./cells/parts";
+import { eligibleEdgePins, pinWidth } from "./edgeRule";
 
 const UTILITIES = ["clock", "timer", "weather", "sysmon", "uptime"] as const;
 type Utility = (typeof UTILITIES)[number];
@@ -126,12 +127,6 @@ function slotOf(tab: Utility, raw: unknown): SlotItem {
       return { id: u.id, label: u.label, value: down ? u.outageFor ?? "DOWN" : u.uptime, reserve: "000.00%", detail: u.responseAvg ?? u.detail, tone: down ? "down" : undefined };
     }
   }
-}
-
-/** Pins with an edge-cell renderer; eligibility does not depend on live data. */
-export function eligibleEdgePins(pins: readonly WidgetPin[], activeTabs: readonly string[]) {
-  return pins.filter(p => activeTabs.includes(p.widget) &&
-    ["sports", "finance", "rss"].includes(sourceForWidget(p.widget) ?? ""));
 }
 
 /** What the edge holds: utilities on the ticker with data, then pins that resolve. */
@@ -256,8 +251,10 @@ function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipCli
   return <NewsCell item={r} width={p.width} line onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
 }
 
-export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth }: {
+export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWidth, onChipClick, maxUtilitiesWidth, stretchPins = false, reservedPins }: {
   edge: Edge;
+  stretchPins?: boolean;
+  reservedPins?: readonly WidgetPin[];
   maxUtilitiesWidth?: number;
   /** The utilities' strip width (pins not in it), reported on every change; 0 when the edge is gone (SCROLLR-284). */
   onUtilWidth?: (w: number) => void;
@@ -268,7 +265,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
   edgeRef?: Ref<HTMLDivElement>;
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
 }) {
-  const empty = edge.utilities.length === 0 && edge.pins.length === 0;
+  const empty = edge.utilities.length === 0 && edge.pins.length === 0 && !reservedPins?.length;
   const strip = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = strip.current;
@@ -285,8 +282,14 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
   if (empty) return null;
   const slots = maxUtilitiesWidth === undefined ? edge.utilities.length : Math.max(1, Math.floor(maxUtilitiesWidth / 180));
   const utilities = utilityTurns(edge.utilities.length, slots, tick);
+  const pinSlots = reservedPins
+    ? reservedPins.map(saved => ({
+      key: JSON.stringify([saved.widget, saved.subject]), width: pinWidth(saved.widget),
+      pin: edge.pins.find(p => p.widget === saved.widget && JSON.parse(p.pin).subject === saved.subject),
+    }))
+    : edge.pins.map(pin => ({ key: pin.pin, width: pin.width, pin }));
   return (
-    <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
+    <div ref={edgeRef} data-edge="" className={clsx("relative flex h-full border-l border-edge", stretchPins ? "min-w-0 flex-1" : "ml-auto shrink-0")}>
       <div ref={strip} data-edge-utils="" className="flex h-full">
         {utilities.map(({ index, tick: itemTick }, i) => {
           const u = edge.utilities[index];
@@ -298,13 +301,13 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
           );
         })}
       </div>
-      {edge.pins.map((p, i) => (
+      {pinSlots.map(({ key, width, pin: p }, i) => p ? (
         <div
-          key={p.pin}
+          key={key}
           className="relative h-full shrink-0"
           data-widget={p.widget}
           data-pin-subject={p.pin}
-          style={{ ...accentStyle(accentFor(p.hex, dark), inkFor(p.hex, dark)), width: p.width }}
+          style={{ ...accentStyle(accentFor(p.hex, dark), inkFor(p.hex, dark)), width, flexGrow: stretchPins ? 1 : undefined }}
         >
           {(i > 0 || edge.utilities.length > 0) && <Rule />}
           <PinCell p={p} tick={tick} onChipClick={onChipClick} />
@@ -317,7 +320,7 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
             style={{ backgroundImage: "repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 10px)" }}
           />
         </div>
-      ))}
+      ) : <div key={key} data-pin-reserved="" aria-hidden="true" className="h-full shrink-0" style={{ width, flexGrow: stretchPins ? 1 : undefined }} />)}
     </div>
   );
 }

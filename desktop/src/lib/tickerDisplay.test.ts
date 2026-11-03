@@ -20,12 +20,7 @@ describe("dedicated display geometry", () => {
         expect(g.width * g.scale).toBeCloseTo(width);
         expect(g.height * g.scale).toBeCloseTo(height);
         expect(g.width / shape.columns).toBeGreaterThanOrEqual(264);
-        for (const footer of [0, 64]) {
-          const withPins = displayGrid(g.width, g.height, 264, footer);
-          expect(
-            (g.height - 48 - footer) / withPins.rows,
-          ).toBeGreaterThanOrEqual(160 - 0.001);
-        }
+        expect((g.height - 48) / shape.rows).toBeGreaterThanOrEqual(160 - 0.001);
         const strip = displayGeometry(width, height, "strip", reading);
         expect(strip.grid).toBe(false);
         expect(strip.width).toBeGreaterThanOrEqual(780 - 0.001);

@@ -23,6 +23,7 @@ import { teamShortName } from "../../utils/teamShortName";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
+import { BAND_W, DISPLAY_HEADER_H } from "./pagePlan";
 
 /** The most of the bar the edge may take. */
 export const EDGE_SHARE = 0.4;
@@ -35,6 +36,26 @@ export interface EdgeRoom {
   bar: number;
   /** Widest utilities strip (clocks, weather, ...; the pins are not in it), in CSS px. */
   util: number;
+  /** Fill grid budgets its header directly; docked/strip retain the 40% rule. */
+  budget?: number;
+  region?: "header";
+  activeTabs?: readonly string[];
+}
+
+/** Pins with an edge-cell renderer; eligibility does not depend on live data. */
+export function eligibleEdgePins(pins: readonly WidgetPin[], activeTabs: readonly string[]) {
+  return pins.filter(p => activeTabs.includes(p.widget) &&
+    ["sports", "finance", "rss"].includes(sourceForWidget(p.widget) ?? ""));
+}
+
+/** One fixed-height header: compact shared cells, with up to a third for utilities. */
+export function gridHeaderPlan(width: number, utilityCount: number, activeTabs: readonly string[] = []) {
+  const scale = DISPLAY_HEADER_H / 64;
+  const available = Math.max(0, width / scale - BAND_W);
+  const slots = Math.min(utilityCount, Math.max(1, Math.floor(available / 3 / 180)));
+  const utilitiesWidth = slots * 180;
+  const room: EdgeRoom = { bar: width, util: 0, budget: Math.max(0, available - utilitiesWidth - (slots ? EDGE_BORDER : 0)), region: "header", activeTabs };
+  return { scale, utilitiesWidth, room };
 }
 
 export function edgeBudget(bar: number): number {
@@ -53,10 +74,10 @@ export function pinWidth(widget: string): number {
 }
 
 const used = (pins: readonly WidgetPin[], room: EdgeRoom) =>
-  EDGE_BORDER + room.util + pins.reduce((w, p) => w + pinWidth(p.widget), 0);
+  EDGE_BORDER + room.util + (room.activeTabs ? eligibleEdgePins(pins, room.activeTabs) : pins).reduce((w, p) => w + pinWidth(p.widget), 0);
 
 export function fitsEdge(pins: readonly WidgetPin[], room: EdgeRoom): boolean {
-  return used(pins, room) <= edgeBudget(room.bar);
+  return used(pins, room) <= (room.budget ?? edgeBudget(room.bar));
 }
 
 /** The oldest pins that fit: the rest step back onto their pages. */
@@ -95,6 +116,12 @@ export function pinRefusal(
   }
   const next = [...pins, { widget: add.widget, subject: add.subject, side: "right" as const }];
   if (fitsEdge(next, room)) return null;
+  if (room.region === "header") {
+    const fix = [...pins].reverse().find((p) => fitsEdge(next.filter((n) => n !== p), room));
+    if (fix) return `Header pin area is full — unpin ${labelOf(fix)} first`;
+    if (!fitsEdge([next[next.length - 1]], room)) return `Not enough header space for ${add.label} at this reading size`;
+    return "Header pin area is full — unpin some items first";
+  }
   const tail = "No room on the edge at this screen size";
   // Name the newest pin whose removal makes room; else the newest; else the clocks.
   const fix = [...pins].reverse().find((p) => fitsEdge(next.filter((n) => n !== p), room)) ?? pins[pins.length - 1];

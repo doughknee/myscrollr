@@ -26,7 +26,7 @@ test("Fill controls idle without hiding the native pointer and wake on movement 
   await expect(page.locator("[data-fill-display]")).toHaveCount(0);
 });
 
-test("grid uses its canvas for quotes and reserves a footer only for saved pins", async ({
+test("grid uses its canvas for quotes and places saved pins in the header", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 3440, height: 1440 });
@@ -60,6 +60,99 @@ test("grid uses its canvas for quotes and reserves a footer only for saved pins"
   );
   await expect(page.locator("[data-display-pins]")).toHaveCount(1);
   await expect(page.locator("[data-display-pins]")).toContainText("Bears");
+  await expect(page.locator("[data-display-header] [data-display-pins]")).toHaveCount(1);
+});
+
+for (const [width, height] of [[3440, 1440], [1920, 360], [800, 480], [720, 1280], [1080, 1920]]) {
+  for (const reading of [100, 150]) {
+    test(`header pins fit ${width}x${height} at ${reading}% without a footer`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto(`/ticker-shim.html?fixture=pages&pages=1&fill=grid&reading=${reading}&utils=clock,weather&weather=demo&pin=sports_nfl:Chicago Bears&pin=sports_nfl:Houston Texans&pin=finance_stocks:AAPL`);
+      await expect(page.locator("[data-display-grid]")).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.locator("[data-page]")).toHaveCount(1);
+      const header = (await page.locator("[data-display-header]").boundingBox())!;
+      expect(header.height).toBeLessThan(height * 0.25);
+      for (const el of await page.locator('[data-display-header] [data-pin-subject], [data-display-header] [data-edge-utils] > [data-widget]').all()) {
+        const box = (await el.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(-1);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+        expect(box.y + box.height).toBeLessThanOrEqual(header.height + 1);
+      }
+      const content = (await page.locator("[data-page]").boundingBox())!;
+      expect(content.y).toBeCloseTo(header.height, 0);
+      expect(content.y + content.height).toBeCloseTo(height, 0);
+      const pins = page.locator('[data-display-header] [data-pin-subject]');
+      if (width === 3440 && reading === 100) expect(await pins.count()).toBe(3);
+      if (width < height) expect(await pins.count()).toBe(0);
+    });
+  }
+}
+
+test("saved header pins return to pages on portrait resize and restore when widened", async ({ page, context }) => {
+  await context.clock.install();
+  await page.setViewportSize({ width: 3440, height: 1440 });
+  await page.goto('/ticker-shim.html?fixture=pages&pages=1&fill=grid&utils=clock,weather&weather=demo&pin=sports_nfl:Chicago Bears');
+  await expect(page.locator('[data-display-header] [data-pin-subject]')).toHaveCount(1);
+  await page.setViewportSize({ width: 720, height: 1280 });
+  await context.clock.runFor(1000);
+  await expect(page.locator('[data-display-header] [data-pin-subject]')).toHaveCount(0);
+  await page.keyboard.press('ArrowDown');
+  await context.clock.runFor(1000);
+  await page.locator('[data-seg="sports_nfl"]').click();
+  await context.clock.runFor(1000);
+  await expect(page.locator('[data-page] [data-pin-subject]').filter({ hasText: 'Bears' })).toHaveCount(1);
+  await page.setViewportSize({ width: 3440, height: 1440 });
+  await context.clock.runFor(1000);
+  await expect(page.locator('[data-display-header] [data-pin-subject]')).toHaveCount(1);
+});
+
+test("late pin data keeps neighbouring header cells in place", async ({ page, context }) => {
+  await context.clock.install();
+  await page.setViewportSize({ width: 3440, height: 1440 });
+  await page.goto('/ticker-shim.html?fixture=pages&pages=1&fill=grid&utils=clock,weather&weather=demo&pin=sports_nfl:Chicago Bears&pin=finance_stocks:TEST&live=1');
+  const pins = page.locator('[data-display-header] [data-display-pins]');
+  await expect(pins.locator('[data-pin-reserved]')).toHaveCount(1);
+  const bears = pins.locator('[data-pin-subject]').filter({ hasText: 'Bears' });
+  const before = (await bears.boundingBox())!;
+  await page.evaluate(() => window.__shimDashboard?.(prev => ({
+    ...prev,
+    widgets: prev.widgets.map(w => w.widget_type === 'finance_stocks' ? { ...w, config: { ...w.config, symbols: ['AAPL', 'TEST'] } } : w),
+    data: { ...prev.data, finance: [...prev.data!.finance as object[], { ...(prev.data!.finance as object[])[0], symbol: 'TEST' }] },
+  })));
+  await context.clock.runFor(100);
+  await expect(pins.locator('[data-pin-reserved]')).toHaveCount(0);
+  const after = (await bears.boundingBox())!;
+  expect(after.x).toBeCloseTo(before.x, 0);
+  expect(after.width).toBeCloseTo(before.width, 0);
+});
+
+test("grid context menu uses header capacity and names the right constraint", async ({ page, context }) => {
+  await context.clock.install();
+  await page.setViewportSize({ width: 720, height: 1280 });
+  await page.goto('/ticker-shim.html?fixture=googl&pages=1&fill=grid&utils=clock');
+  const quote = page.locator('[data-display-cell="quote"]').first();
+  await expect(quote).toBeVisible();
+  await page.evaluate(() => {
+    const win = window as unknown as { __TAURI_INTERNALS__: { invoke: (cmd: string, args?: any) => Promise<any> }; __pinMenu: any[] };
+    const original = win.__TAURI_INTERNALS__.invoke;
+    win.__pinMenu = [];
+    win.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
+      if (cmd === 'plugin:menu|new') {
+        win.__pinMenu.push(args);
+        return [100 + win.__pinMenu.length, `test-${win.__pinMenu.length}`];
+      }
+      if (cmd.startsWith('plugin:menu|')) return null;
+      return original(cmd, args);
+    };
+  });
+  await quote.click({ button: 'right' });
+  await expect.poll(() => page.evaluate(() => JSON.stringify((window as unknown as { __pinMenu: unknown[] }).__pinMenu))).toContain('Not enough header space');
+  await page.setViewportSize({ width: 3440, height: 1440 });
+  await context.clock.runFor(1000);
+  await page.evaluate(() => { (window as unknown as { __pinMenu: unknown[] }).__pinMenu = []; });
+  await quote.click({ button: 'right' });
+  await expect.poll(() => page.evaluate(() => JSON.stringify((window as unknown as { __pinMenu: unknown[] }).__pinMenu))).toContain('Pin GOOGL');
 });
 
 test("grid ignores header-only pins and refreshes a visible quote in place", async ({ page, context }) => {

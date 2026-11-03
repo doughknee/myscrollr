@@ -788,11 +788,16 @@ No copied renderer, custom playlist, manual row count or extra connection.
   This runtime flag is a compatibility workaround, not a stable WebView2 API:
   revalidate cursor behavior and rendering performance on runtime updates and
   the customer's hardware before release. Other platforms keep their renderer.
-- Grid uses a 48px heading (the existing 64px band and utilities at 75%), a 64px
-  footer only when pins have local placement, and the remaining height for equal
-  cells. No empty branding footer. Only active data-widget pins reserve a footer;
-  utility pins remain in the header. Eligible saved pins keep their reservation
-  when data is temporarily absent, so an update cannot move the page in view.
+- Grid uses one 48px heading (the existing 64px band, pin cells and utilities at
+  75%). There is no footer: the remaining height belongs to the main grid. The
+  band stays left, compact data pins fill the middle, and utilities stay right.
+  `gridHeaderPlan` reserves the band and up to a third of the remaining width for
+  180px utility slots (at least one when utilities exist); pins use the remainder.
+  Both admission and rendering use this plan and active data-pin eligibility.
+  Pin cells grow into spare header width but never below their family minimum.
+  Eligible saved pins keep their width reservation when data is temporarily absent;
+  pin data changes cannot alter the main grid height. Refusal names the header,
+  and suggests a specific unpin only when that removal actually creates room.
   `displayGrid` takes each family's existing minimum column and a 160px minimum
   row. Capacity is columns × rows.
   A short, wide display naturally has one row; portrait has fewer columns. No
@@ -813,8 +818,8 @@ No copied renderer, custom playlist, manual row count or extra connection.
   Docked windows elect the first **docked** ticker as their page leader. Shared
   SSE ownership remains independent of this election. Real viewport changes replan
   immediately; data changes update values in place until the next page.
-- Filled windows withdraw from `edge:measure`. Grid fits pins locally across the
-  footer; a Pages strip applies the 40% budget locally. Overflow pins step back onto
+- Filled windows withdraw from `edge:measure`. Grid fits pins locally in its
+  single-row header; a Pages strip applies the 40% budget locally. Overflow pins step back onto
   that window's pages and remain saved. Utilities have 180px slots, rotating groups
   when they cannot all fit. Each utility advances its items on its own appearances,
   so grouping cannot skip configured zones or locations. Docked windows retain
