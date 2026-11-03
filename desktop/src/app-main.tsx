@@ -11,6 +11,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { MotionConfig } from "motion/react";
 import "./api/fetchOverride";
 import { initStore } from "./lib/store";
+import { updateController } from "./lib/updateController";
 import { createQueryClient } from "./query";
 import { createAppRouter } from "./router";
 import { startDevBus } from "./dev/bus";
@@ -21,7 +22,9 @@ import "sonner/dist/styles.css";
 
 const queryClient = createQueryClient();
 
-initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
+initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(async () => {
+  // Capture first-install defaults before autostart consumes its marker.
+  await updateController.initialize();
   const router = createAppRouter(queryClient);
   startDevBus("main", { qc: queryClient, router });
 

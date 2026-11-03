@@ -401,6 +401,8 @@ export function installWebAdapter(label: Label): void {
         return "Scrollr";
       case "plugin:updater|check":
         return null; // no update
+      case "check_update_channel":
+        throw new Error("Installable updates are only available in the desktop app.");
       case "plugin:autostart|is_enabled":
         return localStorage.getItem("web:autostart") === "1";
       case "plugin:autostart|enable":

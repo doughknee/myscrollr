@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fa8d32e9a379 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 2ae62213915a -->
+<!-- source: desktop/src/components/settings/rows.ts @ 3ecb053bd1a8 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -246,6 +246,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 ### Settings › Updates
 
+- Settings › Updates › Update channel: Choose Stable or Beta updates for this device. Switching does not install anything.
 - Settings › Updates › Check for updates: Scrollr also checks each time it launches.
 - Settings › Updates › Release history: What shipped in every version
 
