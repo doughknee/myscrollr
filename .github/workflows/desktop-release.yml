@@ -81,15 +81,23 @@ jobs:
   # version's release is missing or still a draft; otherwise skip with
   # a warning — the fix is bumping the version in tauri.conf.json.
   preflight:
-    if: github.event_name != 'release'
+    if: github.event_name != 'release' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Draft listings require push access; this trusted-main job only reads.
+    permissions:
+      contents: write
     outputs:
       proceed: ${{ steps.check.outputs.proceed }}
       prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v6
         with:
-          sparse-checkout: desktop/src-tauri/tauri.conf.json
+          sparse-checkout: |
+            desktop/src-tauri/tauri.conf.json
+            desktop/scripts/release-lookup.mjs
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
       - id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -97,28 +105,6 @@ jobs:
           TAG="desktop-v$(jq -r .version desktop/src-tauri/tauri.conf.json)"
           VERSION=$(jq -r .version desktop/src-tauri/tauri.conf.json)
           if [[ "$VERSION" == *-* ]]; then echo 'prerelease=true' >> "$GITHUB_OUTPUT"; else echo 'prerelease=false' >> "$GITHUB_OUTPUT"; fi
-          set +e
-          RELEASE_LOOKUP=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .draft 2>&1)
-          LOOKUP_EXIT=$?
-          set -e
-          if [ "$LOOKUP_EXIT" -eq 0 ]; then
-            IS_DRAFT="$RELEASE_LOOKUP"
-          elif printf '%s\n' "$RELEASE_LOOKUP" | grep -q 'HTTP 404'; then
-            IS_DRAFT="missing"
-          else
-            echo "::error::Could not verify whether $TAG is already published. Refusing to build."
-            printf '%s\n' "$RELEASE_LOOKUP" >&2
-            exit "$LOOKUP_EXIT"
-          fi
-          if [ "$IS_DRAFT" = "false" ]; then
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::$TAG is already published — skipping the build so its assets are never overwritten. Bump the version in desktop/src-tauri/tauri.conf.json to cut a new release."
-            exit 0
-          fi
-          if [ "$IS_DRAFT" = "true" ]; then
-            SOURCE=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .target_commitish)
-            [ "$SOURCE" = "$GITHUB_SHA" ] || { echo '::error::Draft belongs to another source. Use a new version.'; exit 1; }
-          fi
           # A push builds only when it changed the version (the cut itself). While
           # a draft is open, every later push touching desktop/ used to rebuild all
           # three platforms (19 min of runners) and overwrite the draft's assets
@@ -131,6 +117,13 @@ jobs:
               echo "Version unchanged ($TAG) on this push — not rebuilding the draft. Bump the version to cut, or run this workflow by hand to rebuild."
               exit 0
             fi
+          fi
+          RELEASE_LOOKUP=$(node desktop/scripts/release-lookup.mjs "$GITHUB_REPOSITORY" "$TAG" "$GITHUB_SHA")
+          IS_DRAFT=$(printf '%s' "$RELEASE_LOOKUP" | jq -r 'if . == null then "missing" else .draft end')
+          if [ "$IS_DRAFT" = "false" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::$TAG is already published — skipping so its assets are never overwritten."
+            exit 0
           fi
           echo "proceed=true" >> "$GITHUB_OUTPUT"
           echo "$TAG release state: $IS_DRAFT (missing or draft) — proceeding."

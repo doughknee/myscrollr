@@ -3,20 +3,17 @@ import assert from 'node:assert/strict';
 import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gh, ghJSON, minisign, targets, validateArtifacts, validateRelease, validateRun, validateTagCommit } from './release-policy.mjs';
+import { readReleaseByTag, readTagCommit } from './release-lookup.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 assert(/^[\w.-]+\/[\w.-]+$/.test(repo || ''), 'Repository required');
 const tag = process.env.TAG;
-const release = ghJSON('api', `repos/${repo}/releases/tags/${encodeURIComponent(tag)}`);
+const release = readReleaseByTag(repo, tag);
+assert(release, 'Release not found, including authenticated drafts');
 const identity = validateRelease(release);
 const sha = release.target_commitish;
 assert(/^[a-f0-9]{40}$/.test(sha), 'Draft must name its exact build SHA; rebuild old unbound drafts');
-let tagSHA = null;
-try {
-  tagSHA = ghJSON('api', `repos/${repo}/commits/${encodeURIComponent(`refs/tags/${tag}`)}`).sha;
-} catch (error) {
-  if (!error.message.includes('HTTP 404')) throw error;
-}
+const tagSHA = readTagCommit(repo, tag);
 validateTagCommit(tagSHA, sha, release.draft);
 let runId = process.env.BUILD_RUN_ID;
 if (!runId) {
