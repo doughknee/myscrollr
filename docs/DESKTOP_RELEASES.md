@@ -53,6 +53,37 @@ on Linux. Each must stay alive for 30 seconds. These checks do not prove login,
 rendered content, real update transport, physical Fill cursor behavior, sleep/wake,
 or monitor reconnect. Evidence is retained for 30 days beside build proofs.
 
+## Private native transport rehearsal
+
+`Desktop Update Transport Rehearsal` is a manual main-only workflow taking an
+exact candidate tag/build run and an older `from_version`. Its first job uses
+the read-only finalizer to verify the complete signed cohort. The Windows x64,
+macOS Apple Silicon and Linux x64 jobs then exercise the locked native updater
+against those same package bytes over an ephemeral loopback HTTP server.
+
+The opt-in Rust integration test accepts a valid signed download and rejects
+corrupted bytes, truncated downloads, stalled bodies, missing platform entries,
+malformed manifests, same-version reinstalls and downgrades. The mock Tauri
+runtime and loopback URL rewriting exist only in the test target; shipped app
+endpoints, URL validation, keys and downgrade policy are unchanged. No installer
+is launched, credentials are copied, feed is changed, or release is published.
+
+Local reproduction after read-only finalizer verification:
+
+```powershell
+$env:SCROLLR_REHEARSAL_DIR = '<absolute path to release-verify-RUN_ID>'
+$env:SCROLLR_REHEARSAL_FROM_VERSION = '1.7.2'
+cd desktop/src-tauri
+cargo test --locked --test update_transport -- --ignored --nocapture
+```
+
+The source version belongs to a mock runtime, not an installed signed app.
+Passing this test qualifies transport and signature rejection only. It does not
+replace actual source-to-target installation, application restart, preference
+retention, shared-controller UI checks, or public HTTPS/CDN endpoint validation.
+Those remain separately recorded release gates. Normal `cargo test` compiles
+the harness but skips artifact-dependent execution unless explicitly requested.
+
 ## Finalize only after the release decision
 
 Dispatch **Finish Desktop Release** on main with the exact `desktop-v<version>`
