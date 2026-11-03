@@ -778,6 +778,16 @@ No copied renderer, custom playlist, manual row count or extra connection.
 - The canvas uses CSS layout zoom, not a composited `transform: scale` layer.
   The latter froze the visible Windows cursor while pointer input continued
   in native testing (SCROLLR-399); layout zoom passed the same hover/click case.
+- Windows also uses an app-local WebView2 presentation workaround,
+  `--disable-direct-composition`, configured before any webview is built and
+  inherited by later ticker windows. Native testing still reproduced a frozen
+  visible cursor after keyboard/wheel paging with layout zoom; this alternate
+  rendering path passed with the original slide/wipe animations retained.
+  It applies to all Scrollr webviews sharing the Windows profile, including
+  Docked and the main window. No system-wide graphics setting changes.
+  This runtime flag is a compatibility workaround, not a stable WebView2 API:
+  revalidate cursor behavior and rendering performance on runtime updates and
+  the customer's hardware before release. Other platforms keep their renderer.
 - Grid uses a 48px heading (the existing 64px band and utilities at 75%), a 64px
   footer only when pins have local placement, and the remaining height for equal
   cells. No empty branding footer. A saved pin reserves its footer even when its
