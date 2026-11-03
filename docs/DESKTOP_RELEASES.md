@@ -102,6 +102,22 @@ retention, shared-controller UI checks, or public HTTPS/CDN endpoint validation.
 Those remain separately recorded release gates. Normal `cargo test` compiles
 the harness but skips artifact-dependent execution unless explicitly requested.
 
+Supplying both `source_tag` and `source_run_id` also rehearses a real package
+transition on disposable GitHub-hosted runners. Both source and target cohorts
+must pass finalizer verification first. The runner installs/opens the source,
+seeds a synthetic profile with a Beta preference, invokes the native updater's
+signed download and installation, independently checks the installed target,
+then launches it for 30 seconds and checks retained preferences. Windows NSIS
+installation is asynchronous and exits the host, so the external check polls
+the actual signed installed executable instead of trusting a successful exit.
+macOS verifies the replaced app bundle; Linux verifies the replaced AppImage.
+
+This tests the native installer using a mock updater host with the real source
+version. It does not exercise the production shared controller's full install
+flow, login, public HTTPS feeds or physical displays. It refuses local and
+self-hosted execution and never copies a user's existing profile. Do not run
+its prepare/finish script outside this workflow.
+
 ## Finalize only after the release decision
 
 Dispatch **Finish Desktop Release** on main with the exact `desktop-v<version>`

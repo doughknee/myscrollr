@@ -14,6 +14,12 @@ on:
         description: "Older version used by the test runtime; this is not an installed-app upgrade"
         required: true
         default: "1.7.2"
+      source_tag:
+        description: "Optional verified source candidate for a real installation rehearsal (requires source_run_id)"
+        required: false
+      source_run_id:
+        description: "Successful all-platform source build; installs only on disposable hosted runners"
+        required: false
 
 permissions:
   contents: read
@@ -50,6 +56,28 @@ jobs:
           path: ${{ runner.temp }}/release-verify-${{ inputs.run_id }}/
           if-no-files-found: error
           retention-days: 7
+      - name: Validate optional installation inputs
+        env:
+          SOURCE_TAG: ${{ inputs.source_tag }}
+          SOURCE_RUN: ${{ inputs.source_run_id }}
+        run: |
+          if { [ -n "$SOURCE_TAG" ] && [ -z "$SOURCE_RUN" ]; } || { [ -z "$SOURCE_TAG" ] && [ -n "$SOURCE_RUN" ]; }; then
+            echo 'source_tag and source_run_id must be supplied together' >&2
+            exit 1
+          fi
+      - name: Verify original installed cohort without publishing
+        if: inputs.source_tag != ''
+        env:
+          TAG: ${{ inputs.source_tag }}
+          BUILD_RUN_ID: ${{ inputs.source_run_id }}
+        run: node desktop/scripts/finalize-release.mjs verify
+      - uses: actions/upload-artifact@v4
+        if: inputs.source_tag != ''
+        with:
+          name: verified-install-source
+          path: ${{ runner.temp }}/release-verify-${{ inputs.source_run_id }}/
+          if-no-files-found: error
+          retention-days: 7
 
   transport:
     needs: verify
@@ -61,11 +89,14 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb xdotool
       - uses: dtolnay/rust-toolchain@stable
       - name: Prefer installed Rust over Homebrew stub
         if: runner.os == 'macOS'
@@ -87,11 +118,37 @@ jobs:
           SCROLLR_REHEARSAL_FROM_VERSION: ${{ inputs.from_version }}
         run: |
           set -euo pipefail
-          cargo test --locked --test update_transport -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/update-transport.log"
+          cargo test --locked --test update_transport signed_native_transport -- --ignored --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/update-transport.log"
+      - uses: actions/download-artifact@v4
+        if: inputs.source_tag != ''
+        with:
+          name: verified-install-source
+          path: ${{ runner.temp }}/signed-updater-source
+      - name: Install source, exercise native updater installation, verify restart and preferences
+        if: inputs.source_tag != ''
+        shell: bash
+        env:
+          SCROLLR_REHEARSAL_SOURCE_DIR: ${{ runner.temp }}/signed-updater-source
+          SCROLLR_REHEARSAL_DIR: ${{ runner.temp }}/signed-updater-input
+          SCROLLR_REHEARSAL_INSTALL: "true"
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            Xvfb :99 -screen 0 1920x1080x24 >"$RUNNER_TEMP/xvfb.log" 2>&1 &
+            export DISPLAY=:99
+            export XDG_DATA_HOME="$RUNNER_TEMP/rehearsal-data" XDG_CONFIG_HOME="$RUNNER_TEMP/rehearsal-config" XDG_CACHE_HOME="$RUNNER_TEMP/rehearsal-cache"
+            export WEBKIT_DISABLE_DMABUF_RENDERER=1
+          fi
+          node desktop/scripts/rehearse-installed-update.mjs prepare
+          cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --test update_transport signed_native_install -- --ignored --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/update-install/native-install.log"
+          node desktop/scripts/rehearse-installed-update.mjs finish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: update-transport-${{ runner.os }}
-          path: ${{ runner.temp }}/update-transport.log
+          path: |
+            ${{ runner.temp }}/update-transport.log
+            ${{ runner.temp }}/update-install/*.json
+            ${{ runner.temp }}/update-install/*.log
           if-no-files-found: warn
           retention-days: 30
