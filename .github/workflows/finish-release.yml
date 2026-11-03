@@ -107,7 +107,8 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TAG: ${{ inputs.tag }}
     steps:
-      - run: gh workflow run discord-release.yml --ref main -f tag="$TAG"
+      - name: Start stable announcement
+        run: gh workflow run discord-release.yml --ref main -f tag="$TAG"
   refresh-kb:
     needs: [prepare, publish]
     if: needs.prepare.outputs.channel == 'stable'
@@ -119,7 +120,8 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TAG: ${{ inputs.tag }}
     steps:
-      - run: gh workflow run support-kb-refresh.yml --ref main -f tag="$TAG"
+      - name: Start stable knowledge-base refresh
+        run: gh workflow run support-kb-refresh.yml --ref main -f tag="$TAG"
   refresh-website:
     needs: publish
     runs-on: ubuntu-latest
@@ -129,4 +131,5 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - run: gh workflow run deploy.yml --ref main -f services=website
+      - name: Start website refresh
+        run: gh workflow run deploy.yml --ref main -f services=website
