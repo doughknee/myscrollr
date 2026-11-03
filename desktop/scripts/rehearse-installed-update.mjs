@@ -68,7 +68,9 @@ async function launchAndStop(state, phase) {
     process.env.REHEARSAL_EXE = executable;
     ps('Get-Process scrollr-desktop -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $env:REHEARSAL_EXE } | Stop-Process -Force');
   }
-  const child = spawn(executable, [], { windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.platform === 'linux' ? 'dbus-run-session' : executable,
+    process.platform === 'linux' ? ['--', executable] : [],
+    { windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
   let error;
   child.on('error', e => { error = e; });
   child.stdout.on('data', bytes => appendFileSync(path.join(root, `${phase}.log`), bytes));
