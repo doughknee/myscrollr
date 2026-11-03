@@ -17,10 +17,15 @@ const hash = file => createHash('sha256').update(readFileSync(file)).digest('hex
 const run = (cmd, args, options = {}) => execFileSync(cmd, args, { encoding: 'utf8', timeout: 180_000, windowsHide: true, ...options }).trim();
 const ps = script => run('pwsh', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference = 'Stop'; ${script}`]);
 const target = process.platform === 'win32' ? 'windows-x86_64-nsis' : process.platform === 'darwin' ? 'darwin-aarch64' : 'linux-x86_64';
-function verifiedPackage(directory) {
+function verifiedPackage(directory, sourceOnly = false) {
   const resolved = path.resolve(directory);
   assert(resolved.startsWith(path.resolve(process.env.RUNNER_TEMP) + path.sep), 'Inputs must be in runner temp');
-  const proof = json(path.join(resolved, 'verification.json'));
+  const legacy = sourceOnly && existsSync(path.join(resolved, 'source-integrity.json'));
+  const proof = json(path.join(resolved, legacy ? 'source-integrity.json' : 'verification.json'));
+  if (legacy) {
+    assert.equal(proof.kind, 'legacy-install-source-only');
+    assert.equal(proof.version, '1.7.2');
+  }
   const manifestPath = path.join(resolved, 'latest.json');
   assert.equal(hash(manifestPath), proof.assets['latest.json']);
   const manifest = json(manifestPath);
@@ -29,7 +34,7 @@ function verifiedPackage(directory) {
   assert.equal(path.basename(name), name);
   const file = path.join(resolved, name);
   assert.equal(hash(file), proof.assets[name]);
-  return { file, version: proof.version, source: proof.source, runId: proof.runId };
+  return { file, version: proof.version, source: proof.source, runId: proof.runId, legacy };
 }
 function windowsInfo(executable) {
   process.env.REHEARSAL_EXE = executable;
@@ -66,7 +71,7 @@ async function launchAndStop(state, phase) {
   // that exact path, then launch it explicitly for the restart check.
   if (process.platform === 'win32') {
     process.env.REHEARSAL_EXE = executable;
-    ps('Get-Process scrollr-desktop -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $env:REHEARSAL_EXE } | Stop-Process -Force');
+    ps("Get-Process | Where-Object { $_.ProcessName -eq 'scrollr-desktop' -and $_.Path -eq $env:REHEARSAL_EXE } | Stop-Process -Force");
   }
   const child = spawn(process.platform === 'linux' ? 'dbus-run-session' : executable,
     process.platform === 'linux' ? ['--', executable] : [],
@@ -96,7 +101,7 @@ async function launchAndStop(state, phase) {
 
 if (process.argv[2] === 'prepare') {
   assert(!existsSync(statePath), 'Runner already prepared');
-  const source = verifiedPackage(process.env.SCROLLR_REHEARSAL_SOURCE_DIR);
+  const source = verifiedPackage(process.env.SCROLLR_REHEARSAL_SOURCE_DIR, true);
   const destination = verifiedPackage(process.env.SCROLLR_REHEARSAL_DIR);
   const state = { source, destination, sourceVersion: source.version,
     seed: { 'scrollr:store-migrated': true, 'scrollr:update-channel': 'beta', 'scrollr:rehearsal-marker': 'synthetic-profile-no-credentials' } };
@@ -141,7 +146,8 @@ if (process.argv[2] === 'prepare') {
   await launchAndStop(state, 'target');
   const result = { source: state.sourceVersion, target: state.destination.version, platform: process.platform,
     nativeInstaller: 'passed', packagedRestart: 'passed', syntheticPreferences: 'retained',
-    limitation: 'Mock updater host; not production controller, public HTTPS feeds, login or hardware testing.' };
+    limitation: 'Mock updater host with current locked plugin; not the source app controller, public HTTPS feeds, login or hardware testing.',
+    legacySource: state.source.legacy };
   writeFileSync(path.join(root, 'result.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 } else throw Error('Use prepare or finish');
