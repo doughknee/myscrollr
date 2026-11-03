@@ -97,9 +97,9 @@ describe('getDownloadInfo', () => {
     )
   })
 
-  it('keeps the releases-page fallback pointed at the repo', () => {
+  it('keeps the fallback on the resolved desktop stable release, never repository Latest', () => {
     expect(FALLBACK_RELEASES_URL).toBe(
-      'https://github.com/doughknee/myscrollr/releases/latest',
+      'https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.2.3',
     )
   })
 })

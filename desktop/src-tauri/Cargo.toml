@@ -2,8 +2,8 @@
 name = "scrollr-desktop"
 version = "1.7.2"
 edition = "2021"
-# std::env::home_dir (Sentry path scrubber) is only correct on Windows from 1.85+
-rust-version = "1.85"
+# Updater 2.13.3 requires 1.90 (also includes the Windows home_dir fix from 1.85).
+rust-version = "1.90"
 description = "Scrollr desktop app — pinned live ticker for sports, finance, and RSS."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]
 license = "AGPL-3.0-or-later"
@@ -48,7 +48,8 @@ url = "2"
 futures-util = "0.3"
 tokio = { version = "1", features = ["sync", "time"] }
 tauri-plugin-autostart = "2.5.1"
-tauri-plugin-updater = "2"
+# 2.13.3 includes application-owned downgrade policy and hardened verification.
+tauri-plugin-updater = "=2.13.3"
 tauri-plugin-process = "2"
 tauri-plugin-mcp-bridge = { version = "0.9", optional = true }
 tauri-plugin-store = "2"
