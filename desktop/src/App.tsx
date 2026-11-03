@@ -836,6 +836,7 @@ export default function App() {
                 onChipClick={handleChipClick}
                 pins={prefs.widgets.pins}
                 speed={prefs.ticker.tickerSpeed}
+                fitPins={filled}
                 onHover={filled ? "keep" : prefs.ticker.onHover}
                 widgetDisplay={prefs.widgetDisplay}
                 showSourcelessCTA={showSourcelessCTA}

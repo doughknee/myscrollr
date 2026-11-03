@@ -1,5 +1,46 @@
 import { test, expect } from "@playwright/test";
 
+test("continuous strip keeps overflowing pins accessible without blocking its tape", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto(
+    "/ticker-shim.html?fixture=pinned-far&fill=strip&pin=sports_mlb:Chicago Cubs&pin=sports_mlb:Pittsburgh Pirates&pin=sports_mlb:Cleveland Guardians&pin=sports_mlb:Milwaukee Brewers",
+  );
+  await expect(page.locator(".ticker-container")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect
+    .poll(() =>
+      page.locator(".ticker-container").evaluate((el) => {
+        const width = el.getBoundingClientRect().width;
+        const fixed = [...el.querySelectorAll(".ticker-pinned-zone")].reduce(
+          (sum, zone) => sum + zone.getBoundingClientRect().width,
+          0,
+        );
+        return fixed / width;
+      }),
+    )
+    .toBeLessThanOrEqual(0.4);
+  // The far-future pin must bypass the normal horizon even when it moves
+  // onto this display's tape. Keeping only the normal pool would lose it.
+  await expect(page.locator(".ticker-scroll-wrapper")).toContainText(
+    "Milwaukee Brewers",
+  );
+  await page.setViewportSize({ width: 8000, height: 160 });
+  await expect(page.locator(".ticker-pinned-zone")).toContainText([
+    "Chicago Cubs",
+  ]);
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await expect(page.locator(".ticker-pinned-zone")).toHaveCount(0);
+  await expect(page.locator(".ticker-scroll-wrapper")).toContainText(
+    "Milwaukee Brewers",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".ticker-pinned-zone")).toContainText([
+    "Milwaukee Brewers",
+  ]);
+});
+
 for (const [width, height] of [
   [1920, 360],
   [1920, 1080],

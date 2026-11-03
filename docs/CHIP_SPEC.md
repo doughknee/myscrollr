@@ -792,6 +792,10 @@ No copied renderer, custom playlist, manual row count or extra connection.
   footer; a Pages strip applies the 40% budget locally. Overflow pins step back onto
   that window's pages and remain saved. Utilities have 180px slots, rotating groups
   when they cannot all fit. Docked windows retain their shared narrowest budget.
+  A Continuous strip measures its actual pin chips against a local 40% budget;
+  overflow joins that window's tape using the same pinned renderer (including
+  its horizon bypass), without changing saved pins or duplicating their subjects
+  in normal rotation pools.
 - Pointer activity holds Pages for at most five idle seconds as before. A filled
   Continuous strip keeps moving regardless of the docked hover preference. Fill
   controls and the cursor disappear after five idle seconds; keyboard focus keeps

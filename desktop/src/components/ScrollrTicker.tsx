@@ -1,6 +1,7 @@
 import {
   useMemo,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -60,6 +61,8 @@ interface ScrollrTickerProps {
   /** The fixed zone, in order. Each entry pins one SUBJECT (REL-239);
    *  that subject's current chip is lifted out of the scrolling tape. */
   pins?: WidgetPin[];
+  /** Dedicated displays fit pins locally; overflow joins their tape. */
+  fitPins?: boolean;
   /** Scroll speed in px/sec (default 40) */
   speed?: number;
   /** Gap between chips in px (default 8) */
@@ -263,6 +266,7 @@ export default function ScrollrTicker({
   widgetData,
   onChipClick,
   pins = [],
+  fitPins = false,
   speed = 25,
   gap = 8,
   onHover = "slow",
@@ -448,6 +452,10 @@ export default function ScrollrTicker({
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
+  const [pinRoom, setPinRoom] = useState<{
+    width: number;
+    chips: Record<string, number>;
+  }>({ width: 0, chips: {} });
 
   // ── Slot rotation: advance a slot once it has fully left the viewport ──
   //
@@ -486,21 +494,31 @@ export default function ScrollrTicker({
 
   const pinnedLeft: React.ReactNode[] = [];
   const pinnedRight: React.ReactNode[] = [];
+  const overflowPins: React.ReactNode[] = [];
+  let fixedWidth = 0;
 
   for (const pin of pins) {
     if (!activeTabs.includes(pin.widget)) continue;
-    const target = pin.side === "left" ? pinnedLeft : pinnedRight;
+    const fixedTarget = pin.side === "left" ? pinnedLeft : pinnedRight;
     const key = `pin-${pin.widget}-${pin.subject}`;
     // Same `data-chip` / `data-pin-subject` pair the tape carries, so a
     // right-click on a pinned chip resolves to the same subject and the
     // menu reads "Unpin" without the zone needing its own control.
-    const park = (node: React.ReactNode, label: string) =>
+    const park = (node: React.ReactNode, label: string) => {
+      // A pin may be wider than a page cell (headlines cap at 640px).
+      // Measure the actual shared chip, in logical pixels, instead of
+      // estimating with page-column widths. Until measured, use its cap.
+      const extra = (pinRoom.chips[key] ?? 640) + (fixedTarget.length ? gap : 18);
+      const fits = !fitPins || fixedWidth + extra <= pinRoom.width * 0.4;
+      const target = fits ? fixedTarget : overflowPins;
+      if (fits) fixedWidth += extra;
       target.push(
         <div
           key={key}
           className="flex items-center"
           data-chip=""
           data-widget={pin.widget}
+          data-fit-pin={fitPins ? key : undefined}
           data-pin-subject={JSON.stringify({
             widget: pin.widget,
             subject: pin.subject,
@@ -510,6 +528,7 @@ export default function ScrollrTicker({
           {node}
         </div>,
       );
+    };
 
     if (WIDGET_ORDER.includes(pin.widget)) {
       const wt = pin.widget as keyof WidgetTickerData;
@@ -537,12 +556,42 @@ export default function ScrollrTicker({
     if (chip) park(chip.node, chip.pinLabel ?? pin.subject);
   }
 
+  // Every pin stays rendered exactly once in the logical content: fixed
+  // or on the tape. Reuse those nodes for measurement, including motion's
+  // clones, so we need no invisible duplicate chips. Overflow keeps the
+  // pinned renderer's horizon bypass and is still excluded from normal pools.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!fitPins || !container) return;
+    const measure = () => {
+      const chips: Record<string, number> = {};
+      container.querySelectorAll<HTMLElement>("[data-fit-pin]").forEach((el) => {
+        const key = el.dataset.fitPin!;
+        if (el.offsetWidth) chips[key] = Math.max(chips[key] ?? 0, el.offsetWidth);
+      });
+      setPinRoom((old) => {
+        const next = { ...old.chips, ...chips };
+        return old.width === container.clientWidth &&
+          Object.keys(chips).every((key) => old.chips[key] === chips[key])
+          ? old
+          : { width: container.clientWidth, chips: next };
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    container.querySelectorAll("[data-fit-pin]").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  });
+
+  const tape = overflowPins.length ? [...chips, ...overflowPins] : chips;
+
   // ── Displayed widget types (presence reporting, SCROLLR-210) ──
   // The catalog ids that actually put a chip on this screen — tape or
   // fixed zone — not what is configured or ticker-enabled. A tab whose
   // source returned nothing is not displayed. Only the widget id leaves
   // this window; never a subject, symbol, or label.
-  const displayedWidgets = displayedWidgetTypes([...chips, ...pinnedLeft, ...pinnedRight]);
+  const displayedWidgets = displayedWidgetTypes([...tape, ...pinnedLeft, ...pinnedRight]);
   const displayedKey = displayedWidgets.join("\0");
   useEffect(() => {
     onDisplayedWidgetsChange?.(displayedKey === "" ? [] : displayedKey.split("\0"));
@@ -551,7 +600,7 @@ export default function ScrollrTicker({
   // ── Render ────────────────────────────────────────────────────
   const hasPinnedLeft = pinnedLeft.length > 0;
   const hasPinnedRight = pinnedRight.length > 0;
-  const hasScrollingChips = chips.length > 0;
+  const hasScrollingChips = tape.length > 0;
 
   // Sourceless CTA: signed-in user has zero widgets installed and zero
   // pinned widgets, so there's literally nothing to put on the ticker.
@@ -618,7 +667,7 @@ export default function ScrollrTicker({
       {pinnedZone("left", pinnedLeft)}
       <div className="ticker-scroll-wrapper">
         <Ticker
-          items={chips}
+          items={tape}
           velocity={velocity}
           hoverFactor={HOVER_FACTOR[onHover]}
           gap={gap}
