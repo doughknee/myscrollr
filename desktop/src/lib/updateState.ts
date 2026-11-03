@@ -157,6 +157,8 @@ export class UpdateController {
         // Policy can change while a download is in flight. Never install a now-blocked target.
         if (this.minimum && !gte(candidate.version, this.minimum)) throw new Error("A newer update is required. Check for updates again.");
         if (recovery) await this.deps.saveChannel("stable");
+        // Persisting the channel can also yield to a newly loaded minimum.
+        if (this.minimum && !gte(candidate.version, this.minimum)) throw new Error("A newer update is required. Check for updates again.");
         this.set({ phase: "installing" });
         await candidate.install();
         await candidate.close().catch(() => {});

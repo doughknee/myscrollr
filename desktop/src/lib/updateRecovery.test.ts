@@ -65,6 +65,29 @@ describe("explicit Stable recovery", () => {
     expect(candidate.close).toHaveBeenCalled();
     expect(controller.getSnapshot().phase).toBe("error");
   });
+  it("rechecks the minimum after channel persistence and releases a rejected candidate for retry", async () => {
+    const { controller, candidate, deps } = await setup();
+    await controller.prepareRecovery();
+    const offer = controller.getSnapshot().offerId;
+    let finishSave!: () => void;
+    vi.mocked(deps.saveChannel).mockImplementationOnce(() => new Promise<void>(resolve => { finishSave = resolve; }));
+    const installing = controller.installRecovery(offer);
+    await vi.waitFor(() => expect(deps.saveChannel).toHaveBeenCalledWith("stable"));
+    expect(candidate.install).not.toHaveBeenCalled();
+    controller.setMinimum("1.7.4");
+    finishSave();
+    await installing;
+    expect(candidate.install).not.toHaveBeenCalled();
+    expect(candidate.close).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot()).toMatchObject({ phase: "error", version: undefined, recoveryVersion: undefined, error: expect.stringContaining("newer update is required") });
+    expect(controller.getSnapshot().offerId).not.toBe(offer);
+    controller.setMinimum("1.7.3");
+    await controller.check();
+    await controller.prepareRecovery();
+    await controller.installRecovery(controller.getSnapshot().offerId);
+    expect(candidate.install).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot().phase).toBe("ready");
+  });
   it("does not accept an ordinary downgrade as an update", async () => {
     const { controller, deps, candidate } = await setup();
     vi.mocked(deps.check).mockResolvedValue({ feedVersion: "1.7.3", update: candidate });

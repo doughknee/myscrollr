@@ -12,8 +12,10 @@
 // engages on a positive "server says X, we are provably older than X".
 
 import { useEffect, useState } from "react";
+import { valid } from "semver";
 import { API_BASE } from "../config";
 import { requiresUpdate } from "../lib/releases";
+import { updateController } from "../lib/updateController";
 
 interface UpdateGate {
   /** True when the server's minimum is newer than the installed version. */
@@ -37,7 +39,11 @@ export function useUpdateGate(appVersion: string): UpdateGate {
           body && typeof body === "object"
             ? (body as Record<string, unknown>).min_desktop_version
             : undefined;
-        if (!cancelled && typeof min === "string" && min.trim() !== "") {
+        if (!cancelled && typeof min === "string" && valid(min.trim())) {
+          // This persistent main-window hook owns the policy, even when the
+          // installed Beta is supported and the blocking overlay stays hidden.
+          // Keep the last valid policy through unmounts and failed responses.
+          updateController.setMinimum(min.trim());
           setMinVersion(min.trim());
         }
       } catch {
