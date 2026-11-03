@@ -779,8 +779,22 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ server-2026.10.26.4 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.7.3 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.7.3 — Update controls and reliability (`desktop-v1.7.3`, 2026-11-03)
+
+Scrollr 1.7.3 adds clearer update controls while keeping the existing docked ticker experience.
+
+- Choose Stable or Beta updates in Settings → Updates. The choice applies to this device; switching channels does not install anything.
+- Update progress and errors stay consistent when navigating between pages. Failed checks, downloads and restarts can be retried.
+- Signed release verification now checks the source build and complete Windows, macOS and Linux package set before publication.
+
+Fill this display remains a Beta feature and is not included in 1.7.3.
+
+Supported packages: Windows x64, macOS Apple Silicon, and Linux x64. Linux AppImage is the qualified automatic-update format.
+
+If you are already running a newer Beta, choosing Stable keeps your installed version until a newer Stable release becomes available. Scrollr does not automatically downgrade your installation.
 
 ### Server isolation and safer deployments (`server-2026.10.26.4`, 2026-10-26)
 
@@ -836,9 +850,3 @@ Scrollr now applies account suspensions to API requests and live updates, includ
 Custom RSS changes have account-level limits to curb automated abuse. Existing saved feeds, curated news sources, and ticker visibility controls continue to work; rejected changes leave the saved widget intact.
 
 Bot protection is also enabled on sign-in and signup. This is a server update; no desktop download is required.
-
-### Scrollr 1.7.2 - Security and privacy improvements (`desktop-v1.7.2`, 2026-10-23)
-
-This update keeps sign-in navigation details out of crash reports and includes security updates for libraries used by Scrollr.
-
-Your widgets, feed selections, and ticker settings stay in place. Update to 1.7.2 to receive the desktop protections.
