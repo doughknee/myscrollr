@@ -14,7 +14,8 @@ import (
 // =============================================================================
 //
 // A ticket filed as a bug gets a Linear issue (the File as bug button). When
-// a desktop release publishes, every case whose issue is now Done gets a
+// a desktop release publishes, a case gets a follow-up only when its completed
+// issue has a closing merge contained in that verified stable release. It is a
 // drafted follow-up telling the reporter it shipped — as an ordinary pending
 // draft in the Discord queue, with the same Send / Edit / Ask / Skip buttons
 // as any other. Nothing goes out on its own.
@@ -29,7 +30,7 @@ import (
 const shippedFollowUpLimit = 25
 
 // DraftShippedFollowUps drafts a "fixed in <version>" reply for every open
-// case linked to a Linear issue that has reached a completed state. Returns
+// case whose completed Linear issue has a closing merge proven in this release. Returns
 // how many drafts it created.
 //
 // Idempotent per (case, issue): a note recording the follow-up is written
@@ -37,9 +38,16 @@ const shippedFollowUpLimit = 25
 // re-publishing a release — or publishing the next one — never re-drafts
 // the same news.
 func DraftShippedFollowUps(ctx context.Context, version, releaseURL string) int {
-	if platform.DBPool == nil {
+	if platform.DBPool == nil || !IsStableDesktopTag(version) {
 		return 0
 	}
+	// Verify actual GitHub publication; payload flags/URLs are not release proof.
+	release, err := publishedDesktopRelease(ctx, version)
+	if err != nil || release == nil {
+		log.Println("[Shipped] stable desktop publication could not be verified; nothing drafted")
+		return 0
+	}
+	releaseURL = release.URL
 	version = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(version), "desktop-v"))
 	if version == "" {
 		log.Println("[Shipped] no version in release payload; nothing drafted")
@@ -89,12 +97,16 @@ func DraftShippedFollowUps(ctx context.Context, version, releaseURL string) int 
 			// Nowhere to send it; skip rather than draft something undeliverable.
 			continue
 		}
-		done, err := linearIssueIsDone(ctx, c.issueKey)
+		merge, err := linearClosingMerge(ctx, c.issueKey)
 		if err != nil {
 			log.Printf("[Shipped] %s state lookup: %v", c.issueKey, err)
 			continue
 		}
-		if !done {
+		if merge.MergedAt.IsZero() {
+			continue
+		}
+		contains, err := releaseContains(ctx, *release, merge)
+		if err != nil || !contains {
 			continue
 		}
 
@@ -103,13 +115,13 @@ func DraftShippedFollowUps(ctx context.Context, version, releaseURL string) int 
 			UserEmail:       c.email,
 			OriginalSubject: c.subject,
 			DraftBodyHTML:   shippedFollowUpHTML(version, releaseURL),
-			AISummary:       fmt.Sprintf("Fixed in %s — %s is Done", version, c.issueKey),
+			AISummary:       fmt.Sprintf("Fix for %s is contained in stable %s", c.issueKey, version),
 			AICategory:      c.category,
 			AIPriority:      "low",
 			// Never "high": auto-send must not pick these up, and no human
 			// has read this pairing of ticket and fix yet.
 			AIConfidence: "medium",
-			InternalNote: fmt.Sprintf("Auto-drafted on the %s release because %s is Done. Check the fix actually matches what they reported before sending.", version, c.issueKey),
+			InternalNote: fmt.Sprintf("Stable %s contains merge %s for completed issue %s. Check the fix actually matches what they reported before sending.", version, merge.SHA, c.issueKey),
 		})
 		if err != nil {
 			log.Printf("[Shipped] draft for ticket %s: %v", c.ticket, err)
@@ -140,8 +152,8 @@ func shippedFollowUpHTML(version, releaseURL string) string {
 	}
 	return fmt.Sprintf(
 		`<p>Good news — the fix for what you reported went out in Scrollr %s.</p>`+
-			`<p>Scrollr updates itself, so you should get it within a day; to take it now, `+
-			`download the latest build from <a href="https://myscrollr.com/download">myscrollr.com/download</a>.</p>`+
+			`<p>Check for updates in Settings → Updates, or download the latest stable build from `+
+			`<a href="https://myscrollr.com/download">myscrollr.com/download</a>.</p>`+
 			`%s`+
 			`<p>If you are on %s and still seeing it, reply here and we'll pick it back up.</p>`,
 		escapeHTML(version), notes, escapeHTML(version))

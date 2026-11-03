@@ -7,6 +7,10 @@ on:
       - "myscrollr.com/**"
       - "desktop/src/**"
       - "desktop/package*.json"
+      - "desktop/scripts/*release*.mjs"
+      - "desktop/scripts/repair-desktop-latest.mjs"
+      - ".github/workflows/*release*.yml"
+      - ".github/workflows/support-kb-refresh.yml"
       - "desktop/vitest*.ts"
       - "desktop/e2e/**"
       - "desktop/playwright.config.ts"
@@ -24,6 +28,10 @@ on:
       - "myscrollr.com/**"
       - "desktop/src/**"
       - "desktop/package*.json"
+      - "desktop/scripts/*release*.mjs"
+      - "desktop/scripts/repair-desktop-latest.mjs"
+      - ".github/workflows/*release*.yml"
+      - ".github/workflows/support-kb-refresh.yml"
       - "desktop/vitest*.ts"
       - "desktop/e2e/**"
       - "desktop/playwright.config.ts"
@@ -65,6 +73,10 @@ jobs:
       - run: npm ci
 
       - run: npm test
+
+      - name: Release safety policy fixtures
+        if: matrix.dir == 'desktop'
+        run: node --test scripts/release-policy.test.mjs
 
       - name: Verify website event proxy
         if: matrix.dir == 'myscrollr.com'
