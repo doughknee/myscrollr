@@ -18,7 +18,7 @@ on:
         description: "Optional verified source candidate for a real installation rehearsal (requires source_run_id)"
         required: false
       source_run_id:
-        description: "Successful all-platform source build; installs only on disposable hosted runners"
+        description: "Successful source build run, or legacy for the audited published 1.7.2 source only"
         required: false
 
 permissions:
@@ -66,11 +66,17 @@ jobs:
             exit 1
           fi
       - name: Verify original installed cohort without publishing
-        if: inputs.source_tag != ''
+        if: inputs.source_tag != '' && inputs.source_run_id != 'legacy'
         env:
           TAG: ${{ inputs.source_tag }}
           BUILD_RUN_ID: ${{ inputs.source_run_id }}
         run: node desktop/scripts/finalize-release.mjs verify
+      - name: Verify audited legacy installation source (not publication evidence)
+        if: inputs.source_run_id == 'legacy'
+        env:
+          TAG: ${{ inputs.source_tag }}
+          BUILD_RUN_ID: legacy
+        run: node desktop/scripts/verify-legacy-upgrade-source.mjs
       - uses: actions/upload-artifact@v4
         if: inputs.source_tag != ''
         with:

@@ -118,6 +118,15 @@ flow, login, public HTTPS feeds or physical displays. It refuses local and
 self-hosted execution and never copies a user's existing profile. Do not run
 its prepare/finish script outside this workflow.
 
+For the legacy bootstrap hop only, use `source_tag=desktop-v1.7.2` and
+`source_run_id=legacy`. A read-only verifier checks the published release ID,
+unchanged Git tag, GitHub asset digests, prior audited package hashes and updater
+signatures. Its separate `source-integrity.json` is accepted only as an installed
+source, never as target/publication evidence. The destination still requires the
+full finalizer. This proves replacement of actual 1.7.2 packages by the current
+locked native installer; it does not run 1.7.2's old updater/controller or its live
+legacy URL. No general legacy exception is added to the release or feed policy.
+
 ## Finalize only after the release decision
 
 Dispatch **Finish Desktop Release** on main with the exact `desktop-v<version>`
