@@ -17,7 +17,7 @@ const stable = { tag_name: 'desktop-v1.8.0', draft: false, prerelease: false, pu
 const beta = { ...stable, tag_name: 'desktop-v1.9.0-beta.1', prerelease: true };
 
 test('only published stable desktop releases announce; beta never refreshes stable KB', () => {
-  assert.deepEqual(allowedEffects(stable), { announce: true, kb: true });
+  assert.deepEqual(allowedEffects(stable, true), { announce: true, kb: true });
   for (const r of [beta, { ...beta, prerelease: false }, { ...stable, draft: true }, { ...stable, published_at: null }]) {
     assert.deepEqual(allowedEffects(r), { announce: false, kb: false });
   }

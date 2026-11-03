@@ -59,6 +59,8 @@ exists, and that a non-force ref update rejects non-fast-forward replacement:
 ## Ordered execution after explicit merge/release/activation approval
 
 These steps are prepared instructions, **not authorization to execute them**.
+The canonical order is [Desktop Releases](../../docs/DESKTOP_RELEASES.md#feed-storage-and-publication);
+the checklist below binds that order to the prepared payloads and evidence.
 
 1. Merge the reviewed foundation and channel work in dependency order, including
    this qualification follow-up. Rebase as needed after squash merges and rerun
@@ -89,9 +91,12 @@ These steps are prepared instructions, **not authorization to execute them**.
    the chosen baseline is published; no valid live plan can be manufactured today.
 6. At the separately approved release boundary, enable the activation variable
    only after steps 2–5 pass, then use Finish Desktop Release for that exact tag
-   and run. It publishes the verified baseline, computes both channel files,
+   and run. It publishes the verified baseline, reconciles the greatest signed Stable
+   for legacy Latest, computes both channel files,
    commits index/Stable/Beta together, and checks the public bytes before allowing
-   follow-up jobs. Initially both feeds point to the approved Stable baseline.
+   follow-up jobs. Direct Announce/KB entry points independently require published
+   verification and, while enabled, approved/public feed readiness too. Initially
+   both feeds point to the approved Stable baseline.
    Recheck both public URLs from Windows, macOS and Linux before inviting testers.
 7. For a subsequent Beta, build/qualify a complete new prerelease cohort, review
    its notes and recovery path, then approve publication. Stable must remain on

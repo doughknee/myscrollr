@@ -57,8 +57,11 @@ Before publication the finalizer checks:
   canonical URLs bound to that release, and each updater artifact's signature.
 - Tag, manifest version and GitHub prerelease flag agreement.
 
-The finalizer uploads `verification.json` before publication. Stable becomes
-GitHub Latest; Beta does not. Stable announcement and KB refresh are separate
+The finalizer uploads `verification.json` before publication. Publication itself
+uses `--latest=false`; Stable finalization then runs the existing signed legacy
+reconciler under the artifact lock to select the greatest published Stable
+SemVer. A delayed older Stable cannot move Latest backward, and published retries
+repeat reconciliation. Beta never changes Latest. Stable announcement and KB refresh are separate
 downstream jobs; website refresh is another job. A successful dispatch means the
 downstream workflow started, not that its deployment or announcement succeeded.
 Inspect those runs before declaring the release finished.
@@ -98,7 +101,8 @@ installer bytes. It accepts the historical repository owner alias for old URLs.
 
 The release-published guard repeats this protection for non-prerelease events.
 GitHub does not start release-event workflows for GITHUB_TOKEN publications:
-Finish Desktop Release sets Latest explicitly for stable releases. Any separate
+Finish Desktop Release explicitly reconciles the greatest signed Stable after
+publication, including on retries. Any separate
 backend publisher using GITHUB_TOKEN must preserve desktop Latest explicitly or
 run the repair; an event guard cannot observe a suppressed event.
 
@@ -106,7 +110,15 @@ run the repair; an event guard cannot observe a suppressed event.
 
 Beta, draft and backend events cannot announce a stable desktop fix or consume
 its shipped-follow-up marker. Manual workflow dispatch re-reads GitHub metadata
-and follows the same policy as release events.
+and follows the same policy as release events. Desktop Announce/KB entry points
+require the finalizer-published verification record and manifest to match current
+GitHub asset digests, the successful trusted main build and the actual tag source.
+Like support verification, this trusts the authorized finalizer record; it does
+not download/reverify all installer signatures again. When channel feeds are
+enabled, the entry points also require an unchanged, non-withdrawn approval in
+the registry, valid selected release assets, and both public feeds matching that
+registry. Direct dispatch cannot bypass failed readiness. Historical releases
+without the record fail closed. Backend KB refresh stays a separate policy.
 
 Automatic support claims require a completed Linear issue, an actual merged PR
 in this repository with a dedicated affirmative closing line (`Closes SCROLLR-123`,
@@ -172,27 +184,37 @@ it cannot remove installed software. A broken installed version needs a newer fi
 **Activation is a separate, explicit operation. Nothing in a code merge creates
 the metadata branch or enables publishing.** Before first use:
 
-1. Qualify a complete, signed Stable baseline using the existing finalizer. Old
-   releases without run-bound proofs cannot be silently grandfathered in. If
-   current proofs have expired, build a newly versioned Stable candidate after
-   release approval. A beta-only bootstrap is deliberately refused.
-2. Create the metadata branch with `index.json` containing
-   `{"schema":1,"releases":[]}`. Protect it against force pushes and deletion;
-   restrict changes to trusted release maintainers/workflows. The chosen protection
-   must allow the authorized contents-write workflow to fast-forward this branch
-   (not require an impossible GITHUB_TOKEN bypass of a pull-request rule). The
-   publisher refuses to create an unprotected branch or force a ref.
-3. Run **Reconcile Desktop Update Feeds** with the published Stable tag/build run
-   and `apply=false`. Review all three plan files and both selected versions.
-   Approval re-downloads the Actions proofs and independently verifies signatures.
-4. After approval, set repository variable `DESKTOP_CHANNEL_FEEDS_ENABLED=true`
-   and run the same reconciliation with `apply=true`. This is a live metadata
-   change. Verify both raw URLs without authentication, correct content and cache
-   behavior from supported hosts before distributing a client that uses them.
-5. Qualify actual signed upgrades on Windows, macOS and Linux: Stable→newer Stable,
-   Stable→Beta, Beta→newer Beta/Stable, leaving Beta while ahead, interrupted
-   download, invalid signature, restart failure, and preference retention. A
-   branch artifact installing successfully is not proof of version-to-version updates.
+1. Review/merge the prerequisite code, select a new Stable version and build a
+   complete signed draft from the reviewed main source. Keep the activation
+   switch off. Old releases without run-bound proofs cannot be grandfathered in;
+   expired proofs require a fresh candidate, and beta-only bootstrap is refused.
+2. Create the exact metadata-branch protection and empty registry using the
+   [prepared payloads](../audit/2026-11-03-feed-qualification/READINESS.md).
+   Protect against force pushes and deletion while allowing the authorized
+   contents-write workflow to fast-forward. Verify effective rules and branch
+   content. Do not alter main protection or force an existing metadata ref.
+3. Qualify the draft with read-only finalizer `resolve`/`verify`, the exact source
+   and run, signatures/notarization, and packaged-app/upgrade rehearsals. Review
+   the version, notes, recovery path and evidence. A draft's artifacts cannot be
+   advertised by live public feeds. Do not use Finish Desktop Release as a dry-run.
+4. Only at the separately approved release/activation boundary, enable
+   `DESKTOP_CHANNEL_FEEDS_ENABLED=true`, then run Finish Desktop Release for that
+   exact tag/build. It publishes the verified baseline, reconciles legacy Latest,
+   approves and commits both feeds, and verifies public bytes before follow-ups.
+   Initially both feeds select the approved Stable. Do not publish/announce the
+   channel-only baseline first with the switch off and promise to activate later.
+5. Verify public feed access from Windows, macOS and Linux before inviting testers.
+   Qualify real Stable→newer Stable, Stable→Beta, Beta→newer Beta/Stable, leaving
+   Beta while ahead, interrupted download, invalid signature, restart failure and
+   preference retention. A branch artifact installing is not a version-to-version
+   upgrade test. Any uncompleted OS checks remain explicit launch gates.
+
+This is the canonical first-activation order. For an already-published baseline
+or recovery, Reconcile Desktop Update Feeds may first run with `apply=false` to
+review its exact plan, then with explicitly authorized `apply=true`; that is not
+an alternative first-launch order. Both flows verify published approval evidence
+and public bytes. A failed public check can be retried without republishing or
+replacing signed assets.
 
 Once enabled, Finish Desktop Release advances both feeds after publication and
 verifies both public URLs against the exact plan before release follow-ups. The
