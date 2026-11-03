@@ -64,7 +64,6 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TAG: ${{ inputs.tag }}
       BUILD_RUN_ID: ${{ needs.prepare.outputs.run_id }}
-      CHANNEL: ${{ needs.prepare.outputs.channel }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -80,16 +79,19 @@ jobs:
           set -euo pipefail
           if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = false ]; then
             echo "Already published; verified existing bytes, continuing failed workflow jobs."
-          elif [ "$CHANNEL" = stable ]; then
-            gh release upload "$TAG" "$RUNNER_TEMP/release-verify-$BUILD_RUN_ID/verification.json" --clobber
-            gh release edit "$TAG" --draft=false --latest=true
           else
             gh release upload "$TAG" "$RUNNER_TEMP/release-verify-$BUILD_RUN_ID/verification.json" --clobber
             gh release edit "$TAG" --draft=false --latest=false
           fi
+      - name: Preserve highest Stable legacy Latest
+        if: needs.prepare.outputs.channel == 'stable'
+        run: node desktop/scripts/repair-desktop-latest.mjs --apply
       - name: Advance approved update channels
         if: vars.DESKTOP_CHANNEL_FEEDS_ENABLED == 'true'
         run: node desktop/scripts/release-channels.mjs --apply
+      - name: Verify public update channel bytes
+        if: vars.DESKTOP_CHANNEL_FEEDS_ENABLED == 'true'
+        run: node desktop/scripts/verify-release-feeds.mjs --expected-dir channel-plan
       - uses: actions/upload-artifact@v4
         if: always()
         with:

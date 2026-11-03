@@ -29,11 +29,13 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   announce:
     if: startsWith(github.event.release.tag_name, 'desktop-v') || startsWith(inputs.tag, 'desktop-v')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -49,6 +51,7 @@ jobs:
         id: rel
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          CHANNEL_FEEDS_ENABLED: ${{ vars.DESKTOP_CHANNEL_FEEDS_ENABLED }}
         run: node desktop/scripts/release-event.mjs announce
 
       - name: Post release to Discord
