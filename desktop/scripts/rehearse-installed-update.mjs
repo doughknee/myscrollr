@@ -115,8 +115,9 @@ if (process.argv[2] === 'prepare') {
   const state = { source, destination, sourceVersion: source.version,
     seed: { 'scrollr:store-migrated': true, 'scrollr:update-channel': recovering ? 'stable' : 'beta', 'scrollr:rehearsal-marker': 'synthetic-profile-no-credentials' } };
   if (recovering) {
-    assert.equal(source.version, '1.8.0-beta.1');
-    assert.equal(destination.version, '1.7.3');
+    const policy = json(new URL('../src-tauri/src/commands/stable-recovery.json', import.meta.url));
+    assert(policy.sourceVersions.includes(source.version), 'Recovery source must be explicitly pinned');
+    assert.equal(destination.version, policy.version);
     state.seed['scrollr:settings'] = { appearance: { themeFamily: 'catppuccin', themeMode: 'dark' }, ticker: { scrollMode: 'pages' }, window: { tickerDisplays: { 'synthetic-disconnected-display': { mode: 'grid', readingSize: 125 } } } };
   }
   if (process.platform === 'win32') {

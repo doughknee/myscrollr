@@ -95,3 +95,25 @@ test('all publication/recovery entry points retain the readiness and monotonic L
     assert(text.includes('node desktop/scripts/release-event.mjs'));
   }
 });
+
+test('draft recovery verification is restricted to protected main and the exact Beta 2 pair', async () => {
+  const text = await readFile(new URL('../../.github/workflows/desktop-update-rehearsal.yml', import.meta.url), 'utf8');
+  const draftJob = text.split('  verify:')[1].split('  verify-recovery:')[0];
+  const publishedJob = text.split('  verify-recovery:')[1].split('  transport:')[0];
+  const condition = draftJob.match(/^    if: (.+)$/m)[1];
+  // Evaluate the workflow's actual boolean expression, not a separate policy copy.
+  const allowed = new Function('github', 'inputs', `return (${condition});`);
+  const inputs = { recovery: true, tag: 'desktop-v1.7.3', run_id: '41688396593',
+    source_tag: 'desktop-v1.8.0-beta.2', source_run_id: '12345', from_version: '1.8.0-beta.2' };
+  assert(allowed({ ref: 'refs/heads/main' }, inputs));
+  assert(!allowed({ ref: 'refs/heads/feature/unreviewed' }, inputs));
+  for (const changed of [{ tag: 'desktop-v1.7.2' }, { run_id: '12345' },
+    { source_tag: 'desktop-v1.8.0-beta.3' }, { source_run_id: '' }, { from_version: '1.8.0-beta.1' }]) {
+    assert(!allowed({ ref: 'refs/heads/main' }, { ...inputs, ...changed }));
+  }
+  assert(draftJob.includes('contents: write'));
+  assert(publishedJob.includes('contents: read'));
+  assert(!publishedJob.includes('contents: write'));
+  assert(!text.includes('finalize-release.mjs publish'));
+  assert(!text.includes('--draft=false'));
+});
