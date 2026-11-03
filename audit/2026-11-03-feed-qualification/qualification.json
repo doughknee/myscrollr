@@ -1,0 +1,183 @@
+{
+  "checkedAt": "2026-11-03T08:58:24.894Z",
+  "repository": {
+    "name": "doughknee/myscrollr",
+    "visibility": "public",
+    "defaultBranch": "main"
+  },
+  "sourcePRs": [
+    {
+      "number": 530,
+      "state": "open",
+      "merged": false,
+      "head": "5bfdc08f446be381dc1571b91b6b755f158abf63",
+      "url": "https://github.com/doughknee/myscrollr/pull/530"
+    },
+    {
+      "number": 531,
+      "state": "open",
+      "merged": false,
+      "head": "6846f60039dce1a4358986e67b899f0011d714bc",
+      "url": "https://github.com/doughknee/myscrollr/pull/531"
+    }
+  ],
+  "metadataBranch": null,
+  "effectiveRules": [],
+  "activationVariable": null,
+  "probes": {
+    "stable": {
+      "requestedURL": "https://raw.githubusercontent.com/doughknee/myscrollr/desktop-updates/stable.json",
+      "finalURL": "https://raw.githubusercontent.com/doughknee/myscrollr/desktop-updates/stable.json",
+      "status": 404,
+      "bytes": 14,
+      "sha256": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+      "headers": {
+        "cache-control": null,
+        "etag": null,
+        "age": null,
+        "expires": "Tue, 03 Nov 2026 09:03:23 GMT",
+        "content-type": "text/plain; charset=utf-8",
+        "access-control-allow-origin": "*",
+        "x-cache": "MISS"
+      }
+    },
+    "beta": {
+      "requestedURL": "https://raw.githubusercontent.com/doughknee/myscrollr/desktop-updates/beta.json",
+      "finalURL": "https://raw.githubusercontent.com/doughknee/myscrollr/desktop-updates/beta.json",
+      "status": 404,
+      "bytes": 14,
+      "sha256": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+      "headers": {
+        "cache-control": null,
+        "etag": null,
+        "age": null,
+        "expires": "Tue, 03 Nov 2026 09:03:23 GMT",
+        "content-type": "text/plain; charset=utf-8",
+        "access-control-allow-origin": "*",
+        "x-cache": "MISS"
+      }
+    },
+    "rawHostControl": {
+      "requestedURL": "https://raw.githubusercontent.com/doughknee/myscrollr/6846f60039dce1a4358986e67b899f0011d714bc/desktop/src-tauri/tauri.conf.json",
+      "finalURL": "https://raw.githubusercontent.com/doughknee/myscrollr/6846f60039dce1a4358986e67b899f0011d714bc/desktop/src-tauri/tauri.conf.json",
+      "status": 200,
+      "bytes": 2521,
+      "sha256": "7b3c59545cbc905cfe53b85f0c29c7c032140f9a5d0cba6f160d4d4fdbe0a7b6",
+      "headers": {
+        "cache-control": "max-age=300",
+        "etag": "W/\"676659eabd22c36f57ccd032d621e7a6a1828cd0d0a7cbc50b9c8dca28e8f015\"",
+        "age": null,
+        "expires": "Tue, 03 Nov 2026 09:03:23 GMT",
+        "content-type": "text/plain; charset=utf-8",
+        "access-control-allow-origin": "*",
+        "x-cache": "MISS"
+      }
+    },
+    "controlConditional": {
+      "requestedURL": "https://raw.githubusercontent.com/doughknee/myscrollr/6846f60039dce1a4358986e67b899f0011d714bc/desktop/src-tauri/tauri.conf.json",
+      "finalURL": "https://raw.githubusercontent.com/doughknee/myscrollr/6846f60039dce1a4358986e67b899f0011d714bc/desktop/src-tauri/tauri.conf.json",
+      "status": 304,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "headers": {
+        "cache-control": "max-age=300",
+        "etag": "W/\"676659eabd22c36f57ccd032d621e7a6a1828cd0d0a7cbc50b9c8dca28e8f015\"",
+        "age": null,
+        "expires": "Tue, 03 Nov 2026 09:03:23 GMT",
+        "content-type": null,
+        "access-control-allow-origin": "*",
+        "x-cache": "HIT"
+      }
+    },
+    "legacyLatest": {
+      "requestedURL": "https://github.com/doughknee/myscrollr/releases/latest/download/latest.json",
+      "finalURL": "https://github.com/doughknee/myscrollr/releases/download/server-2026.10.26.4/latest.json",
+      "status": 404,
+      "bytes": 9,
+      "sha256": "0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5",
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": null,
+        "age": null,
+        "expires": null,
+        "content-type": "text/plain; charset=utf-8",
+        "access-control-allow-origin": null,
+        "x-cache": null
+      }
+    }
+  },
+  "legacyLatest": "server-2026.10.26.4",
+  "stable": {
+    "tag": "desktop-v1.7.2",
+    "source": "631d7826b815332ffd2e6baf523f609ce98db3bf",
+    "tagSource": "631d7826b815332ffd2e6baf523f609ce98db3bf",
+    "verificationAssetPresent": false,
+    "buildEvidence": [
+      {
+        "runId": 39991274744,
+        "source": "631d7826b815332ffd2e6baf523f609ce98db3bf",
+        "branch": "main",
+        "conclusion": "success",
+        "event": "workflow_dispatch",
+        "artifacts": [],
+        "missingTargets": [
+          "windows-x86_64",
+          "darwin-aarch64",
+          "linux-x86_64"
+        ]
+      },
+      {
+        "runId": 39991271920,
+        "source": "631d7826b815332ffd2e6baf523f609ce98db3bf",
+        "branch": "main",
+        "conclusion": "success",
+        "event": "push",
+        "artifacts": [],
+        "missingTargets": [
+          "windows-x86_64",
+          "darwin-aarch64",
+          "linux-x86_64"
+        ]
+      }
+    ],
+    "integrity": [
+      {
+        "name": "Scrollr_1.7.2_amd64.AppImage",
+        "sha256": "f79f0db4ce974fb97dc202a6f66e9af4664899bfc7e49c11b2d90e42421f501c",
+        "updaterSignature": "verified"
+      },
+      {
+        "name": "Scrollr_1.7.2_amd64.deb",
+        "sha256": "80c10ef0226229b041e93520bae3ad4298bed4188c2100782a9b5ab7ca9a1c6f",
+        "updaterSignature": "verified"
+      },
+      {
+        "name": "Scrollr-1.7.2-1.x86_64.rpm",
+        "sha256": "082dda9998e310b6023fe61bd0fd48647d4d6b7b6469d79d53b5fed7d8d46851",
+        "updaterSignature": "verified"
+      },
+      {
+        "name": "Scrollr_aarch64.app.tar.gz",
+        "sha256": "2639ce4744f24d4bab0dd91f1aef83b94e63ddec802b4496f199ec4e859a1aa9",
+        "updaterSignature": "verified"
+      },
+      {
+        "name": "Scrollr_1.7.2_x64_en-US.msi",
+        "sha256": "291e73223f841776afb2f61fdf694f387399fbc6305ef23962708a9853ca69d3",
+        "updaterSignature": "verified"
+      },
+      {
+        "name": "Scrollr_1.7.2_x64-setup.exe",
+        "sha256": "a1ce40f36d7b2d907060eb36536547ad080b478b726fba129fc35deb480c99aa",
+        "updaterSignature": "verified"
+      }
+    ]
+  },
+  "qualification": "PRE_ACTIVATION_ONLY",
+  "readyToActivate": false,
+  "limitations": [
+    "This inventory does not approve a release or create publisher evidence.",
+    "Actual feed bytes, publication/cache transitions and workflow write permission cannot be qualified while the feed branch is absent.",
+    "Signature validity alone is not run-bound provenance or OS install/upgrade qualification."
+  ]
+}

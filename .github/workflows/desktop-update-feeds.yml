@@ -61,6 +61,7 @@ jobs:
           if [ "$APPLY" = true ]; then
             test "$ENABLED" = true
             node desktop/scripts/release-channels.mjs --apply
+            node desktop/scripts/verify-release-feeds.mjs --expected-dir "$CHANNEL_PLAN_DIR"
           else
             node desktop/scripts/release-channels.mjs
           fi

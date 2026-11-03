@@ -195,15 +195,27 @@ the metadata branch or enables publishing.** Before first use:
    branch artifact installing successfully is not proof of version-to-version updates.
 
 Once enabled, Finish Desktop Release advances both feeds after publication and
-before release follow-ups. A feed failure leaves the published release intact,
-the old feeds available, and follow-ups blocked; rerun failed jobs after resolving
-it. The standalone reconciliation workflow can retry an approval, withdraw one
+verifies both public URLs against the exact plan before release follow-ups. The
+read-only check allows up to seven minutes for CDN convergence and never uses
+authentication or a cache-busting URL. An atomic Git commit does not imply
+simultaneous global cache visibility. A feed failure leaves the published release intact
+and follow-ups blocked. A failed metadata write preserves existing feeds; a failed
+public check may occur after the new metadata is committed. First activation has
+no previous feeds to fall back to. Resolve the cause and rerun failed jobs.
+The standalone reconciliation workflow can retry an approval, withdraw one
 tag, or recompute feeds. It defaults to dry-run and shares the build/finalizer
 artifact lock. Approval and withdrawal must be separate actions.
 
 The legacy Latest repair remains separate for already-installed older clients.
 Do not retire that route when channel feeds are enabled. Never use a test run to
 publish a release, enable the variable, write metadata, or enroll a tester.
+
+For read-only pre-activation evidence, run `node desktop/scripts/qualify-release-feeds.mjs
+--out desktop/test-results/feed-qualification` from the repository root. This
+collects actual host/cache/protection/build-proof state and independently verifies
+the existing Stable packages. It does not approve historical releases or activate
+anything. The [prepared activation packet](../audit/2026-11-03-feed-qualification/READINESS.md)
+distinguishes completed checks from the baseline and live-host gates.
 
 ## Local verification
 
