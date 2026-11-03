@@ -4,6 +4,7 @@ import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promise
 import path from 'node:path';
 import { gh, ghJSON, minisign, targets, validateArtifacts, validateRelease, validateRun, validateTagCommit } from './release-policy.mjs';
 import { readReleaseByTag, readTagCommit } from './release-lookup.mjs';
+import { verifySourceProtection } from './release-source.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 assert(/^[\w.-]+\/[\w.-]+$/.test(repo || ''), 'Repository required');
@@ -19,7 +20,7 @@ let runId = process.env.BUILD_RUN_ID;
 if (!runId) {
   const { workflow_runs: runs } = ghJSON('api', `repos/${repo}/actions/workflows/desktop-release.yml/runs?head_sha=${sha}&per_page=100`);
   for (const run of runs) {
-    validateRun(run, sha, repo);
+    validateRun(run, sha, repo, false, identity.version);
     const pages = ghJSON('api', '--paginate', '--slurp', `repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`);
     if (pages.flatMap(p => p.jobs).some(j => j.name.startsWith('build') && j.conclusion !== 'skipped')) {
       runId = String(run.id); break;
@@ -28,7 +29,8 @@ if (!runId) {
 }
 assert(/^\d+$/.test(runId || ''), 'No eligible build run');
 const run = ghJSON('api', `repos/${repo}/actions/runs/${runId}`);
-validateRun(run, sha, repo, process.argv[2] === 'verify');
+validateRun(run, sha, repo, process.argv[2] === 'verify', identity.version);
+verifySourceProtection(repo, run.head_branch, identity.version);
 if (process.argv[2] === 'resolve') {
   await appendFile(process.env.GITHUB_OUTPUT, `run_id=${runId}\nsha=${sha}\nchannel=${identity.channel}\n`);
   console.log(`Bound ${tag} to ${sha}, build ${runId} (${run.status}/${run.conclusion})`);

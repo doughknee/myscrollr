@@ -19,7 +19,7 @@ and release history; malformed minimum-version policy fails open.
 
 ## Build a candidate after approval
 
-1. Use a reviewed main commit with a new, consistent version in desktop
+1. Use a reviewed main commit (or the restricted maintenance source below) with a new, consistent version in desktop
    package.json, package-lock.json, Cargo.toml, Cargo.lock and tauri.conf.json.
    `node desktop/scripts/release-policy.mjs version` checks those identities.
    Prerelease versions produce GitHub prereleases; final versions produce stable
@@ -52,6 +52,24 @@ verified mounted DMG copy on macOS, and the final repackaged AppImage under Xvfb
 on Linux. Each must stay alive for 30 seconds. These checks do not prove login,
 rendered content, real update transport, physical Fill cursor behavior, sleep/wake,
 or monitor reconnect. Evidence is retained for 30 days beside build proofs.
+
+## Maintenance baseline source
+
+The approved maintenance exception is exactly `release/desktop-1.7`, restricted
+to final Stable versions `1.7.3` and later within `1.7.x`. No prerelease, other
+version line, arbitrary source ref or fork qualifies. Its Desktop Release run
+must still bind to the exact source SHA and all three platform proofs.
+
+Before building or finalizing, the read-only source guard verifies effective
+deletion, non-fast-forward, pull-request and required `repo-shape` protections.
+Frontend/backend/security CI runs on maintenance PRs and pushes. The existing
+main rules are unchanged. Finish Desktop Release stays main-only and validates
+the maintenance run rather than trusting branch-local publication instructions.
+Keep this branch protected and available while its releases may be finalized.
+
+The 1.7.3 baseline starts from the released 1.7.2 desktop source and backports
+release/update foundations. Fill from PR #529 is excluded. The current
+1.8.0-beta.1 candidate remains separate and newer under SemVer.
 
 ## Private native transport rehearsal
 
@@ -102,7 +120,7 @@ on trusted main; unchanged-version pushes skip without rebuilding the draft.
 Before publication the finalizer checks:
 
 - Exact source SHA, actual tag resolution (or absent tag for a draft), trusted
-  repository/main workflow/event, and successful completion of that build run.
+  repository/approved branch/workflow/event, and successful completion of that build run.
 - One Actions proof per platform, from that exact run, version and source.
 - Final downloadable bytes matching the proofs, all required installers,
   canonical URLs bound to that release, and each updater artifact's signature.
