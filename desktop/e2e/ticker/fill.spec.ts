@@ -1,5 +1,67 @@
 import { test, expect } from "@playwright/test";
 
+test("Fill controls idle without hiding the native pointer and wake on movement or focus", async ({
+  page,
+  context,
+}) => {
+  await context.clock.install();
+  await page.goto("/ticker-shim.html?fixture=pages&pages=1&fill=grid");
+  await expect(page.locator("[data-page]")).toHaveCount(1);
+  await page.mouse.move(300, 200);
+  const controls = page.locator("[data-fill-controls]");
+  await expect(controls).toHaveCSS("opacity", "1");
+  await context.clock.runFor(5100);
+  await expect(controls).toHaveCSS("opacity", "0");
+  await expect(controls).toHaveCSS("pointer-events", "none");
+  await expect(page.locator("[data-fill-display]")).not.toHaveCSS(
+    "cursor",
+    "none",
+  );
+  await page.mouse.move(301, 200);
+  await expect(controls).toHaveCSS("opacity", "1");
+  await controls.getByRole("button", { name: "Settings", exact: true }).focus();
+  await context.clock.runFor(5100);
+  await expect(controls).toHaveCSS("opacity", "1");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-fill-display]")).toHaveCount(0);
+});
+
+test("grid uses its canvas for quotes and reserves a footer only for saved pins", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 3440, height: 1440 });
+  await page.goto("/ticker-shim.html?fixture=googl&pages=1&fill=grid");
+  await expect(page.locator('[data-page^="finance_stocks:"]')).toHaveCount(1);
+  await expect(page.locator("[data-display-pins]")).toHaveCount(0);
+  const shape = await page
+    .locator('[data-display-cell="quote"]')
+    .first()
+    .evaluate((el) => {
+      const cell = el.getBoundingClientRect();
+      const spark = el
+        .querySelector('[data-part="spark"]')!
+        .getBoundingClientRect();
+      const price = el
+        .querySelector('[data-part="price"]')!
+        .getBoundingClientRect();
+      return {
+        chartShare: spark.width / cell.width,
+        chartHeight: spark.height,
+        belowPrice: spark.top >= price.bottom,
+      };
+    });
+  expect(shape.chartShare).toBeGreaterThan(0.8);
+  expect(shape.chartHeight).toBeGreaterThan(80);
+  expect(shape.belowPrice).toBe(true);
+  const header = await page.locator("[data-display-header]").boundingBox();
+  expect(header!.height).toBeLessThan(160);
+  await page.goto(
+    "/ticker-shim.html?fixture=pages&pages=1&fill=grid&pin=sports_nfl:Chicago Bears",
+  );
+  await expect(page.locator("[data-display-pins]")).toHaveCount(1);
+  await expect(page.locator("[data-display-pins]")).toContainText("Bears");
+});
+
 test("continuous strip keeps overflowing pins accessible without blocking its tape", async ({
   page,
 }) => {
@@ -70,6 +132,18 @@ for (const [width, height] of [
       expect(bounds!.height).toBeLessThanOrEqual(height + 1);
       if (mode === "grid") {
         expect(bounds!.height).toBeCloseTo(height, 0);
+        for (const box of await page
+          .locator("[data-display-header] [data-edge]")
+          .evaluateAll((nodes) =>
+            nodes.map((el) => {
+              const r = el.getBoundingClientRect();
+              return { left: r.left, right: r.right, bottom: r.bottom };
+            }),
+          )) {
+          expect(box.left).toBeGreaterThanOrEqual(0);
+          expect(box.right).toBeLessThanOrEqual(width + 1);
+          expect(box.bottom).toBeLessThanOrEqual(height);
+        }
         for (const box of await page
           .locator(
             '[data-page] [data-part="status"], [data-page] [data-part$="-score"]',

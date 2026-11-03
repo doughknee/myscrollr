@@ -771,17 +771,29 @@ No copied renderer, custom playlist, manual row count or extra connection.
   Exiting Fill retains the docked top/bottom, scale and always-on-top preferences.
 - `lib/tickerDisplay.ts` scales the shared logical canvas uniformly from the actual
   viewport. Auto/Larger/Largest reading sizes are 100/125/150%; larger text reduces
-  capacity. Grid keeps at least 420 logical pixels wide and 268 high. Strip keeps
+  capacity. Grid keeps at least 420 logical pixels wide and 272 high. Strip keeps
   at least 780 logical pixels wide and 64 high; on tall screens it is centered with
   background space. These are layout reservations, not a hardware allowlist or a
   claim that arbitrarily small physical displays remain readable.
-- Grid uses a 64px heading (the existing band plus utilities), a 64px pins footer,
-  and the remaining height for equal cells. `displayGrid` takes each family's
-  existing minimum column and a 140px minimum row. Capacity is columns × rows.
+- The canvas uses CSS layout zoom, not a composited `transform: scale` layer.
+  The latter froze the visible Windows cursor while pointer input continued
+  in native testing (SCROLLR-399); layout zoom passed the same hover/click case.
+- Grid uses a 48px heading (the existing 64px band and utilities at 75%), a 64px
+  footer only when pins have local placement, and the remaining height for equal
+  cells. No empty branding footer. A saved pin reserves its footer even when its
+  data is temporarily absent, so an update cannot move the page in view.
+  `displayGrid` takes each family's existing minimum column and a 160px minimum
+  row. Capacity is columns × rows.
   A short, wide display naturally has one row; portrait has fewer columns. No
-  item is duplicated to occupy spare cells. Non-sports cells retain their 64px
-  grammar centered inside the row. Sports uses the same `GameCell`, with scores
-  reserved at 26px and status below the teams; its minimum column is unchanged.
+  item is duplicated to occupy spare cells. Sports uses the same `GameCell`, with
+  scores reserved at 26px and status below the teams. Quotes use the shared
+  `QuoteCell` expanded presentation: symbol and reserved change across the top,
+  a 26px reserved price beneath, and the existing sparkline/range across the
+  remaining cell width and height. Its amplitude calculation and missing-data
+  behavior stay unchanged. News uses the shared `NewsCell`: a reserved 66px,
+  three-line headline at 18px/22px, then age and up to three lines of summary
+  (or the feed name). Other cells retain their 64px grammar centered in the row.
+  Family minimum columns and docked cells are unchanged.
 - The pool, tier ordering, source eligibility, reservations, frozen identities,
   visits and dwell remain those of Pages. Each filled window owns its own cursor,
   dwell, hover and manual steps; it neither sends nor consumes docked page turns.
@@ -798,8 +810,9 @@ No copied renderer, custom playlist, manual row count or extra connection.
   in normal rotation pools.
 - Pointer activity holds Pages for at most five idle seconds as before. A filled
   Continuous strip keeps moving regardless of the docked hover preference. Fill
-  controls and the cursor disappear after five idle seconds; keyboard focus keeps
-  the controls available. Escape in the focused ticker exits Fill for that monitor.
+  controls disappear after five idle seconds and stop intercepting clicks;
+  keyboard focus keeps them available and pointer movement wakes them. The
+  native cursor stays visible. Escape in the focused ticker exits Fill for that monitor.
 - Native Fill releases AppBar space, moves to the selected physical monitor bounds
   and enters fullscreen. It is not always-on-top, so the main window can be reached.
   Settings, tray and second-launch opening size the main window down for short
@@ -808,7 +821,8 @@ No copied renderer, custom playlist, manual row count or extra connection.
   name; unstable/ambiguous OS identities still require reselection.
 
 Validation: `tickerDisplay.test.ts`, the grid traversal case in `widgetPages.test.ts`,
-`e2e/ticker/fill.spec.ts`, and the `game-fill` reservation case in `cells.spec.ts`.
+`e2e/ticker/fill.spec.ts`, and the game/quote/news display reservation cases in
+`cells.spec.ts` (including quote digit-boundary crossings).
 Browser evidence does not prove native taskbar, hotplug, sleep/wake or DPI behavior.
 Windows, macOS and Wayland need their own native checks before platform parity is
 advertised; a customer strip-monitor pilot remains a release gate.

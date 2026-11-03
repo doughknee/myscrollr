@@ -19,7 +19,9 @@ const PARTS: Record<string, [string, "box" | "left" | "right"][]> = {
   "game-wide": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "right"], ["home-name", "left"]],
   "game-fill": [["away-score", "box"], ["home-score", "box"], ["status", "box"], ["away-name", "left"], ["home-name", "left"]],
   quote: [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-rail", "box"], ["range-low", "left"], ["range-high", "right"]],
+  "quote-display": [["change", "box"], ["price", "box"], ["spark", "box"], ["range", "box"], ["range-rail", "box"], ["range-low", "left"], ["range-high", "right"]],
   news: [["age", "box"], ["headline", "box"], ["summary", "left"]],
+  "news-display": [["age", "box"], ["headline", "box"], ["summary", "left"]],
 };
 
 async function edges(page: Page, strip: string) {
@@ -47,11 +49,11 @@ test.describe("page cells hold still", () => {
   test("quote: a price crossing a digit boundary, up or down, moves nothing", async ({ page }) => {
     const parts: [string, "box" | "left" | "right"][] = [["price", "box"], ["change", "box"], ["spark", "box"], ["range-rail", "box"], ["range-low", "left"], ["range-high", "right"]];
     await page.goto("/ticker-shim.html?cells=1");
-    await page.locator('[data-strip="quote-cross"] [data-state]').first().waitFor();
+    await page.locator('[data-strip="quote-cross-display"] [data-state]').first().waitFor();
     await page.evaluate(() => document.fonts.ready);
     const read = () =>
       page.evaluate((parts) =>
-        [...document.querySelectorAll('[data-strip="quote-cross"] [data-state]')].map((cell) => {
+        [...document.querySelectorAll('[data-strip^="quote-cross"] [data-state]')].map((cell) => {
           const origin = cell.getBoundingClientRect().left;
           const out: Record<string, string> = { text: cell.querySelector('[data-part="price"]')!.textContent! };
           for (const [part, how] of parts) {

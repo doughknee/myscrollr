@@ -62,25 +62,27 @@ export default function TickerSurface({
     <div
       data-fill-display={display.mode}
       className="relative h-screen w-full overflow-hidden bg-base-150"
-      style={{ cursor: active ? undefined : "none" }}
-      onMouseMove={wake}
+      // Keep pointer visibility under the native webview's control.
+      // Only the controls idle out; moving always wakes them.
+      onPointerMove={wake}
+      onPointerEnter={wake}
       onPointerDown={wake}
       onFocusCapture={wake}
     >
       <div
-        className="absolute left-0 top-0 flex origin-top-left items-center"
+        className="absolute left-0 top-0 flex items-center"
         style={{
           width: geometry.width,
           height: geometry.height,
-          transform: `scale(${geometry.scale})`,
+          zoom: geometry.scale,
         }}
       >
         {children(geometry.grid ? geometry.height : undefined)}
       </div>
       <div
         className="absolute right-3 top-3 z-50 flex gap-2 rounded-lg border border-edge bg-base-150 p-2 text-sm text-fg focus-within:opacity-100"
-        style={{ opacity: active ? 1 : undefined }}
         data-fill-controls=""
+        data-active={active ? "" : undefined}
         onMouseEnter={wake}
       >
         <button
@@ -106,7 +108,10 @@ export default function TickerSurface({
           {error}
         </div>
       )}
-      <style>{`[data-fill-controls] { opacity: 0; } [data-fill-controls]:focus-within { opacity: 1 !important; }`}</style>
+      <style>{`
+        [data-fill-controls] { opacity: 0; pointer-events: none; }
+        [data-fill-controls][data-active], [data-fill-controls]:focus-within { opacity: 1; pointer-events: auto; }
+      `}</style>
     </div>
   );
 }

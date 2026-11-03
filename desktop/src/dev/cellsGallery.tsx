@@ -159,6 +159,9 @@ function CrossingStrip() {
       <Strip name="quote-cross" width={QUOTE_MIN_COL}>
         {CROSSINGS.map(([s, a, b]) => [s, <QuoteCell trade={{ ...aapl, price: ticked ? b : a }} />])}
       </Strip>
+      <Strip name="quote-cross-display" width={QUOTE_MIN_COL} height={160}>
+        {CROSSINGS.map(([s, a, b]) => [s, <QuoteCell trade={{ ...aapl, price: ticked ? b : a }} expanded />])}
+      </Strip>
     </div>
   );
 }
@@ -297,8 +300,10 @@ function Gallery() {
       <Strip name="game-fill" width={gameMinCol("NFL")} height={140}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={gameMinCol("NFL")} fill mine now={NOW} />])}</Strip>
       <Strip name="game-wide" width={460}>{GAME_STATES.map(([s, g]) => [s, <GameCell game={g} width={460} mine now={NOW} />])}</Strip>
       <Strip name="quote" width={QUOTE_MIN_COL}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} />])}</Strip>
+      <Strip name="quote-display" width={QUOTE_MIN_COL} height={160}>{QUOTE_STATES.map(([s, t]) => [s, <QuoteCell trade={t} expanded />])}</Strip>
       <CrossingStrip />
       <Strip name="news" width={420}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} />])}</Strip>
+      <Strip name="news-display" width={420} height={160}>{NEWS_STATES.map(([s, r]) => [s, <NewsCell item={r} width={420} now={NOW} expanded />])}</Strip>
       <States />
       {/* style.css stretches the shell's last child div to fill the window; this is it. */}
       <div aria-hidden />

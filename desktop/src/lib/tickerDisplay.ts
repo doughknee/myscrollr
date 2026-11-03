@@ -61,7 +61,7 @@ export function displayGeometry(
   const scale = Math.min(
     desired,
     w / (grid ? 420 : 780),
-    h / (grid ? 268 : 64),
+    h / (grid ? 272 : 64),
   );
   return { scale, width: w / scale, height: h / scale, grid };
 }

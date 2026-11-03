@@ -54,7 +54,7 @@ import { isPrimaryTicker } from "../../lib/windowRole";
 import { useEdgeMeasures, useEdgeRoom, usePublishEdge } from "../../lib/edgeMeasure";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
-import { BAND_W, PILLS_MAX, columnsFor, contentWidth, displayGrid, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
+import { BAND_W, DISPLAY_HEADER_H, DISPLAY_PIN_H, PILLS_MAX, columnsFor, contentWidth, displayGrid, edgeBar, freezePage, pageItems, refreshPage, trackMarker, type FrozenPage } from "./pagePlan";
 import {
   ALSO_TAB,
   buildPageWidgets,
@@ -390,11 +390,11 @@ function Cell({ widget, item, colW, dark, onChipClick, fill = false }: {
     }
     case "news": {
       const r = item.data as RssItem;
-      return <NewsCell item={r} width={colW} onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
+      return <NewsCell item={r} width={colW} expanded={fill} onClick={() => onChipClick?.("rss", r.id, chipUrlForRss(r))} />;
     }
     case "finance": {
       const t = item.data as Trade;
-      return <QuoteCell trade={t} fill={item.fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
+      return <QuoteCell trade={t} fill={item.fill} expanded={fill} onClick={() => onChipClick?.("finance", t.symbol, chipUrlForFinance(t))} />;
     }
     case "github": {
       if (item.fill) {
@@ -439,6 +439,9 @@ export default function PagedBar({
   const grid = fillHeight !== undefined;
   const room = useMemo(() => independent ? { bar: grid ? localWidth / 0.4 : localWidth, util: grid ? 0 : utilW } : sharedRoom, [independent, grid, localWidth, utilW, sharedRoom]);
   const onEdge = useMemo(() => (room ? stepBack(pins, room) : pins), [pins, room]);
+  // Saved pin placement determines the footer reservation. A data update
+  // cannot collapse it and move the page currently being read.
+  const footerHeight = grid && onEdge.length > 0 ? DISPLAY_PIN_H : 0;
 
   // Live width for the NEXT page; the page on screen keeps the width it froze with.
   const widthRef = useRef(0);
@@ -446,7 +449,7 @@ export default function PagedBar({
 
   // The whole market's quotes, only while a watchlist is shorter than a page
   // (its empty columns fill with popular symbols, SCROLLR-292).
-  const quoteCols = grid ? displayGrid(width, fillHeight, QUOTE_MIN_COL).capacity : columnsFor(contentWidth(width, 0), QUOTE_MIN_COL);
+  const quoteCols = grid ? displayGrid(width, fillHeight, QUOTE_MIN_COL, footerHeight).capacity : columnsFor(contentWidth(width, 0), QUOTE_MIN_COL);
   const shortWatchlist = activeTabs.some((tab) => {
     if (sourceForWidget(tab) !== "finance") return false;
     const symbols = (dashboard?.widgets?.find((w) => w.widget_type === tab)?.config as { symbols?: unknown } | undefined)?.symbols;
@@ -523,18 +526,18 @@ export default function PagedBar({
   // ── Leader: the page clock ──────────────────────────────────────
   const advance = useCallback(() => {
     const ws = widgetsRef.current;
-    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW(), fillHeight), nav.current));
+    show(nextTurn(turnRef.current, ws, planAll(ws, widthRef.current, edgeW(), fillHeight, footerHeight), nav.current));
     broadcast();
-  }, [show, broadcast, fillHeight]);
+  }, [show, broadcast, fillHeight, footerHeight]);
 
   /** A manual move on the leader: a new turn, so the clock below restarts the page's dwell. */
   const stepHere = useCallback((move: Move) => {
     const ws = widgetsRef.current;
-    const t = stepTurn(turnRef.current, move, ws, planAll(ws, widthRef.current, edgeW(), fillHeight), nav.current);
+    const t = stepTurn(turnRef.current, move, ws, planAll(ws, widthRef.current, edgeW(), fillHeight, footerHeight), nav.current);
     if (!t) return;
     show(t);
     broadcast();
-  }, [show, broadcast, fillHeight]);
+  }, [show, broadcast, fillHeight, footerHeight]);
 
   useEffect(() => {
     // The ref, not the state: StrictMode runs this twice before the first
@@ -547,7 +550,7 @@ export default function PagedBar({
     if (independent && turnRef.current && width > 0) {
       show({ ...turnRef.current, seq: turnRef.current.seq + 1 });
     }
-  }, [independent, width, fillHeight, show]);
+  }, [independent, width, fillHeight, footerHeight, show]);
 
   // The clock restarts only on a new turn, never on a data update, and
   // stands still while the page is held.
@@ -658,7 +661,7 @@ export default function PagedBar({
   }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── The frozen page ─────────────────────────────────────────────
-  const plans = useMemo(() => planAll(widgets, planWidth, planEdge, fillHeight), [widgets, planWidth, planEdge, fillHeight]);
+  const plans = useMemo(() => planAll(widgets, planWidth, planEdge, fillHeight, footerHeight), [widgets, planWidth, planEdge, fillHeight, footerHeight]);
   const shown = useRef<Shown | null>(null);
   if (turn && shown.current?.seq !== turn.seq) {
     const w = widgets.find((x) => x.tab === turn.tab);
@@ -677,7 +680,7 @@ export default function PagedBar({
         page: freezePage(items, keyOf),
         index,
         count: plan.pages.length,
-        colW: grid ? planWidth / displayGrid(planWidth, fillHeight, w.minCol).columns : contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
+        colW: grid ? planWidth / displayGrid(planWidth, fillHeight, w.minCol, footerHeight).columns : contentWidth(planWidth, planEdge) / (short ? plan.cols : items.length),
         short,
         cols: plan.cols,
         total: plan.pages.reduce((n, p) => n + p.length, 0),
@@ -726,15 +729,18 @@ export default function PagedBar({
   if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
 
   if (grid) {
-    const shape = displayGrid(planWidth || width, fillHeight, cur?.widget.minCol ?? QUOTE_MIN_COL);
+    const shape = displayGrid(planWidth || width, fillHeight, cur?.widget.minCol ?? QUOTE_MIN_COL, footerHeight);
     const tick = turn ? turn.seq : wallTick;
+    const chromeScale = DISPLAY_HEADER_H / 64;
     return (
       <div ref={setBar} data-pages="" data-display-grid="" data-motion-style={reduced ? "fade" : "swipe"}
         className="ticker-container group/bar relative flex w-full shrink-0 flex-col overflow-hidden bg-base-150"
         style={{ height: fillHeight }} onMouseEnter={hover.move} onMouseMove={hover.move} onMouseLeave={hover.leave}>
-        <div className="flex h-16 shrink-0 border-b border-edge/50">
-          {cur && <Band cur={cur} live={live ?? cur.widget} widgets={widgets} turn={turn} held={held} dark={dark} keypad={pageControls} reduced={reduced} onMove={step} wipe={wipe} fade={fade} />}
-          <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={Math.max(180, width - BAND_W)} onChipClick={onChipClick} />
+        <div data-display-header="" className="relative shrink-0 overflow-hidden border-b border-edge/50" style={{ height: DISPLAY_HEADER_H }}>
+          <div className="absolute inset-y-0 left-0 flex h-16 w-full" style={{ zoom: chromeScale }}>
+            {cur && <Band cur={cur} live={live ?? cur.widget} widgets={widgets} turn={turn} held={held} dark={dark} keypad={pageControls} reduced={reduced} onMove={step} wipe={wipe} fade={fade} />}
+            <EdgeZone edge={{ ...edge, pins: [] }} tick={tick} reduced={reduced} dark={dark} maxUtilitiesWidth={Math.max(180, width / chromeScale - BAND_W)} onChipClick={onChipClick} />
+          </div>
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <AnimatePresence initial={false} custom={cur?.back}>
@@ -744,17 +750,16 @@ export default function PagedBar({
               style={{ ...accentStyle(accent, ink), gridTemplateColumns: `repeat(${shape.columns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${shape.rows}, minmax(0, 1fr))` }} {...(reduced ? fade : swipe)}>
               {items.map((item) => <div key={item.key} data-widget={cur.widget.tab} data-pin-subject={item.pin}
                 className="flex min-h-0 min-w-0 items-center overflow-hidden border-b border-r border-edge/50">
-                <div className={cur.widget.kind === "sports" ? "h-full w-full min-w-0" : "h-16 w-full min-w-0"}>
+                <div className={["sports", "finance", "news"].includes(cur.widget.kind) ? "h-full w-full min-w-0" : "h-16 w-full min-w-0"}>
                   <Cell widget={cur.widget} item={item} colW={cur.colW} dark={dark} fill onChipClick={onChipClick} />
                 </div>
               </div>)}
             </motion.div>}
           </AnimatePresence>
         </div>
-        <div className="flex h-16 shrink-0 items-center border-t border-edge/50">
-          {edge.pins.length ? <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} onChipClick={onChipClick} />
-            : <span className="px-4 text-xs font-semibold tracking-widest text-fg-3">SCROLLR</span>}
-        </div>
+        {footerHeight > 0 && <div data-display-pins="" className="flex shrink-0 items-center border-t border-edge/50" style={{ height: footerHeight }}>
+          <EdgeZone edge={{ ...edge, utilities: [] }} tick={tick} reduced={reduced} dark={dark} onChipClick={onChipClick} />
+        </div>}
       </div>
     );
   }
