@@ -37,7 +37,7 @@
  *    (Settings › Ticker, or the bar's right-click menu) hides the keypad only:
  *    the band's width and everything else stay.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import clsx from "clsx";
 import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
@@ -77,7 +77,7 @@ import AlsoCell from "./cells/AlsoCell";
 import RepoCell from "./cells/RepoCell";
 import ThingCell from "./cells/ThingCell";
 import { Rule, accentFor, accentStyle, inkFor, mix } from "./cells/parts";
-import EdgeZone, { buildEdge, edgeTabs } from "./EdgeZone";
+import EdgeZone, { buildEdge, edgeTabs, eligibleEdgePins } from "./EdgeZone";
 import { stepBack } from "./edgeRule";
 import { useActiveHover } from "./activeHover";
 
@@ -375,7 +375,9 @@ function watchTheme(onChange: () => void) {
   return () => mo.disconnect();
 }
 
-function Cell({ widget, item, colW, dark, onChipClick, fill = false }: {
+// Utility clock ticks should not repaint unchanged cells or replace their click
+// closures. Fresh data arrives through a new item prop and still renders in place.
+const Cell = memo(function Cell({ widget, item, colW, dark, onChipClick, fill = false }: {
   widget: PageWidget;
   item: PageItem;
   colW: number;
@@ -409,7 +411,7 @@ function Cell({ widget, item, colW, dark, onChipClick, fill = false }: {
       return <AlsoCell code={a.code} text={a.text} hex={a.hex} dark={dark} onClick={() => onChipClick?.(a.tab, a.tab)} />;
     }
   }
-}
+});
 
 export default function PagedBar({
   dashboard,
@@ -438,7 +440,10 @@ export default function PagedBar({
   const [localWidth, setLocalWidth] = useState(0);
   const grid = fillHeight !== undefined;
   const room = useMemo(() => independent ? { bar: grid ? localWidth / 0.4 : localWidth, util: grid ? 0 : utilW } : sharedRoom, [independent, grid, localWidth, utilW, sharedRoom]);
-  const onEdge = useMemo(() => (room ? stepBack(pins, room) : pins), [pins, room]);
+  const onEdge = useMemo(() => {
+    const eligible = grid ? eligibleEdgePins(pins, activeTabs) : pins;
+    return room ? stepBack(eligible, room) : eligible;
+  }, [pins, room, grid, activeTabs]);
   // Saved pin placement determines the footer reservation. A data update
   // cannot collapse it and move the page currently being read.
   const footerHeight = grid && onEdge.length > 0 ? DISPLAY_PIN_H : 0;
@@ -581,6 +586,15 @@ export default function PagedBar({
     if (independent || !leader || e.payload.label === label) return;
     if (e.payload.on) remoteHover.current.add(e.payload.label);
     else remoteHover.current.delete(e.payload.label);
+    updateHold();
+  });
+  useTauriListener<string[]>("ticker-windows-changed", (e) => {
+    if (independent || !leader) return;
+    // A native window destroyed on disconnect cannot reliably run React cleanup.
+    const live = new Set(e.payload);
+    for (const label of remoteHover.current) {
+      if (!live.has(label)) remoteHover.current.delete(label);
+    }
     updateHold();
   });
   useTauriListener(HELLO_EVENT, () => {
@@ -744,7 +758,7 @@ export default function PagedBar({
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <AnimatePresence initial={false} custom={cur?.back}>
-            {cur && <motion.div key={cur.seq} data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`} data-visit={cur.seq}
+            {cur && <motion.div key={cur.seq} custom={cur.back} data-page={`${cur.widget.tab}:${cur.index + 1}/${cur.count}`} data-visit={cur.seq}
               data-cols={cur.cols} data-total={cur.total} data-avail={cur.avail} data-grid-columns={shape.columns} data-grid-rows={shape.rows}
               className="absolute inset-0 grid"
               style={{ ...accentStyle(accent, ink), gridTemplateColumns: `repeat(${shape.columns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${shape.rows}, minmax(0, 1fr))` }} {...(reduced ? fade : swipe)}>

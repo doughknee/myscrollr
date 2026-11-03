@@ -128,6 +128,12 @@ function slotOf(tab: Utility, raw: unknown): SlotItem {
   }
 }
 
+/** Pins with an edge-cell renderer; eligibility does not depend on live data. */
+export function eligibleEdgePins(pins: readonly WidgetPin[], activeTabs: readonly string[]) {
+  return pins.filter(p => activeTabs.includes(p.widget) &&
+    ["sports", "finance", "rss"].includes(sourceForWidget(p.widget) ?? ""));
+}
+
 /** What the edge holds: utilities on the ticker with data, then pins that resolve. */
 export function buildEdge(
   widgetData: WidgetTickerData | undefined,
@@ -143,9 +149,7 @@ export function buildEdge(
     }
   }
   const out: EdgePin[] = [];
-  for (const p of pins) {
-    // A pinned utility is already on the edge; pins of widgets off the ticker do not show.
-    if (!activeTabs.includes(p.widget) || (UTILITIES as readonly string[]).includes(p.widget)) continue;
+  for (const p of eligibleEdgePins(pins, activeTabs)) {
     const source = sourceForWidget(p.widget);
     const raw = source ? dashboard?.data?.[source] : undefined;
     const ctx = { tab: p.widget, source, dashboard } as TickerContext;
@@ -174,6 +178,15 @@ export function edgeTabs(edge: Edge): string[] {
 }
 
 const EASE = [0.32, 0.72, 0, 1] as const;
+
+/** Count each utility's appearances, so grouped slots cannot skip its items. */
+export function utilityTurns(count: number, requested: number, tick: number) {
+  const visible = Math.min(count, Math.max(1, requested));
+  return Array.from({ length: visible }, (_, offset) => {
+    const visit = tick * visible + offset;
+    return { index: ((visit % count) + count) % count, tick: Math.floor(visit / count) };
+  });
+}
 
 function SlotFace({ it, sizer }: { it: SlotItem; sizer?: boolean }) {
   return (
@@ -271,17 +284,19 @@ export default function EdgeZone({ edge, tick, reduced, dark, edgeRef, onUtilWid
   }, [onUtilWidth, empty]);
   if (empty) return null;
   const slots = maxUtilitiesWidth === undefined ? edge.utilities.length : Math.max(1, Math.floor(maxUtilitiesWidth / 180));
-  const utilities = maxUtilitiesWidth === undefined || edge.utilities.length <= slots ? edge.utilities
-    : Array.from({ length: slots }, (_, i) => edge.utilities[(tick * slots + i) % edge.utilities.length]);
+  const utilities = utilityTurns(edge.utilities.length, slots, tick);
   return (
     <div ref={edgeRef} data-edge="" className="relative ml-auto flex h-full shrink-0 border-l border-edge">
       <div ref={strip} data-edge-utils="" className="flex h-full">
-        {utilities.map((u, i) => (
+        {utilities.map(({ index, tick: itemTick }, i) => {
+          const u = edge.utilities[index];
+          return (
           <div key={u.tab} className="relative flex h-full" data-widget={u.tab} style={{ ...accentStyle(accentFor(u.hex, dark), inkFor(u.hex, dark)), width: maxUtilitiesWidth === undefined ? undefined : 180 }}>
             {i > 0 && <Rule />}
-            <Slot u={u} tick={tick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
+            <Slot u={u} tick={itemTick} reduced={reduced} onClick={(id) => onChipClick?.(u.tab, id)} />
           </div>
-        ))}
+          );
+        })}
       </div>
       {edge.pins.map((p, i) => (
         <div

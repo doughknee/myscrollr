@@ -43,6 +43,10 @@ export function createActiveHover(onChange: (active: boolean) => void, idleMs = 
     },
     dispose() {
       clearTimeout(timer);
+      timer = undefined;
+      // A follower can unmount while it holds the docked leader (e.g. entering
+      // Fill). Canceling its idle timer alone would strand that remote hold.
+      set(false);
     },
   };
 }

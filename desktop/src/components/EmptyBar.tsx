@@ -11,7 +11,7 @@
 import type { ComponentType, ReactNode } from "react";
 import clsx from "clsx";
 import { Plus } from "lucide-react";
-import { BAND_W } from "./pages/pagePlan";
+import { BAND_W, DISPLAY_HEADER_H } from "./pages/pagePlan";
 import { accentStyle, mix } from "./pages/cells/parts";
 
 export interface InstalledWidgetMeta {
@@ -25,18 +25,20 @@ interface Props {
   kind: "sourceless" | "installedOff";
   /** Draw the pages-look label block ahead of the message. */
   pages?: boolean;
+  /** Shared Fill-grid canvas height; docked/strip keep their compact row. */
+  fillHeight?: number;
   installedWidgets?: InstalledWidgetMeta[];
   onAddSources?: () => void;
   onOpenWidget?: (widgetId: string) => void;
 }
 
 /** Accent hairline + centred stack, with an optional teaching tip beneath. */
-function Row({ tip, children }: { tip?: ReactNode; children: ReactNode }) {
+function Row({ tip, children, expanded }: { tip?: ReactNode; children: ReactNode; expanded?: boolean }) {
   return (
-    <div className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-0.5 px-4">
-      <div className="flex min-w-0 items-center justify-center gap-2">{children}</div>
+    <div className={clsx("flex w-full min-w-0 flex-col items-center justify-center px-4", expanded ? "min-h-full gap-4 py-6" : "h-full gap-0.5")}>
+      <div className={clsx("flex min-w-0 items-center justify-center", expanded ? "w-full max-w-xl flex-col gap-3 text-center" : "gap-2")}>{children}</div>
       {tip && (
-        <p className="hidden shrink-0 items-center gap-1 text-[10px] leading-tight text-fg-4/80 md:inline-flex">
+        <p className={clsx("shrink-0 items-center gap-1 text-[10px] leading-tight text-fg-4/80", expanded ? "flex max-w-sm flex-wrap justify-center text-center" : "hidden md:inline-flex")}>
           <span className="text-fg-4">Tip:</span>
           {tip}
         </p>
@@ -45,10 +47,12 @@ function Row({ tip, children }: { tip?: ReactNode; children: ReactNode }) {
   );
 }
 
-export default function EmptyBar({ kind, pages = false, installedWidgets = [], onAddSources, onOpenWidget }: Props) {
+export default function EmptyBar({ kind, pages = false, fillHeight, installedWidgets = [], onAddSources, onOpenWidget }: Props) {
+  const expanded = fillHeight !== undefined;
   const body =
     kind === "sourceless" ? (
       <Row
+        expanded={expanded}
         tip={
           <>
             <span>use</span>
@@ -59,8 +63,8 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
           </>
         }
       >
-        <span className="shrink-0 text-ui-meta font-medium text-fg-2">You haven&rsquo;t added any sources yet.</span>
-        <span className="hidden shrink-0 text-ui-meta text-fg-4 sm:inline">Browse the catalog to add one:</span>
+        <span className={clsx("text-ui-meta font-medium text-fg-2", expanded ? "max-w-full" : "shrink-0")}>You haven&rsquo;t added any sources yet.</span>
+        <span className={clsx("text-ui-meta text-fg-4", expanded ? "max-w-full" : "hidden shrink-0 sm:inline")}>Browse the catalog to add one:</span>
         <button
           type="button"
           onClick={onAddSources}
@@ -79,10 +83,10 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
         </button>
       </Row>
     ) : (
-      <Row tip={<span>every widget&rsquo;s settings live in the bar at the top of its page.</span>}>
-        <span className="shrink-0 text-ui-meta font-medium text-fg-2">Your ticker is empty right now.</span>
-        <span className="hidden shrink-0 text-ui-meta text-fg-4 sm:inline">Open a source to pick what shows up here:</span>
-        <div className="scrollbar-none flex min-w-0 items-center gap-1.5 overflow-x-auto">
+      <Row expanded={expanded} tip={<span>every widget&rsquo;s settings live in the bar at the top of its page.</span>}>
+        <span className={clsx("text-ui-meta font-medium text-fg-2", expanded ? "max-w-full" : "shrink-0")}>Your ticker is empty right now.</span>
+        <span className={clsx("text-ui-meta text-fg-4", expanded ? "max-w-full" : "hidden shrink-0 sm:inline")}>Open a source to pick what shows up here:</span>
+        <div className={clsx("flex min-w-0 items-center gap-1.5", expanded ? "max-w-full flex-wrap justify-center" : "scrollbar-none overflow-x-auto")}>
           {installedWidgets.map((ch) => {
             const WidgetGlyphIcon = ch.icon;
             return (
@@ -92,7 +96,7 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
                 onClick={() => onOpenWidget?.(ch.id)}
                 disabled={!onOpenWidget}
                 className={clsx(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-md",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-md max-w-full",
                   "px-2 py-1 text-ui-meta font-semibold",
                   "border transition-colors active:scale-[0.97]",
                   "disabled:pointer-events-none disabled:opacity-50",
@@ -117,7 +121,8 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
     <div
       data-pages={pages ? "" : undefined}
       data-empty={kind}
-      className="ticker-container relative flex h-16 w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150"
+      className={clsx("ticker-container relative flex w-full shrink-0 items-stretch overflow-hidden border-b border-edge/50 bg-base-150", expanded ? "flex-col" : "h-16")}
+      style={expanded ? { height: fillHeight } : undefined}
     >
       <div className="absolute left-0 right-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
       {pages && (
@@ -126,9 +131,11 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
           className="flex shrink-0 flex-col justify-center gap-[3px] pl-3.5 pr-2"
           style={{
             ...accentStyle("var(--color-primary)", "color-mix(in srgb, var(--color-primary) 50%, var(--color-fg))"),
-            width: BAND_W,
+            width: expanded ? undefined : BAND_W,
+            height: expanded ? DISPLAY_HEADER_H : undefined,
             background: mix(16),
-            borderRight: `1px solid ${mix(40)}`,
+            borderRight: expanded ? undefined : `1px solid ${mix(40)}`,
+            borderBottom: expanded ? `1px solid ${mix(40)}` : undefined,
           }}
         >
           <span className="font-sans text-[19px] font-extrabold leading-none tracking-[0.04em]" style={{ color: "var(--accent-ink)" }}>
@@ -139,7 +146,7 @@ export default function EmptyBar({ kind, pages = false, installedWidgets = [], o
           </span>
         </div>
       )}
-      <div className="min-w-0 flex-1">{body}</div>
+      <div className={clsx("min-w-0 flex-1", expanded && "min-h-0 overflow-y-auto")}>{body}</div>
     </div>
   );
 }

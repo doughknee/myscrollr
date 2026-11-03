@@ -790,8 +790,9 @@ No copied renderer, custom playlist, manual row count or extra connection.
   the customer's hardware before release. Other platforms keep their renderer.
 - Grid uses a 48px heading (the existing 64px band and utilities at 75%), a 64px
   footer only when pins have local placement, and the remaining height for equal
-  cells. No empty branding footer. A saved pin reserves its footer even when its
-  data is temporarily absent, so an update cannot move the page in view.
+  cells. No empty branding footer. Only active data-widget pins reserve a footer;
+  utility pins remain in the header. Eligible saved pins keep their reservation
+  when data is temporarily absent, so an update cannot move the page in view.
   `displayGrid` takes each family's existing minimum column and a 160px minimum
   row. Capacity is columns × rows.
   A short, wide display naturally has one row; portrait has fewer columns. No
@@ -804,6 +805,8 @@ No copied renderer, custom playlist, manual row count or extra connection.
   three-line headline at 18px/22px, then age and up to three lines of summary
   (or the feed name). Other cells retain their 64px grammar centered in the row.
   Family minimum columns and docked cells are unchanged.
+  The shared empty state uses the grid canvas too: recovery text and source
+  buttons wrap within the available width, with vertical scrolling if needed.
 - The pool, tier ordering, source eligibility, reservations, frozen identities,
   visits and dwell remain those of Pages. Each filled window owns its own cursor,
   dwell, hover and manual steps; it neither sends nor consumes docked page turns.
@@ -813,7 +816,9 @@ No copied renderer, custom playlist, manual row count or extra connection.
 - Filled windows withdraw from `edge:measure`. Grid fits pins locally across the
   footer; a Pages strip applies the 40% budget locally. Overflow pins step back onto
   that window's pages and remain saved. Utilities have 180px slots, rotating groups
-  when they cannot all fit. Docked windows retain their shared narrowest budget.
+  when they cannot all fit. Each utility advances its items on its own appearances,
+  so grouping cannot skip configured zones or locations. Docked windows retain
+  their shared narrowest budget.
   A Continuous strip measures its actual pin chips against a local 40% budget;
   overflow joins that window's tape using the same pinned renderer (including
   its horizon bypass), without changing saved pins or duplicating their subjects

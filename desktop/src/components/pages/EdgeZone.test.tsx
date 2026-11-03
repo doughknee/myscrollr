@@ -6,7 +6,7 @@ import fixture from "../../dev/__fixtures__/dashboard.pages.json";
 import { gameMinCol } from "./cells/GameCell";
 import { NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
-import EdgeZone, { buildEdge, edgeTabs, reserveOf, type Edge } from "./EdgeZone";
+import EdgeZone, { buildEdge, edgeTabs, eligibleEdgePins, reserveOf, utilityTurns, type Edge } from "./EdgeZone";
 import { ALSO_TAB, buildPageWidgets } from "./widgetPages";
 
 const dash = fixture as unknown as DashboardResponse;
@@ -27,6 +27,26 @@ const data = {
 } as WidgetTickerData;
 const pin = (widget: string, subject: string): WidgetPin => ({ widget, subject, side: "right" });
 
+describe("grouped utility turns", () => {
+  it.each([[4, 2, 2], [5, 2, 3], [4, 1, 4], [4, 4, 3], [4, 8, 3]])(
+    "%i utilities in %i slots visit all %i items in order",
+    (count, slots, items) => {
+      const visits = Array.from({ length: count }, () => [] as number[]);
+      for (let tick = 0; tick < count * items; tick++) {
+        for (const turn of utilityTurns(count, slots, tick)) visits[turn.index].push(turn.tick % items);
+      }
+      for (const sequence of visits) {
+        expect(new Set(sequence).size).toBe(items);
+        expect(sequence).toEqual(sequence.map((_, i) => i % items));
+      }
+    },
+  );
+  it("keeps the docked global turn and handles no utilities", () => {
+    expect(utilityTurns(3, 10, 7)).toEqual([0, 1, 2].map(index => ({ index, tick: 7 })));
+    expect(utilityTurns(0, 1, 7)).toEqual([]);
+  });
+});
+
 describe("reserveOf", () => {
   it("widens every digit and pads the first run, so a ticking value never grows its slot", () => {
     expect(reserveOf("7:21 PM", 2)).toBe("00:00 PM");
@@ -38,6 +58,10 @@ describe("reserveOf", () => {
 });
 
 describe("buildEdge", () => {
+  it("budgets only active data pins, even before their data arrives", () => {
+    const pins = [pin("clock", "clock"), pin("finance_stocks", "MISSING"), pin("sports_nfl", BEARS)];
+    expect(eligibleEdgePins(pins, ["clock", "finance_stocks"])).toEqual([pins[1]]);
+  });
   it("utilities on the ticker with data, in a fixed order, then pins that resolve", () => {
     const edge = buildEdge(data, [pin("sports_nfl", BEARS), pin("finance_stocks", "AAPL"), pin("news_bbc", "https://feeds.bbci.co.uk/news/rss.xml")], dash, ["weather", "clock", ...TABS]);
     expect(edge.utilities.map((u) => u.tab)).toEqual(["clock", "weather"]);

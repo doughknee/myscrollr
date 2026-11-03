@@ -62,6 +62,40 @@ test("grid uses its canvas for quotes and reserves a footer only for saved pins"
   await expect(page.locator("[data-display-pins]")).toContainText("Bears");
 });
 
+test("grid ignores header-only pins and refreshes a visible quote in place", async ({ page, context }) => {
+  await context.clock.install();
+  await page.goto("/ticker-shim.html?fixture=googl&pages=1&fill=grid&pin=clock:clock&utils=clock&live=1");
+  const cell = page.locator('[data-display-cell="quote"]').filter({ hasText: "GOOGL" }).first();
+  await expect(cell).toBeVisible();
+  await expect(page.locator("[data-display-pins]")).toHaveCount(0);
+  const visit = await page.locator("[data-page]").getAttribute("data-visit");
+  await page.evaluate(() => window.__shimDashboard?.(prev => ({
+    ...prev, data: { ...prev.data, finance: (prev.data!.finance as { symbol: string; price: number }[]).map(t => t.symbol === "GOOGL" ? { ...t, price: 432.10 } : t) },
+  })));
+  await context.clock.runFor(100);
+  await expect(cell.locator('[data-part="price"]')).toContainText("432.10");
+  await expect(page.locator("[data-page]")).toHaveAttribute("data-visit", visit!);
+  await cell.click();
+  await expect.poll(() => page.evaluate(() =>
+    (window as unknown as { __shimCalls: string[] }).__shimCalls.some(call => call.startsWith("plugin:shell|open")),
+  )).toBe(true);
+});
+
+test("previous grid pages enter from the left", async ({ page, context }) => {
+  await context.clock.install();
+  await page.goto("/ticker-shim.html?fixture=pages&pages=1&fill=grid");
+  await expect(page.locator("[data-page]")).toHaveCount(1);
+  await context.clock.runFor(1000);
+  await page.keyboard.press("ArrowUp");
+  await context.clock.runFor(100);
+  const positions = await page.locator("[data-page]").evaluateAll(nodes => nodes.map(node =>
+    new DOMMatrixReadOnly(getComputedStyle(node).transform).m41,
+  ));
+  expect(positions).toHaveLength(2);
+  expect(positions[0]).toBeGreaterThan(0);
+  expect(positions[1]).toBeLessThan(0);
+});
+
 test("continuous strip keeps overflowing pins accessible without blocking its tape", async ({
   page,
 }) => {
@@ -197,6 +231,72 @@ test("a filled primary cannot drive or hold a docked secondary's pages", async (
   });
   expect(measurements?.bar).toBe(1280);
 });
+
+for (const change of ["fill", "removed"]) {
+  test(`a hovered docked follower releases the leader when ${change}`, async ({ page, context }) => {
+    await context.clock.install();
+    await page.goto("/ticker-shim.html?fixture=pages&pages=1&label=ticker");
+    await page.mouse.move(600, 700);
+    await expect(page.locator("[data-page]")).toHaveCount(1, { timeout: 15000 });
+    const follower = await context.newPage();
+    await follower.goto("/ticker-shim.html?fixture=pages&pages=1&label=ticker-2");
+    await context.clock.runFor(1000);
+    await expect(follower.locator("[data-page]")).toHaveCount(1);
+    await follower.mouse.move(400, 30);
+    await context.clock.runFor(100);
+    const before = await page.locator("[data-page]").getAttribute("data-visit");
+    if (change === "fill") {
+      await follower.evaluate(async () => {
+        const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (cmd: string, args?: unknown) => Promise<any> } }).__TAURI_INTERNALS__;
+        const original = bridge.invoke;
+        bridge.invoke = async (cmd, args) => {
+          const value = await original(cmd, args);
+          return cmd === "ticker_display" ? { ...value, mode: "grid" } : value;
+        };
+        await original("plugin:event|emit_to", { event: "ticker-reposition", payload: null, target: { kind: "WebviewWindow", label: "ticker-2" } });
+      });
+      await context.clock.runFor(1000);
+      await expect(follower.locator("[data-fill-display]")).toHaveAttribute("data-fill-display", "grid");
+    } else {
+      await follower.close();
+      await page.evaluate(async () => {
+        const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (cmd: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+        await bridge.invoke("plugin:event|emit", { event: "ticker-windows-changed", payload: ["ticker"] });
+      });
+    }
+    await context.clock.runFor(14000);
+    await expect(page.locator("[data-page]").last()).not.toHaveAttribute("data-visit", before!);
+  });
+}
+
+for (const [width, height] of [[720, 1280], [1920, 360]]) {
+  for (const reading of [100, 150]) {
+  for (const fixture of ["empty", "off"]) {
+    test(`grid ${fixture} recovery actions fit ${width}x${height} at ${reading}%`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto(`/ticker-shim.html?fixture=${fixture}&pages=1&fill=grid&utils=&reading=${reading}`);
+      const empty = page.locator("[data-empty]");
+      await expect(empty).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const bounds = (await empty.boundingBox())!;
+      expect(bounds.height).toBeCloseTo(height, 0);
+      const actions = empty.getByRole("button");
+      expect(await actions.count()).toBeGreaterThan(0);
+      for (const button of await actions.all()) {
+        const box = (await button.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height).toBeLessThanOrEqual(height + 1);
+      }
+      await actions.first().click();
+      await expect.poll(() => page.evaluate(() =>
+        (window as unknown as { __shimCalls: string[] }).__shimCalls.filter(call => call.startsWith("show_app_window")).length,
+      )).toBeGreaterThan(0);
+    });
+  }
+  }
+}
 
 for (const fixture of ["busy", "longnames", "quiet"]) {
   test(`largest grid handles ${fixture}, reduced motion and viewport changes`, async ({

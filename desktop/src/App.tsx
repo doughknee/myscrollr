@@ -811,6 +811,7 @@ export default function App() {
                     emptyKind && (
                       <EmptyBar
                         pages
+                        fillHeight={fillHeight}
                         kind={emptyKind}
                         installedWidgets={installedWidgetsMeta}
                         onAddSources={handleAddSources}
