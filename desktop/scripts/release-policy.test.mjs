@@ -39,6 +39,15 @@ test('run binding rejects wrong source, workflow, repository, event and status',
   }
 });
 
+test('maintenance run binding needs its approved Stable version as well as exact source', () => {
+  const maintenance = { ...run, head_branch: 'release/desktop-1.7' };
+  validateRun(maintenance, sha, repo, true, '1.7.3');
+  for (const version of [undefined, '1.7.2', '1.8.0', '1.8.0-beta.1']) {
+    assert.throws(() => validateRun(maintenance, sha, repo, true, version));
+  }
+  assert.throws(() => validateRun({ ...maintenance, head_sha: 'b'.repeat(40) }, sha, repo, true, '1.7.3'));
+});
+
 async function fixture(t) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'scrollr-release-test-'));
   t.after(() => rm(dir, { recursive: true, force: true }));

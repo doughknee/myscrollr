@@ -38,7 +38,7 @@ export async function verifyDesktopEffects(release, deps) {
   validatePublished(entry, release, repo);
   const run = await deps.readRun(evidence.runId);
   assert.equal(String(run.id), evidence.runId, 'Evidence build run mismatch');
-  validateRun(run, evidence.source, repo, true);
+  validateRun(run, evidence.source, repo, true, evidence.version);
   assert.equal(await deps.readTag(entry.tag), evidence.source, 'Published tag moved');
   if (!deps.feedsEnabled) return;
 

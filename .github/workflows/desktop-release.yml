@@ -16,7 +16,7 @@ on:
           - macos
           - linux
   push:
-    branches: [main]
+    branches: [main, release/desktop-1.7]
     # Pattern order matters: a negated pattern after a positive match excludes
     # the path. The workflow still runs if at least one changed file survives
     # the net filter, so a push touching both a test file and a source file
@@ -81,9 +81,9 @@ jobs:
   # version's release is missing or still a draft; otherwise skip with
   # a warning — the fix is bumping the version in tauri.conf.json.
   preflight:
-    if: github.event_name != 'release' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'release' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7')
     runs-on: ubuntu-latest
-    # Draft listings require push access; this trusted-main job only reads.
+    # Draft listings require push access; this protected-source job only reads.
     permissions:
       contents: write
     outputs:
@@ -95,6 +95,7 @@ jobs:
           sparse-checkout: |
             desktop/src-tauri/tauri.conf.json
             desktop/scripts/release-lookup.mjs
+            desktop/scripts/release-source.mjs
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -104,6 +105,7 @@ jobs:
         run: |
           TAG="desktop-v$(jq -r .version desktop/src-tauri/tauri.conf.json)"
           VERSION=$(jq -r .version desktop/src-tauri/tauri.conf.json)
+          node desktop/scripts/release-source.mjs "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$VERSION"
           if [[ "$VERSION" == *-* ]]; then echo 'prerelease=true' >> "$GITHUB_OUTPUT"; else echo 'prerelease=false' >> "$GITHUB_OUTPUT"; fi
           # A push builds only when it changed the version (the cut itself). While
           # a draft is open, every later push touching desktop/ used to rebuild all
@@ -163,7 +165,7 @@ jobs:
   # ── Build ──────────────────────────────────────────────────────
   build:
     needs: [matrix-setup, preflight]
-    if: needs.preflight.outputs.proceed == 'true' && github.ref == 'refs/heads/main'
+    if: needs.preflight.outputs.proceed == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7')
     permissions:
       contents: write
     strategy:
@@ -592,9 +594,9 @@ jobs:
 
   # A branch dispatch with platform=windows proves the complete signing path
   # without creating or modifying a GitHub Release. This job deliberately uses
-  # read-only repository permission; public release builds remain main-only.
+  # read-only repository permission; drafts require an approved source branch.
   windows-signing-test:
-    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && (inputs.platform == 'windows' || inputs.platform == 'all')
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/release/desktop-1.7' && (inputs.platform == 'windows' || inputs.platform == 'all')
     runs-on: windows-latest
     timeout-minutes: 35
     permissions:
@@ -699,7 +701,7 @@ jobs:
   # This job re-verifies the staged bytes before any GitHub Release mutation.
   publish-windows:
     needs: [matrix-setup, preflight, build]
-    if: github.ref == 'refs/heads/main' && needs.preflight.outputs.proceed == 'true' && (inputs.platform == 'windows' || inputs.platform == 'all' || github.event_name == 'push')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/desktop-1.7') && needs.preflight.outputs.proceed == 'true' && (inputs.platform == 'windows' || inputs.platform == 'all' || github.event_name == 'push')
     runs-on: windows-latest
     permissions:
       contents: write
