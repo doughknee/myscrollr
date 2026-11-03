@@ -86,8 +86,11 @@ impl Server {
                     changed[0] ^= 1;
                     let _ = stream.write_all(&changed);
                 } else if is_package && mode == "stall" {
+                    // Establish a body stream before stalling, so this checks
+                    // a transfer timeout rather than a header/connection race.
+                    let _ = stream.write_all(&body[..1]);
                     // Bounded independently of the updater timeout and test cleanup.
-                    for _ in 0..100 {
+                    for _ in 0..500 {
                         if stopped.load(Ordering::Relaxed) {
                             break;
                         }
@@ -193,7 +196,7 @@ fn signed_native_transport() {
                     .unwrap()
                     .expect("Target must be newer than the test source version");
                 if mode == "stall" {
-                    update.timeout = Some(Duration::from_millis(150));
+                    update.timeout = Some(Duration::from_millis(500));
                 }
                 let downloaded = update.download(|_, _| {}, || {}).await;
                 if mode == "valid" {
@@ -206,7 +209,7 @@ fn signed_native_transport() {
                         ("interrupted", tauri_plugin_updater::Error::Reqwest(_)) => {}
                         ("stall", tauri_plugin_updater::Error::Reqwest(cause))
                             if cause.is_timeout() => {}
-                        _ => panic!("Unexpected {mode} rejection: {error}"),
+                        _ => panic!("Unexpected {mode} rejection: {error:?}"),
                     }
                 }
             }
