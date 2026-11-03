@@ -4,6 +4,10 @@ run-name: Rehearse signed updater transport for ${{ inputs.tag }}
 on:
   workflow_dispatch:
     inputs:
+      recovery:
+        description: "Rehearse only the pinned Beta-to-Stable pair; never publishes"
+        type: boolean
+        default: false
       tag:
         description: "Exact signed draft or published desktop tag (no publication performed)"
         required: true
@@ -26,7 +30,7 @@ permissions:
 
 jobs:
   verify:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && !inputs.recovery
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Authenticated draft visibility requires push access. Only read commands run.
@@ -85,8 +89,51 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # PR-branch recovery rehearsals read published packages only. They never receive
+  # the contents:write permission needed for draft visibility in the main-only job.
+  verify-recovery:
+    if: inputs.recovery && inputs.tag == 'desktop-v1.7.3' && inputs.run_id == '41688396593' && inputs.source_tag == 'desktop-v1.8.0-beta.1' && inputs.source_run_id == '41622562602' && inputs.from_version == '1.8.0-beta.1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+        working-directory: desktop
+      - run: sudo apt-get update && sudo apt-get install -y minisign
+      - name: Verify published Stable target without writes
+        env:
+          TAG: desktop-v1.7.3
+          BUILD_RUN_ID: '41688396593'
+        run: node desktop/scripts/finalize-release.mjs verify
+      - name: Verify published Beta source without writes
+        env:
+          TAG: desktop-v1.8.0-beta.1
+          BUILD_RUN_ID: '41622562602'
+        run: node desktop/scripts/finalize-release.mjs verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-transport-input
+          path: ${{ runner.temp }}/release-verify-41688396593/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-install-source
+          path: ${{ runner.temp }}/release-verify-41622562602/
+          if-no-files-found: error
+          retention-days: 7
+
   transport:
-    needs: verify
+    needs: [verify, verify-recovery]
+    if: always() && !cancelled() && (needs.verify.result == 'success' || needs.verify-recovery.result == 'success')
     strategy:
       fail-fast: false
       matrix:
@@ -121,6 +168,7 @@ jobs:
         working-directory: desktop/src-tauri
         env:
           SCROLLR_REHEARSAL_DIR: ${{ runner.temp }}/signed-updater-input
+          SCROLLR_REHEARSAL_RECOVERY: ${{ inputs.recovery }}
           SCROLLR_REHEARSAL_FROM_VERSION: ${{ inputs.from_version }}
         run: |
           set -euo pipefail
@@ -137,6 +185,7 @@ jobs:
           SCROLLR_REHEARSAL_SOURCE_DIR: ${{ runner.temp }}/signed-updater-source
           SCROLLR_REHEARSAL_DIR: ${{ runner.temp }}/signed-updater-input
           SCROLLR_REHEARSAL_INSTALL: "true"
+          SCROLLR_REHEARSAL_RECOVERY: ${{ inputs.recovery }}
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then

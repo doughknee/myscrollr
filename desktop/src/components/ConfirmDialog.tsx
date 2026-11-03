@@ -15,6 +15,8 @@ interface ConfirmDialogProps {
   destructive?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Use when an asynchronous action replaced the original trigger element. */
+  restoreFocus?: () => HTMLElement | null;
 }
 
 export default function ConfirmDialog({
@@ -26,6 +28,7 @@ export default function ConfirmDialog({
   destructive = false,
   onConfirm,
   onCancel,
+  restoreFocus,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -40,7 +43,10 @@ export default function ConfirmDialog({
 
   return (
     <AnimatePresence
-      onExitComplete={() => restoreRef.current?.focus()}
+      onExitComplete={() => {
+        // The modal must leave the top layer before outside controls can focus.
+        requestAnimationFrame(() => (restoreFocus?.() ?? restoreRef.current)?.focus());
+      }}
     >
       {open && (
         <motion.dialog

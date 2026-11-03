@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { RefreshCw, Download } from "lucide-react";
 import { motion } from "motion/react";
 import { updateBusy } from "../lib/updateState";
@@ -15,12 +14,7 @@ interface Props {
 
 export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
   const state = useUpdateController();
-  useEffect(() => {
-    updateController.setMinimum(minVersion);
-    return () => updateController.setMinimum(undefined);
-  }, [minVersion]);
   const runUpdate = async () => {
-    updateController.setMinimum(minVersion);
     await updateController.check();
     await updateController.install();
   };

@@ -1,26 +1,5 @@
-/**
- * ReleaseNotes — the sortable release-history table.
- *
- * Lives under Updates rather than on its own page: the version you're on
- * and the list of what shipped are the same question asked twice, and
- * splitting them meant the updater and its changelog were two clicks
- * apart. The account menu still offers "What's new" as a way in — it's a
- * more inviting label than "Updates" — it just lands here now.
- *
- * Data comes from GitHub Releases at runtime (see lib/releases.ts for the
- * contract shared with myscrollr.com). Sorting is a menu beside the
- * heading rather than clickable column headers — the 680px settings
- * column has no room for four columns of content — and still offers both
- * date and version order, the latter comparing numeric segments rather
- * than lexically. Defaults to newest first. A row expands in place to
- * rendered markdown plus a "View on GitHub" link. Newest stable wears
- * "Latest"; prereleases wear "Pre-release".
- *
- * States: skeleton rows while fetching, and a card linking to the GitHub
- * releases page when nothing loads (offline, rate-limited, or genuinely
- * empty) — never a blank space.
- */
-import { useCallback, useEffect, useMemo, useState } from "react";
+/** Published history is independent of enrollment and approved update offers. */
+import { useCallback, useEffect, useMemo, useState, useId } from "react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 import { ChevronDown, ExternalLink, PackageOpen } from "lucide-react";
@@ -36,6 +15,7 @@ import {
 } from "../../lib/releases";
 import { SelectMenu } from "../widget-bar/SelectMenu";
 import { CARD_SURFACE } from "./SettingsControls";
+import type { UpdateChannel } from "../../lib/updateState";
 
 // ── Sort state ──────────────────────────────────────────────────
 
@@ -47,17 +27,10 @@ function dateMs(iso: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-// Shared row grid — body and skeleton rows must agree on columns:
-// Version (+badges) | Headline | relative date | expand chevron.
-//
-// The calendar-date column and the clickable sort headers were dropped
-// when the surface narrowed to a 680px reading column: four columns of
-// content did not fit without truncating the headline to uselessness.
-// Sorting survives as a menu next to the heading — the version
-// comparator is version-aware (numeric segments, not lexical), which is
-// worth more than the header affordance was.
+// Headline gets a second line so version badges wrap on narrow windows.
+// Sorting remains independent of which tab is being browsed.
 const ROW_GRID =
-  "grid grid-cols-[minmax(112px,auto)_1fr_auto_20px] items-center gap-3";
+  "grid grid-cols-[minmax(0,1fr)_auto_20px] items-center gap-x-3 gap-y-1";
 
 type SortChoice = "date-desc" | "date-asc" | "version-desc" | "version-asc";
 
@@ -70,7 +43,10 @@ const SORT_OPTIONS: { value: SortChoice; label: string }[] = [
 
 // ── Component ───────────────────────────────────────────────────
 
-export default function ReleaseNotes() {
+export default function ReleaseNotes({ channel = "stable", installedVersion, approvedVersion }: { channel?: UpdateChannel; installedVersion?: string; approvedVersion?: string }) {
+  const [tab, setTab] = useState<UpdateChannel>(channel);
+  const id = useId();
+  useEffect(() => { setTab(channel); }, [channel]);
   // null = loading, [] = nothing available (error/offline/empty).
   const [releases, setReleases] = useState<ReleaseEntry[] | null>(null);
   useEffect(() => {
@@ -90,7 +66,7 @@ export default function ReleaseNotes() {
 
   const sorted = useMemo(() => {
     if (!releases) return [];
-    const copy = [...releases];
+    const copy = releases.filter(r => tab === "beta" ? r.prerelease : !r.prerelease);
     copy.sort((a, b) => {
       const cmp =
         sortKey === "version"
@@ -99,17 +75,9 @@ export default function ReleaseNotes() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
-  }, [releases, sortKey, sortDir]);
+  }, [releases, sortKey, sortDir, tab]);
 
-  // "Latest" = newest stable by publish date (GitHub's own convention);
-  // if every entry is a prerelease, the newest one overall wins.
-  const latestTag = useMemo(() => {
-    if (!releases || releases.length === 0) return null;
-    const stable = releases.filter((r) => !r.prerelease);
-    const pool = stable.length > 0 ? stable : releases;
-    return pool.reduce((best, r) => (dateMs(r.date) > dateMs(best.date) ? r : best))
-      .tag;
-  }, [releases]);
+  const latestTag = sorted.reduce<ReleaseEntry | null>((best, entry) => !best || compareVersions(entry.version, best.version) > 0 ? entry : best, null)?.tag;
 
   return (
     <>
@@ -125,10 +93,25 @@ export default function ReleaseNotes() {
         )}
       </div>
 
+      <div role="tablist" aria-label="Release history channel" className="mb-2 flex gap-1 rounded-lg bg-base-200 p-1">
+        {(["stable", "beta"] as const).map(value => <button key={value} type="button" role="tab"
+          id={`${id}-${value}`} aria-controls={`${id}-panel`} aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
+          className={clsx("rounded-md px-3 py-1.5 text-ui-body", tab === value ? "bg-surface-2 text-fg" : "text-fg-3 hover:text-fg")}
+          onClick={() => { setTab(value); setExpandedTag(null); }} onKeyDown={event => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === "Home" ? "stable" : event.key === "End" ? "beta" : tab === "stable" ? "beta" : "stable";
+            setTab(next); setExpandedTag(null); document.getElementById(`${id}-${next}`)?.focus();
+          }}>{value === "stable" ? "Stable" : "Beta"}</button>)}
+      </div>
+      <p className="mb-3 text-ui-meta text-fg-3">Browse published releases. These tabs do not change your update channel; update checks determine availability.</p>
+      <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${tab}`} tabIndex={0}>
       {releases === null ? (
         <SkeletonTable />
       ) : releases.length === 0 ? (
         <EmptyState />
+      ) : sorted.length === 0 ? (
+        <div className={clsx(CARD_SURFACE, "px-4 py-8 text-ui-body text-fg-3")}>No {tab === "beta" ? "Beta" : "Stable"} releases in this history yet.</div>
       ) : (
         <div className={clsx(CARD_SURFACE, "overflow-hidden")}>
           {sorted.map((entry) => (
@@ -136,6 +119,8 @@ export default function ReleaseNotes() {
               key={entry.tag}
               entry={entry}
               isLatest={entry.tag === latestTag}
+              installed={entry.version === installedVersion}
+              approved={entry.version === approvedVersion ? channel : undefined}
               expanded={expandedTag === entry.tag}
               onToggle={() =>
                 setExpandedTag((prev) => (prev === entry.tag ? null : entry.tag))
@@ -144,6 +129,7 @@ export default function ReleaseNotes() {
           ))}
         </div>
       )}
+      </div>
     </>
   );
 }
@@ -153,11 +139,15 @@ export default function ReleaseNotes() {
 function ReleaseRow({
   entry,
   isLatest,
+  installed,
+  approved,
   expanded,
   onToggle,
 }: {
   entry: ReleaseEntry;
   isLatest: boolean;
+  installed: boolean;
+  approved?: UpdateChannel;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -190,27 +180,21 @@ function ReleaseRow({
         )}
       >
         {/* Version + badges */}
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="font-mono text-ui-body font-semibold">
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="break-all font-mono text-ui-body font-semibold">
             v{entry.version}
           </span>
           {isLatest && (
             <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-ui-chip font-semibold leading-none text-accent">
-              Latest
+              Newest {entry.prerelease ? "Beta" : "Stable"}
             </span>
           )}
-          {entry.prerelease && (
-            // `warn`, not Tailwind's amber: a fixed palette color is the
-            // one thing that cannot follow 20 themes, and this badge sits
-            // next to an accent-tinted one that does.
-            <span className="shrink-0 rounded-full bg-warn/15 px-1.5 py-0.5 text-ui-chip font-semibold leading-none text-warn">
-              Pre-release
-            </span>
-          )}
+          {installed && <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-ui-chip font-semibold text-accent">Installed</span>}
+          {approved && <span className="rounded-full bg-base-300 px-1.5 py-0.5 text-ui-chip text-fg-3">Approved for {approved === "beta" ? "Beta" : "Stable"}</span>}
         </span>
 
         {/* Headline */}
-        <span className="truncate text-ui-body text-fg">
+        <span className="col-start-1 row-start-2 min-w-0 break-words text-ui-body text-fg">
           {entry.headline || entry.name}
         </span>
 
@@ -218,7 +202,7 @@ function ReleaseRow({
             attribute rather than being dropped outright — it is still
             the thing you want when comparing two releases. */}
         <span
-          className="shrink-0 text-ui-chip text-fg-4"
+          className="col-start-2 row-start-1 shrink-0 text-ui-chip text-fg-4"
           title={formatReleaseDate(entry.date) || undefined}
         >
           {relativeTime(entry.date)}
@@ -227,7 +211,7 @@ function ReleaseRow({
         <ChevronDown
           size={15}
           className={clsx(
-            "justify-self-end text-fg-3",
+            "col-start-3 row-start-1 justify-self-end text-fg-3",
             expanded && "rotate-180",
           )}
         />

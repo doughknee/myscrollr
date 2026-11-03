@@ -4,6 +4,7 @@ pub mod open_external;
 pub mod sse;
 pub mod system_info;
 pub mod updates;
+pub mod recovery;
 pub mod window;
 
 #[cfg(target_os = "windows")]

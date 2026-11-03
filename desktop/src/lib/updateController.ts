@@ -31,8 +31,12 @@ export const updateController = new UpdateController({
   },
   saveChannel: saveUpdateChannel,
   check: async channel => {
-    const result = await invoke<{ feedVersion: string; update: Metadata | null }>("check_update_channel", { channel });
-    return { feedVersion: result.feedVersion, update: result.update ? new Update(result.update) : null };
+    const result = await invoke<{ feedVersion: string; update: Metadata | null; recoveryVersion?: string | null }>("check_update_channel", { channel });
+    return { feedVersion: result.feedVersion, recoveryVersion: result.recoveryVersion, update: result.update ? new Update(result.update) : null };
+  },
+  prepareRecovery: async () => {
+    const result = await invoke<{ feedVersion: string; update: Metadata | null; recoveryVersion: string }>("prepare_stable_recovery");
+    return { ...result, update: result.update ? new Update(result.update) : null };
   },
   restart: relaunch,
 });

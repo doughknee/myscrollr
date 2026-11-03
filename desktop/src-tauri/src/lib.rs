@@ -241,6 +241,7 @@ pub fn run() {
         })))
         .invoke_handler(tauri::generate_handler![
             commands::updates::check_update_channel,
+            commands::updates::prepare_stable_recovery,
             commands::window::position_ticker,
             commands::window::ticker_display,
             commands::window::list_monitors,

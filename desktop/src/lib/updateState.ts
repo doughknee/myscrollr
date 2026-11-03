@@ -9,13 +9,19 @@ export interface UpdateCandidate {
   install: () => Promise<void>;
   close: () => Promise<void>;
 }
+export interface UpdateCheck {
+  feedVersion: string;
+  update: UpdateCandidate | null;
+  recoveryVersion?: string | null;
+}
 export interface UpdateDependencies {
   load: () => Promise<{ version: string; channel: unknown; fresh: boolean }>;
   saveChannel: (channel: UpdateChannel) => Promise<void>;
-  check: (channel: UpdateChannel) => Promise<{ feedVersion: string; update: UpdateCandidate | null }>;
+  check: (channel: UpdateChannel) => Promise<UpdateCheck>;
+  prepareRecovery?: () => Promise<UpdateCheck>;
   restart: () => Promise<void>;
 }
-export type UpdatePhase = "idle" | "initializing" | "selecting" | "checking" | "current" | "waiting" | "available" | "downloading" | "installing" | "ready" | "restarting" | "error";
+export type UpdatePhase = "idle" | "initializing" | "selecting" | "checking" | "current" | "waiting" | "available" | "recovery" | "downloading" | "installing" | "ready" | "restarting" | "error";
 export interface UpdateSnapshot {
   initialized: boolean;
   phase: UpdatePhase;
@@ -24,6 +30,8 @@ export interface UpdateSnapshot {
   suggestBeta: boolean;
   offerId: number;
   version?: string;
+  feedVersion?: string;
+  recoveryVersion?: string;
   body?: string;
   error?: string;
   errorOperation?: UpdatePhase;
@@ -32,7 +40,7 @@ export interface UpdateSnapshot {
 }
 export const DOWNLOAD_TIMEOUT_MS = 180_000;
 export const updateBusy = (s: UpdateSnapshot) => ["initializing", "selecting", "checking", "downloading", "installing", "restarting"].includes(s.phase);
-export const channelLocked = (s: UpdateSnapshot) => updateBusy(s) || s.phase === "ready";
+export const channelLocked = (s: UpdateSnapshot) => updateBusy(s) || s.phase === "ready" || s.phase === "recovery";
 const errorText = (e: unknown) => e instanceof Error ? e.message : String(e);
 
 /** Main-window singleton in production. Native requests cancel before releasing the lock;
@@ -63,7 +71,7 @@ export class UpdateController {
   private async discard() {
     const candidate = this.candidate;
     this.candidate = null;
-    this.set({ version: undefined, body: undefined, offerId: this.state.offerId + 1, downloaded: 0, total: undefined });
+    this.set({ version: undefined, recoveryVersion: undefined, body: undefined, offerId: this.state.offerId + 1, downloaded: 0, total: undefined });
     await candidate?.close().catch(() => {});
   }
   initialize = (): Promise<void> => {
@@ -84,32 +92,59 @@ export class UpdateController {
     return this.run("selecting", async () => {
       await this.discard();
       await this.deps.saveChannel(channel);
-      this.set({ channel, phase: "idle", suggestBeta: false });
+      this.set({ channel, phase: "idle", suggestBeta: false, feedVersion: undefined });
     });
   };
   setMinimum = (minimum?: string) => { this.minimum = minimum && valid(minimum) ? minimum : undefined; };
   check = async (): Promise<void> => {
     await this.initialize();
-    if (!this.state.initialized || this.state.phase === "ready" || this.state.phase === "restarting") return;
+    if (!this.state.initialized || this.state.phase === "ready" || this.state.phase === "restarting" || this.state.phase === "recovery") return;
     if (this.operation) return this.operation;
     return this.run("checking", async () => {
       await this.discard();
-      const { feedVersion, update } = await this.deps.check(this.state.channel);
+      this.set({ feedVersion: undefined });
+      const { feedVersion, update, recoveryVersion } = await this.deps.check(this.state.channel);
       this.candidate = update;
       try {
         if (!valid(feedVersion) || (this.state.channel === "stable" && prerelease(feedVersion))) throw new Error("Invalid update feed. No update was accepted.");
         if (update && (update.version !== feedVersion || !gt(update.version, this.state.currentVersion))) throw new Error("The update is not newer than your installed version.");
         if (!update && gt(feedVersion, this.state.currentVersion)) throw new Error("The update is unavailable for this installation.");
         if (this.minimum && !gte(feedVersion, this.minimum)) throw new Error("The required update is not available on this channel yet. Please retry later.");
-        this.set({ phase: update ? "available" : gt(this.state.currentVersion, feedVersion) ? "waiting" : "current", version: update?.version, body: update?.body });
+        this.set({ phase: update ? "available" : gt(this.state.currentVersion, feedVersion) ? "waiting" : "current", version: update?.version, body: update?.body, feedVersion, recoveryVersion: this.state.channel === "stable" && prerelease(this.state.currentVersion) && recoveryVersion === feedVersion && gt(this.state.currentVersion, feedVersion) ? recoveryVersion : undefined });
       } catch (error) {
         await this.discard();
         throw error;
       }
     });
   };
-  install = async (offerId = this.state.offerId): Promise<void> => {
-    if (this.operation || this.state.phase !== "available" || !this.candidate || offerId !== this.state.offerId) return;
+  prepareRecovery = async (): Promise<void> => {
+    if (this.operation || this.state.phase !== "waiting" || this.state.channel !== "stable" || !this.state.recoveryVersion || !this.deps.prepareRecovery) return;
+    const expected = this.state.recoveryVersion;
+    return this.run("checking", async () => {
+      await this.discard();
+      this.set({ feedVersion: undefined });
+      const result = await this.deps.prepareRecovery!();
+      this.candidate = result.update;
+      try {
+        if (!result.update || result.feedVersion !== expected || result.update.version !== expected || result.recoveryVersion !== expected || !valid(expected) || prerelease(expected) || !prerelease(this.state.currentVersion) || !gt(this.state.currentVersion, expected)) throw new Error("The verified recovery offer changed. Check for updates again.");
+        if (this.minimum && !gte(expected, this.minimum)) throw new Error("This Stable version no longer meets the required minimum. Check for updates again.");
+        this.set({ phase: "recovery", version: expected, recoveryVersion: expected, feedVersion: result.feedVersion });
+      } catch (error) { await this.discard(); throw error; }
+    });
+  };
+  cancelRecovery = async (): Promise<void> => {
+    if (this.operation || this.state.phase !== "recovery") return;
+    return this.run("checking", async () => {
+      const recoveryVersion = this.state.recoveryVersion;
+      await this.discard();
+      this.set({ phase: "waiting", recoveryVersion });
+    });
+  };
+  install = (offerId = this.state.offerId) => this.installCandidate(offerId, false);
+  installRecovery = (offerId: number) => this.installCandidate(offerId, true);
+  private installCandidate = async (offerId: number, recovery: boolean): Promise<void> => {
+    if (this.operation || this.state.phase !== (recovery ? "recovery" : "available") || !this.candidate || offerId !== this.state.offerId) return;
+    if (recovery && (this.state.channel !== "stable" || this.candidate.version !== this.state.recoveryVersion)) return;
     const candidate = this.candidate;
     return this.run("downloading", async () => {
       try {
@@ -119,6 +154,11 @@ export class UpdateController {
           if (event.event === "Started") this.set({ total: event.data.contentLength || undefined });
           if (event.event === "Progress") this.set({ downloaded: this.state.downloaded + event.data.chunkLength });
         }, { timeout: DOWNLOAD_TIMEOUT_MS });
+        // Policy can change while a download is in flight. Never install a now-blocked target.
+        if (this.minimum && !gte(candidate.version, this.minimum)) throw new Error("A newer update is required. Check for updates again.");
+        if (recovery) await this.deps.saveChannel("stable");
+        // Persisting the channel can also yield to a newly loaded minimum.
+        if (this.minimum && !gte(candidate.version, this.minimum)) throw new Error("A newer update is required. Check for updates again.");
         this.set({ phase: "installing" });
         await candidate.install();
         await candidate.close().catch(() => {});
