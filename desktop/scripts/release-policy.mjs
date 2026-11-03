@@ -70,6 +70,12 @@ export async function validateVersions(root) {
   const cargoLock = await readFile(path.join(root, 'src-tauri/Cargo.lock'), 'utf8');
   const version = config.version;
   assert(semver.valid(version), 'Invalid desktop version');
+  const wixVersion = config.bundle?.windows?.wix?.version;
+  if (wixVersion) {
+    const parsed = semver.parse(version);
+    assert(new RegExp(`^${parsed.major}\\.${parsed.minor}\\.${parsed.patch}\\.\\d+$`).test(wixVersion), 'MSI numeric version must match app major/minor/patch');
+    assert(Number(wixVersion.split('.')[3]) <= 65535, 'MSI build number exceeds limit');
+  }
   for (const [label, actual] of Object.entries({ package: pkg.version, npmLock: lock.version,
     npmRoot: lock.packages[''].version, cargo: /^version = "([^"]+)"/m.exec(cargo)?.[1],
     cargoLock: /name = "scrollr-desktop"\r?\nversion = "([^"]+)"/.exec(cargoLock)?.[1] })) {

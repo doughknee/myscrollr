@@ -197,7 +197,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb xdotool dbus-x11 scrot
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -231,7 +231,7 @@ jobs:
         run: |
           echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
           echo "Before workaround, cargo resolves to: $(command -v cargo || echo 'not found')"
-          echo "Real cargo at \$CARGO_HOME/bin/cargo: $($CARGO_HOME/bin/cargo --version)"
+          echo "Real cargo at \$CARGO_HOME/bin/cargo: $("$CARGO_HOME/bin/cargo" --version)"
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -418,6 +418,7 @@ jobs:
 
       - name: Build signed Windows artifacts
         if: matrix.platform == 'windows-latest'
+        shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
@@ -555,6 +556,28 @@ jobs:
           else
             echo '::error::Missing AppImage'; exit 1
           fi
+
+      - name: Smoke test installed Windows package
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: ./scripts/smoke-release-windows.ps1
+
+      - name: Smoke test packaged macOS application
+        if: matrix.platform == 'macos-14'
+        run: bash scripts/smoke-release-unix.sh
+
+      - name: Smoke test packaged Linux application
+        if: matrix.platform == 'ubuntu-22.04'
+        run: xvfb-run -a dbus-run-session -- bash scripts/smoke-release-unix.sh
+
+      - name: Retain packaged startup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-smoke-${{ matrix.rust_target }}-${{ github.sha }}
+          path: desktop/package-smoke/
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Record final platform bytes
         id: proof
