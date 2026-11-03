@@ -122,12 +122,13 @@ export class UpdateController {
     const expected = this.state.recoveryVersion;
     return this.run("checking", async () => {
       await this.discard();
+      this.set({ feedVersion: undefined });
       const result = await this.deps.prepareRecovery!();
       this.candidate = result.update;
       try {
         if (!result.update || result.feedVersion !== expected || result.update.version !== expected || result.recoveryVersion !== expected || !valid(expected) || prerelease(expected) || !prerelease(this.state.currentVersion) || !gt(this.state.currentVersion, expected)) throw new Error("The verified recovery offer changed. Check for updates again.");
         if (this.minimum && !gte(expected, this.minimum)) throw new Error("This Stable version no longer meets the required minimum. Check for updates again.");
-        this.set({ phase: "recovery", version: expected, recoveryVersion: expected });
+        this.set({ phase: "recovery", version: expected, recoveryVersion: expected, feedVersion: result.feedVersion });
       } catch (error) { await this.discard(); throw error; }
     });
   };

@@ -53,7 +53,7 @@ export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
           <p className="px-4 pb-3 text-ui-meta leading-relaxed text-fg-3">
             Beta includes early releases that may have bugs, plus newer stable releases. It uses your usual Scrollr account and data.
             {state.channel === "beta" && " Choose Stable to stop receiving beta updates. To replace an installed beta, use Return to Stable when a verified recovery is available."}
-            {state.suggestBeta && " You installed a beta manually. Choose Beta above if you want future beta updates."}
+            {state.suggestBeta && " You are running a beta build while Stable updates are selected."}
             {state.phase === "ready" && " Restart before changing channels."}
           </p>
         </Row>
