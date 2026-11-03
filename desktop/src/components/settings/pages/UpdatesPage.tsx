@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { prerelease, valid } from "semver";
 import { open } from "@tauri-apps/plugin-shell";
 import { updateController, useUpdateController } from "../../../lib/updateController";
@@ -31,6 +31,7 @@ export function updateDescription(s: UpdateSnapshot): string {
 
 export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
   const state = useUpdateController();
+  const recoveryControl = useRef<HTMLDivElement>(null);
   useEffect(() => { void updateController.initialize(); }, []);
   const installed = state.currentVersion || appVersion || "";
   const betaBuild = valid(installed) && prerelease(installed);
@@ -80,7 +81,7 @@ export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
               <p className="text-ui-meta text-fg-3">{(state.downloaded / 1_048_576).toFixed(1)} MB downloaded{progress !== undefined ? ` · ${progress}%` : ""}</p>
             </>}
             {state.phase === "available" && state.body && <p className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-ui-meta leading-relaxed text-fg-3">{state.body}</p>}
-            {state.phase === "waiting" && state.recoveryVersion && <SettingsButton tone="accent" onClick={() => { void updateController.prepareRecovery(); }}>Return to Stable {state.recoveryVersion}…</SettingsButton>}
+            {state.phase === "waiting" && state.recoveryVersion && <div ref={recoveryControl}><SettingsButton tone="accent" onClick={() => { void updateController.prepareRecovery(); }}>Return to Stable {state.recoveryVersion}…</SettingsButton></div>}
             {betaBuild && state.channel === "stable" && !busy && state.phase !== "ready" && <div className="space-y-2">
               {state.phase === "waiting" && !state.recoveryVersion && <p className="text-ui-meta text-fg-3">In-app recovery is not verified for this version or installer. Recovery instructions cover the supported options.</p>}
               <SettingsButton onClick={() => { void open("https://github.com/doughknee/myscrollr/blob/main/docs/beta-recovery.md").catch(() => {}); }}>Beta recovery instructions</SettingsButton>
@@ -94,6 +95,7 @@ export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
       </RowList>
     </SettingsGroup>
     <ConfirmDialog open={state.phase === "recovery"} title={`Return to Stable ${state.version}?`}
+      restoreFocus={() => recoveryControl.current?.querySelector("button") ?? null}
       description={`Replace installed ${installed} with Stable ${state.version}. Fill this display will be unavailable; the ticker returns to docking. Your account and compatible preferences stay in place. Scrollr may close and restart. Future updates will use Stable.`}
       confirmLabel={`Install Stable ${state.version}`} onCancel={() => { void updateController.cancelRecovery(); }}
       onConfirm={() => { void updateController.installRecovery(state.offerId); }} />

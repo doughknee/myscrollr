@@ -111,6 +111,7 @@ for (const width of [960, 400]) {
     expect(await page.evaluate(() => (window as any).recoveryFixture.downloads)).toBe(0);
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Return to Stable 1.7.3…" })).toBeFocused();
     await page.screenshot({ path: info.outputPath(`recovery-history-${width}.png`), fullPage: true });
     await page.getByRole("button", { name: "Return to Stable 1.7.3…" }).click();
     await page.getByRole("button", { name: "Install Stable 1.7.3", exact: true }).click();
