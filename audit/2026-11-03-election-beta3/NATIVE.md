@@ -8,6 +8,8 @@ Hover over a ticker race for the two highest individual candidate totals. Click 
 
 The unsigned executable embeds its UI and uses the dedicated app identifier `com.scrollr.electionnationalbeta3test`. Its preferences and WebView2 data are in the tester’s temporary profile, with updater access, autostart writes and legacy credential cleanup disabled. [Local backend setup and browser verification](TESTING.md)
 
+A November 3, 2026 Windows check opened a follow from the packaged ticker in the native detail window. The Tennessee Governor hover showed Blackburn at 752,938 and Green at 727,509 with 72.4% reporting at 9:13 p.m. CST. The picker offered all 50 states and DC, displayed observed count changes for East Providence Mayor and the Statesboro-area council special election, and showed official fallback links in the empty Tennessee and North Carolina municipal filters.
+
 ## Tennessee fixture replay
 
 On the prepared Windows machine, open **Start Scrollr Election Tester.cmd** in `%TEMP%\scrollr-election-native-beta3`. The launcher verifies the private core and its synthetic session, then starts the packaged Tauri executable. Use the tester tray icon’s **Quit** command to close both windows.
