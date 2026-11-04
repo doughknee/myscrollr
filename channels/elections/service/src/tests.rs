@@ -37,6 +37,7 @@ async fn provider_recovers_from_bad_routes_without_bypassing_rate_limits() -> Re
     let reads = alternate_reads.clone();
     let app = Router::new()
         .route("/gateway", get(|| async { StatusCode::BAD_GATEWAY }))
+        .route("/hung", get(|| std::future::pending::<&'static str>()))
         .route("/busy", get(|| async { StatusCode::TOO_MANY_REQUESTS }))
         .route("/html", get(|| async { "temporarily unavailable" }))
         .route("/older", get(|| async { Json(raw(false)) }))
@@ -53,28 +54,30 @@ async fn provider_recovers_from_bad_routes_without_bypassing_rate_limits() -> Re
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let base = format!("http://{}", listener.local_addr()?);
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(1))
+        .build()?;
     let race = &catalog()?[0];
     let previous = Some(time("2026-11-04T02:07:00Z"));
     let good = format!("{base}/ok");
-    for path in ["gateway", "html", "older"] {
+    for path in ["gateway", "hung", "html", "older"] {
         let recovered =
             fetch_with_fallback(&client, race, previous, &format!("{base}/{path}"), &good).await?;
         assert_eq!(recovered.candidates[0].votes, 110);
     }
-    assert_eq!(alternate_reads.load(Ordering::SeqCst), 3);
+    assert_eq!(alternate_reads.load(Ordering::SeqCst), 4);
     assert!(
         fetch_with_fallback(&client, race, previous, &format!("{base}/busy"), &good)
             .await
             .is_err()
     );
-    assert_eq!(alternate_reads.load(Ordering::SeqCst), 3);
+    assert_eq!(alternate_reads.load(Ordering::SeqCst), 4);
     assert!(
         fetch_with_fallback(&client, race, previous, &good, &good)
             .await
             .is_ok()
     );
-    assert_eq!(alternate_reads.load(Ordering::SeqCst), 4);
+    assert_eq!(alternate_reads.load(Ordering::SeqCst), 5);
     assert!(
         fetch_with_fallback(
             &client,
