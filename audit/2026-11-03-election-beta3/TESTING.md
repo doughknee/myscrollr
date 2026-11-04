@@ -1,5 +1,21 @@
 # Test Election Results on Windows
 
+## National race picker with real returns
+
+Double-click **Test National Race Picker.cmd**. It starts its own local API on 18441 and opens the signed-in tester on 19441. On an empty tester account, it follows Tennessee Governor and one mayor and council contest with reported votes. Close the tester browser to stop its polling worker. Your follows are saved in its private database.
+
+Under **Election Results → Find races**, choose a state, office and vote activity. “Observed count changes” compares two election-night samples. “Reported votes” includes contests with positive counts even when the two samples agreed. The directory shows the time of its check. Once you follow a contest the worker requests updates for it. While a detail response is unavailable, candidate totals can come from the dated directory snapshot. A municipal candidate vote total can include multiple choices per voter.
+
+The reproducible 51-jurisdiction check is in [coverage](coverage/). [Major office presence](coverage/major-offices.csv) compares the directory with the [FEC Senate calendar](https://www.fec.gov/documents/5910/2026pdates.pdf) and [NGA governor calendar](https://www.nga.org/governors/elections/). An office marked listed does not establish that all precincts or all local offices are reporting.
+
+To verify the national web flow on a separate synthetic account with the visible national tester closed, run:
+
+```powershell
+node audit/2026-11-03-election-beta3/tester.mjs --national --live --check
+```
+
+## Tennessee replay
+
 With Docker Desktop running, Node 22+ and Microsoft Edge installed, double-click **Test Election Results.cmd**. Or run this in PowerShell from the beta.3 checkout:
 
 ```powershell

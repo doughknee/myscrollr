@@ -88,6 +88,23 @@ func TestElectionDashboardAcrossOldAndPreviewClients(t *testing.T) {
 	if n, r := dashboard(preview, "MISS"); n != 1 || r != nil {
 		t.Fatalf("disabled widget returned data: %d %+v", n, r)
 	}
+	// The original beta must not overwrite a watch list containing races
+	// whose winner rules it cannot render.
+	national := "?preview=" + platform.NationalElectionPreview
+	request("PUT", "/users/me/widgets/elections"+national, `{"enabled":true,"config":{"race_ids":[161737,87476]}}`, 200)
+	if _, rs := dashboard("/dashboard"+national, "MISS"); len(rs) != 2 || rs[0].SnapshotKind != "directory" || rs[0].ResultMode != "counts_only" || rs[0].ObservedAt == nil || rs[0].SourceUpdatedAt != nil || len(rs[0].Candidates) == 0 {
+		t.Fatalf("wrong national directory fallback: %+v", rs)
+	}
+	if _, rs := dashboard(preview, "HIT"); len(rs) != 1 || rs[0].ID != 87476 {
+		t.Fatalf("legacy result projection: %+v", rs)
+	}
+	legacy, _ := request("GET", "/users/me/widgets?preview=elections", "", 200)
+	if strings.Contains(string(legacy), "161737") {
+		t.Fatal("legacy widget list exposed national selection")
+	}
+	request("PUT", "/users/me/widgets/elections?preview=elections", `{"config":{"race_ids":[]}}`, 404)
+	request("DELETE", "/users/me/widgets/elections?preview=elections", "", 404)
+	request("PUT", "/users/me/widgets/elections"+national, `{"config":{"race_ids":[87476]}}`, 200)
 	request("DELETE", "/users/me/widgets/elections?preview=elections", "", 200)
 	if n, r := dashboard(preview, "MISS"); n != 0 || r != nil {
 		t.Fatalf("deleted widget remains: %d %+v", n, r)

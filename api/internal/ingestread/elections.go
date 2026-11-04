@@ -5,39 +5,52 @@ import (
 	_ "embed"
 	"encoding/json"
 	"log"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
 
-// Only verified single-seat contests enter the beta catalog. A client can choose
-// an ID, but cannot supply an upstream URL or cause arbitrary races to be fetched.
 type ElectionRace struct {
-	ID           int    `json:"id"`
-	Name         string `json:"name"`
-	State        string `json:"state"`
-	ElectionDate string `json:"election_date"`
+	ID           int        `json:"id"`
+	Name         string     `json:"name"`
+	State        string     `json:"state"`
+	ElectionDate string     `json:"election_date"`
+	Office       string     `json:"office"`
+	OfficeLabel  string     `json:"office_label"`
+	District     string     `json:"district,omitempty"`
+	Municipality string     `json:"municipality,omitempty"`
+	ResultMode   string     `json:"result_mode"`
+	VoteStatus   string     `json:"vote_status"`
+	CheckedAt    *time.Time `json:"checked_at"`
+	ChangedAt    *time.Time `json:"changed_at"`
 }
 
 //go:embed elections_catalog.json
 var electionCatalog []byte
 
 var electionRaces []ElectionRace
+var electionByID = map[int]ElectionRace{}
 
-func init() {
+var loadElectionDirectory = sync.OnceFunc(func() {
 	if err := json.Unmarshal(electionCatalog, &electionRaces); err != nil {
 		panic(err)
 	}
-}
+	for _, race := range electionRaces {
+		if race.ID <= 0 || electionByID[race.ID].ID != 0 {
+			panic("invalid election catalog ID")
+		}
+		electionByID[race.ID] = race
+	}
+	prepareElectionDirectory()
+})
 
 func ElectionRaceSupported(id int) bool {
-	for _, race := range electionRaces {
-		if race.ID == id {
-			return true
-		}
-	}
-	return false
+	loadElectionDirectory()
+	_, ok := electionByID[id]
+	return ok
 }
 
 type ElectionCandidate struct {
@@ -50,6 +63,10 @@ type ElectionCandidate struct {
 }
 
 type ElectionResult struct {
+	ResultMode   string     `json:"result_mode,omitempty"`
+	SnapshotKind string     `json:"snapshot_kind,omitempty"`
+	ObservedAt   *time.Time `json:"observed_at,omitempty"`
+
 	ID               int                 `json:"id"`
 	Name             string              `json:"name"`
 	State            string              `json:"state"`
@@ -63,23 +80,28 @@ type ElectionResult struct {
 
 func (r ElectionRace) pendingResult() ElectionResult {
 	return ElectionResult{ID: r.ID, Name: r.Name, State: r.State, ElectionDate: r.ElectionDate,
-		Candidates: []ElectionCandidate{}}
+		ResultMode: r.ResultMode, Candidates: []ElectionCandidate{}}
 }
 
 func HandleElectionRaces(c *fiber.Ctx) error {
 	if !platform.ElectionsBetaEnabled() {
 		return c.SendStatus(fiber.StatusNotFound)
 	}
-	return c.JSON(electionRaces)
+	loadElectionDirectory()
+	return c.JSON([]ElectionRace{electionByID[platform.LegacyElectionRaceID]})
 }
 
 var electionsSource = localSource{dashboard: electionsDashboard}
 
 func electionsDashboard(ctx context.Context, sub string) map[string]interface{} {
+	return ElectionDashboardForClient(ctx, sub, true)
+}
+
+func ElectionDashboardForClient(ctx context.Context, sub string, national bool) map[string]interface{} {
 	if !platform.ElectionsBetaEnabled() {
 		return nil
 	}
-	results, err := followedElectionResults(ctx, sub)
+	results, err := followedElectionResults(ctx, sub, national)
 	if err != nil {
 		log.Printf("[Elections] load followed races: %v", err)
 		return nil
@@ -87,43 +109,61 @@ func electionsDashboard(ctx context.Context, sub string) map[string]interface{} 
 	return map[string]interface{}{"elections": results}
 }
 
-func followedElectionResults(ctx context.Context, sub string) ([]ElectionResult, error) {
+func followedElectionResults(ctx context.Context, sub string, national bool) ([]ElectionResult, error) {
+	loadElectionDirectory()
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	ids := make([]int, len(electionRaces))
-	for i, race := range electionRaces {
-		ids[i] = race.ID
-	}
+	// Read at most the user's 12 follows in configured order. Do not pass a
+	// national catalog to PostgreSQL on every dashboard poll. Malformed
+	// legacy values cannot cause a lookup or unsafe integer cast.
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT catalog.id, res.snapshot, COALESCE(res.failures > 0 OR res.verified_until < now(), false)
-		FROM user_widgets w CROSS JOIN unnest($2::int[]) AS catalog(id)
-		LEFT JOIN election_results res ON res.race_id = catalog.id
-		WHERE w.logto_sub = $1 AND w.widget_type = 'elections' AND w.enabled
-		  AND w.config->'race_ids' @> jsonb_build_array(catalog.id)
-		ORDER BY array_position($2::int[], catalog.id)`, sub, ids)
+        SELECT f.id::text, res.snapshot, COALESCE(res.failures>0 OR res.verified_until<now(),false),
+          COALESCE(res.next_poll_at <> 'infinity'::timestamptz,true)
+        FROM user_widgets w CROSS JOIN LATERAL jsonb_array_elements(
+            CASE WHEN jsonb_typeof(w.config->'race_ids')='array' THEN w.config->'race_ids' ELSE '[]'::jsonb END
+        ) WITH ORDINALITY f(id,ord)
+        LEFT JOIN election_results res ON res.race_id = CASE
+            WHEN jsonb_typeof(f.id)='number' AND f.id::text ~ '^[1-9][0-9]{0,9}$' THEN f.id::text::bigint END
+        WHERE w.logto_sub=$1 AND w.widget_type='elections' AND w.enabled
+        ORDER BY f.ord LIMIT 12`, sub)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := make([]ElectionResult, 0)
 	for rows.Next() {
-		var id int
+		var rawID string
 		var data []byte
-		var delayed bool
-		if err := rows.Scan(&id, &data, &delayed); err != nil {
+		var delayed, useDirectory bool
+		if err := rows.Scan(&rawID, &data, &delayed, &useDirectory); err != nil {
 			return nil, err
 		}
-		var result ElectionResult
+		id, err := strconv.Atoi(rawID)
+		race, ok := electionByID[id]
+		if err != nil || !ok || (!national && id != platform.LegacyElectionRaceID) {
+			continue
+		}
+		result := race.pendingResult()
 		if len(data) != 0 {
 			if err := json.Unmarshal(data, &result); err != nil {
 				return nil, err
 			}
-		} else {
-			for _, race := range electionRaces {
-				if race.ID == id {
-					result = race.pendingResult()
-					break
-				}
+			result.SnapshotKind = "detail"
+			result.ResultMode = race.ResultMode
+		}
+		if seed, ok := electionSeeds[id]; national && useDirectory && ok && (len(data) == 0 || detailPredatesObservedChange(result, race, seed)) {
+			delayed = delayed || len(data) > 0
+			result = race.pendingResult()
+			result.Candidates = seed.Candidates
+			result.PercentReporting = seed.PercentReporting
+			result.ObservedAt = &seed.ObservedAt
+			result.SnapshotKind = "directory"
+			result.ResultMode = "counts_only"
+		}
+		if result.ResultMode != "single_seat" && result.SnapshotKind == "detail" {
+			// Includes pre-existing snapshots if a race is reclassified.
+			for i := range result.Candidates {
+				result.Candidates[i].Winner = false
 			}
 		}
 		result.Delayed = delayed

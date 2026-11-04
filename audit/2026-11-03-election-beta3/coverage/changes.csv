@@ -1,0 +1,1547 @@
+id,state,office,name,first_total,last_total
+187095,GA,city_council,Bulloch County City Council - District 2 (Special),1120,1630
+178073,ME,city_council,Maine Ellsworth City Council At-Large,2338,4991
+178144,ME,city_council,Maine Bucksport Town Council At-Large,0,3638
+179501,RI,city_council,Barrington Town Council,10077,12941
+179519,RI,city_council,Coventry Town Council At-Large,10697,14143
+179520,RI,city_council,Coventry Town Council District 1,1810,2223
+179521,RI,city_council,Coventry Town Council District 2,2129,2594
+179522,RI,city_council,Coventry Town Council District 3,1487,1760
+179523,RI,city_council,Coventry Town Council District 4,1396,1879
+179524,RI,city_council,Coventry Town Council District 5,1121,1966
+179554,RI,city_council,East Providence City Council At-Large,12696,14770
+179555,RI,city_council,East Providence City Council Ward 1,3794,4192
+179556,RI,city_council,East Providence City Council Ward 2,2386,2624
+179557,RI,city_council,East Providence City Council Ward 3,3248,3606
+179558,RI,city_council,East Providence City Council Ward 4,3602,4710
+179567,RI,city_council,Exeter Town Council,9994,11805
+179592,RI,city_council,Johnston Town Council District 1,857,1336
+179601,RI,city_council,Lincoln Town Council District 1,1024,1541
+179602,RI,city_council,Lincoln Town Council District 2,1144,1860
+179603,RI,city_council,Lincoln Town Council District 3,516,1746
+179604,RI,city_council,Lincoln Town Council District 4,1107,1873
+179605,RI,city_council,Lincoln Town Council District 5,653,942
+179637,RI,city_council,North Providence Town Council At-Large,6474,8810
+179638,RI,city_council,North Providence Town Council District 1,2060,2669
+179639,RI,city_council,North Providence Town Council District 2,2030,3114
+179640,RI,city_council,North Providence Town Council District 3,2232,2808
+179659,RI,city_council,Providence City Council Ward 1,2936,3257
+179660,RI,city_council,Providence City Council Ward 2,2011,3047
+179661,RI,city_council,Providence City Council Ward 3,4089,4494
+179662,RI,city_council,Providence City Council Ward 4,2144,2247
+179663,RI,city_council,Providence City Council Ward 5,3248,3554
+179664,RI,city_council,Providence City Council Ward 6,1134,1220
+179665,RI,city_council,Providence City Council Ward 7,1598,1662
+179666,RI,city_council,Providence City Council Ward 8,1650,1743
+179667,RI,city_council,Providence City Council Ward 9,1930,2031
+179668,RI,city_council,Providence City Council Ward 10,1274,1357
+179669,RI,city_council,Providence City Council Ward 11,1364,1726
+179670,RI,city_council,Providence City Council Ward 12,1548,1699
+179671,RI,city_council,Providence City Council Ward 13,3158,3467
+179672,RI,city_council,Providence City Council Ward 14,1636,2045
+179673,RI,city_council,Providence City Council Ward 15,1236,1287
+179680,RI,city_council,Scituate Town Council,13912,18270
+179686,RI,city_council,South Kingstown Town Council,21023,37854
+179701,RI,city_council,Warwick City Council Ward 5,2200,2852
+179715,RI,city_council,West Warwick Town Council Ward 1,621,1369
+86908,AL,governor,Alabama Governor,627642,830521
+86938,AR,governor,Arkansas Governor,346300,381252
+86928,AZ,governor,Arizona Governor,0,1584769
+87069,FL,governor,Florida Governor,8203108,8217273
+87088,GA,governor,Georgia Governor,3522185,3561516
+87152,IA,governor,Iowa Governor,373787,421936
+87130,IL,governor,Illinois Governor,0,2035890
+87163,KS,governor,Kansas Governor,717870,758557
+87198,MD,governor,Maryland Governor,0,1307839
+87189,ME,governor,Maine Governor,155337,176475
+87215,MI,governor,Michigan Governor,805313,844155
+87230,MN,governor,Minnesota Governor,67626,74727
+87255,NE,governor,Nebraska Governor,303819,306993
+87284,NH,governor,New Hampshire Governor,306482,321999
+87329,NY,governor,New York Governor,7078250,7725364
+87365,OH,governor,Ohio Governor,3286653,3440049
+87582,OK,governor,Oklahoma Governor,833854,892359
+87393,PA,governor,Pennsylvania Governor,2617826,3118010
+87397,RI,governor,Rhode Island Governor,344139,349737
+87410,SC,governor,South Carolina Governor,1795813,1802024
+87476,TN,governor,Tennessee Governor,1554654,1641859
+55857,TX,governor,Texas Governor,5805515,5832413
+87491,WI,governor,Wisconsin Governor,997313,1207094
+179553,RI,mayor,East Providence Mayor,13741,15974
+179591,RI,mayor,Johnston Mayor,7381,7875
+179658,RI,mayor,Providence Mayor,32848,36992
+86909,AL,other,Alabama Lieutenant Governor,663869,767166
+86910,AL,other,Alabama Attorney General,568014,669936
+86911,AL,other,Alabama Secretary of State,651549,750845
+86912,AL,other,Alabama State Treasurer,643200,759061
+86913,AL,other,Alabama State Auditor,642324,749146
+176501,AL,other,Alabama State House 2,9486,16760
+176503,AL,other,Alabama State House 4,7922,10201
+176506,AL,other,Alabama State House 7,8757,9670
+176507,AL,other,Alabama State House 8,4168,6914
+176518,AL,other,Alabama State House 19,1277,12655
+176519,AL,other,Alabama State House 20,13180,14893
+176520,AL,other,Alabama State House 21,12631,12683
+176537,AL,other,Alabama State House 38,4746,6240
+176567,AL,other,Alabama State House 68,12051,13567
+176568,AL,other,Alabama State House 69,10424,14381
+176573,AL,other,Alabama State House 74,7749,16554
+176574,AL,other,Alabama State House 75,3733,17044
+176581,AL,other,Alabama State House 82,2083,2803
+176584,AL,other,Alabama State House 85,9870,13611
+176607,AL,other,Alabama State Senate 3,14504,26430
+176611,AL,other,Alabama State Senate 7,29869,36470
+176614,AL,other,Alabama State Senate 10,11183,11306
+176617,AL,other,Alabama State Senate 13,23456,24947
+176625,AL,other,Alabama State Senate 21,12758,19240
+176627,AL,other,Alabama State Senate 23,15022,21264
+176629,AL,other,Alabama State Senate 25,5633,48947
+176632,AL,other,Alabama State Senate 28,31204,34948
+86934,AR,other,Arkansas Attorney,244745,272254
+86936,AR,other,Arkansas Commissioner of State Lands,316199,348134
+86939,AR,other,Arkansas Lieutenant Governor,324354,357130
+86942,AR,other,Arkansas Secretary of State,343442,378000
+86943,AR,other,Arkansas State Auditor,240090,266960
+86944,AR,other,Arkansas State Treasurer,243783,270993
+150201,AR,other,Arkansas State Senate 1,2600,10224
+150202,AR,other,Arkansas State House 44,7363,7585
+150224,AR,other,Arkansas State House 35,182,327
+150227,AR,other,Arkansas State House 3,9283,9631
+150245,AR,other,Arkansas State House 65,0,5282
+150249,AR,other,Arkansas State Senate 10,5257,6438
+150254,AR,other,Arkansas State House 93,1786,6550
+150256,AR,other,Arkansas State House 64,402,5580
+150265,AR,other,Arkansas State House 4,3829,3831
+150272,AR,other,Arkansas State House 94,0,3914
+150285,AR,other,Arkansas State House 43,0,2602
+150293,AR,other,Arkansas State House 86,0,4832
+150304,AR,other,Arkansas State House 41,7796,7971
+150308,AR,other,Arkansas State House 42,347,2173
+150309,AR,other,Arkansas State House 37,2325,3367
+150311,AR,other,Arkansas State Senate 24,816,5627
+150314,AR,other,Arkansas State House 27,5,45
+86926,AZ,other,Arizona State Mine Inspector,0,1535243
+86927,AZ,other,Arizona Corporation Commission,0,2928784
+86929,AZ,other,Arizona Secretary of State,0,1573001
+86930,AZ,other,Arizona Attorney General,0,1567993
+86932,AZ,other,Arizona Superintendent of Public Instruction,0,1555944
+86933,AZ,other,Arizona State Treasurer,0,1553591
+149175,AZ,other,Arizona State House 1,0,130638
+149176,AZ,other,Arizona State House 10,0,113337
+149177,AZ,other,Arizona State House 11,0,60294
+149178,AZ,other,Arizona State House 12,0,98570
+149179,AZ,other,Arizona State House 13,0,116708
+149180,AZ,other,Arizona State House 14,0,83174
+149181,AZ,other,Arizona State House 15,0,68178
+149182,AZ,other,Arizona State House 16,0,68611
+149183,AZ,other,Arizona State House 17,0,165418
+149184,AZ,other,Arizona State House 18,0,115341
+149185,AZ,other,Arizona State House 19,0,96840
+149186,AZ,other,Arizona State House 2,0,68578
+149187,AZ,other,Arizona State House 20,0,55155
+149188,AZ,other,Arizona State House 21,0,49882
+149189,AZ,other,Arizona State House 22,0,39668
+149190,AZ,other,Arizona State House 23,0,42262
+149191,AZ,other,Arizona State House 24,0,35171
+149192,AZ,other,Arizona State House 25,0,58187
+149193,AZ,other,Arizona State House 26,0,37985
+149194,AZ,other,Arizona State House 27,0,68584
+149195,AZ,other,Arizona State House 28,0,158677
+149196,AZ,other,Arizona State House 29,0,89473
+149197,AZ,other,Arizona State House 3,0,179922
+149198,AZ,other,Arizona State House 30,0,82384
+149199,AZ,other,Arizona State House 4,0,159610
+149200,AZ,other,Arizona State House 5,0,70555
+149201,AZ,other,Arizona State House 6,0,29911
+149202,AZ,other,Arizona State House 7,0,78167
+149203,AZ,other,Arizona State House 8,0,63763
+149204,AZ,other,Arizona State House 9,0,57166
+149205,AZ,other,Arizona State Senate 1,0,87455
+149206,AZ,other,Arizona State Senate 10,0,60280
+149207,AZ,other,Arizona State Senate 11,0,32966
+149208,AZ,other,Arizona State Senate 12,0,57617
+149209,AZ,other,Arizona State Senate 13,0,61639
+149210,AZ,other,Arizona State Senate 14,0,58463
+149211,AZ,other,Arizona State Senate 15,0,62113
+149212,AZ,other,Arizona State Senate 16,0,47829
+149213,AZ,other,Arizona State Senate 17,0,87366
+149214,AZ,other,Arizona State Senate 18,0,71973
+149215,AZ,other,Arizona State Senate 19,0,53544
+149216,AZ,other,Arizona State Senate 2,0,50350
+149217,AZ,other,Arizona State Senate 20,0,31117
+149218,AZ,other,Arizona State Senate 21,0,32196
+149219,AZ,other,Arizona State Senate 22,0,23924
+149220,AZ,other,Arizona State Senate 23,0,23154
+149221,AZ,other,Arizona State Senate 24,0,22102
+149222,AZ,other,Arizona State Senate 25,0,41023
+149223,AZ,other,Arizona State Senate 26,0,20463
+149224,AZ,other,Arizona State Senate 27,0,48117
+149225,AZ,other,Arizona State Senate 28,0,83789
+149226,AZ,other,Arizona State Senate 29,0,62761
+149227,AZ,other,Arizona State Senate 3,0,95403
+149228,AZ,other,Arizona State Senate 30,0,42790
+149229,AZ,other,Arizona State Senate 4,0,83874
+149230,AZ,other,Arizona State Senate 5,0,45977
+149231,AZ,other,Arizona State Senate 6,0,20469
+149232,AZ,other,Arizona State Senate 7,0,48668
+149233,AZ,other,Arizona State Senate 8,0,39800
+149234,AZ,other,Arizona State Senate 9,0,36858
+142358,CT,other,Connecticut Probate Judge District 12,0,4529
+142359,CT,other,Connecticut Probate Judge District 13,0,1748
+142372,CT,other,Connecticut Probate Judge District 26,833,5760
+142373,CT,other,Connecticut Probate Judge District 27,588,1908
+142374,CT,other,Connecticut Probate Judge District 28,940,1508
+142379,CT,other,Connecticut Probate Judge District 33,0,2183
+142390,CT,other,Connecticut Probate Judge District 44,0,893
+142416,CT,other,Bridgewater Registrar of Voters,0,893
+142420,CT,other,Chaplin Registrar of Voters,0,949
+142424,CT,other,Columbia Registrar of Voters,0,2769
+142476,CT,other,Plainfield Registrar of Voters,0,4432
+142488,CT,other,Ellington Registrar of Voters,0,6888
+87037,DE,other,Delaware Attorney General,314366,346740
+87038,DE,other,Delaware State Auditor,313373,345703
+87039,DE,other,Delaware State Treasurer,313940,346310
+150700,DE,other,Delaware State Senate 1,14472,16293
+150701,DE,other,Delaware State Senate 5,16946,17889
+150702,DE,other,Delaware State Senate 7,13155,15065
+150704,DE,other,Delaware State Senate 9,9215,10062
+150705,DE,other,Delaware State Senate 12,16177,18791
+150706,DE,other,Delaware State Senate 13,9227,12315
+150707,DE,other,Delaware State Senate 14,16623,19694
+150708,DE,other,Delaware State Senate 15,14771,18104
+150709,DE,other,Delaware State Senate 19,11662,12032
+150710,DE,other,Delaware State Senate 20,22977,24262
+150711,DE,other,Delaware State House 1,5869,6256
+150713,DE,other,Delaware State House 3,2954,3864
+150714,DE,other,Delaware State House 4,13411,14055
+150715,DE,other,Delaware State House 5,3291,6287
+150716,DE,other,Delaware State House 6,8727,8772
+150718,DE,other,Delaware State House 8,9129,10226
+150720,DE,other,Delaware State House 10,8945,9875
+150721,DE,other,Delaware State House 11,4934,8910
+150722,DE,other,Delaware State House 12,9834,11318
+150723,DE,other,Delaware State House 13,4791,5226
+150724,DE,other,Delaware State House 14,10768,11742
+150725,DE,other,Delaware State House 15,5326,6717
+150727,DE,other,Delaware State House 17,5258,5956
+150728,DE,other,Delaware State House 18,4748,5881
+150729,DE,other,Delaware State House 19,6686,7932
+150730,DE,other,Delaware State House 20,13982,14522
+150732,DE,other,Delaware State House 22,10429,11589
+150736,DE,other,Delaware State House 26,3814,5415
+150737,DE,other,Delaware State House 27,7212,9374
+150738,DE,other,Delaware State House 28,5129,5686
+150739,DE,other,Delaware State House 29,7538,8190
+150740,DE,other,Delaware State House 30,5853,6276
+150741,DE,other,Delaware State House 31,6211,6698
+150743,DE,other,Delaware State House 33,8555,9062
+150745,DE,other,Delaware State House 35,2559,3230
+150747,DE,other,Delaware State House 37,4294,4661
+150748,DE,other,Delaware State House 38,13522,14806
+150749,DE,other,Delaware State House 39,3765,4113
+150752,DE,other,Delaware New Castle County Recorder of Deeds,115353,144010
+150753,DE,other,Delaware New Castle County Register of Wills,115782,144560
+150754,DE,other,Delaware New Castle County Sheriff,115140,143773
+150755,DE,other,Delaware New Castle County Council District 1,6668,10713
+150756,DE,other,Delaware New Castle County Council District 2,18120,19706
+150757,DE,other,Delaware New Castle County Council District 3,13706,20401
+150758,DE,other,Delaware New Castle County Council District 4,9510,10413
+150759,DE,other,Delaware New Castle County Council District 5,9198,10904
+150760,DE,other,Delaware New Castle County Council District 6,16416,20271
+150761,DE,other,Delaware Kent County Recorder of Deeds,52064,63134
+150762,DE,other,Delaware Kent County Sheriff,28378,35205
+150763,DE,other,Delaware Kent County Levy Court At-Large,52176,63299
+150764,DE,other,Delaware Kent County Levy Court District 2,5580,6871
+150765,DE,other,Delaware Kent County Levy Court District 4,5969,7180
+150766,DE,other,Delaware Kent County Levy Court District 6,5954,7934
+150767,DE,other,Delaware Sussex County Recorder of Deeds,48479,53970
+150768,DE,other,Delaware Sussex County Register of Wills,48721,54226
+150769,DE,other,Delaware Sussex County Sheriff,48455,53941
+150770,DE,other,Delaware Sussex County Council District 4,21693,24082
+150771,DE,other,Delaware Sussex County Council District 5,18214,19371
+87070,FL,other,Florida Attorney General,8136157,8154057
+87071,FL,other,Florida Chief Financial Officer,8083719,8101508
+87089,GA,other,Georgia Lieutenant Governor,3508420,3547551
+87090,GA,other,Georgia Attorney General,3519248,3558515
+87091,GA,other,Georgia Secretary of State,3512746,3551964
+87092,GA,other,Georgia Insurance Commissioner,3505135,3544237
+87093,GA,other,Georgia Labor Commissioner,3500659,3539681
+87094,GA,other,Georgia State Superintendent,3510439,3549624
+87095,GA,other,Georgia Agriculture Commissioner,3508921,3548070
+87096,GA,other,Georgia Public Service Commission 3,3494436,3533417
+87097,GA,other,Georgia Public Service Commission 5,3500098,3539137
+151500,GA,other,Georgia State Senate 1,65033,70243
+151501,GA,other,Georgia State Senate 2,42872,50116
+151503,GA,other,Georgia State Senate 4,29810,30850
+151511,GA,other,Georgia State Senate 12,18251,20625
+151514,GA,other,Georgia State Senate 15,44053,44219
+151515,GA,other,Georgia State Senate 16,82674,87899
+151519,GA,other,Georgia State Senate 20,56755,58106
+151523,GA,other,Georgia State Senate 24,85996,86894
+151524,GA,other,Georgia State Senate 25,52452,54056
+151525,GA,other,Georgia State Senate 26,45501,48439
+151529,GA,other,Georgia State Senate 30,58203,61888
+151533,GA,other,Georgia State Senate 34,49766,50075
+151550,GA,other,Georgia State Senate 51,68980,71844
+151562,GA,other,Georgia State House 7,19171,21856
+151573,GA,other,Georgia State House 18,15101,18768
+151588,GA,other,Georgia State House 33,19989,20801
+151623,GA,other,Georgia State House 68,17554,18517
+151624,GA,other,Georgia State House 69,22305,22613
+151628,GA,other,Georgia State House 73,23887,25613
+151637,GA,other,Georgia State House 82,25489,27312
+151679,GA,other,Georgia State House 124,26644,28073
+151683,GA,other,Georgia State House 128,19450,22561
+151699,GA,other,Georgia State House 144,18456,18840
+151705,GA,other,Georgia State House 150,16439,16607
+151709,GA,other,Georgia State House 154,10371,13954
+151710,GA,other,Georgia State House 155,19263,21081
+151716,GA,other,Georgia State House 161,5945,7329
+151717,GA,other,Georgia State House 162,13030,16058
+151718,GA,other,Georgia State House 163,15157,16839
+151719,GA,other,Georgia State House 164,19748,21540
+151720,GA,other,Georgia State House 165,14493,16345
+151721,GA,other,Georgia State House 166,26750,31047
+187005,GA,other,Georgia Pataula Judicial Circuit District Attorney,7008,11566
+187018,GA,other,Atkinson County Commission Chairman,0,1888
+187019,GA,other,Atkinson County Commission - District 2,0,265
+187020,GA,other,Atkinson County Commission - District 4,0,343
+187092,GA,other,Bulloch County Commissioner- 1-B,4207,5268
+187093,GA,other,Bulloch County Commissioner- 2-B,13632,15433
+187094,GA,other,Bulloch County Commissioner- 2-D,13650,15452
+187096,GA,other,Bulloch County Soil and Water,16987,19687
+187104,GA,other,Calhoun County Commissioner - Post 1,0,311
+187105,GA,other,Calhoun County Commissioner - Post 3,0,224
+187106,GA,other,Calhoun County Commissioner - Post 5,0,251
+187107,GA,other,Calhoun County Soil and Water,0,1425
+187135,GA,other,Charlton County Solicitor General,0,60
+187136,GA,other,Charlton County Commission - District 1,0,17
+187137,GA,other,Charlton County Commission - District 4,0,15
+187138,GA,other,Charlton County Commission - District 5,0,12
+187139,GA,other,Charlton County School Board - District 1,0,18
+187140,GA,other,Charlton County School Board - District 3,0,13
+187141,GA,other,Charlton County School Board - District 5,0,12
+187147,GA,other,Chatham County Soil and Water,71520,84278
+187148,GA,other,Chatham County BOE - District 2 (Hoskins-Brown),8956,10267
+187230,GA,other,Dade County Commission - District 1 at Large,3591,4680
+187231,GA,other,Dade County Commission - District 2 at Large,3503,4557
+187232,GA,other,Dade County BOE - District 1 at Large,4177,5333
+187233,GA,other,Dade County BOE - District 2 at Large,3486,4530
+187282,GA,other,Early County Commission - District 1,0,960
+187283,GA,other,Early County Commission - District 3,0,671
+187284,GA,other,Early County Soil and Water,0,2883
+187310,GA,other,Fannin County Commission - Post 2,6659,9528
+187311,GA,other,Fannin County BOE - Bearden,5673,8355
+187312,GA,other,Fannin County BOE - Cole,5640,8291
+187313,GA,other,Fannin County Blue Ridge Mtn Soil and Water Conservation District Supervisor,5609,8063
+187314,GA,other,Fayette County Commission - District 3,13504,15491
+187315,GA,other,Fayette County Commission - District 4,12255,12561
+187316,GA,other,Fayette County BOE - District 2,14055,16175
+187317,GA,other,Fayette County BOE - District 4,12224,12532
+187326,GA,other,Forsyth County Solicitor General,60794,66835
+187327,GA,other,Forsyth County Commission - District 1,17782,18480
+187328,GA,other,Forsyth County Commission - District 3,14280,16160
+187329,GA,other,Forsyth County BOE - District 1,17778,18475
+187330,GA,other,Forsyth County BOE - District 5,14577,17230
+187331,GA,other,Forsyth County Soil and Water Conservation District Supervisor,62709,68670
+187332,GA,other,Forsyth County Tax Commissioner (Special),62109,68263
+187357,GA,other,Glynn County Commissioner - Post 1,24269,24485
+187360,GA,other,Glynn County BOE - Post 1,32782,33077
+187382,GA,other,Gwinnett County Solicitor General,207391,220170
+187383,GA,other,Gwinnett County Commission - District 2,50542,54982
+187384,GA,other,Gwinnett County Commission - District 4,67983,71149
+187385,GA,other,Gwinnett County Soil and Water,206035,219021
+187406,GA,other,Hancock County Soil & Water Conservation Supervisor,0,2440
+187408,GA,other,Haralson County Commission - District 2,1976,2673
+187409,GA,other,Haralson County Commission - District 4,1123,2195
+187410,GA,other,Haralson County BOE - District 2,1664,1896
+187411,GA,other,Haralson County BOE - District 3,479,1247
+187412,GA,other,Haralson County BOE - District 5,961,1425
+187419,GA,other,Hart County Commission - District 2,2157,2588
+187420,GA,other,Hart County Commission - District 4,1790,1924
+187421,GA,other,Hart County BOE - District 2,2137,2559
+187422,GA,other,Hart County BOE - District 4,1788,1919
+187437,GA,other,Houston County Solicitor General,40416,42697
+187438,GA,other,Houston County Commission Chairman,40596,42917
+187439,GA,other,Houston County Commissioner - Post 2,57641,61113
+187478,GA,other,Jasper County Commissioner - District 2,622,1173
+187479,GA,other,Jasper County Commissioner - District 4,600,1194
+187488,GA,other,Jefferson County Commission - District 1,1330,1334
+187489,GA,other,Jefferson County Commission - District 3,1131,1686
+187513,GA,other,Laurens County Commission - District 1,1670,2184
+187514,GA,other,Laurens County Commission - District 4,2708,2893
+187515,GA,other,Laurens County Commission - District 5,2211,2535
+187516,GA,other,Laurens County Soil & Water Conservation District Supervisor,13555,15027
+187542,GA,other,Macon County Commission - District 1,705,721
+187543,GA,other,Macon County Commission - District 3,568,613
+187544,GA,other,Macon County Commission - District 5,585,623
+187545,GA,other,Macon County BOE - District 1,509,523
+187546,GA,other,Macon County BOE - District 2,689,711
+187547,GA,other,Macon County BOE - District 4,592,628
+187548,GA,other,Macon County Soil and Water Conservation District Supervisor,2887,3027
+187584,GA,other,Mitchell County Commission - District 3,1211,1248
+187599,GA,other,Newton County Board of Commissioners - District 2,6236,7926
+187600,GA,other,Newton County Board of Commissioners - District 4,5939,6377
+187601,GA,other,Newton County BOE - District 1,6298,7069
+187602,GA,other,Newton County BOE - District 3,7488,7649
+187603,GA,other,Newton County BOE - District 5,6806,8405
+187604,GA,other,Newton County Soil and Water,26408,30246
+187665,GA,other,Putnam County Commissioner Chairman,8232,10080
+187666,GA,other,Putnam County Commissioner - District 3,2392,3077
+187668,GA,other,Putnam County BOE - District 1,885,1217
+187669,GA,other,Putnam County BOE - District 2,875,1209
+187670,GA,other,Putnam County Soil and Water District Supervisor,7208,8841
+187685,GA,other,Richmond County Board of Education District 2,4394,5625
+187686,GA,other,Richmond County Board of Education District 3,6879,8900
+187687,GA,other,Richmond County Board of Education District 3 (Special),6893,8917
+187688,GA,other,Richmond County Board of Education District 6,7014,7129
+187689,GA,other,Richmond County Board of Education District 7,4299,6982
+187690,GA,other,Richmond County Board of Education District 9,22190,27946
+187691,GA,other,Richmond County Brier Creek Soil and Water Conservation District Supervisor,43482,56273
+187705,GA,other,Seminole County Commission - District 2,0,413
+187706,GA,other,Seminole County Commission - District 4,0,513
+187707,GA,other,Seminole County Flint River Soil and Water Conservation District Supervisor,0,1964
+187709,GA,other,Spalding County Solicitor General - State Court,13478,18239
+187710,GA,other,Spalding County Commission - District 2,4100,4747
+187711,GA,other,Spalding County Commission - District 5,5489,6921
+187712,GA,other,Spalding County Soil and Water Conservation District Supervisor,14589,19513
+187778,GA,other,Toombs County Commissioner - District 1,992,1003
+187779,GA,other,Toombs County Commissioner - District 4,1714,1953
+187787,GA,other,Troup County Commission Chairperson,14304,17289
+187788,GA,other,Troup County Commission - District 5,3392,3444
+187789,GA,other,Troup County Soil and Water Conservation District Supervisor,15491,18432
+187817,GA,other,Walton County Commission - District 1,4075,4786
+187818,GA,other,Walton County Commission - District 4,7033,7756
+187819,GA,other,Walton County Commission - District 5,6009,6407
+187821,GA,other,Walton County BOE - District 2,5888,6757
+187823,GA,other,Walton County Soil and Water Conservation District Supervisor,55376,58553
+187831,GA,other,Washington County State Court Solicitor,5213,5857
+187832,GA,other,Washington County Commissioner Chairman,6779,7750
+187833,GA,other,Washington County Commissioner - District 1,1420,1741
+187834,GA,other,Washington County Commissioner - District 2,1218,1471
+187835,GA,other,Washington County Commissioner - District 3,1383,1601
+187837,GA,other,Washington County BOE Chairman,6818,7788
+187838,GA,other,Washington County BOE - District 1,1348,1556
+187839,GA,other,Washington County BOE - District 2,1230,1482
+187840,GA,other,Washington County BOE - District 3,1169,1369
+187853,GA,other,Whitfield County Commission - District 1,1995,3956
+187854,GA,other,Whitfield County Commission - District 3,3973,6309
+187855,GA,other,Whitfield County BOE - At Large,8991,17107
+187856,GA,other,Whitfield County BOE - District 2,8980,17041
+187857,GA,other,Whitfield County BOE - District 4,8974,17055
+87153,IA,other,Iowa Attorney General,344911,387220
+87154,IA,other,Iowa Secretary of State,359586,408911
+87155,IA,other,Iowa State Treasurer,359003,407113
+154305,IA,other,Iowa State Senate 11,1647,5365
+154306,IA,other,Iowa State Senate 13,1034,5491
+154308,IA,other,Iowa State Senate 17,12039,17703
+154310,IA,other,Iowa State Senate 21,26861,35258
+154311,IA,other,Iowa State Senate 23,18764,25215
+154320,IA,other,Iowa State Senate 41,0,3209
+154328,IA,other,Iowa State House 4,3507,8009
+154345,IA,other,Iowa State House 21,1499,3106
+154346,IA,other,Iowa State House 22,174,2299
+154348,IA,other,Iowa State House 24,0,341
+154350,IA,other,Iowa State House 26,1032,5511
+154355,IA,other,Iowa State House 31,14208,14929
+154357,IA,other,Iowa State House 33,6722,8866
+154360,IA,other,Iowa State House 36,13288,14908
+154363,IA,other,Iowa State House 39,7957,10465
+154364,IA,other,Iowa State House 40,9575,14974
+154365,IA,other,Iowa State House 41,13923,19241
+154366,IA,other,Iowa State House 42,13757,15905
+154394,IA,other,Iowa State House 70,0,3099
+154400,IA,other,Iowa State House 76,4607,4991
+154408,IA,other,Iowa State House 84,0,1032
+154419,IA,other,Iowa State House 95,1420,1953
+154423,IA,other,Iowa State House 99,5856,6272
+154424,IA,other,Iowa State House 100,0,3633
+87131,IL,other,Illinois Attorney General,0,2019220
+87132,IL,other,Illinois Secretary of State,0,2019252
+87133,IL,other,Illinois Comptroller,0,1994541
+87134,IL,other,Illinois State Treasurer,0,1999039
+152704,IL,other,Illinois State Senate 8,0,43639
+152705,IL,other,Illinois State Senate 9,0,69512
+152708,IL,other,Illinois State Senate 14,0,47658
+152710,IL,other,Illinois State Senate 17,0,38744
+152711,IL,other,Illinois State Senate 18,0,27584
+152713,IL,other,Illinois State Senate 21,0,9806
+152714,IL,other,Illinois State Senate 23,0,1045
+152715,IL,other,Illinois State Senate 24,0,7159
+152716,IL,other,Illinois State Senate 26,0,32276
+152717,IL,other,Illinois State Senate 27,0,41179
+152718,IL,other,Illinois State Senate 29,0,24539
+152720,IL,other,Illinois State Senate 32,0,29906
+152721,IL,other,Illinois State Senate 33,0,48717
+152722,IL,other,Illinois State Senate 35,0,50235
+152723,IL,other,Illinois State Senate 36,0,20572
+152724,IL,other,Illinois State Senate 38,0,15661
+152727,IL,other,Illinois State Senate 42,0,25835
+152729,IL,other,Illinois State Senate 45,0,42425
+152731,IL,other,Illinois State Senate 48,0,50680
+152736,IL,other,Illinois State Senate 56,0,57151
+152737,IL,other,Illinois State Senate 57,0,42940
+152738,IL,other,Illinois State Senate 59,0,40840
+152740,IL,other,Illinois State House 2,0,10892
+152750,IL,other,Illinois State House 12,0,18829
+152751,IL,other,Illinois State House 13,0,28058
+152755,IL,other,Illinois State House 17,0,33088
+152756,IL,other,Illinois State House 18,0,36121
+152757,IL,other,Illinois State House 19,0,22979
+152759,IL,other,Illinois State House 21,0,14208
+152763,IL,other,Illinois State House 25,0,11093
+152773,IL,other,Illinois State House 35,0,19367
+152774,IL,other,Illinois State House 36,0,7600
+152777,IL,other,Illinois State House 39,0,13782
+152779,IL,other,Illinois State House 41,0,9808
+152782,IL,other,Illinois State House 44,0,20937
+152783,IL,other,Illinois State House 45,0,1037
+152786,IL,other,Illinois State House 48,0,7141
+152787,IL,other,Illinois State House 49,0,7599
+152789,IL,other,Illinois State House 51,0,21280
+152790,IL,other,Illinois State House 52,0,10800
+152791,IL,other,Illinois State House 53,0,25085
+152792,IL,other,Illinois State House 54,0,16065
+152793,IL,other,Illinois State House 55,0,27429
+152794,IL,other,Illinois State House 56,0,19652
+152795,IL,other,Illinois State House 57,0,21849
+152802,IL,other,Illinois State House 64,0,8241
+152803,IL,other,Illinois State House 65,0,26371
+152804,IL,other,Illinois State House 66,0,22391
+152806,IL,other,Illinois State House 68,0,19689
+152807,IL,other,Illinois State House 69,0,21895
+152808,IL,other,Illinois State House 70,0,28329
+152809,IL,other,Illinois State House 71,0,13866
+152811,IL,other,Illinois State House 73,0,23311
+152812,IL,other,Illinois State House 74,0,23701
+152813,IL,other,Illinois State House 75,0,1577
+152814,IL,other,Illinois State House 76,0,13964
+152815,IL,other,Illinois State House 77,0,13982
+152816,IL,other,Illinois State House 78,0,30570
+152818,IL,other,Illinois State House 80,0,23423
+152821,IL,other,Illinois State House 83,0,17497
+152822,IL,other,Illinois State House 84,0,8335
+152823,IL,other,Illinois State House 85,0,18494
+152835,IL,other,Illinois State House 97,0,25710
+152836,IL,other,Illinois State House 98,0,20442
+152839,IL,other,Illinois State House 101,0,12731
+152842,IL,other,Illinois State House 104,0,7745
+152849,IL,other,Illinois State House 111,0,26913
+152850,IL,other,Illinois State House 112,0,30101
+152852,IL,other,Illinois State House 114,0,17110
+152856,IL,other,Illinois State House 118,0,19279
+87144,IN,other,Indiana Secretary of State,1563119,1606765
+87164,KS,other,Kansas Attorney General,715427,755070
+87165,KS,other,Kansas Secretary of State,711662,751051
+87166,KS,other,Kansas State Treasurer,700653,744066
+155302,KS,other,Kansas State Senate 25 Special,8991,14222
+155304,KS,other,Kansas State House 2,4711,7359
+155307,KS,other,Kansas State House 5,4232,5960
+155308,KS,other,Kansas State House 6,4313,5721
+155309,KS,other,Kansas State House 7,4517,6736
+155310,KS,other,Kansas State House 8,7928,10891
+155314,KS,other,Kansas State House 12,1746,3656
+155315,KS,other,Kansas State House 13,4409,4737
+155316,KS,other,Kansas State House 14,8558,11724
+155317,KS,other,Kansas State House 15,3966,5041
+155319,KS,other,Kansas State House 17,8121,9821
+155320,KS,other,Kansas State House 18,6740,8517
+155321,KS,other,Kansas State House 19,9886,12245
+155326,KS,other,Kansas State House 24,5925,8841
+155328,KS,other,Kansas State House 26,8070,10525
+155329,KS,other,Kansas State House 27,9248,11620
+155330,KS,other,Kansas State House 28,7814,9982
+155332,KS,other,Kansas State House 30,6957,9262
+155340,KS,other,Kansas State House 38,8655,9150
+155341,KS,other,Kansas State House 39,7840,10064
+155344,KS,other,Kansas State House 42,3046,3189
+155345,KS,other,Kansas State House 43,4636,6854
+155351,KS,other,Kansas State House 49,7148,9061
+155361,KS,other,Kansas State House 59,7196,8633
+155362,KS,other,Kansas State House 60,4342,7434
+155364,KS,other,Kansas State House 62,4045,4270
+155372,KS,other,Kansas State House 70,2944,7435
+155378,KS,other,Kansas State House 76,5396,6538
+155380,KS,other,Kansas State House 78,6613,9290
+155381,KS,other,Kansas State House 79,2965,5087
+155382,KS,other,Kansas State House 80,1673,3482
+155383,KS,other,Kansas State House 81,3610,6504
+155384,KS,other,Kansas State House 82,4625,5534
+155385,KS,other,Kansas State House 83,3290,5620
+155387,KS,other,Kansas State House 85,6319,8296
+155409,KS,other,Kansas State House 107,2970,3964
+155412,KS,other,Kansas State House 110,3143,4899
+155415,KS,other,Kansas State House 113,1203,2800
+155418,KS,other,Kansas State House 116,1950,3335
+155419,KS,other,Kansas State House 117,8626,11064
+155423,KS,other,Kansas State House 121,6500,9721
+87277,MA,other,Massachusetts Attorney General,367413,492544
+87278,MA,other,Massachusetts Secretary of the Commonwealth,228736,490766
+87279,MA,other,Massachusetts Treasurer,355055,484432
+153518,MA,other,Massachusetts State Senate Second Essex & Middlesex,17571,26502
+153542,MA,other,Massachusetts State Senate Suffolk & Middlesex,1178,11607
+153546,MA,other,Massachusetts State Senate Worcester & Hampshire,10316,15267
+153588,MA,other,Massachusetts State House Eighteenth Essex,0,3397
+153640,MA,other,Massachusetts State House Thirty-Fifth Middlesex,0,9948
+153673,MA,other,Massachusetts State House Fourth Suffolk,301,1447
+153679,MA,other,Massachusetts State House Tenth Suffolk,1429,1943
+153706,MA,other,Massachusetts State House Eighteenth Worcester,0,4794
+87199,MD,other,Maryland Attorney General,0,1300890
+87200,MD,other,Maryland Comptroller,0,1291421
+154800,MD,other,Maryland State Senate 1,0,36211
+154801,MD,other,Maryland State Senate 2,0,26007
+154802,MD,other,Maryland State Senate 3,0,15671
+154803,MD,other,Maryland State Senate 4,0,18709
+154804,MD,other,Maryland State Senate 5,0,43535
+154805,MD,other,Maryland State Senate 6,0,20441
+154806,MD,other,Maryland State Senate 7,0,35934
+154807,MD,other,Maryland State Senate 8,0,21954
+154808,MD,other,Maryland State Senate 9,0,33515
+154809,MD,other,Maryland State Senate 10,0,24778
+154810,MD,other,Maryland State Senate 11,0,24859
+154811,MD,other,Maryland State Senate 12,0,25516
+154812,MD,other,Maryland State Senate 13,0,29503
+154813,MD,other,Maryland State Senate 14,0,30933
+154814,MD,other,Maryland State Senate 15,0,22139
+154815,MD,other,Maryland State Senate 16,0,23047
+154816,MD,other,Maryland State Senate 17,0,21870
+154817,MD,other,Maryland State Senate 18,0,23118
+154818,MD,other,Maryland State Senate 19,0,24588
+154819,MD,other,Maryland State Senate 20,0,21054
+154820,MD,other,Maryland State Senate 21,0,18411
+154821,MD,other,Maryland State Senate 22,0,17603
+154822,MD,other,Maryland State Senate 23,0,35886
+154823,MD,other,Maryland State Senate 24,0,23127
+154824,MD,other,Maryland State Senate 25,0,26581
+154825,MD,other,Maryland State Senate 26,0,26641
+154826,MD,other,Maryland State Senate 27,0,42528
+154827,MD,other,Maryland State Senate 28,0,42079
+154828,MD,other,Maryland State Senate 29,0,38984
+154829,MD,other,Maryland State Senate 30,0,25568
+154830,MD,other,Maryland State Senate 31,0,29677
+154831,MD,other,Maryland State Senate 32,0,16846
+154832,MD,other,Maryland State Senate 33,0,28699
+154833,MD,other,Maryland State Senate 34,0,43936
+154834,MD,other,Maryland State Senate 35,0,45274
+154835,MD,other,Maryland State Senate 36,0,41921
+154836,MD,other,Maryland State Senate 37,0,45216
+154837,MD,other,Maryland State Senate 38,0,37543
+154838,MD,other,Maryland State Senate 39,0,13005
+154839,MD,other,Maryland State Senate 40,0,11783
+154840,MD,other,Maryland State Senate 41,0,14293
+154841,MD,other,Maryland State Senate 42,0,28174
+154842,MD,other,Maryland State Senate 43,0,15316
+154843,MD,other,Maryland State Senate 44,0,18623
+154844,MD,other,Maryland State Senate 45,0,12095
+154845,MD,other,Maryland State Senate 46,0,12630
+154846,MD,other,Maryland State Senate 47,0,11966
+154847,MD,other,Maryland House of Delegates 1A,0,12587
+154848,MD,other,Maryland House of Delegates 1B,0,12554
+154849,MD,other,Maryland House of Delegates 1C,0,10938
+154850,MD,other,Maryland House of Delegates 2A,0,38252
+154851,MD,other,Maryland House of Delegates 2B,0,5871
+154852,MD,other,Maryland House of Delegates 3,0,38796
+154853,MD,other,Maryland House of Delegates 4,0,53937
+154854,MD,other,Maryland House of Delegates 5,0,122334
+154855,MD,other,Maryland House of Delegates 6,0,54024
+154856,MD,other,Maryland House of Delegates 7A,0,33804
+154857,MD,other,Maryland House of Delegates 7B,0,17559
+154858,MD,other,Maryland House of Delegates 8,0,59412
+154859,MD,other,Maryland House of Delegates 9A,0,41156
+154860,MD,other,Maryland House of Delegates 9B,0,9229
+154861,MD,other,Maryland House of Delegates 10,0,62756
+154862,MD,other,Maryland House of Delegates 11A,0,7687
+154863,MD,other,Maryland House of Delegates 11B,0,27113
+154864,MD,other,Maryland House of Delegates 12A,0,40667
+154865,MD,other,Maryland House of Delegates 12B,0,4876
+154866,MD,other,Maryland House of Delegates 13,0,80722
+154867,MD,other,Maryland House of Delegates 14,0,80867
+154868,MD,other,Maryland House of Delegates 15,0,63282
+154869,MD,other,Maryland House of Delegates 16,0,68210
+154870,MD,other,Maryland House of Delegates 17,0,52482
+154871,MD,other,Maryland House of Delegates 18,0,63621
+154872,MD,other,Maryland House of Delegates 19,0,65334
+154873,MD,other,Maryland House of Delegates 20,0,57969
+154874,MD,other,Maryland House of Delegates 21,0,43517
+154875,MD,other,Maryland House of Delegates 22,0,41502
+154876,MD,other,Maryland House of Delegates 23,0,94405
+154877,MD,other,Maryland House of Delegates 24,0,59467
+154878,MD,other,Maryland House of Delegates 25,0,68539
+154879,MD,other,Maryland House of Delegates 26,0,72870
+154880,MD,other,Maryland House of Delegates 27A,0,12135
+154881,MD,other,Maryland House of Delegates 27B,0,14061
+154882,MD,other,Maryland House of Delegates 27C,0,16265
+154883,MD,other,Maryland House of Delegates 28,0,121342
+154884,MD,other,Maryland House of Delegates 29A,0,15995
+154885,MD,other,Maryland House of Delegates 29B,0,7939
+154886,MD,other,Maryland House of Delegates 29C,0,15030
+154887,MD,other,Maryland House of Delegates 30A,0,22886
+154888,MD,other,Maryland House of Delegates 30B,0,9761
+154889,MD,other,Maryland House of Delegates 31,0,83075
+154890,MD,other,Maryland House of Delegates 32,0,47265
+154891,MD,other,Maryland House of Delegates 33A,0,6069
+154892,MD,other,Maryland House of Delegates 33B,0,11378
+154893,MD,other,Maryland House of Delegates 33C,0,10200
+154894,MD,other,Maryland House of Delegates 34A,0,39182
+154895,MD,other,Maryland House of Delegates 34B,0,16602
+154896,MD,other,Maryland House of Delegates 35A,0,61720
+154897,MD,other,Maryland House of Delegates 35B,0,9872
+154898,MD,other,Maryland House of Delegates 36,0,109729
+154899,MD,other,Maryland House of Delegates 37A,0,8137
+154900,MD,other,Maryland House of Delegates 37B,0,63941
+154901,MD,other,Maryland House of Delegates 38A,0,14004
+154503,ME,other,Maine State Senate 4,8249,9805
+154504,ME,other,Maine State Senate 5,1217,2348
+154505,ME,other,Maine State Senate 6,5080,5710
+154506,ME,other,Maine State Senate 7,7844,8717
+154514,ME,other,Maine State Senate 15,3290,5161
+154516,ME,other,Maine State Senate 17,3550,4656
+154517,ME,other,Maine State Senate 18,3085,4693
+154518,ME,other,Maine State Senate 19,4992,5433
+154531,ME,other,Maine State Senate 32,2633,12193
+154545,ME,other,Maine State House 11,1371,2009
+154550,ME,other,Maine State House 16,1361,2220
+154592,ME,other,Maine State House 58,1064,2942
+154607,ME,other,Maine State House 73,1498,2130
+154608,ME,other,Maine State House 74,0,430
+154610,ME,other,Maine State House 76,0,1123
+154624,ME,other,Maine State House 90,0,1611
+154632,ME,other,Maine State House 98,0,1181
+154667,ME,other,Maine State House 133,0,4353
+154689,ME,other,Maine Hancock Judge of Probate,9374,12365
+154696,ME,other,Maine Franklin County Treasurer,0,1150
+154698,ME,other,Maine Kennebec County Treasurer,6766,13789
+154700,ME,other,Maine Oxford County Treasurer,4231,8089
+154710,ME,other,Maine Kennebec Register of Deeds,5476,11066
+154722,ME,other,Maine Hancock Sheriff,6673,12057
+154725,ME,other,Maine Oxford Sheriff,4320,8298
+154731,ME,other,Maine York Sheriff,18433,19193
+154733,ME,other,Maine District Attorney 2,7928,14783
+154738,ME,other,Maine District Attorney 7,7057,12985
+154744,ME,other,Maine Aroostook County Commissioner 1,1763,1920
+154745,ME,other,Maine Cumberland County Commissioner 3,279,4490
+154751,ME,other,Maine Kennebec County Commissioner 2,2536,3404
+154754,ME,other,Maine Oxford County Commissioner 3,2202,4584
+154759,ME,other,Maine Somerset County Commissioner 4,0,664
+154761,ME,other,Maine Waldo County Commissioner 1,4474,6021
+178028,ME,other,"Maine Regional School Unit 01, Woolwich Residence",0,1708
+178114,ME,other,Maine Ellsworth School Department At-Large,2341,4959
+178344,ME,other,Maine Ellsworth Library Board - 2 year,1928,4117
+87216,MI,other,Michigan Secretary of State,788560,815973
+87217,MI,other,Michigan Attorney General,782550,809703
+87218,MI,other,Michigan Supreme Court,411799,471083
+155616,MI,other,Michigan State Senate 17,23878,26062
+155619,MI,other,Michigan State Senate 20,1680,1926
+155620,MI,other,Michigan State Senate 21,47303,51104
+155624,MI,other,Michigan State Senate 25,2871,7902
+155625,MI,other,Michigan State Senate 26,6444,7252
+155633,MI,other,Michigan State Senate 34,4238,12931
+155634,MI,other,Michigan State Senate 35,6937,7646
+155635,MI,other,Michigan State Senate 36,10514,12298
+155637,MI,other,Michigan State Senate 38,4851,14142
+155673,MI,other,Michigan State House 36,22249,23953
+155675,MI,other,Michigan State House 38,724,973
+155702,MI,other,Michigan State House 65,2884,3258
+155713,MI,other,Michigan State House 76,35485,41290
+155729,MI,other,Michigan State House 92,1035,5106
+155730,MI,other,Michigan State House 93,3404,5163
+155731,MI,other,Michigan State House 94,3542,3802
+155732,MI,other,Michigan State House 95,2475,4548
+155734,MI,other,Michigan State House 97,2711,3391
+155737,MI,other,Michigan State House 100,1796,3107
+155745,MI,other,Michigan State House 108,4738,13827
+155748,MI,other,Michigan State Board of Education,578535,627215
+155749,MI,other,Michigan University of Michigan Board of Regents,527647,574951
+155750,MI,other,Michigan State University Board of Trustees,569459,605794
+155751,MI,other,Michigan Wayne State University Board of Governors,558861,598338
+87231,MN,other,Minnesota Attorney General,51924,56837
+87232,MN,other,Minnesota Secretary of State,6976,58847
+156100,MO,other,Missouri State Senate 2,23399,32436
+156103,MO,other,Missouri State Senate 10,12543,46611
+156104,MO,other,Missouri State Senate 12,30611,37012
+156106,MO,other,Missouri State Senate 16,7132,32171
+156111,MO,other,Missouri State Senate 26,16775,34070
+156112,MO,other,Missouri State Senate 28,29478,34634
+156124,MO,other,Missouri State House 9,3032,9451
+156132,MO,other,Missouri State House 19,5161,6903
+156134,MO,other,Missouri State House 21,1826,2743
+156135,MO,other,Missouri State House 28,3046,3903
+156140,MO,other,Missouri State House 33,2219,4707
+156142,MO,other,Missouri State House 35,5908,8018
+156143,MO,other,Missouri State House 36,2791,5649
+156146,MO,other,Missouri State House 40,4684,11906
+156147,MO,other,Missouri State House 41,0,12764
+156148,MO,other,Missouri State House 42,0,1110
+156149,MO,other,Missouri State House 43,9085,10560
+156151,MO,other,Missouri State House 48,4329,10057
+156152,MO,other,Missouri State House 49,3146,12195
+156158,MO,other,Missouri State House 56,0,3529
+156160,MO,other,Missouri State House 58,10796,10859
+156163,MO,other,Missouri State House 61,0,12684
+156178,MO,other,Missouri State House 88,7003,7105
+156179,MO,other,Missouri State House 89,9584,12243
+156180,MO,other,Missouri State House 92,7657,7745
+156195,MO,other,Missouri State House 109,7176,14403
+156207,MO,other,Missouri State House 121,0,4784
+156210,MO,other,Missouri State House 124,0,4419
+156223,MO,other,Missouri State House 137,0,4191
+156226,MO,other,Missouri State House 140,7407,10923
+156227,MO,other,Missouri State House 141,0,9734
+156228,MO,other,Missouri State House 142,1428,9570
+156229,MO,other,Missouri State House 143,7715,10823
+156230,MO,other,Missouri State House 144,7281,8889
+156235,MO,other,Missouri State House 149,3032,8311
+156237,MO,other,Missouri State House 151,2642,10245
+156239,MO,other,Missouri State House 153,4697,8682
+156626,MS,other,Mississippi State House 77 Special,6921,7292
+87348,ND,other,North Dakota Secretary of State,75723,92404
+87349,ND,other,North Dakota Attorney General,75939,92648
+158298,ND,other,North Dakota State Senate 17,0,3561
+158454,ND,other,North Dakota State Senate 43,0,2598
+158465,ND,other,North Dakota State House 17,0,5285
+158478,ND,other,North Dakota State House 43,0,4694
+158481,ND,other,North Dakota State House 20 Unexpired 2-Year Term,3179,5851
+158483,ND,other,North Dakota State House 42 Unexpired 2-Year Term,0,1819
+158484,ND,other,North Dakota Agriculture Commissioner,76311,93058
+158485,ND,other,North Dakota Public Service Commissioner,75003,91527
+158486,ND,other,North Dakota Public Service Commissioner Unexpired 2-Year Term,74894,91424
+158487,ND,other,North Dakota Tax Commissioner,74196,90581
+158488,ND,other,North Dakota Superintendent of Public Instruction Unexpired 2-Year Term,66791,80986
+158489,ND,other,North Dakota Justice of the Supreme Court Unexpired 8-Year Term,60882,73532
+158490,ND,other,North Dakota Justice of the Supreme Court,62987,76337
+132403,NE,other,Nebraska Attorney General,297505,300564
+132404,NE,other,Nebraska Auditor,261561,264387
+132466,NE,other,Nebraska Secretary of State,299898,303005
+132474,NE,other,Nebraska Unicameral Legislature District 16,454,2799
+132490,NE,other,Nebraska Unicameral Legislature District 42,3985,4592
+132496,NE,other,Nebraska Treasurer,296405,299487
+153905,NH,other,New Hampshire State Senate District 1,11143,14341
+153906,NH,other,New Hampshire State Senate District 2,11424,12883
+153908,NH,other,New Hampshire State Senate District 4,5776,5837
+153911,NH,other,New Hampshire State Senate District 7,11353,11751
+153912,NH,other,New Hampshire State Senate District 8,11214,11640
+153918,NH,other,New Hampshire State Senate District 14,15052,24526
+153922,NH,other,New Hampshire State Senate District 18,16694,16730
+153930,NH,other,New Hampshire State House Belknap County District 2,0,6980
+153963,NH,other,New Hampshire State House Coos County District 1,2030,4479
+153966,NH,other,New Hampshire State House Coos County District 4,555,1624
+153969,NH,other,New Hampshire State House Coos County District 7,2130,3197
+153972,NH,other,New Hampshire State House Grafton County District 3,757,1419
+153973,NH,other,New Hampshire State House Grafton County District 4,0,1463
+154000,NH,other,New Hampshire State House Hillsborough County District 13,0,49166
+154025,NH,other,New Hampshire State House Hillsborough County District 38,7326,24927
+154040,NH,other,New Hampshire State House Merrimack County District 8,6041,6130
+154106,NH,other,New Hampshire State House Strafford County District 4,19529,19688
+154120,NH,other,New Hampshire State House Strafford County District 18,9165,9225
+154127,NH,other,New Hampshire State House Sullivan County District 4,819,1183
+154129,NH,other,New Hampshire State House Sullivan County District 6,11500,12724
+154131,NH,other,New Hampshire State House Sullivan County District 8,9130,10610
+87330,NY,other,New York Attorney General,6999144,7635940
+87331,NY,other,New York Comptroller,6950932,7584420
+157800,NY,other,New York State Senate 1,121252,139772
+157801,NY,other,New York State Senate 2,121552,146854
+157802,NY,other,New York State Senate 3,87578,109610
+157803,NY,other,New York State Senate 4,60502,80112
+157807,NY,other,New York State Senate 8,103122,112302
+157809,NY,other,New York State Senate 10,95650,101464
+157810,NY,other,New York State Senate 11,136364,141660
+157811,NY,other,New York State Senate 12,122406,123856
+157812,NY,other,New York State Senate 13,83070,87822
+157813,NY,other,New York State Senate 14,118036,125518
+157814,NY,other,New York State Senate 15,94428,96498
+157815,NY,other,New York State Senate 16,71110,73420
+157816,NY,other,New York State Senate 17,68478,74844
+157817,NY,other,New York State Senate 18,92238,100488
+157818,NY,other,New York State Senate 19,104464,106500
+157819,NY,other,New York State Senate 20,160348,169466
+157820,NY,other,New York State Senate 21,131798,135800
+157821,NY,other,New York State Senate 22,99142,105622
+157822,NY,other,New York State Senate 23,122044,122496
+157824,NY,other,New York State Senate 25,142824,152038
+157825,NY,other,New York State Senate 26,179956,185754
+157826,NY,other,New York State Senate 27,148318,152664
+157827,NY,other,New York State Senate 28,178508,183392
+157828,NY,other,New York State Senate 29,100230,103030
+157829,NY,other,New York State Senate 30,139096,140832
+157830,NY,other,New York State Senate 31,106102,109312
+157831,NY,other,New York State Senate 32,66994,67418
+157832,NY,other,New York State Senate 33,81288,83346
+157833,NY,other,New York State Senate 34,79678,81080
+157835,NY,other,New York State Senate 36,90960,92400
+157837,NY,other,New York State Senate 38,96822,164882
+157838,NY,other,New York State Senate 39,126530,158030
+157839,NY,other,New York State Senate 40,54090,60516
+157840,NY,other,New York State Senate 41,121318,141788
+157841,NY,other,New York State Senate 42,74038,95972
+157843,NY,other,New York State Senate 44,86704,94570
+157844,NY,other,New York State Senate 45,104462,136012
+157845,NY,other,New York State Senate 46,30030,47442
+157846,NY,other,New York State Senate 47,193510,198730
+157847,NY,other,New York State Senate 48,76516,98090
+157848,NY,other,New York State Senate 49,64916,87328
+157849,NY,other,New York State Senate 50,108100,127540
+157850,NY,other,New York State Senate 51,82508,87990
+157851,NY,other,New York State Senate 52,90966,98672
+157852,NY,other,New York State Senate 53,139878,161500
+157853,NY,other,New York State Senate 54,109058,115050
+157856,NY,other,New York State Senate 57,78230,120524
+157857,NY,other,New York State Senate 58,67498,79042
+157858,NY,other,New York State Senate 59,149846,151852
+157861,NY,other,New York State Senate 62,139312,202804
+157863,NY,other,New York State House 1,58498,68254
+157864,NY,other,New York State House 2,52262,60268
+157865,NY,other,New York State House 3,31438,40938
+157866,NY,other,New York State House 4,31038,36204
+157867,NY,other,New York State House 5,37808,47764
+157868,NY,other,New York State House 6,17800,28840
+157869,NY,other,New York State House 7,44612,48774
+157870,NY,other,New York State House 8,56064,67128
+157871,NY,other,New York State House 9,34944,38468
+157872,NY,other,New York State House 10,47450,51494
+157873,NY,other,New York State House 11,34360,41446
+157874,NY,other,New York State House 12,37960,49262
+157885,NY,other,New York State House 23,68746,68756
+157886,NY,other,New York State House 24,45832,46976
+157887,NY,other,New York State House 25,28240,28604
+157888,NY,other,New York State House 26,69304,69730
+157889,NY,other,New York State House 27,34024,36660
+157890,NY,other,New York State House 28,44116,47760
+157891,NY,other,New York State House 29,48028,52714
+157893,NY,other,New York State House 31,29122,32106
+157894,NY,other,New York State House 32,45754,47978
+157895,NY,other,New York State House 33,56410,59420
+157896,NY,other,New York State House 34,40750,42912
+157897,NY,other,New York State House 35,26950,29236
+157898,NY,other,New York State House 36,71068,73412
+157899,NY,other,New York State House 37,57058,58472
+157901,NY,other,New York State House 39,39092,40032
+157903,NY,other,New York State House 41,47664,50634
+157904,NY,other,New York State House 42,53588,55436
+157905,NY,other,New York State House 43,67074,69918
+157906,NY,other,New York State House 44,71712,78946
+157908,NY,other,New York State House 46,58752,59238
+157909,NY,other,New York State House 47,32272,34612
+157910,NY,other,New York State House 48,33298,36454
+157911,NY,other,New York State House 49,27852,27854
+157912,NY,other,New York State House 50,42266,43718
+157913,NY,other,New York State House 51,41726,44526
+157914,NY,other,New York State House 52,101522,106060
+157915,NY,other,New York State House 53,40238,44188
+157916,NY,other,New York State House 54,32054,33466
+157917,NY,other,New York State House 55,42194,43746
+157918,NY,other,New York State House 56,62586,65456
+157919,NY,other,New York State House 57,77242,85432
+157920,NY,other,New York State House 58,50460,51802
+157921,NY,other,New York State House 59,54158,54570
+157922,NY,other,New York State House 60,44292,45344
+157927,NY,other,New York State House 65,56300,58682
+157928,NY,other,New York State House 66,66402,67668
+157929,NY,other,New York State House 67,78966,80960
+157930,NY,other,New York State House 68,47148,49544
+157931,NY,other,New York State House 69,80002,81354
+157932,NY,other,New York State House 70,57002,58012
+157933,NY,other,New York State House 71,60866,62496
+157934,NY,other,New York State House 72,46212,47450
+157935,NY,other,New York State House 73,63956,66616
+157936,NY,other,New York State House 74,72352,72970
+157937,NY,other,New York State House 75,67300,69546
+157938,NY,other,New York State House 76,83806,85598
+157939,NY,other,New York State House 77,27340,28514
+157940,NY,other,New York State House 78,24968,25242
+157941,NY,other,New York State House 79,32026,32170
+157942,NY,other,New York State House 80,38330,39188
+157943,NY,other,New York State House 81,51130,51190
+157945,NY,other,New York State House 83,45648,46218
+157946,NY,other,New York State House 84,34992,35088
+157947,NY,other,New York State House 85,32294,33592
+157948,NY,other,New York State House 86,27308,28612
+157949,NY,other,New York State House 87,39040,39622
+157964,NY,other,New York State House 102,35542,47608
+157965,NY,other,New York State House 103,53122,54518
+157966,NY,other,New York State House 104,32016,33248
+157967,NY,other,New York State House 105,53724,76582
+157968,NY,other,New York State House 106,65952,70548
+157972,NY,other,New York State House 110,14364,16122
+157973,NY,other,New York State House 111,25940,44074
+157974,NY,other,New York State House 112,35470,37210
+157975,NY,other,New York State House 113,44764,47962
+157976,NY,other,New York State House 114,47196,60162
+157977,NY,other,New York State House 115,29126,31528
+157978,NY,other,New York State House 116,21858,22654
+157979,NY,other,New York State House 117,43488,47728
+157980,NY,other,New York State House 118,28684,43638
+157981,NY,other,New York State House 119,51818,59600
+157982,NY,other,New York State House 120,22706,34138
+157983,NY,other,New York State House 121,24040,24562
+157984,NY,other,New York State House 122,63338,74588
+157985,NY,other,New York State House 123,34228,41228
+157986,NY,other,New York State House 124,28044,35282
+157988,NY,other,New York State House 126,51432,59360
+157989,NY,other,New York State House 127,50316,52894
+157990,NY,other,New York State House 128,32436,37228
+157991,NY,other,New York State House 129,29696,33104
+157993,NY,other,New York State House 131,41512,42270
+157994,NY,other,New York State House 132,17894,21258
+157995,NY,other,New York State House 133,32098,38094
+158001,NY,other,New York State House 139,40612,80870
+158002,NY,other,New York State House 140,72034,73944
+158006,NY,other,New York State House 144,77500,91202
+158007,NY,other,New York State House 145,61776,89036
+158010,NY,other,New York State House 148,9816,13058
+158012,NY,other,New York State House 150,56866,66546
+87366,OH,other,Ohio Attorney General,3251145,3411841
+87367,OH,other,Ohio Secretary of State,3259890,3421135
+158301,OH,other,Ohio Treasurer of State,3218643,3325262
+158302,OH,other,Ohio Justice of the Supreme Court - Term Commencing 01/01/2027,3224264,3330655
+158303,OH,other,Ohio Justice of the Supreme Court - Term Commencing 01/02/2027,3225206,3332317
+158328,OH,other,Ohio State Senate 3,75087,91257
+158329,OH,other,Ohio State Senate 5,107107,116785
+158340,OH,other,Ohio State Senate 27,100361,103123
+158341,OH,other,Ohio State Senate 29,92415,126102
+158342,OH,other,Ohio State Senate 31,100304,101895
+158355,OH,other,Ohio State House 12,24384,40425
+158366,OH,other,Ohio State House 23,38018,50416
+158378,OH,other,Ohio State House 35,29415,32162
+158387,OH,other,Ohio State House 44,7247,11311
+158391,OH,other,Ohio State House 48,37055,47646
+158392,OH,other,Ohio State House 49,28317,36928
+158393,OH,other,Ohio State House 50,26687,40931
+158394,OH,other,Ohio State House 51,35987,37579
+158400,OH,other,Ohio State House 57,48499,56217
+158414,OH,other,Ohio State House 71,29667,31992
+158417,OH,other,Ohio State House 74,34504,39204
+158418,OH,other,Ohio State House 75,26243,32500
+158423,OH,other,Ohio State House 80,41953,51670
+158442,OH,other,Ohio State House 99,34373,42613
+158927,OK,other,Oklahoma Lieutenant Governor,832605,890987
+158928,OK,other,Oklahoma Attorney General,830552,888784
+158929,OK,other,Oklahoma State Treasurer,773684,826660
+158930,OK,other,Oklahoma Superintendent of Public Instruction,825368,883341
+158931,OK,other,Oklahoma Commissioner of Labor,826951,884858
+158932,OK,other,Oklahoma Insurance Commissioner,826524,884489
+158933,OK,other,Oklahoma Corporation Commissioner,825033,882817
+158959,OK,other,Oklahoma State Senate 18,23455,23949
+158960,OK,other,Oklahoma State Senate 22,22138,26622
+158961,OK,other,Oklahoma State House 41,11414,13227
+158971,OK,other,Oklahoma State Senate 17 Unexpired Term,18445,18533
+158972,OK,other,Oklahoma State Senate 24,200,2899
+158973,OK,other,Oklahoma State House 20,9562,10291
+158974,OK,other,Oklahoma State House 27,5168,5989
+158975,OK,other,Oklahoma State House 36,3042,3267
+158976,OK,other,Oklahoma State House 45,77,1543
+158977,OK,other,Oklahoma State House 53,85,1377
+158978,OK,other,Oklahoma State House 54,199,968
+158979,OK,other,Oklahoma State House 90,1180,2827
+158980,OK,other,Oklahoma State House 91,127,1906
+158981,OK,other,Oklahoma State House 95,5773,7657
+158993,OK,other,Oklahoma State Senate 12,21078,22250
+158994,OK,other,Oklahoma State House 24,7330,10280
+158996,OK,other,Oklahoma State House 68,4516,4920
+159012,OK,other,Oklahoma State Senate 10,22621,23032
+159031,OK,other,Oklahoma State House 16,9516,10020
+159036,OK,other,Oklahoma State Senate 42,11430,15817
+159038,OK,other,Oklahoma State House 82,8389,8915
+159039,OK,other,Oklahoma State House 83,5918,9797
+159040,OK,other,Oklahoma State House 84,5788,6436
+159041,OK,other,Oklahoma State House 85,12074,12961
+159042,OK,other,Oklahoma State House 87,3846,4599
+159044,OK,other,Oklahoma State House 99,8156,8852
+159045,OK,other,Oklahoma State House 100,5997,6876
+159055,OK,other,Oklahoma State House 66,7973,8366
+159077,OK,other,Oklahoma State House 74,9552,10405
+159081,OK,other,Oklahoma State Senate 34,11111,12331
+159082,OK,other,Oklahoma State Senate 36,18319,20328
+159084,OK,other,Oklahoma State House 72,4925,6108
+159085,OK,other,Oklahoma State House 75,5214,7217
+159087,OK,other,Oklahoma State House 78,6556,7498
+159089,OK,other,Oklahoma State House 80,8921,9624
+159200,PA,other,Pennsylvania State Senate 2,15642,32244
+159201,PA,other,Pennsylvania State Senate 4,28293,60846
+159202,PA,other,Pennsylvania State Senate 6,53531,60694
+159203,PA,other,Pennsylvania State Senate 8,15542,33551
+159204,PA,other,Pennsylvania State Senate 10,57695,67101
+159205,PA,other,Pennsylvania State Senate 12,31862,45669
+159207,PA,other,Pennsylvania State Senate 16,57379,69051
+159211,PA,other,Pennsylvania State Senate 24,30196,31375
+159214,PA,other,Pennsylvania State Senate 30,75951,78615
+159217,PA,other,Pennsylvania State Senate 36,61481,83712
+159218,PA,other,Pennsylvania State Senate 38,112474,114639
+159220,PA,other,Pennsylvania State Senate 42,74599,80892
+159221,PA,other,Pennsylvania State Senate 44,59720,63438
+159222,PA,other,Pennsylvania State Senate 46,47442,47896
+159223,PA,other,Pennsylvania State Senate 48,81677,82545
+159224,PA,other,Pennsylvania State Senate 50,52138,63405
+159230,PA,other,Pennsylvania State House 6,11485,15621
+159232,PA,other,Pennsylvania State House 8,8872,28520
+159234,PA,other,Pennsylvania State House 10,3239,9699
+159235,PA,other,Pennsylvania State House 11,0,18314
+159236,PA,other,Pennsylvania State House 12,0,27888
+159238,PA,other,Pennsylvania State House 14,7453,17262
+159239,PA,other,Pennsylvania State House 15,10156,15297
+159240,PA,other,Pennsylvania State House 16,10842,18846
+159241,PA,other,Pennsylvania State House 17,5798,13875
+159242,PA,other,Pennsylvania State House 18,5982,5986
+159243,PA,other,Pennsylvania State House 19,13903,15761
+159244,PA,other,Pennsylvania State House 20,25655,26551
+159245,PA,other,Pennsylvania State House 21,22050,22557
+159247,PA,other,Pennsylvania State House 23,17658,20344
+159248,PA,other,Pennsylvania State House 24,16392,18942
+159249,PA,other,Pennsylvania State House 25,24748,24925
+159251,PA,other,Pennsylvania State House 27,17066,19358
+159253,PA,other,Pennsylvania State House 29,25410,33835
+159254,PA,other,Pennsylvania State House 30,30297,30801
+159255,PA,other,Pennsylvania State House 31,11792,11794
+159256,PA,other,Pennsylvania State House 32,25047,25418
+159258,PA,other,Pennsylvania State House 34,18854,20848
+159259,PA,other,Pennsylvania State House 35,13580,16743
+159260,PA,other,Pennsylvania State House 36,19951,20900
+159261,PA,other,Pennsylvania State House 37,11879,21140
+159262,PA,other,Pennsylvania State House 38,19486,20774
+159263,PA,other,Pennsylvania State House 39,16128,19018
+159264,PA,other,Pennsylvania State House 40,19416,21660
+159265,PA,other,Pennsylvania State House 41,18729,22513
+159266,PA,other,Pennsylvania State House 42,22052,23410
+159267,PA,other,Pennsylvania State House 43,8689,12509
+159268,PA,other,Pennsylvania State House 44,24135,27903
+159269,PA,other,Pennsylvania State House 45,20763,23338
+159270,PA,other,Pennsylvania State House 46,16972,17417
+159273,PA,other,Pennsylvania State House 49,8974,13271
+159277,PA,other,Pennsylvania State House 53,6666,6672
+159278,PA,other,Pennsylvania State House 54,7954,9641
+159285,PA,other,Pennsylvania State House 61,9646,13454
+159287,PA,other,Pennsylvania State House 63,19321,19526
+159288,PA,other,Pennsylvania State House 64,14893,18384
+159289,PA,other,Pennsylvania State House 65,6993,8426
+159294,PA,other,Pennsylvania State House 70,8341,11086
+159295,PA,other,Pennsylvania State House 71,11975,16043
+159296,PA,other,Pennsylvania State House 72,16671,22166
+159297,PA,other,Pennsylvania State House 73,17108,18698
+159304,PA,other,Pennsylvania State House 80,19265,19303
+159305,PA,other,Pennsylvania State House 81,19692,22319
+159309,PA,other,Pennsylvania State House 85,5705,16568
+159320,PA,other,Pennsylvania State House 96,21430,25410
+159321,PA,other,Pennsylvania State House 97,17663,25274
+159322,PA,other,Pennsylvania State House 98,14874,18858
+159323,PA,other,Pennsylvania State House 99,12599,13650
+159324,PA,other,Pennsylvania State House 100,3999,8006
+159331,PA,other,Pennsylvania State House 107,12304,12637
+159340,PA,other,Pennsylvania State House 116,2160,4193
+159347,PA,other,Pennsylvania State House 123,7486,10923
+159348,PA,other,Pennsylvania State House 124,6507,9079
+159365,PA,other,Pennsylvania State House 141,5473,5475
+159366,PA,other,Pennsylvania State House 142,9146,9959
+159367,PA,other,Pennsylvania State House 143,18683,23209
+159368,PA,other,Pennsylvania State House 144,21949,25397
+159369,PA,other,Pennsylvania State House 145,8569,15733
+159370,PA,other,Pennsylvania State House 146,5706,5899
+159371,PA,other,Pennsylvania State House 147,6842,7579
+159372,PA,other,Pennsylvania State House 148,9781,15139
+159373,PA,other,Pennsylvania State House 149,11497,14571
+159374,PA,other,Pennsylvania State House 150,13606,17739
+159375,PA,other,Pennsylvania State House 151,8684,14345
+159377,PA,other,Pennsylvania State House 153,7415,9396
+159378,PA,other,Pennsylvania State House 154,7198,8893
+159394,PA,other,Pennsylvania State House 170,15915,16950
+159396,PA,other,Pennsylvania State House 172,7341,11665
+159397,PA,other,Pennsylvania State House 173,6765,12556
+159398,PA,other,Pennsylvania State House 174,8346,10455
+159399,PA,other,Pennsylvania State House 175,5985,22527
+159401,PA,other,Pennsylvania State House 177,7871,14361
+159402,PA,other,Pennsylvania State House 178,16526,20480
+159403,PA,other,Pennsylvania State House 179,4032,8361
+159404,PA,other,Pennsylvania State House 180,4511,6949
+159405,PA,other,Pennsylvania State House 181,2906,15184
+159406,PA,other,Pennsylvania State House 182,7761,23650
+159408,PA,other,Pennsylvania State House 184,7728,15663
+159409,PA,other,Pennsylvania State House 185,4003,6146
+159410,PA,other,Pennsylvania State House 186,4516,16416
+159412,PA,other,Pennsylvania State House 188,3268,7007
+159414,PA,other,Pennsylvania State House 190,7222,12934
+159415,PA,other,Pennsylvania State House 191,3322,6464
+159416,PA,other,Pennsylvania State House 192,5036,10758
+159418,PA,other,Pennsylvania State House 194,6760,18476
+159419,PA,other,Pennsylvania State House 195,3842,7108
+159421,PA,other,Pennsylvania State House 197,3333,9623
+159422,PA,other,Pennsylvania State House 198,4315,15171
+159424,PA,other,Pennsylvania State House 200,7668,26143
+159425,PA,other,Pennsylvania State House 201,6548,16525
+159426,PA,other,Pennsylvania State House 202,2624,6025
+159427,PA,other,Pennsylvania State House 203,2522,11274
+87398,RI,other,Rhode Island Lieutenant Governor,341160,346714
+87399,RI,other,Rhode Island Secretary of State,275396,279819
+87400,RI,other,Rhode Island Attorney General,337723,343240
+87401,RI,other,Rhode Island State Treasurer,336053,341541
+153202,RI,other,Rhode Island State Senate 3,6983,7268
+153220,RI,other,Rhode Island State Senate 21,7678,8162
+153225,RI,other,Rhode Island State Senate 26,7173,7858
+153226,RI,other,Rhode Island State Senate 27,7168,8946
+153227,RI,other,Rhode Island State Senate 28,6236,7081
+153230,RI,other,Rhode Island State Senate 31,8342,8589
+153232,RI,other,Rhode Island State Senate 33,9853,10168
+153241,RI,other,Rhode Island State House 4,4853,5118
+153251,RI,other,Rhode Island State House 14,2366,2576
+153252,RI,other,Rhode Island State House 15,5859,6433
+153253,RI,other,Rhode Island State House 16,2779,3760
+153254,RI,other,Rhode Island State House 17,3536,3974
+153255,RI,other,Rhode Island State House 18,3340,4008
+153256,RI,other,Rhode Island State House 19,6655,6802
+153263,RI,other,Rhode Island State House 26,3091,3595
+153267,RI,other,Rhode Island State House 30,4561,4770
+153277,RI,other,Rhode Island State House 40,3465,3996
+153278,RI,other,Rhode Island State House 41,6109,6251
+153279,RI,other,Rhode Island State House 42,4664,4764
+179500,RI,other,Barrington Town Moderator,4936,6330
+179502,RI,other,Barrington School Committee,8006,10241
+179525,RI,other,Coventry School Committee At-Large,10025,13172
+179526,RI,other,Coventry School Committee District 1,1629,1999
+179527,RI,other,Coventry School Committee District 2,1753,2109
+179528,RI,other,Coventry School Committee District 3,1430,1689
+179529,RI,other,Coventry School Committee District 4,1290,1733
+179559,RI,other,East Providence School Committee At-Large,11204,12947
+179560,RI,other,East Providence School Committee Ward 1,3260,3591
+179561,RI,other,East Providence School Committee Ward 2,2287,2514
+179562,RI,other,East Providence School Committee Ward 3,3092,3430
+179563,RI,other,East Providence School Committee Ward 4,3570,4664
+179564,RI,other,Exeter Town Moderator,1853,2163
+179565,RI,other,Exeter Town Clerk,1973,2354
+179566,RI,other,Regional School Committee Town of Exeter,1804,2110
+179568,RI,other,Exeter Town Sergeant,2081,2466
+179569,RI,other,Exeter Town Treasurer,1877,2201
+179570,RI,other,Exeter Zoning Inspector,2315,2742
+179600,RI,other,Lincoln Town Administrator,4740,8550
+179606,RI,other,Lincoln School Committee District 1,946,1412
+179607,RI,other,Lincoln School Committee District 3,479,1569
+179609,RI,other,Lincoln Water Commissioner District 1,1031,1551
+179610,RI,other,Lincoln Water Commissioner District 3,500,1676
+179641,RI,other,North Providence School Committee At-Large,6281,8522
+179642,RI,other,North Providence School Committee District 1,2055,2656
+179643,RI,other,North Providence School Committee District 2,2247,3468
+179644,RI,other,North Providence School Committee District 3,2245,2826
+179676,RI,other,Scituate Town Clerk,2785,3635
+179677,RI,other,Scituate Town Moderator,2547,3370
+179678,RI,other,Scituate Town Treasurer,2497,3298
+179679,RI,other,Scituate Town Sergeant,3378,4386
+179681,RI,other,Scituate School Committee,5906,7729
+179682,RI,other,Scituate Director of Public Welfare,2460,3237
+179683,RI,other,Scituate Board of Assessment Review,2273,2976
+179687,RI,other,South Kingstown School Committee,17439,31584
+179707,RI,other,Warwick School Committee District 2,7197,7802
+179718,RI,other,West Warwick School Committee Ward 1,613,1331
+142155,SC,other,South Carolina Secretary of State,1755930,1797940
+142156,SC,other,South Carolina Treasurer,1753088,1792029
+142157,SC,other,South Carolina Attorney General,1754752,1790949
+142158,SC,other,South Carolina Comptroller General,1745597,1781683
+176110,TN,other,Tennessee State House 11,8870,18383
+176132,TN,other,Tennessee State House 33,18771,20202
+176140,TN,other,Tennessee State House 41,15011,15049
+176146,TN,other,Tennessee State House 47,3231,18278
+176151,TN,other,Tennessee State House 52,9755,12874
+176154,TN,other,Tennessee State House 55,8319,10483
+176158,TN,other,Tennessee State House 59,22423,24080
+176159,TN,other,Tennessee State House 60,15583,17732
+176165,TN,other,Tennessee State House 66,13402,18658
+176177,TN,other,Tennessee State House 78,18804,20596
+176179,TN,other,Tennessee State House 80,8874,14483
+176186,TN,other,Tennessee State House 87,0,9349
+176201,TN,other,Tennessee State Senate 5,35317,36770
+176207,TN,other,Tennessee State Senate 17,61499,65462
+176210,TN,other,Tennessee State Senate 23,47525,54314
+44210,TX,other,Texas Comptroller,4422102,4552072
+55859,TX,other,Texas Supreme Court Place 2,4386107,4496547
+55860,TX,other,Texas Supreme Court Place 8,4376945,4487177
+87439,TX,other,Texas Lieutenant Governor,5190064,5430600
+87440,TX,other,Texas Attorney General,5062678,5196648
+87441,TX,other,Texas Railroad Commissioner,5076625,5209486
+162408,TX,other,Texas Supreme Court Chief Justice,4398445,4509243
+162711,TX,other,Texas Supreme Court Place 7,4380205,4490561
+87492,WI,other,Wisconsin Attorney General,972306,1355265
+87493,WI,other,Wisconsin Secretary of State,309197,1170795
+87494,WI,other,Wisconsin State Treasurer,306926,1163467
+176301,WI,other,Wisconsin State Assembly 2,15795,16823
+176302,WI,other,Wisconsin State Assembly 3,1040,2434
+176306,WI,other,Wisconsin State Assembly 7,11193,16303
+176307,WI,other,Wisconsin State Assembly 8,5193,7006
+176309,WI,other,Wisconsin State Assembly 10,13944,19674
+176310,WI,other,Wisconsin State Assembly 11,10741,11244
+176312,WI,other,Wisconsin State Assembly 13,6731,10370
+176313,WI,other,Wisconsin State Assembly 14,12951,14877
+176315,WI,other,Wisconsin State Assembly 16,8682,10581
+176316,WI,other,Wisconsin State Assembly 17,14337,14678
+176317,WI,other,Wisconsin State Assembly 18,10162,12339
+176318,WI,other,Wisconsin State Assembly 19,16228,19459
+176319,WI,other,Wisconsin State Assembly 20,13872,16945
+176320,WI,other,Wisconsin State Assembly 21,7802,14868
+176321,WI,other,Wisconsin State Assembly 22,18879,23525
+176322,WI,other,Wisconsin State Assembly 23,26212,32650
+176324,WI,other,Wisconsin State Assembly 25,3245,4119
+176330,WI,other,Wisconsin State Assembly 31,16674,23435
+176331,WI,other,Wisconsin State Assembly 32,20829,24863
+176333,WI,other,Wisconsin State Assembly 34,2182,6992
+176335,WI,other,Wisconsin State Assembly 36,184,2568
+176336,WI,other,Wisconsin State Assembly 37,17237,17741
+176337,WI,other,Wisconsin State Assembly 38,18118,19274
+176338,WI,other,Wisconsin State Assembly 39,6453,11507
+176342,WI,other,Wisconsin State Assembly 43,20128,22065
+176343,WI,other,Wisconsin State Assembly 44,13166,16999
+176344,WI,other,Wisconsin State Assembly 45,12860,14273
+176349,WI,other,Wisconsin State Assembly 50,11422,18452
+176350,WI,other,Wisconsin State Assembly 51,6376,8129
+176352,WI,other,Wisconsin State Assembly 53,9341,20971
+176353,WI,other,Wisconsin State Assembly 54,7641,8852
+176354,WI,other,Wisconsin State Assembly 55,20594,22695
+176355,WI,other,Wisconsin State Assembly 56,16384,17168
+176356,WI,other,Wisconsin State Assembly 57,4213,4672
+176357,WI,other,Wisconsin State Assembly 58,16030,25070
+176358,WI,other,Wisconsin State Assembly 59,24021,25596
+176360,WI,other,Wisconsin State Assembly 61,17175,20227
+176364,WI,other,Wisconsin State Assembly 65,16213,16643
+176366,WI,other,Wisconsin State Assembly 67,5605,8020
+176367,WI,other,Wisconsin State Assembly 68,1061,7162
+176368,WI,other,Wisconsin State Assembly 69,1352,3119
+176373,WI,other,Wisconsin State Assembly 74,384,1625
+176374,WI,other,Wisconsin State Assembly 75,1806,2475
+176390,WI,other,Wisconsin State Assembly 91,18417,25819
+176391,WI,other,Wisconsin State Assembly 92,0,1591
+176392,WI,other,Wisconsin State Assembly 93,13400,21206
+176393,WI,other,Wisconsin State Assembly 94,12922,28330
+176394,WI,other,Wisconsin State Assembly 95,1308,16626
+176395,WI,other,Wisconsin State Assembly 96,5913,19061
+176397,WI,other,Wisconsin State Assembly 98,4586,6044
+176399,WI,other,Wisconsin State Senate 1,39776,42174
+176401,WI,other,Wisconsin State Senate 5,19840,25445
+176402,WI,other,Wisconsin State Senate 7,37935,51332
+176403,WI,other,Wisconsin State Senate 9,4092,7496
+176404,WI,other,Wisconsin State Senate 11,46258,49274
+176405,WI,other,Wisconsin State Senate 13,41757,48481
+176406,WI,other,Wisconsin State Senate 15,46585,53823
+176407,WI,other,Wisconsin State Senate 17,19184,28014
+176408,WI,other,Wisconsin State Senate 19,37006,44642
+176409,WI,other,Wisconsin State Senate 21,26964,30013
+176410,WI,other,Wisconsin State Senate 23,7992,18222
+176411,WI,other,Wisconsin State Senate 25,19505,21418
+176414,WI,other,Wisconsin State Senate 31,31987,48874
+176415,WI,other,Wisconsin State Senate 33,14202,16605
+86900,AL,us_house,Alabama US House 1,17648,37062
+86901,AL,us_house,Alabama US House 2,127957,188875
+86902,AL,us_house,Alabama US House 3,108181,112256
+86904,AL,us_house,Alabama US House 5,138295,150211
+86906,AL,us_house,Alabama US House 7,47220,60001
+86945,AR,us_house,Arkansas US House 1,47723,49437
+86946,AR,us_house,Arkansas US House 2,95699,101276
+86948,AR,us_house,Arkansas US House 4,80123,107249
+86917,AZ,us_house,Arizona US House 1,0,248275
+86918,AZ,us_house,Arizona US House 2,0,173538
+86919,AZ,us_house,Arizona US House 3,0,85105
+86920,AZ,us_house,Arizona US House 4,0,162506
+86921,AZ,us_house,Arizona US House 5,0,205601
+86922,AZ,us_house,Arizona US House 6,0,233303
+86923,AZ,us_house,Arizona US House 7,0,100612
+86924,AZ,us_house,Arizona US House 8,0,197021
+86925,AZ,us_house,Arizona US House 9,0,167544
+87023,CT,us_house,Connecticut US House 1,0,6513
+87035,DE,us_house,Delaware US House At-Large,314880,347261
+87046,FL,us_house,Florida US House 7,321647,322873
+87048,FL,us_house,Florida US House 9,284209,284273
+87055,FL,us_house,Florida US House 16,340574,340628
+87060,FL,us_house,Florida US House 21,333265,337437
+87061,FL,us_house,Florida US House 22,292859,293449
+87062,FL,us_house,Florida US House 23,255902,256200
+87063,FL,us_house,Florida US House 24,201938,202370
+87064,FL,us_house,Florida US House 25,279029,279054
+87065,FL,us_house,Florida US House 26,228129,228246
+87067,FL,us_house,Florida US House 28,234585,234815
+87073,GA,us_house,Georgia US House 1,219522,234987
+87074,GA,us_house,Georgia US House 2,180667,184417
+87075,GA,us_house,Georgia US House 3,247867,256811
+87078,GA,us_house,Georgia US House 6,261687,262087
+87081,GA,us_house,Georgia US House 9,258751,261616
+87082,GA,us_house,Georgia US House 10,300310,306252
+87084,GA,us_house,Georgia US House 12,259188,261020
+87147,IA,us_house,Iowa US House 1,24976,39939
+87148,IA,us_house,Iowa US House 2,62814,77689
+87149,IA,us_house,Iowa US House 3,219148,223922
+87150,IA,us_house,Iowa US House 4,61561,73633
+87112,IL,us_house,Illinois US House 1,0,139336
+87113,IL,us_house,Illinois US House 2,0,132213
+87114,IL,us_house,Illinois US House 3,0,103288
+87115,IL,us_house,Illinois US House 4,0,86143
+87116,IL,us_house,Illinois US House 5,0,171537
+87117,IL,us_house,Illinois US House 6,0,136408
+87118,IL,us_house,Illinois US House 7,0,141073
+87119,IL,us_house,Illinois US House 8,0,117460
+87120,IL,us_house,Illinois US House 9,0,164402
+87121,IL,us_house,Illinois US House 10,0,37875
+87122,IL,us_house,Illinois US House 11,0,103342
+87123,IL,us_house,Illinois US House 12,0,135235
+87124,IL,us_house,Illinois US House 13,0,128334
+87125,IL,us_house,Illinois US House 14,0,108853
+87126,IL,us_house,Illinois US House 15,0,87500
+87127,IL,us_house,Illinois US House 16,0,76088
+87128,IL,us_house,Illinois US House 17,0,127404
+87135,IN,us_house,Indiana US House 1,153262,197163
+87142,IN,us_house,Indiana US House 8,199143,210999
+87158,KS,us_house,Kansas US House 1,133654,152917
+87159,KS,us_house,Kansas US House 2,146341,156079
+87160,KS,us_house,Kansas US House 3,281332,284592
+87161,KS,us_house,Kansas US House 4,157368,165890
+87169,KY,us_house,Kentucky US House 2,227799,231052
+87171,KY,us_house,Kentucky US House 4,245854,249510
+87177,LA,us_house,Louisiana US House 1,86537,102873
+87178,LA,us_house,Louisiana US House 2,55469,68222
+87179,LA,us_house,Louisiana US House 3,64519,83630
+87180,LA,us_house,Louisiana US House 4,92937,131525
+87181,LA,us_house,Louisiana US House 5,139767,163739
+87182,LA,us_house,Louisiana US House 6,95221,119883
+87266,MA,us_house,Massachusetts US House 1,46980,56721
+87271,MA,us_house,Massachusetts US House 6,4726,27309
+87190,MD,us_house,Maryland US House 1,0,245171
+87191,MD,us_house,Maryland US House 2,0,167634
+87192,MD,us_house,Maryland US House 3,0,175245
+87193,MD,us_house,Maryland US House 4,0,112400
+87194,MD,us_house,Maryland US House 5,0,215175
+87195,MD,us_house,Maryland US House 6,0,125727
+87196,MD,us_house,Maryland US House 7,0,93678
+87197,MD,us_house,Maryland US House 8,0,170154
+87186,ME,us_house,Maine US House 1,62336,72339
+87187,ME,us_house,Maine US House 2,91540,100303
+87201,MI,us_house,Michigan US House 1,20720,31195
+87202,MI,us_house,Michigan US House 2,24255,30909
+87204,MI,us_house,Michigan US House 4,14021,14116
+87205,MI,us_house,Michigan US House 5,27123,32440
+87208,MI,us_house,Michigan US House 8,19412,23030
+87209,MI,us_house,Michigan US House 9,76389,80171
+87221,MN,us_house,Minnesota US House 1,15714,18668
+87227,MN,us_house,Minnesota US House 7,4929,8646
+87228,MN,us_house,Minnesota US House 8,11655,12079
+87235,MO,us_house,Missouri US House 2,168135,171987
+87236,MO,us_house,Missouri US House 3,95242,153461
+87237,MO,us_house,Missouri US House 4,107763,151189
+87238,MO,us_house,Missouri US House 5,182725,182862
+87239,MO,us_house,Missouri US House 6,194793,207431
+87240,MO,us_house,Missouri US House 7,78791,82791
+87241,MO,us_house,Missouri US House 8,92555,120451
+81000,MS,us_house,Mississippi US House 1,104696,125529
+81001,MS,us_house,Mississippi US House 2,85463,105338
+81002,MS,us_house,Mississippi US House 3,125607,141020
+81003,MS,us_house,Mississippi US House 4,129291,144489
+87332,NC,us_house,North Carolina US House 1,255541,273321
+87334,NC,us_house,North Carolina US House 3,177469,224029
+87335,NC,us_house,North Carolina US House 4,311213,318266
+87336,NC,us_house,North Carolina US House 5,263721,265151
+87337,NC,us_house,North Carolina US House 6,251384,256126
+87338,NC,us_house,North Carolina US House 7,267874,285609
+87339,NC,us_house,North Carolina US House 8,266848,286933
+87340,NC,us_house,North Carolina US House 9,242899,248908
+87341,NC,us_house,North Carolina US House 10,271210,275514
+87343,NC,us_house,North Carolina US House 12,212873,234291
+87344,NC,us_house,North Carolina US House 13,289504,291500
+87345,NC,us_house,North Carolina US House 14,258754,272515
+87347,ND,us_house,North Dakota US House At-Large,76490,93394
+87253,NE,us_house,Nebraska US House 3,41408,44543
+87281,NH,us_house,New Hampshire US House 1,165449,165521
+87282,NH,us_house,New Hampshire US House 2,140390,155364
+87291,NJ,us_house,New Jersey US House 2,170091,172684
+87296,NJ,us_house,New Jersey US House 7,240342,245075
+87297,NJ,us_house,New Jersey US House 8,78827,89456
+87299,NJ,us_house,New Jersey US House 10,138073,148014
+87303,NY,us_house,New York US House 1,273264,327504
+87304,NY,us_house,New York US House 2,199156,238226
+87305,NY,us_house,New York US House 3,295846,298394
+87307,NY,us_house,New York US House 5,285362,301746
+87308,NY,us_house,New York US House 6,241034,249972
+87309,NY,us_house,New York US House 7,293152,305108
+87310,NY,us_house,New York US House 8,300574,312792
+87311,NY,us_house,New York US House 9,298444,314064
+87312,NY,us_house,New York US House 10,368402,384260
+87313,NY,us_house,New York US House 11,352254,354282
+87314,NY,us_house,New York US House 12,447486,460998
+87315,NY,us_house,New York US House 13,291442,296918
+87316,NY,us_house,New York US House 14,262080,269526
+87317,NY,us_house,New York US House 15,226614,231076
+87319,NY,us_house,New York US House 17,178560,257432
+87320,NY,us_house,New York US House 18,257192,318402
+87321,NY,us_house,New York US House 19,219720,238634
+87322,NY,us_house,New York US House 20,117048,138746
+87323,NY,us_house,New York US House 21,230580,289168
+87324,NY,us_house,New York US House 22,264954,310924
+87325,NY,us_house,New York US House 23,333162,368692
+87326,NY,us_house,New York US House 24,176896,259824
+87328,NY,us_house,New York US House 26,295210,319664
+87352,OH,us_house,Ohio US House 3,227245,246899
+87353,OH,us_house,Ohio US House 4,293581,298748
+87354,OH,us_house,Ohio US House 5,262245,269345
+87355,OH,us_house,Ohio US House 6,236593,254449
+87357,OH,us_house,Ohio US House 8,219035,241480
+87358,OH,us_house,Ohio US House 9,141912,145269
+87359,OH,us_house,Ohio US House 10,223453,232526
+87362,OH,us_house,Ohio US House 13,182280,199532
+87363,OH,us_house,Ohio US House 14,274053,303194
+87364,OH,us_house,Ohio US House 15,190830,221425
+87509,OK,us_house,Oklahoma US House 1,161278,179046
+87511,OK,us_house,Oklahoma US House 3,176398,180193
+87512,OK,us_house,Oklahoma US House 4,88696,105817
+87513,OK,us_house,Oklahoma US House 5,194086,213768
+87376,PA,us_house,Pennsylvania US House 1,145434,176143
+87377,PA,us_house,Pennsylvania US House 2,78921,158679
+87378,PA,us_house,Pennsylvania US House 3,70684,189391
+87379,PA,us_house,Pennsylvania US House 4,111135,136065
+87380,PA,us_house,Pennsylvania US House 5,91863,101990
+87384,PA,us_house,Pennsylvania US House 9,174563,183314
+87386,PA,us_house,Pennsylvania US House 11,137880,179832
+87387,PA,us_house,Pennsylvania US House 12,216925,237055
+87388,PA,us_house,Pennsylvania US House 13,195887,210486
+87390,PA,us_house,Pennsylvania US House 15,185659,201373
+87391,PA,us_house,Pennsylvania US House 16,119391,208864
+87392,PA,us_house,Pennsylvania US House 17,265979,303108
+87394,RI,us_house,Rhode Island US House 1,157329,157641
+87395,RI,us_house,Rhode Island US House 2,185873,191130
+87402,SC,us_house,South Carolina US House 1,239670,245750
+87404,SC,us_house,South Carolina US House 3,257685,261486
+87408,SC,us_house,South Carolina US House 7,297682,299334
+87448,TN,us_house,Tennessee US House 1,123236,132826
+87449,TN,us_house,Tennessee US House 2,187176,199691
+87450,TN,us_house,Tennessee US House 3,214825,223098
+87451,TN,us_house,Tennessee US House 4,160876,167642
+87453,TN,us_house,Tennessee US House 6,195621,203926
+87454,TN,us_house,Tennessee US House 7,169202,184314
+87455,TN,us_house,Tennessee US House 8,176582,177560
+56007,TX,us_house,Texas US House 21,189954,191884
+56008,TX,us_house,Texas US House 22,185661,186891
+56010,TX,us_house,Texas US House 27,121051,121744
+56014,TX,us_house,Texas US House 36,135495,135506
+87411,TX,us_house,Texas US House 1,110780,129797
+87415,TX,us_house,Texas US House 6,172518,172562
+87419,TX,us_house,Texas US House 12,214121,216689
+87420,TX,us_house,Texas US House 13,114862,117677
+87421,TX,us_house,Texas US House 14,205250,205423
+87428,TX,us_house,Texas US House 23,155127,156002
+87483,WI,us_house,Wisconsin US House 1,139015,219755
+87485,WI,us_house,Wisconsin US House 3,70027,79978
+87487,WI,us_house,Wisconsin US House 5,117592,298827
+87488,WI,us_house,Wisconsin US House 6,127957,158419
+87489,WI,us_house,Wisconsin US House 7,52684,72733
+87490,WI,us_house,Wisconsin US House 8,107659,110331
+86907,AL,us_senate,Alabama US Senate,730586,767512
+86949,AR,us_senate,Arkansas US Senate,346474,381367
+87036,DE,us_senate,Delaware US Senate,314509,346990
+87068,FL,us_senate,Florida US Senate Special,8209054,8223326
+87087,GA,us_senate,Georgia US Senate,3520276,3559617
+87151,IA,us_senate,Iowa US Senate,382508,429958
+87129,IL,us_senate,Illinois US Senate,0,2096422
+87162,KS,us_senate,Kansas US Senate,721904,762137
+87174,KY,us_senate,Kentucky US Senate,1399140,1406123
+87183,LA,us_senate,Louisiana US Senate,537045,673388
+87275,MA,us_senate,Massachusetts US Senate,402292,542440
+87188,ME,us_senate,Maine US Senate,154028,163355
+87214,MI,us_senate,Michigan US Senate,805381,840383
+87229,MN,us_senate,Minnesota US Senate,67651,74752
+81004,MS,us_senate,Mississippi US Senate,454094,529245
+87346,NC,us_senate,North Carolina US Senate,3677266,3840548
+87254,NE,us_senate,Nebraska US Senate,302668,305837
+87302,NJ,us_senate,New Jersey US Senate,2101345,2141082
+87527,OH,us_senate,Ohio US Senate Special General,3292762,3456154
+87526,OK,us_senate,Oklahoma US Senate,832503,890884
+87396,RI,us_senate,Rhode Island US Senate,344590,350179
+87409,SC,us_senate,South Carolina US Senate,1799452,1804916
+87475,TN,us_senate,Tennessee US Senate,1531768,1645422
+87438,TX,us_senate,Texas US Senate,5737065,5768398

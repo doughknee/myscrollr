@@ -11,6 +11,7 @@ use redis::AsyncCommands;
 use serde_json::{Value, json};
 use sqlx::postgres::PgPoolOptions;
 use std::{
+    collections::HashMap,
     env,
     sync::{
         Arc,
@@ -63,7 +64,10 @@ async fn run() -> Result<()> {
             .connect(&env::var("DATABASE_URL").context("DATABASE_URL required")?)
             .await?;
         let redis = redis::Client::open(env::var("REDIS_URL").context("REDIS_URL required")?)?;
-        let races = provider::catalog()?;
+        let races: HashMap<_, _> = provider::catalog()?
+            .into_iter()
+            .map(|race| (race.id, race))
+            .collect();
         let http = provider::client()?;
         let pulse = state.last_cycle.clone();
         tokio::spawn(async move {
@@ -72,32 +76,54 @@ async fn run() -> Result<()> {
             loop {
                 ticks.tick().await;
                 let mut healthy = true;
-                for race in &races {
-                    let update = async {
-                        if let Some(lease) = store::claim(&db, race.id).await? {
-                            let result =
-                                provider::fetch(&http, race, lease.source_updated_at).await;
-                            let outcome = store::complete(&db, race, lease, result).await?;
-                            if let Some(err) = outcome.upstream_error {
-                                log::warn!("Race {} provider check failed: {}", race.id, err);
-                            }
-                            if outcome.changed {
-                                publish(&redis, race.id).await?;
-                            }
+                let mut tasks = tokio::task::JoinSet::new();
+                let due = timeout(Duration::from_secs(8), store::due_followed(&db, &races))
+                    .await
+                    .context("election scheduling timed out")
+                    .and_then(|result| result);
+                match due {
+                    Ok(ids) => {
+                        for id in ids {
+                            let race = races[&id].clone();
+                            let (db, http, redis) = (db.clone(), http.clone(), redis.clone());
+                            tasks.spawn(async move {
+                                let update = async {
+                                    if let Some(lease) = store::claim(&db, id).await? {
+                                        let result =
+                                            provider::fetch(&http, &race, lease.source_updated_at)
+                                                .await;
+                                        let outcome =
+                                            store::complete(&db, &race, lease, result).await?;
+                                        if let Some(err) = outcome.upstream_error {
+                                            log::warn!(
+                                                "Race {} provider check failed: {}",
+                                                id,
+                                                err
+                                            );
+                                        }
+                                        if outcome.changed {
+                                            publish(&redis, id).await?;
+                                        }
+                                    }
+                                    anyhow::Ok(())
+                                };
+                                timeout(Duration::from_secs(35), update).await?
+                            });
                         }
-                        anyhow::Ok(())
-                    };
-                    // Two bounded 12-second HTTP reads plus database and Redis I/O.
-                    match timeout(Duration::from_secs(35), update).await {
-                        Ok(Ok(())) => {}
-                        err => {
-                            healthy = false;
-                            log::error!("Race {} worker cycle failed: {:?}", race.id, err);
-                            sentry::capture_message(
-                                "Election worker cycle failed",
-                                sentry::Level::Error,
-                            );
-                        }
+                    }
+                    Err(err) => {
+                        log::error!("Could not schedule followed election races: {}", err);
+                        healthy = false;
+                    }
+                }
+                while let Some(completion) = tasks.join_next().await {
+                    if !matches!(completion, Ok(Ok(()))) {
+                        healthy = false;
+                        log::error!("Election worker task failed: {:?}", completion);
+                        sentry::capture_message(
+                            "Election worker cycle failed",
+                            sentry::Level::Error,
+                        );
                     }
                 }
                 pulse.store(

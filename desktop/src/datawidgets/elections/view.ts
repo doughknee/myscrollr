@@ -14,7 +14,7 @@ const sourceDate = new Intl.DateTimeFormat(undefined, {
   timeZoneName: "short",
 });
 
-export const votes = (value: number) => numbers.format(value);
+export const votes = (value: number | bigint) => numbers.format(value);
 export const percent = (value: number) => percentages.format(value) + "%";
 
 export function followedRaceIds(config: unknown): number[] {
@@ -23,11 +23,25 @@ export function followedRaceIds(config: unknown): number[] {
 }
 
 export function raceView(race: ElectionRace) {
-  const candidates = [...race.candidates].sort((a, b) => b.votes - a.votes || a.id - b.id);
+  // Before national discovery this beta supported only Tennessee Governor.
+  const singleSeat = race.result_mode === "single_seat" || (!race.result_mode && race.id === 87476);
+  const directoryOnly = race.snapshot_kind === "directory";
+  const countsOnly = !singleSeat || directoryOnly;
+  const byVotes = [...race.candidates].sort((a, b) => b.votes - a.votes || a.id - b.id);
+  const candidates = countsOnly
+    ? [...byVotes].sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id)
+    : byVotes;
+  const candidateTotals = byVotes.slice(0, 2)
+    .map((c) => c.name + " " + votes(c.votes) + (c.votes === 1 ? " vote" : " votes"))
+    .join(" · ");
   const [first, second] = candidates;
   const winners = candidates.filter((c) => c.winner);
   let headline = !race.source_updated_at && race.delayed ? "Waiting for source data" : "Awaiting votes";
-  if (race.disputed || winners.length > 1) headline = "Result disputed";
+  if (countsOnly) {
+    const total = candidates.reduce((sum, c) => sum + BigInt(c.votes), 0n);
+    if (total > 0n) headline = votes(total) + (total === 1n ? " candidate vote" : " candidate votes");
+    if (race.disputed) headline = "Disputed · " + headline;
+  } else if (race.disputed || winners.length > 1) headline = "Result disputed";
   else if (winners.length === 1) headline = "civicAPI calls it for " + winners[0].name;
   else if (first && first.votes > 0) {
     if (!second) headline = first.name + " leads";
@@ -37,9 +51,18 @@ export function raceView(race: ElectionRace) {
       headline = first.name + " leads by " + votes(margin) + (margin === 1 ? " vote" : " votes");
     }
   }
-  const reporting =
-    race.percent_reporting == null ? "Reporting unavailable" : percent(race.percent_reporting) + " reporting";
+  const reporting = countsOnly
+    ? null
+    : race.percent_reporting == null
+      ? "Reporting unavailable"
+      : percent(race.percent_reporting) + " reporting";
   const time = Date.parse(race.source_updated_at ?? "");
-  const updated = Number.isFinite(time) ? sourceDate.format(time) : "No source update yet";
-  return { candidates, headline, reporting, updated };
+  const observed = Date.parse(race.observed_at ?? "");
+  const updated = directoryOnly
+    ? "Directory snapshot" +
+      (Number.isFinite(observed) ? " · checked " + sourceDate.format(observed) : " · check time unknown")
+    : Number.isFinite(time)
+      ? sourceDate.format(time)
+      : "No source update yet";
+  return { candidates, candidateTotals, headline, reporting, updated, countsOnly, directoryOnly };
 }

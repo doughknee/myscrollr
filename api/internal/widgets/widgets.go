@@ -94,7 +94,7 @@ func GetWidgets(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{"widgets": platform.VisibleWidgets(widgets, platform.ElectionsPreview(c.Query("preview")))})
+	return c.JSON(fiber.Map{"widgets": platform.VisibleWidgets(widgets, c.Query("preview"))})
 }
 
 // Save the widget and its polling targets atomically, including quota checks.
@@ -134,17 +134,26 @@ func widgetVisibleToClient(c *fiber.Ctx, widgetType string) bool {
 	return widgetType != "elections" || platform.ElectionsPreview(c.Query("preview"))
 }
 
-func validateElectionConfig(cfg map[string]any) error {
+func validateElectionConfig(cfg map[string]any, national bool) error {
 	ids, ok := platform.ElectionRaceIDs(cfg)
 	if !ok {
 		return errors.New("race_ids must be a list of up to 12 unique positive integers")
 	}
 	for _, id := range ids {
-		if !ingestread.ElectionRaceSupported(id) {
+		if !ingestread.ElectionRaceSupported(id) || (!national && id != platform.LegacyElectionRaceID) {
 			return errors.New("unsupported election race")
 		}
 	}
 	return nil
+}
+
+// Apply the guard in the write itself: an older beta cannot replace or
+// remove follows created concurrently by a national-capable client.
+func electionWriteGuard(c *fiber.Ctx, widgetType string) string {
+	if widgetType == "elections" && c.Query("preview") != platform.NationalElectionPreview {
+		return fmt.Sprintf(" AND config->'race_ids' <@ '[%d]'::jsonb", platform.LegacyElectionRaceID)
+	}
+	return ""
 }
 
 // CreateWidget adds a new widget for the authenticated user.
@@ -215,7 +224,7 @@ func CreateWidget(c *fiber.Ctx) error {
 
 	req.Config = configOrDefault(req.WidgetType, req.Config)
 	if req.WidgetType == "elections" && req.Config != nil {
-		if err := validateElectionConfig(req.Config); err != nil {
+		if err := validateElectionConfig(req.Config, c.Query("preview") == platform.NationalElectionPreview); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
 		}
 	}
@@ -391,7 +400,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 	}
 
 	if widgetType == "elections" && req.Config != nil {
-		if err := validateElectionConfig(req.Config); err != nil {
+		if err := validateElectionConfig(req.Config, c.Query("preview") == platform.NationalElectionPreview); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
 		}
 	}
@@ -465,9 +474,9 @@ func UpdateWidget(c *fiber.Ctx) error {
 	query := fmt.Sprintf(`
 		UPDATE user_widgets
 		SET %s
-		WHERE logto_sub = $1 AND widget_type = $2
+		WHERE logto_sub = $1 AND widget_type = $2 %s
 		RETURNING id, logto_sub, widget_type, enabled, ticker_enabled, config, created_at, updated_at
-	`, strings.Join(setClauses, ", "))
+	`, strings.Join(setClauses, ", "), electionWriteGuard(c, widgetType))
 
 	ch, err := saveWidget(userID, widgetType, req.Config, query, args...)
 	if err != nil {
@@ -531,7 +540,7 @@ func DeleteWidget(c *fiber.Ctx) error {
 
 	tag, err := platform.DBPool.Exec(context.Background(), `
 		DELETE FROM user_widgets WHERE logto_sub = $1 AND widget_type = $2
-	`, userID, widgetType)
+	`+electionWriteGuard(c, widgetType), userID, widgetType)
 	if err != nil {
 		log.Printf("[Widgets] Delete error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{

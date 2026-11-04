@@ -1,0 +1,495 @@
+{
+  "observed_at": "2026-11-04T03:03:24Z",
+  "source": "https://civicapi.org/api/v2/race/search?startDate=2026-11-03&endDate=2026-11-03&limit=50000",
+  "raw_sha256": "d977942843eed4b09e0e316f03b87df3bed9a559baaba99a5fa4ef82b6cc6a44",
+  "state": "NC",
+  "admitted_mayor_or_council": 97,
+  "with_votes": 0,
+  "rows": [
+    {
+      "id": 141255,
+      "name": "Town Of Badin Town Council Member East District",
+      "total": 0
+    },
+    {
+      "id": 141161,
+      "name": "City Of Trinity Mayor",
+      "total": 0
+    },
+    {
+      "id": 141346,
+      "name": "City Of Raleigh City Council District D",
+      "total": 0
+    },
+    {
+      "id": 141252,
+      "name": "City Of Albemarle City Council Member District 04",
+      "total": 0
+    },
+    {
+      "id": 141455,
+      "name": "Town Of East Bend Mayor",
+      "total": 0
+    },
+    {
+      "id": 141130,
+      "name": "Village Of Simpson Village Council",
+      "total": 0
+    },
+    {
+      "id": 141458,
+      "name": "Town Of Jonesville Town Council",
+      "total": 0
+    },
+    {
+      "id": 141287,
+      "name": "Town Of Dobson Mayor",
+      "total": 0
+    },
+    {
+      "id": 141162,
+      "name": "City Of Trinity City Council Ward 02",
+      "total": 0
+    },
+    {
+      "id": 140277,
+      "name": "Town Of Hildebran Council Member",
+      "total": 0
+    },
+    {
+      "id": 141203,
+      "name": "Town Of China Grove Town Council",
+      "total": 0
+    },
+    {
+      "id": 141254,
+      "name": "Town Of Badin Town Council Member At-Large",
+      "total": 0
+    },
+    {
+      "id": 141292,
+      "name": "City Of Mount Airy Mayor",
+      "total": 0
+    },
+    {
+      "id": 140771,
+      "name": "Town Of Mills River Town Council District 03",
+      "total": 0
+    },
+    {
+      "id": 141457,
+      "name": "Town Of Jonesville Mayor",
+      "total": 0
+    },
+    {
+      "id": 140760,
+      "name": "City Of Hendersonville City Council",
+      "total": 0
+    },
+    {
+      "id": 141260,
+      "name": "Town Of Richfield Mayor",
+      "total": 0
+    },
+    {
+      "id": 141069,
+      "name": "Town Of Oriental Mayor",
+      "total": 0
+    },
+    {
+      "id": 140231,
+      "name": "City Of Asheville Mayor",
+      "total": 0
+    },
+    {
+      "id": 140889,
+      "name": "City Of Lincolnton Mayor",
+      "total": 0
+    },
+    {
+      "id": 141226,
+      "name": "Town Of Rutherfordton Councilman",
+      "total": 0
+    },
+    {
+      "id": 141214,
+      "name": "Town Of Bostic Mayor",
+      "total": 0
+    },
+    {
+      "id": 140820,
+      "name": "Town Of Harmony Town Council",
+      "total": 0
+    },
+    {
+      "id": 141267,
+      "name": "Town Of Norwood Town Council",
+      "total": 0
+    },
+    {
+      "id": 140566,
+      "name": "City Of Raleigh Mayor",
+      "total": 0
+    },
+    {
+      "id": 140298,
+      "name": "City Of Locust Mayor",
+      "total": 0
+    },
+    {
+      "id": 140758,
+      "name": "Village Of Flat Rock Village Council District 03",
+      "total": 0
+    },
+    {
+      "id": 140859,
+      "name": "Town Of Trenton Mayor",
+      "total": 0
+    },
+    {
+      "id": 140759,
+      "name": "City Of Hendersonville Mayor",
+      "total": 0
+    },
+    {
+      "id": 141257,
+      "name": "Town Of New London Mayor",
+      "total": 0
+    },
+    {
+      "id": 141216,
+      "name": "Chimney Rock Village Councilman",
+      "total": 0
+    },
+    {
+      "id": 140756,
+      "name": "Village Of Flat Rock Village Council District 01",
+      "total": 0
+    },
+    {
+      "id": 141266,
+      "name": "City Of Albemarle City Council Member District 02",
+      "total": 0
+    },
+    {
+      "id": 141322,
+      "name": "City Of Monroe Council",
+      "total": 0
+    },
+    {
+      "id": 141083,
+      "name": "Town Of Minnesott Beach Mayor",
+      "total": 0
+    },
+    {
+      "id": 141298,
+      "name": "Town Of Pilot Mountain Mayor",
+      "total": 0
+    },
+    {
+      "id": 140599,
+      "name": "Town Of Rural Hall Town Council",
+      "total": 0
+    },
+    {
+      "id": 140253,
+      "name": "Town Of Black Mountain Town Council (Unexpired)",
+      "total": 0
+    },
+    {
+      "id": 140299,
+      "name": "City Of Locust City Council",
+      "total": 0
+    },
+    {
+      "id": 140713,
+      "name": "City Of Archdale City Council Ward 01",
+      "total": 0
+    },
+    {
+      "id": 141079,
+      "name": "Town Of Vandemere Mayor",
+      "total": 0
+    },
+    {
+      "id": 141263,
+      "name": "Town Of Red Cross Town Council",
+      "total": 0
+    },
+    {
+      "id": 141204,
+      "name": "Town Of Faith Board Of Aldermen",
+      "total": 0
+    },
+    {
+      "id": 140774,
+      "name": "Town Of Fletcher Town Council District 04",
+      "total": 0
+    },
+    {
+      "id": 140252,
+      "name": "Town Of Black Mountain Town Council",
+      "total": 0
+    },
+    {
+      "id": 140775,
+      "name": "Town Of Laurel Park Town Council",
+      "total": 0
+    },
+    {
+      "id": 141075,
+      "name": "Town Of Stonewall Mayor",
+      "total": 0
+    },
+    {
+      "id": 140568,
+      "name": "City Of Raleigh City Council District E",
+      "total": 0
+    },
+    {
+      "id": 140232,
+      "name": "City Of Asheville City Council",
+      "total": 0
+    },
+    {
+      "id": 140857,
+      "name": "Town Of Pollocksville Mayor",
+      "total": 0
+    },
+    {
+      "id": 140459,
+      "name": "Town Of Bridgeton Mayor",
+      "total": 0
+    },
+    {
+      "id": 140776,
+      "name": "City Of Saluda Mayor",
+      "total": 0
+    },
+    {
+      "id": 141372,
+      "name": "City Of Raleigh City Council District B",
+      "total": 0
+    },
+    {
+      "id": 140772,
+      "name": "Town Of Fletcher Mayor",
+      "total": 0
+    },
+    {
+      "id": 140598,
+      "name": "Town Of Rural Hall Mayor",
+      "total": 0
+    },
+    {
+      "id": 141219,
+      "name": "Town Of Ellenboro Aldermen",
+      "total": 0
+    },
+    {
+      "id": 140251,
+      "name": "Town Of Black Mountain Mayor",
+      "total": 0
+    },
+    {
+      "id": 140279,
+      "name": "Town Of Rutherford College Council Member",
+      "total": 0
+    },
+    {
+      "id": 141217,
+      "name": "Town Of Lake Lure Mayor",
+      "total": 0
+    },
+    {
+      "id": 141264,
+      "name": "Town Of Stanfield Mayor",
+      "total": 0
+    },
+    {
+      "id": 141256,
+      "name": "Town Of Badin Town Council Member West District",
+      "total": 0
+    },
+    {
+      "id": 141144,
+      "name": "Town Of Columbus Town Council",
+      "total": 0
+    },
+    {
+      "id": 141453,
+      "name": "Town Of Boonville Mayor",
+      "total": 0
+    },
+    {
+      "id": 140456,
+      "name": "Town Of River Bend Council Member",
+      "total": 0
+    },
+    {
+      "id": 140675,
+      "name": "Town Of Walstonburg Mayor",
+      "total": 0
+    },
+    {
+      "id": 141225,
+      "name": "Town Of Rutherfordton Mayor",
+      "total": 0
+    },
+    {
+      "id": 141129,
+      "name": "Village Of Simpson Mayor",
+      "total": 0
+    },
+    {
+      "id": 141081,
+      "name": "Town Of Arapahoe Mayor",
+      "total": 0
+    },
+    {
+      "id": 140769,
+      "name": "Town Of Mills River Town Council District 01",
+      "total": 0
+    },
+    {
+      "id": 140891,
+      "name": "City Of Lincolnton City Council Ward Three",
+      "total": 0
+    },
+    {
+      "id": 140996,
+      "name": "Town Of Star Mayor",
+      "total": 0
+    },
+    {
+      "id": 141078,
+      "name": "Town Of Mesic Councilman",
+      "total": 0
+    },
+    {
+      "id": 141430,
+      "name": "Town Of Ronda Mayor (Unexpired)",
+      "total": 0
+    },
+    {
+      "id": 141220,
+      "name": "Town Of Forest City Mayor",
+      "total": 0
+    },
+    {
+      "id": 140711,
+      "name": "City Of Archdale Mayor",
+      "total": 0
+    },
+    {
+      "id": 140463,
+      "name": "Town Of Dover Mayor",
+      "total": 0
+    },
+    {
+      "id": 141259,
+      "name": "Village Of Misenheimer Village Council",
+      "total": 0
+    },
+    {
+      "id": 140447,
+      "name": "City Of Havelock Mayor",
+      "total": 0
+    },
+    {
+      "id": 141251,
+      "name": "City Of Albemarle City Council Member At-Large",
+      "total": 0
+    },
+    {
+      "id": 140998,
+      "name": "Town Of Troy Mayor",
+      "total": 0
+    },
+    {
+      "id": 141321,
+      "name": "City Of Monroe Mayor",
+      "total": 0
+    },
+    {
+      "id": 141163,
+      "name": "City Of Trinity City Council Ward 04",
+      "total": 0
+    },
+    {
+      "id": 141222,
+      "name": "Town Of Spindale Mayor",
+      "total": 0
+    },
+    {
+      "id": 140672,
+      "name": "Town Of Hookerton Mayor",
+      "total": 0
+    },
+    {
+      "id": 140567,
+      "name": "City Of Raleigh City Council At-Large",
+      "total": 0
+    },
+    {
+      "id": 141361,
+      "name": "City Of Raleigh City Council District C",
+      "total": 0
+    },
+    {
+      "id": 140714,
+      "name": "City Of Archdale City Council Ward 04",
+      "total": 0
+    },
+    {
+      "id": 140773,
+      "name": "Town Of Fletcher Town Council District 01",
+      "total": 0
+    },
+    {
+      "id": 140757,
+      "name": "Village Of Flat Rock Village Council District 02",
+      "total": 0
+    },
+    {
+      "id": 140276,
+      "name": "Town Of Hildebran Mayor",
+      "total": 0
+    },
+    {
+      "id": 140770,
+      "name": "Town Of Mills River Town Council District 02",
+      "total": 0
+    },
+    {
+      "id": 141073,
+      "name": "Town Of Bayboro Mayor",
+      "total": 0
+    },
+    {
+      "id": 140452,
+      "name": "Town Of Trent Woods Mayor",
+      "total": 0
+    },
+    {
+      "id": 140712,
+      "name": "City Of Archdale City Council At-Large",
+      "total": 0
+    },
+    {
+      "id": 140890,
+      "name": "City Of Lincolnton City Council Ward One",
+      "total": 0
+    },
+    {
+      "id": 141364,
+      "name": "City Of Raleigh City Council District A",
+      "total": 0
+    },
+    {
+      "id": 140278,
+      "name": "Town Of Rutherford College Mayor",
+      "total": 0
+    }
+  ]
+}

@@ -9,8 +9,11 @@ import (
 // Election previews require both an opted-in server and a capable client.
 func ElectionsBetaEnabled() bool { return os.Getenv("ELECTIONS_BETA_ENABLED") == "true" }
 
+const LegacyElectionRaceID = 87476
+const NationalElectionPreview = "elections-national"
+
 func ElectionsPreview(preview string) bool {
-	return preview == "elections" && ElectionsBetaEnabled()
+	return (preview == "elections" || preview == NationalElectionPreview) && ElectionsBetaEnabled()
 }
 
 var electionWidget = WidgetDef{
@@ -31,11 +34,25 @@ func ElectionsCatalog() []WidgetDef {
 
 // VisibleWidgets removes private-preview rows for clients without the renderer.
 // The caller owns rows (per-request DB result or decoded dashboard).
-func VisibleWidgets(rows []Widget, preview bool) []Widget {
-	if preview {
+func VisibleWidgets(rows []Widget, preview string) []Widget {
+	if !ElectionsPreview(preview) {
+		return slices.DeleteFunc(rows, func(w Widget) bool { return w.WidgetType == "elections" })
+	}
+	if preview == NationalElectionPreview {
 		return rows
 	}
-	return slices.DeleteFunc(rows, func(w Widget) bool { return w.WidgetType == "elections" })
+	for i, w := range rows {
+		if w.WidgetType != "elections" {
+			continue
+		}
+		ids, _ := ElectionRaceIDs(w.Config)
+		visible := []int{}
+		if slices.Contains(ids, LegacyElectionRaceID) {
+			visible = append(visible, LegacyElectionRaceID)
+		}
+		rows[i].Config = map[string]any{"race_ids": visible}
+	}
+	return rows
 }
 
 // ElectionRaceIDs parses the stored JSON shape for both writes and topic

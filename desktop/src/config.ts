@@ -42,7 +42,7 @@ export const API_HOST = (() => {
 export function electionPreviewPath(path: string): string {
   const beta = typeof __APP_VERSION__ !== "undefined" && __APP_VERSION__.includes("-beta.");
   if (!beta || import.meta.env.MODE === "embed") return path;
-  return path + (path.includes("?") ? "&" : "?") + "preview=elections";
+  return path + (path.includes("?") ? "&" : "?") + "preview=elections-national";
 }
 
 // ── Auth (Logto PKCE) ───────────────────────────────────────────

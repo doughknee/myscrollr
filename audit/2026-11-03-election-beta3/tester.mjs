@@ -11,12 +11,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const desktop = path.resolve(here, "../../desktop");
 const requireDesktop = createRequire(path.join(desktop, "package.json"));
-const state = path.join(tmpdir(), "scrollr-election-tester");
+const national = process.argv.includes("--national");
+const project = national ? "scrollr-election-national" : "scrollr-election-tester";
+const state = path.join(tmpdir(), project);
 const publicKeys = path.join(state, "jwks");
 const warm = { api: "http://127.0.0.1:18439", web: "http://127.0.0.1:19439" };
-const fresh = { api: "http://127.0.0.1:18440", web: "http://127.0.0.1:19440" };
+const apiPort = national ? 18441 : 18440;
+const webPort = national ? 19441 : 19440;
+const fresh = { api: `http://127.0.0.1:${apiPort}`, web: `http://127.0.0.1:${webPort}` };
 const verifyReplay = process.argv.includes("--verify");
-const sub = verifyReplay ? "beta3-fixture-verifier" : "beta3-local-tester";
+const sub = process.argv.includes("--check") && national ? "beta3-national-verifier" : verifyReplay ? "beta3-fixture-verifier" : "beta3-local-tester";
 const check = process.argv.includes("--check");
 mkdirSync(publicKeys, { recursive: true });
 
@@ -36,9 +40,9 @@ function compose(args, input, capture = false) {
   }
   return execFileSync(
     "docker",
-    ["compose", "-p", "scrollr-election-tester", "-f", path.join(here, "compose.yaml"), ...args],
+    ["compose", "-p", project, "-f", path.join(here, "compose.yaml"), ...args],
     {
-      env: { ...process.env, ELECTION_TEST_KEYS: publicKeys },
+      env: { ...process.env, ELECTION_TEST_KEYS: publicKeys, ELECTION_TEST_API_PORT: apiPort.toString(), ELECTION_TEST_WEB_PORT: webPort.toString() },
       input,
       encoding: "utf8",
       stdio: [input ? "pipe" : "inherit", capture ? "pipe" : "inherit", "inherit"],
@@ -139,12 +143,12 @@ async function startWeb(getMode) {
         configureServer(vite) {
           vite.middlewares.use("/__election_tester_mode", (_req, res) => {
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ project: "scrollr-election-tester", mode: getMode() }));
+            res.end(JSON.stringify({ project, mode: getMode() }));
           });
         },
       },
     ],
-    server: { host: "127.0.0.1", port: 19440, strictPort: true },
+    server: { host: "127.0.0.1", port: webPort, strictPort: true },
   });
   try {
     await server.listen();
@@ -176,7 +180,7 @@ async function run() {
     })
       .then((r) => r.json())
       .catch(() => null);
-    if (mode?.project !== "scrollr-election-tester" || mode.mode !== "replay")
+    if (mode?.project !== project || mode.mode !== "replay")
       throw Error(
         "Open --fresh at 127.0.0.1:19440 before changing phases. The currently running review stack on 19439 and live mode use a different source.",
       );
@@ -195,7 +199,7 @@ async function run() {
     // Verify the real local issuer through both the API and the Vite proxy.
     // Never install this credential into an existing personal browser profile.
     if (
-      live ||
+      national || live ||
       process.argv.includes("--fresh") ||
       !((await verified(warm.api, session)) && (await verified(warm.web + "/__api", session)))
     ) {
@@ -305,6 +309,17 @@ async function run() {
       }
       return;
     }
+    if (national && check) {
+      // A failed earlier run may have left follows in this dedicated verifier account.
+      const removed = await fetch(fresh.api + "/users/me/widgets/elections?preview=elections-national", {
+        method: "DELETE", headers: { Authorization: "Bearer " + session.accessToken }, redirect: "error",
+      });
+      if (!removed.ok && removed.status !== 404) throw Error("Could not reset the private national verifier.");
+    }
+    if (national && !check) {
+      // Private issuer and local synthetic account only; native and web can review the same follows.
+      writeFileSync(path.join(state, "tester.json"), JSON.stringify(session), { mode: 0o600 });
+    }
     const { chromium } = requireDesktop("playwright");
     browser = await chromium.launch({
       headless: check,
@@ -326,6 +341,10 @@ async function run() {
     );
     await Promise.all([dash, page.goto(endpoints.web + "/web.html")]);
     console.log("Signed-in Election Results tester ready at " + endpoints.web + "/web.html");
+    if (national) {
+      const { reviewPicker } = requireDesktop(path.join(here, "verify-national.cjs"));
+      await reviewPicker(page, { verify: check });
+    }
     if (!check)
       await new Promise((resolve) => {
         page.once("close", resolve);

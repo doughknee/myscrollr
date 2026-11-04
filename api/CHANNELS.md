@@ -55,15 +55,25 @@ Two artifacts ride along, both generated and both guarded by a Go test:
 ## Election Results private beta
 
 Set `ELECTIONS_BETA_ENABLED=true` on the private test API at startup. A beta
-client sends `preview=elections` on catalog, dashboard and widget requests.
+client sends `preview=elections-national` on catalog, dashboard and widget requests.
+Earlier beta clients using `preview=elections` can read Tennessee Governor and
+change configurations that contain only that original race.
 The stable catalog, bundled snapshot and public feed continue to use their
 existing sources. A tester adds Election Results in the Library and follows
 a supported race. The widget uses one account slot and starts with no races
 selected. Remove the widget in the beta to release its slot before switching
 the same account back to Stable.
 
-`GET /elections/races` lists the curated contests. The dedicated Rust ingester in
-`channels/elections/service/` polls civicAPI for followed races when enabled.
+The national picker requests `GET /elections/search` for bounded pages and
+`GET /elections/coverage` for the measured state coverage. Both use the national
+preview parameter. The directory stores the observation time separately from
+a source update. A followed race with no validated detail can display recorded
+directory votes as counts only. The original `GET /elections/races` serves the
+Tennessee beta contract.
+
+The dedicated Rust ingester in
+`channels/elections/service/` polls civicAPI for followed races when enabled. It selects up to three due,
+allowlisted follows per cycle, oldest due first after first-time reads.
 It requests the explicit JSON race URL first. A timeout, server error, invalid
 payload or regressing source timestamp triggers one attempt via civicAPI's
 www hostname. A client error such as HTTP 429 goes straight to backoff.

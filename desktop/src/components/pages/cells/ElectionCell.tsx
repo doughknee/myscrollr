@@ -14,7 +14,7 @@ const ElectionCell = memo(function ElectionCell({
   expanded?: boolean;
   onClick?: () => void;
 }) {
-  const { headline, reporting, updated } = raceView(race);
+  const { headline, candidateTotals, reporting, updated } = raceView(race);
   return (
     <button
       type="button"
@@ -24,7 +24,7 @@ const ElectionCell = memo(function ElectionCell({
       data-display-cell={expanded ? "elections" : undefined}
       onClick={onClick}
       className="grid h-full w-full min-w-0 content-center grid-rows-[14px_21px_15px] gap-y-px px-4 text-left"
-      title={[race.name, headline, race.delayed ? "Updates delayed" : "", reporting, updated]
+      title={[race.name, headline, candidateTotals, race.delayed ? "Updates delayed" : "", reporting, updated]
         .filter(Boolean)
         .join(" · ")}
     >
@@ -34,7 +34,7 @@ const ElectionCell = memo(function ElectionCell({
       </span>
       <strong className="truncate text-[15px] leading-[21px] text-fg">{headline}</strong>
       <span className="truncate font-mono text-[10px] leading-[15px] text-fg-3">
-        {reporting} · {updated}
+        {[reporting, updated].filter(Boolean).join(" · ")}
       </span>
     </button>
   );

@@ -11,6 +11,41 @@ pub struct Lease {
     delayed: bool,
 }
 
+// A single cycle launches at most this many HTTP tasks on a replica. Load
+// actual follows once, discard retired IDs, then select the oldest due work.
+// Unwatched catalog entries do not cause DB probes or network requests.
+const POLL_BATCH: i64 = 3;
+
+pub async fn due_followed(
+    db: &PgPool,
+    catalog: &std::collections::HashMap<i32, Race>,
+) -> Result<Vec<i32>> {
+    let followed: Vec<String> = sqlx::query_scalar("SELECT DISTINCT value::text
+        FROM user_widgets CROSS JOIN LATERAL jsonb_array_elements(
+          CASE WHEN jsonb_typeof(config->'race_ids')='array' THEN config->'race_ids' ELSE '[]'::jsonb END
+        ) f(value)
+        WHERE widget_type='elections' AND enabled AND jsonb_typeof(value)='number'")
+        .fetch_all(db).await?;
+    let ids: Vec<i32> = followed
+        .iter()
+        .filter_map(|raw| raw.parse().ok())
+        .filter(|id| catalog.contains_key(id))
+        .collect();
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT f.id FROM unnest($1::int[]) f(id)
+        LEFT JOIN election_results r ON r.race_id=f.id
+        WHERE r.next_poll_at IS NULL OR r.next_poll_at<=now()
+        ORDER BY r.next_poll_at NULLS FIRST,f.id LIMIT $2",
+    )
+    .bind(ids)
+    .bind(POLL_BATCH)
+    .fetch_all(db)
+    .await?)
+}
+
 pub async fn claim(db: &PgPool, id: i32) -> Result<Option<Lease>> {
     Ok(sqlx::query_as("INSERT INTO election_results (race_id,next_poll_at,verified_until)
         SELECT $1,now()+interval '45 seconds',now()+interval '90 seconds'

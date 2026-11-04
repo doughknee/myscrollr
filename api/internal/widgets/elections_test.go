@@ -29,11 +29,11 @@ func TestElectionSettingsValidateBeforeWriting(t *testing.T) {
 		if err := json.Unmarshal([]byte(cfg), &v); err != nil {
 			t.Fatal(err)
 		}
-		if err := validateElectionConfig(v); err != nil {
+		if err := validateElectionConfig(v, true); err != nil {
 			t.Errorf("valid config %s: %v", cfg, err)
 		}
 	}
-	if err := validateElectionConfig(configOrDefault("elections", nil)); err != nil {
+	if err := validateElectionConfig(configOrDefault("elections", nil), true); err != nil {
 		t.Fatalf("invalid default: %v", err)
 	}
 	for _, tc := range []struct{ method, path string }{

@@ -11,7 +11,7 @@ const ElectionChip = memo(function ElectionChip({
   race: ElectionRace;
   onClick?: () => void;
 }) {
-  const { headline, reporting, updated } = raceView(race);
+  const { headline, candidateTotals, reporting, updated } = raceView(race);
   const c = getChipColors("elections");
   const detail = [race.delayed ? "Delayed" : "", reporting, updated].filter(Boolean).join(" · ");
   return (
@@ -19,7 +19,7 @@ const ElectionChip = memo(function ElectionChip({
       type="button"
       data-race-id={race.id}
       onClick={onClick}
-      title={[race.name, headline, detail].join(" · ")}
+      title={[race.name, headline, candidateTotals, detail].filter(Boolean).join(" · ")}
       className={clsx(
         chipShellClasses(c),
         "grid w-[460px] grid-cols-[138px_minmax(0,1fr)] grid-rows-[30px_20px] font-mono",
