@@ -25,6 +25,71 @@ fn raw(corrected: bool) -> Value {
             {"candidate_id":2,"name":"Preview B","party":"QA replay","votes":votes_b,"percent":percent_b,"winner":false}]})
 }
 
+#[tokio::test]
+async fn provider_recovers_from_bad_routes_without_bypassing_rate_limits() -> Result<()> {
+    use axum::{Json, Router, http::StatusCode, routing::get};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let alternate_reads = Arc::new(AtomicUsize::new(0));
+    let reads = alternate_reads.clone();
+    let app = Router::new()
+        .route("/gateway", get(|| async { StatusCode::BAD_GATEWAY }))
+        .route("/busy", get(|| async { StatusCode::TOO_MANY_REQUESTS }))
+        .route("/html", get(|| async { "temporarily unavailable" }))
+        .route("/older", get(|| async { Json(raw(false)) }))
+        .route(
+            "/ok",
+            get(move || {
+                let reads = reads.clone();
+                async move {
+                    reads.fetch_add(1, Ordering::SeqCst);
+                    Json(raw(true))
+                }
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let base = format!("http://{}", listener.local_addr()?);
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let client = reqwest::Client::new();
+    let race = &catalog()?[0];
+    let previous = Some(time("2026-11-04T02:07:00Z"));
+    let good = format!("{base}/ok");
+    for path in ["gateway", "html", "older"] {
+        let recovered =
+            fetch_with_fallback(&client, race, previous, &format!("{base}/{path}"), &good).await?;
+        assert_eq!(recovered.candidates[0].votes, 110);
+    }
+    assert_eq!(alternate_reads.load(Ordering::SeqCst), 3);
+    assert!(
+        fetch_with_fallback(&client, race, previous, &format!("{base}/busy"), &good)
+            .await
+            .is_err()
+    );
+    assert_eq!(alternate_reads.load(Ordering::SeqCst), 3);
+    assert!(
+        fetch_with_fallback(&client, race, previous, &good, &good)
+            .await
+            .is_ok()
+    );
+    assert_eq!(alternate_reads.load(Ordering::SeqCst), 4);
+    assert!(
+        fetch_with_fallback(
+            &client,
+            race,
+            previous,
+            &format!("{base}/gateway"),
+            &format!("{base}/html")
+        )
+        .await
+        .is_err()
+    );
+    server.abort();
+    Ok(())
+}
+
 fn parse(value: &Value, race: &Race) -> Result<Snapshot> {
     decode(
         &serde_json::to_vec(value)?,

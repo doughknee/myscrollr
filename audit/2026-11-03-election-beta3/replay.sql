@@ -50,5 +50,5 @@ ON CONFLICT (race_id) DO UPDATE SET snapshot=EXCLUDED.snapshot,source_updated_at
 -- Keep an advancing generation so a slow pre-reset worker cannot overwrite it.
 UPDATE election_results SET snapshot=NULL,source_updated_at=NULL,failures=0,
     next_poll_at=now(),verified_until=now()+interval '90 seconds',lease_generation=lease_generation+1
-WHERE race_id=87476 AND (SELECT phase FROM replay_step)='reset';
+WHERE race_id=87476 AND next_poll_at='infinity' AND (SELECT phase FROM replay_step)='reset';
 COMMIT;

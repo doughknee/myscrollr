@@ -75,7 +75,8 @@ async fn run() -> Result<()> {
                 for race in &races {
                     let update = async {
                         if let Some(lease) = store::claim(&db, race.id).await? {
-                            let result = provider::fetch(&http, race).await;
+                            let result =
+                                provider::fetch(&http, race, lease.source_updated_at).await;
                             let outcome = store::complete(&db, race, lease, result).await?;
                             if let Some(err) = outcome.upstream_error {
                                 log::warn!("Race {} provider check failed: {}", race.id, err);
@@ -86,7 +87,8 @@ async fn run() -> Result<()> {
                         }
                         anyhow::Ok(())
                     };
-                    match timeout(Duration::from_secs(22), update).await {
+                    // Two bounded 12-second HTTP reads plus database and Redis I/O.
+                    match timeout(Duration::from_secs(35), update).await {
                         Ok(Ok(())) => {}
                         err => {
                             healthy = false;

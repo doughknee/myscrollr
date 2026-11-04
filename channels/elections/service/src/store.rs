@@ -7,13 +7,13 @@ use sqlx::{FromRow, PgPool};
 pub struct Lease {
     lease_generation: i64,
     failures: i32,
-    source_updated_at: Option<DateTime<Utc>>,
+    pub(super) source_updated_at: Option<DateTime<Utc>>,
     delayed: bool,
 }
 
 pub async fn claim(db: &PgPool, id: i32) -> Result<Option<Lease>> {
     Ok(sqlx::query_as("INSERT INTO election_results (race_id,next_poll_at,verified_until)
-        SELECT $1,now()+interval '30 seconds',now()+interval '90 seconds'
+        SELECT $1,now()+interval '45 seconds',now()+interval '90 seconds'
         WHERE EXISTS (SELECT 1 FROM user_widgets WHERE enabled AND widget_type='elections'
             AND config->'race_ids' @> jsonb_build_array($1::int))
         ON CONFLICT (race_id) DO UPDATE SET next_poll_at=excluded.next_poll_at,

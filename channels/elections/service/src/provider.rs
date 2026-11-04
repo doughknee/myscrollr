@@ -128,12 +128,58 @@ pub fn client() -> Result<Client> {
         .build()?)
 }
 
-pub async fn fetch(client: &Client, race: &Race) -> Result<Snapshot> {
+pub async fn fetch(
+    client: &Client,
+    race: &Race,
+    previous: Option<DateTime<Utc>>,
+) -> Result<Snapshot> {
+    let primary = format!("https://civicapi.org/api/v2/race/{}?format=json", race.id);
+    let alternate = format!("https://www.civicapi.org/api/v2/race/{}", race.id);
+    fetch_with_fallback(client, race, previous, &primary, &alternate).await
+}
+
+pub(super) async fn fetch_with_fallback(
+    client: &Client,
+    race: &Race,
+    previous: Option<DateTime<Utc>>,
+    primary: &str,
+    alternate: &str,
+) -> Result<Snapshot> {
+    match fetch_at(client, race, previous, primary).await {
+        Ok(snapshot) => Ok(snapshot),
+        Err(first) => {
+            // Both URLs belong to one provider. Honor a refusal or rate limit
+            // across both hostnames and let the store schedule the next poll.
+            if first
+                .downcast_ref::<reqwest::Error>()
+                .and_then(|e| e.status())
+                .is_some_and(|status| status.is_client_error())
+            {
+                return Err(first);
+            }
+            let snapshot = fetch_at(client, race, previous, alternate)
+                .await
+                .with_context(|| {
+                    format!("primary civicAPI read failed ({first}); alternate failed")
+                })?;
+            log::info!("Race {} recovered through alternate civicAPI URL", race.id);
+            Ok(snapshot)
+        }
+    }
+}
+
+async fn fetch_at(
+    client: &Client,
+    race: &Race,
+    previous: Option<DateTime<Utc>>,
+    url: &str,
+) -> Result<Snapshot> {
     let mut res = client
-        .get(format!("https://civicapi.org/api/v2/race/{}", race.id))
+        .get(url)
         .header(reqwest::header::ACCEPT, "application/json")
         .send()
-        .await?;
+        .await?
+        .error_for_status()?;
     ensure!(
         res.status() == reqwest::StatusCode::OK,
         "civicAPI HTTP {}",
@@ -144,7 +190,12 @@ pub async fn fetch(client: &Client, race: &Race) -> Result<Snapshot> {
         ensure!(chunk.len() <= BODY_LIMIT - body.len(), "oversized response");
         body.extend_from_slice(&chunk);
     }
-    decode(&body, race, Utc::now())
+    let snapshot = decode(&body, race, Utc::now())?;
+    ensure!(
+        previous.is_none_or(|last| snapshot.source_updated_at >= last),
+        "older civicAPI snapshot"
+    );
+    Ok(snapshot)
 }
 
 pub fn interval(race: &Race, now: DateTime<Utc>) -> i32 {

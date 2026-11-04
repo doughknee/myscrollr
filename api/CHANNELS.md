@@ -63,7 +63,11 @@ selected. Remove the widget in the beta to release its slot before switching
 the same account back to Stable.
 
 `GET /elections/races` lists the curated contests. The dedicated Rust ingester in
-`channels/elections/service/` polls CivicAPI for followed races when enabled.
+`channels/elections/service/` polls civicAPI for followed races when enabled.
+It requests the explicit JSON race URL first. A timeout, server error, invalid
+payload or regressing source timestamp triggers one attempt via civicAPI's
+www hostname. A client error such as HTTP 429 goes straight to backoff.
+Two unsuccessful reads preserve the last verified count and its source time.
 A PostgreSQL lease shares the work across workers. After a committed change,
 the ingester publishes a refresh signal to the race's Redis
 topic. The next authenticated dashboard read merges the latest stored result
