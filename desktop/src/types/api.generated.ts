@@ -50,14 +50,31 @@ export interface ElectionCandidate {
   winner: boolean;
 }
 
+export interface ElectionCoverage {
+  previous_checked_at?: string;
+  checked_at: string;
+  states: ElectionStateCoverage[];
+}
+
 export interface ElectionRace {
   id: number;
   name: string;
   state: string;
   election_date: string;
+  office: string;
+  office_label: string;
+  district?: string;
+  municipality?: string;
+  result_mode: string;
+  vote_status: string;
+  checked_at: string | null;
+  changed_at: string | null;
 }
 
 export interface ElectionResult {
+  result_mode?: string;
+  snapshot_kind?: string;
+  observed_at?: string;
   id: number;
   name: string;
   state: string;
@@ -67,6 +84,17 @@ export interface ElectionResult {
   delayed: boolean;
   disputed: boolean;
   candidates: ElectionCandidate[];
+}
+
+export interface ElectionSearch {
+  races: ElectionRace[];
+  total: number;
+}
+
+export interface ElectionStateCoverage {
+  state: string;
+  status: string;
+  race_count: number;
 }
 
 export interface ErrorResponse {

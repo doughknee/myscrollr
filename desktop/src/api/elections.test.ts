@@ -53,7 +53,7 @@ const refresh = () => client.fetchQuery({ ...dashboardQueryOptions(), staleTime:
 
 describe("elections preview and dashboard recovery", () => {
   it("negotiates beta data while retaining pins and leaves the stable URL unchanged", () => {
-    expect(electionPreviewPath("/dashboard?pins=x")).toBe("/dashboard?pins=x&preview=elections");
+    expect(electionPreviewPath("/dashboard?pins=x")).toBe("/dashboard?pins=x&preview=elections-national");
     vi.stubGlobal("__APP_VERSION__", "1.8.0");
     expect(electionPreviewPath("/catalog")).toBe("/catalog");
   });
@@ -61,7 +61,7 @@ describe("elections preview and dashboard recovery", () => {
     vi.mocked(authFetch).mockResolvedValue({ widgets: [row], data: {} });
     const dashboard = await refresh();
     expect(dashboard.data.elections).toEqual([{ ...race, delayed: true }]);
-    expect(authFetch).toHaveBeenCalledWith("/dashboard?preview=elections");
+    expect(authFetch).toHaveBeenCalledWith("/dashboard?preview=elections-national");
   });
   it("clears a removed widget and never resurrects another account's count", async () => {
     vi.mocked(authFetch).mockResolvedValue({ widgets: [{ ...row, id: 73 }], data: {} });

@@ -1,4 +1,6 @@
+mod directory_store;
 mod log;
+mod nationwide;
 mod provider;
 mod store;
 #[cfg(test)]
@@ -11,6 +13,7 @@ use redis::AsyncCommands;
 use serde_json::{Value, json};
 use sqlx::postgres::PgPoolOptions;
 use std::{
+    collections::HashMap,
     env,
     sync::{
         Arc,
@@ -27,6 +30,51 @@ async fn publish(redis: &redis::Client, id: i32) -> Result<()> {
     let _: usize = conn
         .publish(format!("cdc:elections:{id}"), INVALIDATION)
         .await?;
+    Ok(())
+}
+
+async fn refresh_directory(
+    db: &sqlx::PgPool,
+    redis: &redis::Client,
+    http: &reqwest::Client,
+    catalog: &HashMap<i32, provider::Race>,
+) -> Result<()> {
+    for (date, wanted) in directory_store::failing_by_date(db, catalog).await? {
+        let Some(race) = wanted.values().next() else {
+            continue;
+        };
+        let Some(lease) = directory_store::claim(db, date).await? else {
+            continue;
+        };
+        let cadence = provider::interval(race, Utc::now()).max(60);
+        match nationwide::fetch(http, date, &wanted).await {
+            Ok((observed, rows)) => {
+                let ids =
+                    directory_store::save(db, &lease, &wanted, observed, &rows, cadence).await?;
+                if !ids.is_empty() {
+                    log::info!(
+                        "Nationwide check for {date} refreshed {} followed races at {observed}",
+                        ids.len()
+                    );
+                    let mut conn = redis.get_multiplexed_async_connection().await?;
+                    let mut pipeline = redis::pipe();
+                    for id in ids {
+                        pipeline
+                            .cmd("PUBLISH")
+                            .arg(format!("cdc:elections:{id}"))
+                            .arg(INVALIDATION)
+                            .ignore();
+                    }
+                    pipeline.query_async::<()>(&mut conn).await?;
+                }
+            }
+            Err(err) => {
+                directory_store::fail(db, &lease, cadence, nationwide::retry_after(&err)).await?;
+                log::warn!("Nationwide election check for {date} failed: {err}");
+            }
+        }
+        break;
+    }
     Ok(())
 }
 
@@ -63,8 +111,35 @@ async fn run() -> Result<()> {
             .connect(&env::var("DATABASE_URL").context("DATABASE_URL required")?)
             .await?;
         let redis = redis::Client::open(env::var("REDIS_URL").context("REDIS_URL required")?)?;
-        let races = provider::catalog()?;
+        let races: Arc<HashMap<_, _>> = Arc::new(
+            provider::catalog()?
+                .into_iter()
+                .map(|race| (race.id, race))
+                .collect(),
+        );
         let http = provider::client()?;
+        {
+            // Bulk retrieval can take a minute. Never hold up the detail
+            // queue or its health heartbeat waiting for the shared request.
+            let (db, redis, http, races) = (db.clone(), redis.clone(), http.clone(), races.clone());
+            tokio::spawn(async move {
+                let mut ticks = interval(Duration::from_secs(10));
+                ticks.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    ticks.tick().await;
+                    match timeout(
+                        Duration::from_secs(95),
+                        refresh_directory(&db, &redis, &http, &races),
+                    )
+                    .await
+                    {
+                        Ok(Ok(())) => {}
+                        Ok(Err(err)) => log::error!("Election directory worker failed: {err}"),
+                        Err(_) => log::error!("Election directory worker timed out"),
+                    }
+                }
+            });
+        }
         let pulse = state.last_cycle.clone();
         tokio::spawn(async move {
             let mut ticks = interval(Duration::from_secs(10));
@@ -72,32 +147,54 @@ async fn run() -> Result<()> {
             loop {
                 ticks.tick().await;
                 let mut healthy = true;
-                for race in &races {
-                    let update = async {
-                        if let Some(lease) = store::claim(&db, race.id).await? {
-                            let result =
-                                provider::fetch(&http, race, lease.source_updated_at).await;
-                            let outcome = store::complete(&db, race, lease, result).await?;
-                            if let Some(err) = outcome.upstream_error {
-                                log::warn!("Race {} provider check failed: {}", race.id, err);
-                            }
-                            if outcome.changed {
-                                publish(&redis, race.id).await?;
-                            }
+                let mut tasks = tokio::task::JoinSet::new();
+                let due = timeout(Duration::from_secs(8), store::due_followed(&db, &races))
+                    .await
+                    .context("election scheduling timed out")
+                    .and_then(|result| result);
+                match due {
+                    Ok(ids) => {
+                        for id in ids {
+                            let race = races[&id].clone();
+                            let (db, http, redis) = (db.clone(), http.clone(), redis.clone());
+                            tasks.spawn(async move {
+                                let update = async {
+                                    if let Some(lease) = store::claim(&db, id).await? {
+                                        let result =
+                                            provider::fetch(&http, &race, lease.source_updated_at)
+                                                .await;
+                                        let outcome =
+                                            store::complete(&db, &race, lease, result).await?;
+                                        if let Some(err) = outcome.upstream_error {
+                                            log::warn!(
+                                                "Race {} provider check failed: {}",
+                                                id,
+                                                err
+                                            );
+                                        }
+                                        if outcome.changed {
+                                            publish(&redis, id).await?;
+                                        }
+                                    }
+                                    anyhow::Ok(())
+                                };
+                                timeout(Duration::from_secs(35), update).await?
+                            });
                         }
-                        anyhow::Ok(())
-                    };
-                    // Two bounded 12-second HTTP reads plus database and Redis I/O.
-                    match timeout(Duration::from_secs(35), update).await {
-                        Ok(Ok(())) => {}
-                        err => {
-                            healthy = false;
-                            log::error!("Race {} worker cycle failed: {:?}", race.id, err);
-                            sentry::capture_message(
-                                "Election worker cycle failed",
-                                sentry::Level::Error,
-                            );
-                        }
+                    }
+                    Err(err) => {
+                        log::error!("Could not schedule followed election races: {}", err);
+                        healthy = false;
+                    }
+                }
+                while let Some(completion) = tasks.join_next().await {
+                    if !matches!(completion, Ok(Ok(()))) {
+                        healthy = false;
+                        log::error!("Election worker task failed: {:?}", completion);
+                        sentry::capture_message(
+                            "Election worker cycle failed",
+                            sentry::Level::Error,
+                        );
                     }
                 }
                 pulse.store(

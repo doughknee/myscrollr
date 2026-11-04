@@ -14,6 +14,16 @@ pub struct Race {
     pub name: String,
     pub state: String,
     pub election_date: NaiveDate,
+    pub result_mode: ResultMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub municipality: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResultMode {
+    SingleSeat,
+    CountsOnly,
 }
 
 pub fn catalog() -> Result<Vec<Race>> {
@@ -28,12 +38,15 @@ pub fn catalog() -> Result<Vec<Race>> {
 
 #[derive(Deserialize)]
 struct ProviderRace {
+    id: Option<i32>,
+    race_id: Option<i32>,
+    municipality: Option<String>,
     election_name: String,
     country: String,
     province: String,
     election_date: DateTime<Utc>,
     test_data: bool,
-    is_disputed: bool,
+    is_disputed: Option<bool>,
     last_updated: DateTime<Utc>,
     percent_reporting: Option<f64>,
     candidates: Vec<Candidate>,
@@ -48,7 +61,7 @@ pub struct Candidate {
     pub party: String,
     pub votes: u64,
     pub percent: Option<f64>,
-    pub winner: bool,
+    pub winner: Option<bool>,
 }
 
 // A nonpartisan candidate can have no party label.
@@ -75,9 +88,17 @@ fn valid_label(s: &str) -> bool {
 
 pub fn decode(body: &[u8], race: &Race, now: DateTime<Utc>) -> Result<Snapshot> {
     ensure!(body.len() <= BODY_LIMIT, "oversized response");
-    let p: ProviderRace = serde_json::from_slice(body).context("invalid provider response")?;
+    let mut p: ProviderRace = serde_json::from_slice(body).context("invalid provider response")?;
     ensure!(
         !p.test_data
+            && p.id.is_none_or(|id| id == race.id)
+            && p.race_id.is_none_or(|id| id == race.id)
+            && p.municipality
+                .as_deref()
+                .zip(race.municipality.as_deref())
+                .is_none_or(|(a, b)| a.trim().is_empty()
+                    || b.trim().is_empty()
+                    || a.trim().eq_ignore_ascii_case(b.trim()))
             && p.country == "US"
             && p.province == race.state
             && p.election_name == race.name
@@ -103,10 +124,24 @@ pub fn decode(body: &[u8], race: &Race, now: DateTime<Utc>) -> Result<Snapshot> 
             "invalid candidate"
         );
     }
-    ensure!(
-        p.candidates.iter().filter(|c| c.winner).count() <= 1,
-        "ambiguous race call"
-    );
+    if race.result_mode == ResultMode::CountsOnly {
+        // No seat model or round semantics: publish tallies only, even if
+        // the upstream supplies multiple candidate winner flags.
+        for candidate in &mut p.candidates {
+            candidate.winner = Some(false);
+        }
+    } else {
+        ensure!(
+            p.is_disputed.is_some()
+                && p.candidates.iter().all(|c| c.winner.is_some())
+                && p.candidates
+                    .iter()
+                    .filter(|c| c.winner == Some(true))
+                    .count()
+                    <= 1,
+            "ambiguous race call"
+        );
+    }
     // Round down to PostgreSQL timestamptz precision so unchanged snapshots remain identical.
     let updated = DateTime::from_timestamp_micros(p.last_updated.timestamp_micros())
         .context("invalid source time")?;
@@ -115,7 +150,7 @@ pub fn decode(body: &[u8], race: &Race, now: DateTime<Utc>) -> Result<Snapshot> 
         source_updated_at: updated,
         percent_reporting: p.percent_reporting,
         candidates: p.candidates,
-        disputed: p.is_disputed,
+        disputed: p.is_disputed.unwrap_or(false),
     })
 }
 

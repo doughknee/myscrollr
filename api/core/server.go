@@ -214,6 +214,8 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/catalog", widgets.HandleGetCatalog)
 	if platform.ElectionsBetaEnabled() {
 		s.App.Get("/elections/races", ingestread.HandleElectionRaces)
+		s.App.Get("/elections/search", ingestread.HandleElectionSearch)
+		s.App.Get("/elections/coverage", ingestread.HandleElectionCoverage)
 	}
 	// "Request it" from the catalog's zero-match card: one row per user
 	// and query, count across users. Authenticated; IP-rate-limited.
@@ -491,7 +493,7 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 	// desktop prefs and are never stored server-side (SCROLLR-9). Cloned
 	// because c.Query aliases fasthttp's pooled buffer.
 	pins := ingestread.ParsePinnedSubjects(strings.Clone(c.Query("pins")))
-	preview := platform.ElectionsPreview(c.Query("preview"))
+	preview := c.Query("preview")
 
 	// Check per-user Redis cache first
 	cacheKey := platform.RedisDashboardCachePrefix + userID
@@ -573,11 +575,11 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 
 // Merge pins and the latest race results outside the shared aggregate cache.
 // Every caller for an account can use the same cache and invalidation key.
-func mergeDashboardForClient(res *platform.DashboardResponse, userID string, pins map[string][]string, preview bool) {
+func mergeDashboardForClient(res *platform.DashboardResponse, userID string, pins map[string][]string, preview string) {
 	res.Widgets = platform.VisibleWidgets(res.Widgets, preview)
 	for _, row := range res.Widgets {
 		if row.Enabled && row.WidgetType == "elections" {
-			for k, v := range ingestread.LocalDashboard(context.Background(), userID, map[string]bool{"elections": true}) {
+			for k, v := range ingestread.ElectionDashboardForClient(context.Background(), userID, preview == platform.NationalElectionPreview) {
 				res.Data[k] = v
 			}
 			break

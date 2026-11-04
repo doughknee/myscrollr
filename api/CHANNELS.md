@@ -55,19 +55,40 @@ Two artifacts ride along, both generated and both guarded by a Go test:
 ## Election Results private beta
 
 Set `ELECTIONS_BETA_ENABLED=true` on the private test API at startup. A beta
-client sends `preview=elections` on catalog, dashboard and widget requests.
+client sends `preview=elections-national` on catalog, dashboard and widget requests.
+Earlier beta clients using `preview=elections` can read Tennessee Governor and
+change configurations that contain only that original race.
 The stable catalog, bundled snapshot and public feed continue to use their
 existing sources. A tester adds Election Results in the Library and follows
 a supported race. The widget uses one account slot and starts with no races
 selected. Remove the widget in the beta to release its slot before switching
 the same account back to Stable.
 
-`GET /elections/races` lists the curated contests. The dedicated Rust ingester in
-`channels/elections/service/` polls civicAPI for followed races when enabled.
+The national picker requests `GET /elections/search` for bounded pages and
+`GET /elections/coverage` for the measured state coverage. Both use the national
+preview parameter. The directory stores the observation time separately from
+a source update. A followed race with no validated detail can display recorded
+directory votes as counts only. The original `GET /elections/races` serves the
+Tennessee beta contract.
+
+The dedicated Rust ingester in
+`channels/elections/service/` polls civicAPI for followed races when enabled. It selects up to three due,
+allowlisted follows per cycle, oldest due first after first-time reads.
 It requests the explicit JSON race URL first. A timeout, server error, invalid
 payload or regressing source timestamp triggers one attempt via civicAPI's
 www hostname. A client error such as HTTP 429 goes straight to backoff.
-Two unsuccessful reads preserve the last verified count and its source time.
+After a failed detail check, the worker can read the national election-day listing.
+One database lease per election date shares that request across users and replicas.
+During election night it schedules the next successful bulk refresh after 60 seconds,
+rotating up to 256 eligible followed races at a time. Failed bulk requests back off
+and respect Retry-After. The detail reader keeps retrying independently.
+
+The national preview may display a validated bulk count with its HTTP observation
+time. After three minutes without a fresh observation, the ticker labels those
+counts as delayed. Detail results and nationwide observations are stored separately.
+An older bulk response cannot replace newer detail. A lower vote count crossing
+from one feed to the other needs two observations demonstrating a correction.
+The picker’s national activity filter still describes the dated coverage survey.
 A PostgreSQL lease shares the work across workers. After a committed change,
 the ingester publishes a refresh signal to the race's Redis
 topic. The next authenticated dashboard read merges the latest stored result

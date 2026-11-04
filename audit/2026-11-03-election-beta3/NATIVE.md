@@ -1,5 +1,17 @@
 # Windows native election tester
 
+## National race picker
+
+Start **Test National Race Picker.cmd** from this audit folder. Once that local tester is signed in, open **Start Scrollr National Election Tester.cmd** in `%TEMP%\scrollr-election-national-native-beta3`. Keep the national browser tester running while using the native windows. The launcher checks the private core on port 18441 and uses its expiring synthetic account. The native app and browser share race follows.
+
+For a race served by the nationwide feed, the ticker displays individual candidate counts and the time Scrollr checked the feed. **Last nationwide returns** means updates are delayed. **Directory snapshot** identifies a count from the dated survey. Hover over a ticker race for full candidate names and individual counts. Click it for the full candidate table. Under **Find races**, select a state, office or vote activity. **Observed count changes** identifies races with different totals at two checks. **Reported votes** includes races with votes at a single check. Use the native tester’s tray **Quit** to close the app.
+
+The unsigned executable embeds its UI and uses the dedicated app identifier `com.scrollr.electionnationalbeta3test`. Its preferences and WebView2 data are in the tester’s temporary profile, with updater access, autostart writes and legacy credential cleanup disabled. [Local backend setup and browser verification](TESTING.md)
+
+A November 3, 2026 Windows check opened a follow from the packaged ticker in the native detail window. The Tennessee Governor hover showed Blackburn at 752,938 and Green at 727,509 with 72.4% reporting at 9:13 p.m. CST. The picker offered all 50 states and DC, displayed observed count changes for East Providence Mayor and the Statesboro-area council special election, and showed official fallback links in the empty Tennessee and North Carolina municipal filters.
+
+## Tennessee fixture replay
+
 On the prepared Windows machine, open **Start Scrollr Election Tester.cmd** in `%TEMP%\scrollr-election-native-beta3`. The launcher verifies the private core and its synthetic session, then starts the packaged Tauri executable. Use the tester tray icon’s **Quit** command to close both windows.
 
 The ticker should display Tennessee Governor (QA replay). Click the race to open its candidate table. In the first replay phase, Preview A leads by 40 votes, with 40% reporting. The detail shows 120 votes for A and 80 for B, the source time, and a civicAPI attribution link.

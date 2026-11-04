@@ -1,0 +1,30 @@
+{
+  "source": "https://s3.amazonaws.com/dl.ncsbe.gov/ENRS/2026_11_03/results_pct_20261103.zip",
+  "source_modified": "Wed, 04 Nov 2026 03:02:51 GMT",
+  "observed_at": "2026-11-04T03:03:12.429106+00:00",
+  "jurisdiction": "North Carolina",
+  "matched_contests": 84,
+  "matched_contests_with_votes": 84,
+  "examples": {
+    "CITY OF ASHEVILLE MAYOR": {
+      "candidate_vote_sum": 42475,
+      "candidates": {
+        "Esther Manheimer": 17418,
+        "Kim Roney": 24756,
+        "Write-In (Miscellaneous)": 301
+      }
+    },
+    "CITY OF ASHEVILLE CITY COUNCIL": {
+      "candidate_vote_sum": 107295,
+      "candidates": {
+        "Drew Ball": 24525,
+        "Write-In (Miscellaneous)": 415,
+        "Sheneika E. Smith": 11016,
+        "Maggie Ullman Berthiaume": 22238,
+        "S. Antanette Mosley": 18939,
+        "Jeffrey Burroughs": 16634,
+        "Keith Young": 13528
+      }
+    }
+  }
+}

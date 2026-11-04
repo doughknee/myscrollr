@@ -13,9 +13,9 @@ log = "0.4"
 sentry = { version = "0.42", default-features = false, features = ["reqwest","rustls"] }
 chrono = { version = "0.4", features = ["serde"] }
 redis = { version = "0.32", default-features = false, features = ["tokio-comp"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls","gzip"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = {version = "1", features = ["raw_value"]}
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono","json","derive"] }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "signal"] }
 

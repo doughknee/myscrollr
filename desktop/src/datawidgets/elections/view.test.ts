@@ -1,3 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ElectionCell from "../../components/pages/cells/ElectionCell";
+import ElectionChip from "../../components/chips/ElectionChip";
 import { describe, expect, it } from "vitest";
 import { followedRaceIds, raceView } from "./view";
 import { scopeSourceData } from "../../utils/widgetScope";
@@ -55,10 +59,74 @@ describe("election results", () => {
     const candidates = race.candidates.map((c) => ({ ...c, winner: c.id === 1 }));
     expect(raceView({ ...race, candidates }).headline).toBe("civicAPI calls it for Blackburn");
     expect(raceView({ ...race, candidates, disputed: true }).headline).toBe("Result disputed");
-    const beforeVotes = candidates.map(c => ({ ...c, votes: 0 }));
+    const beforeVotes = candidates.map((c) => ({ ...c, votes: 0 }));
     expect(raceView({ ...race, candidates: beforeVotes }).headline).toBe("civicAPI calls it for Blackburn");
-    expect(raceView({ ...race, candidates: candidates.map(c => ({ ...c, winner: true })) }).headline).toBe("Result disputed");
+    expect(raceView({ ...race, candidates: candidates.map((c) => ({ ...c, winner: true })) }).headline).toBe(
+      "Result disputed",
+    );
   });
+  it("shows candidate totals without a lead, margin, share or call when the voting format is unverified", () => {
+    const council = {
+      ...race,
+      id: 918,
+      result_mode: "counts_only",
+      name: "At-large council",
+      candidates: race.candidates.map((c) => ({ ...c, winner: true })),
+    };
+    const view = raceView(council);
+    expect(view.headline).toBe("2,500 candidate votes");
+    expect(view.reporting).toBeNull();
+    expect(view.countsOnly).toBe(true);
+    expect(view.candidateTotals).toBe("Green 1,250 votes · Blackburn 1,000 votes");
+    expect(view.candidates.map((c) => c.name)).toEqual(["Blackburn", "Green", "Other"]);
+    expect(raceView({ ...council, result_mode: undefined }).headline).toBe(view.headline);
+    expect(raceView({ ...council, disputed: true }).headline).toBe("Disputed · 2,500 candidate votes");
+  });
+
+  it("labels a directory observation even for an otherwise single-seat race", () => {
+    const seed = {
+      ...race,
+      snapshot_kind: "directory",
+      result_mode: "single_seat",
+      observed_at: "2026-11-04T03:08:00Z",
+    };
+    for (const component of [ElectionCell, ElectionChip]) {
+      const html = renderToStaticMarkup(createElement(component, { race: seed }));
+      const title = html.match(/title="([^"]+)"/)?.[1];
+      expect(title).toContain("Green 1,250 votes · Blackburn 1,000 votes");
+      expect(title).not.toMatch(/Other|leads|winner|% reporting/);
+    }
+    expect(raceView(seed).headline).toBe("2,500 candidate votes");
+    expect(raceView(seed).updated).toMatch(/^Directory snapshot · checked /);
+    expect(raceView({ ...seed, observed_at: undefined }).updated).toBe(
+      "Directory snapshot · check time unknown",
+    );
+  });
+
+  it.each([
+    [false, "Nationwide returns"],
+    [true, "Last nationwide returns"],
+  ] as const)("labels nationwide counts with their check time and delay status (%s)", (delayed, label) => {
+    const snapshot = {
+      ...race, delayed, snapshot_kind: "directory_live", result_mode: "single_seat",
+      observed_at: "2026-11-04T03:20:00Z",
+      candidates: race.candidates.map((c) => ({ ...c, winner: true })),
+    };
+    const view = raceView(snapshot);
+    expect(view.countsOnly).toBe(true);
+    expect(view.reporting).toBeNull();
+    expect(view.headline).toBe("2,500 candidate votes");
+    expect(view.updated).toMatch(new RegExp("^" + label + " · checked .+"));
+    expect(raceView({ ...snapshot, observed_at: undefined }).updated).toBe(label + " · check time unknown");
+    expect(raceView({ ...snapshot, disputed: true }).tickerCounts).toEqual([]);
+    for (const component of [ElectionCell, ElectionChip]) {
+      const html = renderToStaticMarkup(createElement(component, { race: snapshot }));
+      expect(html.replace(/<[^>]+>/g, "")).toMatch(/Green 1,250 votes\s*Blackburn 1,000 votes/);
+      expect(html).toContain(view.updated);
+      expect(html).not.toMatch(/leads by|calls it|% reporting/);
+    }
+  });
+
   it("never scopes an unfollowed race into a user’s feed", () => {
     expect(followedRaceIds({ race_ids: [87476, "2", null, -1] })).toEqual([87476]);
     expect(scopeSourceData("elections", [race], undefined)).toEqual([]);

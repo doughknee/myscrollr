@@ -57,7 +57,8 @@ async fn provider_recovers_from_bad_routes_without_bypassing_rate_limits() -> Re
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(1))
         .build()?;
-    let race = &catalog()?[0];
+    let races = catalog()?;
+    let race = races.iter().find(|r| r.id == 87476).unwrap();
     let previous = Some(time("2026-11-04T02:07:00Z"));
     let good = format!("{base}/ok");
     for path in ["gateway", "hung", "html", "older"] {
@@ -103,7 +104,8 @@ fn parse(value: &Value, race: &Race) -> Result<Snapshot> {
 
 #[test]
 fn reject_bad_results_and_preserve_source_calls() {
-    let race = &catalog().unwrap()[0];
+    let races = catalog().unwrap();
+    let race = races.iter().find(|r| r.id == 87476).unwrap();
     for (path, bad) in [
         ("/test_data", json!(true)),
         ("/test_data", Value::Null),
@@ -129,9 +131,12 @@ fn reject_bad_results_and_preserve_source_calls() {
     value["candidates"][0]["votes"] = json!(0);
     value["candidates"][0]["winner"] = json!(true);
     value["candidates"][0]["party"] = Value::Null;
+    value["id"] = json!(race.id + 1);
+    assert!(parse(&value, race).is_err());
+    value["id"] = json!(race.id);
     value["percent_reporting"] = Value::Null;
     let snap = parse(&value, race).unwrap();
-    assert!(snap.candidates[0].winner);
+    assert_eq!(snap.candidates[0].winner, Some(true));
     assert!(snap.candidates[0].party.is_empty());
     assert_eq!(snap.candidates[0].votes, 0);
     assert!(snap.percent_reporting.is_none());
@@ -141,10 +146,29 @@ fn reject_bad_results_and_preserve_source_calls() {
 }
 
 #[test]
+fn counts_only_ignores_ambiguous_and_missing_call_fields() {
+    let mut race = catalog()
+        .unwrap()
+        .into_iter()
+        .find(|r| r.id == 87476)
+        .unwrap();
+    race.result_mode = ResultMode::CountsOnly;
+    let mut value = raw(false);
+    value["is_disputed"] = Value::Null;
+    value["candidates"][0]["winner"] = json!(true);
+    value["candidates"][1]["winner"] = Value::Null;
+    let snapshot = parse(&value, &race).unwrap();
+    assert!(snapshot.candidates.iter().all(|c| c.winner == Some(false)));
+    assert_eq!(snapshot.candidates[0].votes, 120);
+}
+
+#[test]
 fn future_mayor_uses_own_polling_window() {
     let race = Race {
         id: 4,
         name: "Mayor".into(),
+        municipality: None,
+        result_mode: crate::provider::ResultMode::CountsOnly,
         state: "TN".into(),
         election_date: "2027-05-04".parse().unwrap(),
     };
@@ -176,7 +200,8 @@ async fn database_claims_corrections_outages_and_fencing() -> Result<()> {
     let Some(db) = common::test_pool("elections").await else {
         return Ok(());
     };
-    let race = &catalog()?[0];
+    let races = catalog()?;
+    let race = races.iter().find(|r| r.id == 87476).unwrap();
     sqlx::raw_sql(
         "DELETE FROM user_widgets WHERE widget_type='elections'; DELETE FROM election_results",
     )
@@ -185,6 +210,18 @@ async fn database_claims_corrections_outages_and_fencing() -> Result<()> {
     assert!(claim(&db, race.id).await?.is_none());
     sqlx::query("INSERT INTO user_widgets(logto_sub,widget_type,config) VALUES('tester-a','elections',$1),('tester-b','elections',$1)")
         .bind(json!({"race_ids":[race.id]})).execute(&db).await?;
+    let mut allowed: std::collections::HashMap<_, _> = [1, 2, 3, 4, 5, race.id]
+        .into_iter()
+        .map(|id| (id, race.clone()))
+        .collect();
+    sqlx::query("INSERT INTO user_widgets(logto_sub,widget_type,config) VALUES ('many-watches','elections',$1)")
+        .bind(json!({"race_ids":[2,3,4,5,99999999]})).execute(&db).await?;
+    let scheduled = due_followed(&db, &allowed).await?;
+    assert_eq!(scheduled, vec![2, 3, 4]);
+    let _ = claim(&db, 2).await?.unwrap();
+    assert_eq!(due_followed(&db, &allowed).await?, vec![3, 4, 5]);
+    allowed.remove(&3);
+    assert_eq!(due_followed(&db, &allowed).await?, vec![4, 5, race.id]);
     let first = claim(&db, race.id).await?.unwrap();
     assert!(claim(&db, race.id).await?.is_none());
     let failed = complete(&db, race, first, Err(anyhow::anyhow!("first outage"))).await?;
@@ -223,6 +260,134 @@ async fn database_claims_corrections_outages_and_fencing() -> Result<()> {
             .fetch_one(&db)
             .await?;
     assert_eq!(failures, 1);
+    directory_refreshes_fence_and_preserve_detail(&db, race).await?;
+    Ok(())
+}
+
+async fn directory_refreshes_fence_and_preserve_detail(db: &PgPool, race: &Race) -> Result<()> {
+    use super::directory_store as directory;
+    use std::collections::HashMap;
+
+    let wanted = HashMap::from([(race.id, race.clone())]);
+    let date = race.election_date;
+    sqlx::query("DELETE FROM election_directory_refreshes WHERE election_date=$1")
+        .bind(date)
+        .execute(db)
+        .await?;
+    sqlx::query("UPDATE election_results SET next_poll_at=now()+interval '1 day' WHERE race_id=$1")
+        .bind(race.id)
+        .execute(db)
+        .await?;
+    assert!(directory::failing_by_date(db, &wanted).await?[&date].contains_key(&race.id));
+    let first = directory::claim(db, date).await?.unwrap();
+    assert!(directory::claim(db, date).await?.is_none());
+    let t = time("2026-11-04T03:30:00Z");
+    let seed =
+        |a, b| json!({"candidates":[{"id":1,"votes":a},{"id":2,"votes":b}],"percent_reporting":33});
+    let mut rows = HashMap::from([(race.id, seed(100, 90))]);
+    assert_eq!(
+        directory::save(db, &first, &wanted, t, &rows, 60).await?,
+        vec![race.id]
+    );
+    let (detail, directory): (Value, Value) =
+        sqlx::query_as("SELECT snapshot,directory_snapshot FROM election_results WHERE race_id=$1")
+            .bind(race.id)
+            .fetch_one(db)
+            .await?;
+    assert_eq!(detail["candidates"][0]["votes"], 110);
+    assert_eq!(directory["candidates"][0]["votes"], 100);
+    assert!(directory["change_after"].is_null());
+    assert!(directory["source_updated_at"].is_null());
+    assert!(directory::claim(db, date).await?.is_none());
+
+    // A successful response can still replay old counts. The shared fallback
+    // must survive that apparent recovery (including across worker restarts).
+    due(db, race.id).await?;
+    let lease = claim(db, race.id).await?.unwrap();
+    let outcome = complete(db, race, lease, parse(&raw(true), race)).await?;
+    assert!(outcome.upstream_error.is_none());
+    assert!(directory::failing_by_date(db, &wanted).await?[&date].contains_key(&race.id));
+
+    async fn next(db: &PgPool, date: chrono::NaiveDate) -> Result<directory::DirectoryLease> {
+        sqlx::query(
+            "UPDATE election_directory_refreshes SET next_check_at=now() WHERE election_date=$1",
+        )
+        .bind(date)
+        .execute(db)
+        .await?;
+        Ok(directory::claim(db, date).await?.unwrap())
+    }
+    // Simulate a worker completing after its lease expired and another owner took over.
+    let lost = next(db, date).await?;
+    let owner = next(db, date).await?;
+    rows.insert(race.id, seed(98, 91)); // lawful downward correction
+    assert!(
+        directory::save(db, &lost, &wanted, t + Duration::hours(5), &rows, 60)
+            .await?
+            .is_empty()
+    );
+    assert_eq!(
+        directory::save(db, &owner, &wanted, t + Duration::minutes(1), &rows, 60).await?,
+        vec![race.id]
+    );
+    rows.get_mut(&race.id).unwrap()["candidates"]
+        .as_array_mut()
+        .unwrap()
+        .reverse();
+    let owner = next(db, date).await?;
+    assert_eq!(
+        directory::save(db, &owner, &wanted, t + Duration::minutes(2), &rows, 60).await?,
+        vec![race.id]
+    );
+    let lower:DateTime<Utc>=sqlx::query_scalar("SELECT (directory_snapshot->>'change_after')::timestamptz FROM election_results WHERE race_id=$1")
+        .bind(race.id).fetch_one(db).await?;
+    assert_eq!(lower, t);
+    let owner = next(db, date).await?;
+    assert!(
+        directory::save(db, &owner, &wanted, t, &rows, 60)
+            .await?
+            .is_empty()
+    );
+
+    let lease = next(db, date).await?;
+    directory::fail(db, &lease, 60, Some(std::time::Duration::from_secs(900))).await?;
+    let sec:f64=sqlx::query_scalar("SELECT extract(epoch FROM next_check_at-now())::float8 FROM election_directory_refreshes WHERE election_date=$1")
+        .bind(date).fetch_one(db).await?;
+    assert!((895.0..=900.0).contains(&sec));
+    // Same votes (irrespective of display order) or a newer publisher
+    // revision ends fallback even if it had already started another request.
+    sqlx::query(
+        "UPDATE election_results SET snapshot=jsonb_set(snapshot,'{candidates}',$2)
+        WHERE race_id=$1",
+    )
+    .bind(race.id)
+    .bind(seed(98, 91)["candidates"].clone())
+    .execute(db)
+    .await?;
+    assert!(directory::failing_by_date(db, &wanted).await?.is_empty());
+    let recovered = next(db, date).await?;
+    assert!(
+        directory::save(db, &recovered, &wanted, t + Duration::hours(1), &rows, 60)
+            .await?
+            .is_empty()
+    );
+    sqlx::query("UPDATE election_results SET snapshot=jsonb_set(snapshot,'{candidates}',$2),source_updated_at=$3
+        WHERE race_id=$1").bind(race.id).bind(seed(150,120)["candidates"].clone())
+        .bind(t+Duration::hours(2)).execute(db).await?;
+    assert!(directory::failing_by_date(db, &wanted).await?.is_empty());
+    sqlx::query("UPDATE election_results SET failures=1 WHERE race_id=$1")
+        .bind(race.id)
+        .execute(db)
+        .await?;
+    let owner = next(db, date).await?;
+    sqlx::query("UPDATE user_widgets SET enabled=false WHERE widget_type='elections' AND config->'race_ids' @> jsonb_build_array($1::int)")
+        .bind(race.id).execute(db).await?;
+    assert!(
+        directory::save(db, &owner, &wanted, t + Duration::hours(1), &rows, 60)
+            .await?
+            .is_empty()
+    );
+    assert!(directory::failing_by_date(db, &wanted).await?.is_empty());
     Ok(())
 }
 
@@ -263,7 +428,8 @@ async fn replay_private_preview() -> Result<()> {
         "refusing replay outside scrollr_preview"
     );
     let redis = redis::Client::open(env::var("TEST_REDIS_URL")?)?;
-    let race = &catalog()?[0];
+    let races = catalog()?;
+    let race = races.iter().find(|r| r.id == 87476).unwrap();
     let mut tx = db.begin().await?;
     let follows: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM user_widgets WHERE enabled AND widget_type='elections'

@@ -1,16 +1,17 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import { toast } from "sonner";
 import { Vote } from "lucide-react";
 import PinSubjectButton from "../../components/PinSubjectButton";
+import RacePicker from "./RacePicker";
+import SourceLink from "./SourceLink";
+import { electionPreviewPath } from "../../config";
 import { authFetch } from "../../api/client";
 import { dashboardQueryOptions } from "../../api/queries";
 import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { followedRaceIds, percent, raceView, votes } from "./view";
 import type { DataWidgetManifest, HomeRowsProps } from "../../types";
-import type { ElectionRace, RaceDescriptor } from "./view";
+import type { ElectionSearch } from "../../types/api.generated";
+import type { ElectionRace } from "./view";
 
 function ElectionHomeRows({ data, onConfigure }: HomeRowsProps) {
   if (!data.length)
@@ -32,15 +33,23 @@ function ElectionHomeRows({ data, onConfigure }: HomeRowsProps) {
         <strong className="block text-sm text-fg">{view.headline}</strong>
         <span className="text-xs text-fg-2">
           {race.delayed && "Updates delayed · "}
-          {view.reporting} · {view.updated}
+          {[view.reporting, view.updated].filter(Boolean).join(" · ")}
         </span>
       </button>
     );
   });
 }
 
-function ResultCard({ race }: { race: ElectionRace }) {
-  const { candidates, headline, reporting, updated } = raceView(race);
+function ResultCard({
+  race,
+  onUnfollow,
+  saving,
+}: {
+  race: ElectionRace;
+  onUnfollow: () => void;
+  saving: boolean;
+}) {
+  const { candidates, headline, reporting, updated, countsOnly, directoryOnly, nationwide } = raceView(race);
   return (
     <article className="rounded-lg border border-edge bg-surface p-4" aria-label={race.name}>
       <div className="text-xs text-fg-3">
@@ -48,16 +57,37 @@ function ResultCard({ race }: { race: ElectionRace }) {
       </div>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold text-fg">{race.name}</h3>
-        <PinSubjectButton widget="elections" subject={String(race.id)} label={race.name} />
+        <div className="flex shrink-0 items-center gap-2">
+          <PinSubjectButton widget="elections" subject={String(race.id)} label={race.name} />
+          <button
+            type="button"
+            aria-label={"Unfollow " + race.name}
+            onClick={onUnfollow}
+            disabled={saving}
+            className="text-xs text-fg-2 underline"
+          >
+            Unfollow
+          </button>
+        </div>
       </div>
       <p className="mt-1 font-semibold text-fg">{headline}</p>
       <p className="mt-1 text-xs text-fg-2">
-        {reporting} · {race.source_updated_at ? "Source updated " : ""}
+        {reporting && reporting + " · "}
+        {race.source_updated_at && !directoryOnly ? "Source updated " : ""}
         {updated}
       </p>
       {race.delayed && (
         <p role="status" className="mt-2 text-xs text-warning">
-          Updates delayed{race.source_updated_at ? " · showing the last available count" : ""}
+          Updates delayed{race.source_updated_at || race.observed_at ? " · showing the last available count" : ""}
+        </p>
+      )}
+      {countsOnly && (
+        <p className="mt-2 text-xs text-fg-2">
+          {nationwide
+            ? "Candidate counts come from civicAPI’s nationwide returns."
+            : directoryOnly
+              ? "These candidate totals were recorded during the directory check."
+              : "Candidate totals are shown while this race’s voting rules are unverified."}
         </p>
       )}
       {candidates.length > 0 && (
@@ -69,9 +99,11 @@ function ResultCard({ race }: { race: ElectionRace }) {
               <th scope="col" className="text-right">
                 Votes
               </th>
-              <th scope="col" className="text-right">
-                Share
-              </th>
+              {!countsOnly && (
+                <th scope="col" className="text-right">
+                  Share
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -81,48 +113,39 @@ function ResultCard({ race }: { race: ElectionRace }) {
                   {c.name} <span className="text-xs text-fg-3">{c.party}</span>
                 </th>
                 <td className="text-right">{votes(c.votes)}</td>
-                <td className="text-right">{c.percent == null ? "—" : percent(c.percent)}</td>
+                {!countsOnly && (
+                  <td className="text-right">{c.percent == null ? "—" : percent(c.percent)}</td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       )}
-      <a
-        href={`https://civicapi.org/results/elections/${race.id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(event) => {
-          event.preventDefault();
-          void invoke("open_external", { url: event.currentTarget.href }).catch(() =>
-            toast.error("Couldn’t open civicAPI in your browser."),
-          );
-        }}
-        className="text-xs text-primary underline"
-      >
+      <SourceLink href={`https://civicapi.org/results/elections/${race.id}`}>
         Results from civicAPI
-      </a>
+      </SourceLink>
     </article>
   );
 }
 
 function ElectionsFeedTab() {
-  const [search, setSearch] = useState("");
   const dashboard = useQuery(dashboardQueryOptions());
   const row = dashboard.data?.widgets?.find((w) => w.widget_type === "elections");
   const ids = followedRaceIds(row?.config);
-  const choices = useQuery({
-    queryKey: ["elections", "races"],
-    queryFn: () => authFetch<RaceDescriptor[]>("/elections/races"),
-    enabled: !!row && row.id > 0,
-    staleTime: 60_000,
-  });
   const { error, saving, updateItems } = useDataWidgetConfig<number[]>("elections", "race_ids");
   const raw = dashboard.data?.data?.elections;
   const races = raw ?? [];
   const missingResults = ids.length > 0 && !raw && !!dashboard.data && !dashboard.isFetching;
-  const matching = (choices.data ?? []).filter((r) =>
-    (r.name + " " + r.state).toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  const missingIds = ids.filter((id) => !races.some((r) => r.id === id)).join(",");
+  const missingChoices = useQuery({
+    queryKey: ["elections", "followed", missingIds],
+    queryFn: ({ signal }) =>
+      authFetch<ElectionSearch>(electionPreviewPath("/elections/search?ids=" + encodeURIComponent(missingIds)), {
+        signal,
+      }),
+    enabled: !!row && row.id > 0 && !!missingIds,
+    staleTime: 60_000,
+  });
   if (dashboard.isSuccess && !row) {
     return (
       <p className="p-4 text-sm text-fg-2">
@@ -136,55 +159,18 @@ function ElectionsFeedTab() {
   }
   return (
     <section className="space-y-4 p-4 text-fg">
-      <header>
-        <h2 className="text-lg font-semibold">Follow races</h2>
-        <p className="text-sm text-fg-2">Choose a supported race to see its returns on your ticker.</p>
-      </header>
-      <input
-        aria-label="Search supported races"
-        placeholder="Search supported races"
-        type="search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm"
-      />
-      {choices.isFetching && !choices.data && <p role="status">Loading supported races…</p>}
-      {choices.isError && (
-        <p role="alert">
-          Couldn’t refresh supported races.{" "}
-          <button onClick={() => void choices.refetch()} className="underline">
-            Retry
+      {ids.length > 0 && (
+        <header className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Following ({ids.length})</h2>
+          <button
+            type="button"
+            onClick={() => document.getElementById("race-picker")?.scrollIntoView()}
+            className="text-sm underline"
+          >
+            Find more races
           </button>
-        </p>
+        </header>
       )}
-      {choices.data && !matching.length && (
-        <p className="text-sm text-fg-2">No supported races match your search.</p>
-      )}
-      <ul className="divide-y divide-edge">
-        {matching.map((r) => {
-          const following = ids.includes(r.id);
-          const label = following ? "Unfollow" : "Follow";
-          return (
-            <li key={r.id} className="flex items-center justify-between gap-4 py-2">
-              <div>
-                <strong className="text-sm">{r.name}</strong>
-                <p className="text-xs text-fg-3">
-                  {r.state} · {r.election_date}
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={saving || !row || row.id < 0}
-                aria-label={label + " " + r.name}
-                onClick={() => updateItems(following ? ids.filter((id) => id !== r.id) : [...ids, r.id])}
-                className="rounded-md border border-edge px-3 py-1.5 text-sm hover:bg-surface-hover disabled:opacity-50"
-              >
-                {label}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
       {error && (
         <p role="alert" className="text-error">
           {error}
@@ -200,14 +186,31 @@ function ElectionsFeedTab() {
       )}
       {ids.map((id) => {
         const race = races.find((r) => r.id === id);
+        const unfollow = () => updateItems(ids.filter((raceId) => raceId !== id));
+        const name = missingChoices.data?.races.find((r) => r.id === id)?.name ?? "race " + id;
         return race ? (
-          <ResultCard key={id} race={race} />
+          <ResultCard key={id} race={race} onUnfollow={unfollow} saving={saving} />
         ) : (
-          <p key={id} role="status" className="text-sm text-fg-2">
-            Waiting for results for {choices.data?.find((r) => r.id === id)?.name ?? "your followed race"}.
-          </p>
+          <div key={id} className="flex justify-between gap-2 text-sm text-fg-2">
+            <p role="status">Waiting for results for {name}.</p>
+            <button
+              type="button"
+              disabled={saving}
+              aria-label={"Unfollow " + name}
+              onClick={unfollow}
+              className="underline"
+            >
+              Unfollow
+            </button>
+          </div>
         );
       })}
+      <RacePicker
+        ids={ids}
+        saving={saving}
+        enabled={!!row && row.id > 0}
+        onFollow={(id) => updateItems([...ids, id])}
+      />
     </section>
   );
 }

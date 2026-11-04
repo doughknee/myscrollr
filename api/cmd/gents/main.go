@@ -55,6 +55,8 @@ var roots = []struct{ pkg, name string }{
 	{"internal/platform", "WidgetDef"},
 	{"internal/ingestread", "ElectionRace"},
 	{"internal/ingestread", "ElectionResult"},
+	{"internal/ingestread", "ElectionCoverage"},
+	{"internal/ingestread", "ElectionSearch"},
 	{"internal/widgets", "CatalogResponse"},
 	{"internal/widgets", "CatalogRequestResponse"},
 	{"internal/widgets", "TierLimitsResponse"},

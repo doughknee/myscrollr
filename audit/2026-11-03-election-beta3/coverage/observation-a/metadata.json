@@ -1,0 +1,13 @@
+{
+  "url": "https://civicapi.org/api/v2/race/search?startDate=2026-11-03&endDate=2026-11-03&limit=50000",
+  "observed_at": "2026-11-04T03:00:23Z",
+  "response_date": "Wed, 04 Nov 2026 03:00:23 GMT",
+  "cache": "COALESCED",
+  "age": null,
+  "cache_control": "public, max-age=15, stale-while-revalidate=30",
+  "raw_sha256": "390101e82b236d4d74f873f88e754d19dbc571ed35bc1246ba391198c5b317a5",
+  "count": 38778,
+  "offset": 0,
+  "limit": 50000,
+  "returned": 38778
+}
