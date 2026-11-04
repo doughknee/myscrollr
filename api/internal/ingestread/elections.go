@@ -118,7 +118,7 @@ func followedElectionResults(ctx context.Context, sub string, national bool) ([]
 	// legacy values cannot cause a lookup or unsafe integer cast.
 	rows, err := platform.DBPool.Query(ctx, `
         SELECT f.id::text, res.snapshot, COALESCE(res.failures>0 OR res.verified_until<now(),false),
-          COALESCE(res.next_poll_at <> 'infinity'::timestamptz,true)
+          COALESCE(res.next_poll_at <> 'infinity'::timestamptz,true), res.directory_snapshot
         FROM user_widgets w CROSS JOIN LATERAL jsonb_array_elements(
             CASE WHEN jsonb_typeof(w.config->'race_ids')='array' THEN w.config->'race_ids' ELSE '[]'::jsonb END
         ) WITH ORDINALITY f(id,ord)
@@ -133,9 +133,9 @@ func followedElectionResults(ctx context.Context, sub string, national bool) ([]
 	out := make([]ElectionResult, 0)
 	for rows.Next() {
 		var rawID string
-		var data []byte
+		var data, nationwide []byte
 		var delayed, useDirectory bool
-		if err := rows.Scan(&rawID, &data, &delayed, &useDirectory); err != nil {
+		if err := rows.Scan(&rawID, &data, &delayed, &useDirectory, &nationwide); err != nil {
 			return nil, err
 		}
 		id, err := strconv.Atoi(rawID)
@@ -151,14 +151,19 @@ func followedElectionResults(ctx context.Context, sub string, national bool) ([]
 			result.SnapshotKind = "detail"
 			result.ResultMode = race.ResultMode
 		}
-		if seed, ok := electionSeeds[id]; national && useDirectory && ok && (len(data) == 0 || detailPredatesObservedChange(result, race, seed)) {
-			delayed = delayed || len(data) > 0
-			result = race.pendingResult()
-			result.Candidates = seed.Candidates
-			result.PercentReporting = seed.PercentReporting
-			result.ObservedAt = &seed.ObservedAt
-			result.SnapshotKind = "directory"
-			result.ResultMode = "counts_only"
+		result.Delayed = delayed
+		detailDisputed := result.Disputed
+		if national && useDirectory {
+			if seed, ok := electionSeeds[id]; ok && (len(data) == 0 || detailPredatesObservedChange(result, race, seed)) {
+				result = directoryResult(race, seed, "directory", delayed || len(data) > 0)
+			}
+			if len(nationwide) > 0 {
+				var live directorySeed
+				if err := json.Unmarshal(nationwide, &live); err != nil {
+					return nil, err
+				}
+				result = withNationwide(race, result, live, time.Now())
+			}
 		}
 		if result.ResultMode != "single_seat" && result.SnapshotKind == "detail" {
 			// Includes pre-existing snapshots if a race is reclassified.
@@ -166,8 +171,60 @@ func followedElectionResults(ctx context.Context, sub string, national bool) ([]
 				result.Candidates[i].Winner = false
 			}
 		}
-		result.Delayed = delayed
+		// The nationwide listing cannot resolve a dispute reported by the detail feed.
+		result.Disputed = result.Disputed || detailDisputed
 		out = append(out, result)
 	}
 	return out, rows.Err()
+}
+
+func directoryResult(race ElectionRace, counts directorySeed, kind string, delayed bool) ElectionResult {
+	result := race.pendingResult()
+	result.Candidates = counts.Candidates
+	result.PercentReporting = counts.PercentReporting
+	result.ObservedAt = &counts.ObservedAt
+	result.SnapshotKind = kind
+	result.ResultMode = "counts_only"
+	result.Delayed = delayed
+	return result
+}
+
+// A bulk read has an observation time but no per-race publisher timestamp.
+// Preserve a newer detail, and require evidence of movement before applying
+// a downward correction across feeds. Never compare unrelated candidate sets.
+func withNationwide(race ElectionRace, current ElectionResult, bulk directorySeed, now time.Time) ElectionResult {
+	if len(bulk.Candidates) == 0 || bulk.ObservedAt.IsZero() || bulk.ObservedAt.After(now.Add(time.Minute)) {
+		return current
+	}
+	asOf := current.SourceUpdatedAt
+	if asOf == nil {
+		asOf = current.ObservedAt
+	}
+	if asOf != nil && !bulk.ObservedAt.After(*asOf) {
+		return current
+	}
+	if len(current.Candidates) > 0 {
+		if len(bulk.Candidates) != len(current.Candidates) {
+			return current
+		}
+		previous := make(map[int]ElectionCandidate, len(current.Candidates))
+		for _, c := range current.Candidates {
+			previous[c.ID] = c
+		}
+		equal := true
+		for _, c := range bulk.Candidates {
+			old, ok := previous[c.ID]
+			if !ok || c.Name != old.Name {
+				return current
+			}
+			if c.Votes < old.Votes && (asOf == nil || bulk.ChangeAfter == nil || bulk.ChangeAfter.Before(*asOf)) {
+				return current
+			}
+			equal = equal && c.Votes == old.Votes
+		}
+		if equal && current.SnapshotKind == "detail" && !current.Delayed {
+			return current
+		}
+	}
+	return directoryResult(race, bulk, "directory_live", now.Sub(bulk.ObservedAt) >= 3*time.Minute)
 }

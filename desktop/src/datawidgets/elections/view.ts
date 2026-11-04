@@ -25,7 +25,8 @@ export function followedRaceIds(config: unknown): number[] {
 export function raceView(race: ElectionRace) {
   // Before national discovery this beta supported only Tennessee Governor.
   const singleSeat = race.result_mode === "single_seat" || (!race.result_mode && race.id === 87476);
-  const directoryOnly = race.snapshot_kind === "directory";
+  const nationwide = race.snapshot_kind === "directory_live";
+  const directoryOnly = nationwide || race.snapshot_kind === "directory";
   const countsOnly = !singleSeat || directoryOnly;
   const byVotes = [...race.candidates].sort((a, b) => b.votes - a.votes || a.id - b.id);
   const candidates = countsOnly
@@ -36,7 +37,8 @@ export function raceView(race: ElectionRace) {
     .join(" · ");
   const [first, second] = candidates;
   const winners = candidates.filter((c) => c.winner);
-  let headline = !race.source_updated_at && race.delayed ? "Waiting for source data" : "Awaiting votes";
+  const hasObservation = race.source_updated_at || (directoryOnly && race.observed_at);
+  let headline = !hasObservation && race.delayed ? "Waiting for source data" : "Awaiting votes";
   if (countsOnly) {
     const total = candidates.reduce((sum, c) => sum + BigInt(c.votes), 0n);
     if (total > 0n) headline = votes(total) + (total === 1n ? " candidate vote" : " candidate votes");
@@ -58,11 +60,15 @@ export function raceView(race: ElectionRace) {
       : percent(race.percent_reporting) + " reporting";
   const time = Date.parse(race.source_updated_at ?? "");
   const observed = Date.parse(race.observed_at ?? "");
+  const directoryLabel = nationwide
+    ? (race.delayed ? "Last nationwide returns" : "Nationwide returns")
+    : "Directory snapshot";
   const updated = directoryOnly
-    ? "Directory snapshot" +
+    ? directoryLabel +
       (Number.isFinite(observed) ? " · checked " + sourceDate.format(observed) : " · check time unknown")
     : Number.isFinite(time)
       ? sourceDate.format(time)
       : "No source update yet";
-  return { candidates, candidateTotals, headline, reporting, updated, countsOnly, directoryOnly };
+  const tickerCounts = nationwide && !race.disputed ? byVotes.slice(0, 2) : [];
+  return { candidates, candidateTotals, headline, tickerCounts, reporting, updated, countsOnly, directoryOnly, nationwide };
 }

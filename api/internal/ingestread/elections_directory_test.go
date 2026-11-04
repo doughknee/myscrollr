@@ -109,3 +109,43 @@ func TestDirectoryOnlySupersedesProvablyOlderConflictingDetail(t *testing.T) {
 		t.Fatal("a single directory reading cannot order differing tallies")
 	}
 }
+
+func TestRefreshedNationwideCountsDoNotRegressTheTicker(t *testing.T) {
+	now := time.Date(2026, 11, 4, 4, 0, 0, 0, time.UTC)
+	detailTime := now.Add(-2 * time.Minute)
+	race := ElectionRace{ID: 87476, ResultMode: "single_seat"}
+	detail := ElectionResult{SnapshotKind: "detail", SourceUpdatedAt: &detailTime, Delayed: true,
+		Candidates: []ElectionCandidate{{ID: 1, Name: "A", Votes: 10}}}
+	row := directorySeed{Candidates: []ElectionCandidate{{ID: 1, Name: "A", Votes: 12}}, ObservedAt: now}
+	read := func() ElectionResult { return withNationwide(race, detail, row, now) }
+	if got := read(); got.SnapshotKind != "directory_live" || got.Candidates[0].Votes != 12 ||
+		got.SourceUpdatedAt != nil || got.Delayed || got.ResultMode != "counts_only" || !got.ObservedAt.Equal(now) {
+		t.Fatal(got)
+	}
+	if got := withNationwide(race, detail, row, now.Add(4*time.Minute)); !got.Delayed || got.Candidates[0].Votes != 12 {
+		t.Fatal("stale fallback lost its counts", got)
+	}
+	row.Candidates[0].Votes = 9
+	if got := read(); got.SnapshotKind != "detail" {
+		t.Fatal("accepted unverified rollback")
+	}
+	row.ChangeAfter = &detailTime
+	if got := read(); got.Candidates[0].Votes != 9 {
+		t.Fatal("ignored observed correction")
+	}
+	row.Candidates[0].ID++
+	if got := read(); got.SnapshotKind != "detail" {
+		t.Fatal("mixed contests or candidates")
+	}
+	row.Candidates[0].ID--
+	row.ObservedAt = detailTime.Add(-time.Second)
+	if got := read(); got.SnapshotKind != "detail" {
+		t.Fatal("used older bulk response")
+	}
+	row.ObservedAt = now
+	row.Candidates[0].Votes = 10
+	detail.Delayed = false
+	if got := read(); got.SnapshotKind != "detail" {
+		t.Fatal("did not resume recovered detail")
+	}
+}

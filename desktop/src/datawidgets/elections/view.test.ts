@@ -103,6 +103,30 @@ describe("election results", () => {
     );
   });
 
+  it.each([
+    [false, "Nationwide returns"],
+    [true, "Last nationwide returns"],
+  ] as const)("labels nationwide counts with their check time and delay status (%s)", (delayed, label) => {
+    const snapshot = {
+      ...race, delayed, snapshot_kind: "directory_live", result_mode: "single_seat",
+      observed_at: "2026-11-04T03:20:00Z",
+      candidates: race.candidates.map((c) => ({ ...c, winner: true })),
+    };
+    const view = raceView(snapshot);
+    expect(view.countsOnly).toBe(true);
+    expect(view.reporting).toBeNull();
+    expect(view.headline).toBe("2,500 candidate votes");
+    expect(view.updated).toMatch(new RegExp("^" + label + " · checked .+"));
+    expect(raceView({ ...snapshot, observed_at: undefined }).updated).toBe(label + " · check time unknown");
+    expect(raceView({ ...snapshot, disputed: true }).tickerCounts).toEqual([]);
+    for (const component of [ElectionCell, ElectionChip]) {
+      const html = renderToStaticMarkup(createElement(component, { race: snapshot }));
+      expect(html.replace(/<[^>]+>/g, "")).toMatch(/Green 1,250 votes\s*Blackburn 1,000 votes/);
+      expect(html).toContain(view.updated);
+      expect(html).not.toMatch(/leads by|calls it|% reporting/);
+    }
+  });
+
   it("never scopes an unfollowed race into a user’s feed", () => {
     expect(followedRaceIds({ race_ids: [87476, "2", null, -1] })).toEqual([87476]);
     expect(scopeSourceData("elections", [race], undefined)).toEqual([]);

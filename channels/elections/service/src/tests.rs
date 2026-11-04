@@ -260,6 +260,134 @@ async fn database_claims_corrections_outages_and_fencing() -> Result<()> {
             .fetch_one(&db)
             .await?;
     assert_eq!(failures, 1);
+    directory_refreshes_fence_and_preserve_detail(&db, race).await?;
+    Ok(())
+}
+
+async fn directory_refreshes_fence_and_preserve_detail(db: &PgPool, race: &Race) -> Result<()> {
+    use super::directory_store as directory;
+    use std::collections::HashMap;
+
+    let wanted = HashMap::from([(race.id, race.clone())]);
+    let date = race.election_date;
+    sqlx::query("DELETE FROM election_directory_refreshes WHERE election_date=$1")
+        .bind(date)
+        .execute(db)
+        .await?;
+    sqlx::query("UPDATE election_results SET next_poll_at=now()+interval '1 day' WHERE race_id=$1")
+        .bind(race.id)
+        .execute(db)
+        .await?;
+    assert!(directory::failing_by_date(db, &wanted).await?[&date].contains_key(&race.id));
+    let first = directory::claim(db, date).await?.unwrap();
+    assert!(directory::claim(db, date).await?.is_none());
+    let t = time("2026-11-04T03:30:00Z");
+    let seed =
+        |a, b| json!({"candidates":[{"id":1,"votes":a},{"id":2,"votes":b}],"percent_reporting":33});
+    let mut rows = HashMap::from([(race.id, seed(100, 90))]);
+    assert_eq!(
+        directory::save(db, &first, &wanted, t, &rows, 60).await?,
+        vec![race.id]
+    );
+    let (detail, directory): (Value, Value) =
+        sqlx::query_as("SELECT snapshot,directory_snapshot FROM election_results WHERE race_id=$1")
+            .bind(race.id)
+            .fetch_one(db)
+            .await?;
+    assert_eq!(detail["candidates"][0]["votes"], 110);
+    assert_eq!(directory["candidates"][0]["votes"], 100);
+    assert!(directory["change_after"].is_null());
+    assert!(directory["source_updated_at"].is_null());
+    assert!(directory::claim(db, date).await?.is_none());
+
+    // A successful response can still replay old counts. The shared fallback
+    // must survive that apparent recovery (including across worker restarts).
+    due(db, race.id).await?;
+    let lease = claim(db, race.id).await?.unwrap();
+    let outcome = complete(db, race, lease, parse(&raw(true), race)).await?;
+    assert!(outcome.upstream_error.is_none());
+    assert!(directory::failing_by_date(db, &wanted).await?[&date].contains_key(&race.id));
+
+    async fn next(db: &PgPool, date: chrono::NaiveDate) -> Result<directory::DirectoryLease> {
+        sqlx::query(
+            "UPDATE election_directory_refreshes SET next_check_at=now() WHERE election_date=$1",
+        )
+        .bind(date)
+        .execute(db)
+        .await?;
+        Ok(directory::claim(db, date).await?.unwrap())
+    }
+    // Simulate a worker completing after its lease expired and another owner took over.
+    let lost = next(db, date).await?;
+    let owner = next(db, date).await?;
+    rows.insert(race.id, seed(98, 91)); // lawful downward correction
+    assert!(
+        directory::save(db, &lost, &wanted, t + Duration::hours(5), &rows, 60)
+            .await?
+            .is_empty()
+    );
+    assert_eq!(
+        directory::save(db, &owner, &wanted, t + Duration::minutes(1), &rows, 60).await?,
+        vec![race.id]
+    );
+    rows.get_mut(&race.id).unwrap()["candidates"]
+        .as_array_mut()
+        .unwrap()
+        .reverse();
+    let owner = next(db, date).await?;
+    assert_eq!(
+        directory::save(db, &owner, &wanted, t + Duration::minutes(2), &rows, 60).await?,
+        vec![race.id]
+    );
+    let lower:DateTime<Utc>=sqlx::query_scalar("SELECT (directory_snapshot->>'change_after')::timestamptz FROM election_results WHERE race_id=$1")
+        .bind(race.id).fetch_one(db).await?;
+    assert_eq!(lower, t);
+    let owner = next(db, date).await?;
+    assert!(
+        directory::save(db, &owner, &wanted, t, &rows, 60)
+            .await?
+            .is_empty()
+    );
+
+    let lease = next(db, date).await?;
+    directory::fail(db, &lease, 60, Some(std::time::Duration::from_secs(900))).await?;
+    let sec:f64=sqlx::query_scalar("SELECT extract(epoch FROM next_check_at-now())::float8 FROM election_directory_refreshes WHERE election_date=$1")
+        .bind(date).fetch_one(db).await?;
+    assert!((895.0..=900.0).contains(&sec));
+    // Same votes (irrespective of display order) or a newer publisher
+    // revision ends fallback even if it had already started another request.
+    sqlx::query(
+        "UPDATE election_results SET snapshot=jsonb_set(snapshot,'{candidates}',$2)
+        WHERE race_id=$1",
+    )
+    .bind(race.id)
+    .bind(seed(98, 91)["candidates"].clone())
+    .execute(db)
+    .await?;
+    assert!(directory::failing_by_date(db, &wanted).await?.is_empty());
+    let recovered = next(db, date).await?;
+    assert!(
+        directory::save(db, &recovered, &wanted, t + Duration::hours(1), &rows, 60)
+            .await?
+            .is_empty()
+    );
+    sqlx::query("UPDATE election_results SET snapshot=jsonb_set(snapshot,'{candidates}',$2),source_updated_at=$3
+        WHERE race_id=$1").bind(race.id).bind(seed(150,120)["candidates"].clone())
+        .bind(t+Duration::hours(2)).execute(db).await?;
+    assert!(directory::failing_by_date(db, &wanted).await?.is_empty());
+    sqlx::query("UPDATE election_results SET failures=1 WHERE race_id=$1")
+        .bind(race.id)
+        .execute(db)
+        .await?;
+    let owner = next(db, date).await?;
+    sqlx::query("UPDATE user_widgets SET enabled=false WHERE widget_type='elections' AND config->'race_ids' @> jsonb_build_array($1::int)")
+        .bind(race.id).execute(db).await?;
+    assert!(
+        directory::save(db, &owner, &wanted, t + Duration::hours(1), &rows, 60)
+            .await?
+            .is_empty()
+    );
+    assert!(directory::failing_by_date(db, &wanted).await?.is_empty());
     Ok(())
 }
 

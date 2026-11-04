@@ -49,7 +49,7 @@ function ResultCard({
   onUnfollow: () => void;
   saving: boolean;
 }) {
-  const { candidates, headline, reporting, updated, countsOnly, directoryOnly } = raceView(race);
+  const { candidates, headline, reporting, updated, countsOnly, directoryOnly, nationwide } = raceView(race);
   return (
     <article className="rounded-lg border border-edge bg-surface p-4" aria-label={race.name}>
       <div className="text-xs text-fg-3">
@@ -78,14 +78,16 @@ function ResultCard({
       </p>
       {race.delayed && (
         <p role="status" className="mt-2 text-xs text-warning">
-          Updates delayed{race.source_updated_at ? " · showing the last available count" : ""}
+          Updates delayed{race.source_updated_at || race.observed_at ? " · showing the last available count" : ""}
         </p>
       )}
       {countsOnly && (
         <p className="mt-2 text-xs text-fg-2">
-          {directoryOnly
-            ? "These candidate totals were recorded during the directory check."
-            : "Candidate totals are shown while this race’s voting rules are unverified."}
+          {nationwide
+            ? "Candidate counts come from civicAPI’s nationwide returns."
+            : directoryOnly
+              ? "These candidate totals were recorded during the directory check."
+              : "Candidate totals are shown while this race’s voting rules are unverified."}
         </p>
       )}
       {candidates.length > 0 && (

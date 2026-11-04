@@ -77,7 +77,18 @@ allowlisted follows per cycle, oldest due first after first-time reads.
 It requests the explicit JSON race URL first. A timeout, server error, invalid
 payload or regressing source timestamp triggers one attempt via civicAPI's
 www hostname. A client error such as HTTP 429 goes straight to backoff.
-Two unsuccessful reads preserve the last verified count and its source time.
+After a failed detail check, the worker can read the national election-day listing.
+One database lease per election date shares that request across users and replicas.
+During election night it schedules the next successful bulk refresh after 60 seconds,
+rotating up to 256 eligible followed races at a time. Failed bulk requests back off
+and respect Retry-After. The detail reader keeps retrying independently.
+
+The national preview may display a validated bulk count with its HTTP observation
+time. After three minutes without a fresh observation, the ticker labels those
+counts as delayed. Detail results and nationwide observations are stored separately.
+An older bulk response cannot replace newer detail. A lower vote count crossing
+from one feed to the other needs two observations demonstrating a correction.
+The picker’s national activity filter still describes the dated coverage survey.
 A PostgreSQL lease shares the work across workers. After a committed change,
 the ingester publishes a refresh signal to the race's Redis
 topic. The next authenticated dashboard read merges the latest stored result

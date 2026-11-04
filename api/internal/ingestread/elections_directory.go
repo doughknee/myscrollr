@@ -35,6 +35,7 @@ type ElectionSearch struct {
 	Total int            `json:"total"`
 }
 type directorySeed struct {
+	ChangeAfter      *time.Time          `json:"change_after,omitempty"`
 	Candidates       []ElectionCandidate `json:"candidates"`
 	PercentReporting *float64            `json:"percent_reporting"`
 	ObservedAt       time.Time           `json:"observed_at"`

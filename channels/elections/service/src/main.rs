@@ -1,4 +1,6 @@
+mod directory_store;
 mod log;
+mod nationwide;
 mod provider;
 mod store;
 #[cfg(test)]
@@ -28,6 +30,51 @@ async fn publish(redis: &redis::Client, id: i32) -> Result<()> {
     let _: usize = conn
         .publish(format!("cdc:elections:{id}"), INVALIDATION)
         .await?;
+    Ok(())
+}
+
+async fn refresh_directory(
+    db: &sqlx::PgPool,
+    redis: &redis::Client,
+    http: &reqwest::Client,
+    catalog: &HashMap<i32, provider::Race>,
+) -> Result<()> {
+    for (date, wanted) in directory_store::failing_by_date(db, catalog).await? {
+        let Some(race) = wanted.values().next() else {
+            continue;
+        };
+        let Some(lease) = directory_store::claim(db, date).await? else {
+            continue;
+        };
+        let cadence = provider::interval(race, Utc::now()).max(60);
+        match nationwide::fetch(http, date, &wanted).await {
+            Ok((observed, rows)) => {
+                let ids =
+                    directory_store::save(db, &lease, &wanted, observed, &rows, cadence).await?;
+                if !ids.is_empty() {
+                    log::info!(
+                        "Nationwide check for {date} refreshed {} followed races at {observed}",
+                        ids.len()
+                    );
+                    let mut conn = redis.get_multiplexed_async_connection().await?;
+                    let mut pipeline = redis::pipe();
+                    for id in ids {
+                        pipeline
+                            .cmd("PUBLISH")
+                            .arg(format!("cdc:elections:{id}"))
+                            .arg(INVALIDATION)
+                            .ignore();
+                    }
+                    pipeline.query_async::<()>(&mut conn).await?;
+                }
+            }
+            Err(err) => {
+                directory_store::fail(db, &lease, cadence, nationwide::retry_after(&err)).await?;
+                log::warn!("Nationwide election check for {date} failed: {err}");
+            }
+        }
+        break;
+    }
     Ok(())
 }
 
@@ -64,11 +111,35 @@ async fn run() -> Result<()> {
             .connect(&env::var("DATABASE_URL").context("DATABASE_URL required")?)
             .await?;
         let redis = redis::Client::open(env::var("REDIS_URL").context("REDIS_URL required")?)?;
-        let races: HashMap<_, _> = provider::catalog()?
-            .into_iter()
-            .map(|race| (race.id, race))
-            .collect();
+        let races: Arc<HashMap<_, _>> = Arc::new(
+            provider::catalog()?
+                .into_iter()
+                .map(|race| (race.id, race))
+                .collect(),
+        );
         let http = provider::client()?;
+        {
+            // Bulk retrieval can take a minute. Never hold up the detail
+            // queue or its health heartbeat waiting for the shared request.
+            let (db, redis, http, races) = (db.clone(), redis.clone(), http.clone(), races.clone());
+            tokio::spawn(async move {
+                let mut ticks = interval(Duration::from_secs(10));
+                ticks.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    ticks.tick().await;
+                    match timeout(
+                        Duration::from_secs(95),
+                        refresh_directory(&db, &redis, &http, &races),
+                    )
+                    .await
+                    {
+                        Ok(Ok(())) => {}
+                        Ok(Err(err)) => log::error!("Election directory worker failed: {err}"),
+                        Err(_) => log::error!("Election directory worker timed out"),
+                    }
+                }
+            });
+        }
         let pulse = state.last_cycle.clone();
         tokio::spawn(async move {
             let mut ticks = interval(Duration::from_secs(10));

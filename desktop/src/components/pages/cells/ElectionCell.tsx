@@ -1,4 +1,5 @@
 import { memo } from "react";
+import TickerHeadline from "../../../datawidgets/elections/TickerHeadline";
 import { raceView } from "../../../datawidgets/elections/view";
 import type { ElectionRace } from "../../../datawidgets/elections/view";
 
@@ -14,7 +15,8 @@ const ElectionCell = memo(function ElectionCell({
   expanded?: boolean;
   onClick?: () => void;
 }) {
-  const { headline, candidateTotals, reporting, updated } = raceView(race);
+  const view = raceView(race);
+  const { headline, candidateTotals, reporting, updated } = view;
   return (
     <button
       type="button"
@@ -32,7 +34,7 @@ const ElectionCell = memo(function ElectionCell({
         <span className="truncate">{race.name}</span>
         {race.delayed && <span className="shrink-0 text-warning">Delayed</span>}
       </span>
-      <strong className="truncate text-[15px] leading-[21px] text-fg">{headline}</strong>
+      <strong className="truncate text-[15px] leading-[21px] text-fg"><TickerHeadline view={view} /></strong>
       <span className="truncate font-mono text-[10px] leading-[15px] text-fg-3">
         {[reporting, updated].filter(Boolean).join(" · ")}
       </span>
