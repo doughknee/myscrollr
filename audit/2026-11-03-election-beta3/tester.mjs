@@ -12,14 +12,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const desktop = path.resolve(here, "../../desktop");
 const requireDesktop = createRequire(path.join(desktop, "package.json"));
 const national = process.argv.includes("--national");
-const project = national ? "scrollr-election-national" : "scrollr-election-tester";
+const verifyFallback = process.argv.includes("--verify-fallback");
+const project = verifyFallback ? "scrollr-election-fallback-qa" : national ? "scrollr-election-national" : "scrollr-election-tester";
 const state = path.join(tmpdir(), project);
 const publicKeys = path.join(state, "jwks");
 const warm = { api: "http://127.0.0.1:18439", web: "http://127.0.0.1:19439" };
-const apiPort = national ? 18441 : 18440;
-const webPort = national ? 19441 : 19440;
+const apiPort = verifyFallback ? 18442 : national ? 18441 : 18440;
+const webPort = verifyFallback ? 19442 : national ? 19441 : 19440;
 const fresh = { api: `http://127.0.0.1:${apiPort}`, web: `http://127.0.0.1:${webPort}` };
-const verifyReplay = process.argv.includes("--verify");
+const verifyReplay = process.argv.includes("--verify") || verifyFallback;
 const sub = process.argv.includes("--check") && national ? "beta3-national-verifier" : verifyReplay ? "beta3-fixture-verifier" : "beta3-local-tester";
 const check = process.argv.includes("--check");
 mkdirSync(publicKeys, { recursive: true });
@@ -270,14 +271,17 @@ async function run() {
     if (!catalog.widgets.some((w) => w.id === "elections"))
       throw Error("Private core did not offer Election Results.");
     if (verifyReplay) {
-      const { verify } = requireDesktop(path.join(here, "verify-preview.cjs"));
+      const { verify } = requireDesktop(path.join(here, verifyFallback ? "verify-fallback.cjs" : "verify-preview.cjs"));
       try {
         await verify({
           origin: endpoints.web,
           session,
           folder: state,
           step: (phase, notify) => {
-            replay(phase);
+            if (verifyFallback) {
+              compose(["exec", "-T", "db", "psql", "-X", "-U", "postgres", "-d", "scrollr_preview",
+                "-v", "phase=" + phase], readFileSync(path.join(here, "fallback-replay.sql")));
+            } else replay(phase);
             if (notify) {
               const event = {
                 data: [

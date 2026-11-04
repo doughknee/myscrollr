@@ -82,4 +82,4 @@ async function reviewPicker(page, { verify }) {
     await picker().scrollIntoViewIfNeeded();
   }
 }
-module.exports = { reviewPicker };
+module.exports = { openWidget, reviewPicker };

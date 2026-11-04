@@ -14,6 +14,12 @@ To verify the national web flow on a separate synthetic account with the visible
 node audit/2026-11-03-election-beta3/tester.mjs --national --live --check
 ```
 
+To replay a failed detail check, updated nationwide counts and detail recovery on an already-open ticker, run the following. It uses fictional votes in a separate private database on ports 18442/19442.
+
+```powershell
+node audit/2026-11-03-election-beta3/tester.mjs --fresh --verify-fallback
+```
+
 ## Tennessee replay
 
 With Docker Desktop running, Node 22+ and Microsoft Edge installed, double-click **Test Election Results.cmd**. Or run this in PowerShell from the beta.3 checkout:
