@@ -9,6 +9,7 @@ Cargo.lock
 !channels/finance/service/Cargo.lock
 !channels/sports/service/Cargo.lock
 !channels/rss/service/Cargo.lock
+!channels/elections/service/Cargo.lock
 .log
 acme_cache/
 release/

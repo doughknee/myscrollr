@@ -41,6 +41,11 @@ describe("pinnedSubjects", () => {
     expect(pinnedSubjectsQuery()).toBe("");
   });
 
+  it("never sends a pinned election race ID in a URL", () => {
+    expect(syncPinnedSubjects([pin("elections", "87476")], () => "elections")).toBe(false);
+    expect(pinnedSubjectsQuery()).toBe("");
+  });
+
   // Order is the user's, not the wire's: reordering the fixed zone must
   // not cost a refetch.
   it("reports no change when only the order differs", () => {

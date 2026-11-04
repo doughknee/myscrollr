@@ -78,6 +78,7 @@ Monorepo — each component is independently deployable with its own dependencie
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
 - The finance, sports, rss, and predictions Go APIs were folded into `api/internal/ingestread/` (ADR-0002); fantasy and predictions were removed outright (SCROLLR-239) — every widget source is now served in-process by core
 - `channels/{finance,sports,rss}/service/` — Rust ingestion services (independent crates, edition 2024)
+- `channels/elections/service/` — opt-in Rust ingester for the Election Results private beta (edition 2024)
 
 ## Running it locally
 

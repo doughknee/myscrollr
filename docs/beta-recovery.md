@@ -31,3 +31,7 @@ Do not broaden the allowlist automatically when bumping a version. Keep publishe
 The exact Beta 2 packages from [build 41742821548](https://github.com/doughknee/myscrollr/actions/runs/41742821548), source `6a0155363b9dd6f0a2ba5ff591c0cbbc0b85c9a9`, passed both [Stable → Beta installation](https://github.com/doughknee/myscrollr/actions/runs/41744773834) and [Beta → Stable recovery](https://github.com/doughknee/myscrollr/actions/runs/41744777329) on Windows x64 NSIS, macOS ARM64 and Linux x64 AppImage. Each passed signature/source verification, native replacement, packaged restart and synthetic preference retention. Stable 1.7.3 assets, signatures and build run `41688396593` remain fixed.
 
 These rehearsals use a mock native updater host with actual signed packages. They do not exercise the source app controller, a real signed-in profile or physical hardware. The local signed-in Windows round trip was not performed for this Beta. A candidate rebuild invalidates previous qualification evidence and needs both runs again against the final bytes.
+
+### Beta 3 candidate
+
+Beta 3 uses the same app identity, package types, updater and Stable 1.7.3 signed artifacts. Election follows are server-side; an older desktop does not need to migrate local election data to recover. Its exact source version is included for private recovery qualification. Before publication, rehearse the final signed Beta 3 artifacts in both directions and record the build and rehearsal evidence here. Beta 2's runs do not qualify Beta 3.

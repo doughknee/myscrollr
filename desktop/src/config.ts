@@ -38,6 +38,13 @@ export const API_HOST = (() => {
   }
 })();
 
+/** The running binary declares the renderer it has; update preferences do not change it. */
+export function electionPreviewPath(path: string): string {
+  const beta = typeof __APP_VERSION__ !== "undefined" && __APP_VERSION__.includes("-beta.");
+  if (!beta || import.meta.env.MODE === "embed") return path;
+  return path + (path.includes("?") ? "&" : "?") + "preview=elections";
+}
+
 // ── Auth (Logto PKCE) ───────────────────────────────────────────
 // VITE_AUTH_ENDPOINT is the Logto base URL, not the full /oidc/auth path.
 

@@ -10,6 +10,7 @@
 import type { TickerSource } from "./ticker";
 import { financeTickerSource } from "./finance/ticker";
 import { sportsTickerSource } from "./sports/ticker";
+import { electionsTickerSource } from "./elections/ticker";
 import { rssTickerSource } from "./rss/ticker";
 
 /** Chip renderers by data source. Indexing an unknown source yields
@@ -18,4 +19,5 @@ export const TICKER_SOURCES: Record<string, TickerSource | undefined> = {
   finance: financeTickerSource,
   sports: sportsTickerSource,
   rss: rssTickerSource,
+  elections: electionsTickerSource,
 };

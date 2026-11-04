@@ -19,7 +19,12 @@ func catalogApp() *fiber.App {
 
 func getCatalog(t *testing.T, app *fiber.App, etag string) (*http.Response, CatalogResponse) {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/catalog", nil)
+	return getCatalogAt(t, app, "/catalog", etag)
+}
+
+func getCatalogAt(t *testing.T, app *fiber.App, path, etag string) (*http.Response, CatalogResponse) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
 	if etag != "" {
 		req.Header.Set("If-None-Match", etag)
 	}
@@ -118,5 +123,23 @@ func TestHandleGetCatalogETagRevalidation(t *testing.T) {
 	}
 	if len(body.Widgets) == 0 {
 		t.Error("stale ETag should resend the full catalog")
+	}
+}
+
+func TestElectionsCatalogIsOptInForClientAndServer(t *testing.T) {
+	app := catalogApp()
+	t.Setenv("ELECTIONS_BETA_ENABLED", "true")
+	standard, stable := getCatalog(t, app, "")
+	beta, preview := getCatalogAt(t, app, "/catalog?preview=elections", standard.Header.Get("ETag"))
+	if beta.StatusCode != 200 || len(preview.Widgets) != len(stable.Widgets)+1 ||
+		preview.Widgets[len(stable.Widgets)].ID != "elections" || beta.Header.Get("ETag") == standard.Header.Get("ETag") {
+		t.Fatal("preview should append the election widget and have its own ETag")
+	}
+	// An old copy of the enabled catalog must not keep the beta alive on
+	// a server that disabled it.
+	t.Setenv("ELECTIONS_BETA_ENABLED", "")
+	off, hidden := getCatalogAt(t, app, "/catalog?preview=elections", beta.Header.Get("ETag"))
+	if off.StatusCode != 200 || hidden.Version != stable.Version {
+		t.Fatal("disabled server did not serve stable catalog")
 	}
 }

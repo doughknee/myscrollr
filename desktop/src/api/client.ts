@@ -12,7 +12,7 @@ import type { Widget, HealthResponse, UserPreferences } from "../types/api.gener
 
 // ── Constants ────────────────────────────────────────────────────
 
-import { API_BASE } from "../config";
+import { API_BASE, electionPreviewPath } from "../config";
 
 // ── Request helpers ─────────────────────────────────────────────
 
@@ -102,7 +102,7 @@ export async function request<T>(
  * first-run desktop with no session still has to render the Library.
  */
 export async function fetchCatalog(): Promise<import("../types").CatalogPayload> {
-  return request<import("../types").CatalogPayload>("/catalog");
+  return request<import("../types").CatalogPayload>(electionPreviewPath("/catalog"));
 }
 
 /**
@@ -309,16 +309,21 @@ export interface RssWidgetConfig {
 
 // ── Widgets API ────────────────────────────────────────────────
 
+function widgetWritePath(widget: WidgetId, create = false): string {
+  const path = create ? "/users/me/widgets" : `/users/me/widgets/${widget}`;
+  return widget === "elections" ? electionPreviewPath(path) : path;
+}
+
 export const dataWidgetsApi = {
   getAll: () =>
-    authFetch<{ widgets: Array<DataWidgetRow> }>("/users/me/widgets"),
+    authFetch<{ widgets: Array<DataWidgetRow> }>(electionPreviewPath("/users/me/widgets")),
 
   create: (
     widgetType: WidgetId,
     config: Record<string, unknown> = {},
     localWidgets?: number,
   ) =>
-    authFetch<DataWidgetRow>("/users/me/widgets", {
+    authFetch<DataWidgetRow>(widgetWritePath(widgetType, true), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -349,7 +354,7 @@ export const dataWidgetsApi = {
       config?: Record<string, unknown>;
     },
   ) =>
-    authFetch<DataWidgetRow>(`/users/me/widgets/${widgetType}`, {
+    authFetch<DataWidgetRow>(widgetWritePath(widgetType), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -357,7 +362,7 @@ export const dataWidgetsApi = {
 
   delete: (widgetType: WidgetId) =>
     authFetch<{ status: string; message: string }>(
-      `/users/me/widgets/${widgetType}`,
+      widgetWritePath(widgetType),
       { method: "DELETE" },
     ),
 };

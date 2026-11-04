@@ -165,6 +165,7 @@ const WIDGET_MAP: Record<string, ChipColors> = {
   finance: PRIMARY,
   sports: SECONDARY,
   rss: INFO,
+  elections: PURPLE,
   clock: WIDGET_CLOCK,
   timer: WIDGET_TIMER,
   weather: WIDGET_WEATHER,

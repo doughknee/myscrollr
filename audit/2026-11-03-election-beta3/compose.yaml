@@ -1,0 +1,74 @@
+name: scrollr-election-tester
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: scrollr_preview
+      POSTGRES_PASSWORD: private-preview
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d scrollr_preview"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  jwks:
+    image: nginx:alpine
+    volumes:
+      - type: bind
+        source: ${ELECTION_TEST_KEYS:?start through tester.mjs}
+        target: /usr/share/nginx/html
+        read_only: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/jwks.json"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  core:
+    image: golang:1.26.10
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      jwks: {condition: service_healthy}
+    working_dir: /runtime
+    command: ["sh", "-ec", "go -C /source build -o /tmp/core . && exec /tmp/core"]
+    volumes:
+      - ../../api:/source:ro
+      - ../../api/migrations:/runtime/migrations:ro
+      - gomod:/go/pkg/mod
+      - gobuild:/root/.cache/go-build
+    ports: ["127.0.0.1:18440:8080"]
+    environment:
+      API_URL: http://127.0.0.1:18440
+      FRONTEND_URL: http://127.0.0.1:19440
+      LOGTO_URL: http://jwks
+      LOGTO_JWKS_URL: http://jwks/jwks.json
+      DATABASE_URL: postgres://postgres:private-preview@db:5432/scrollr_preview?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      ENVIRONMENT: development
+      ADMIN_WARMER: "off"
+      STRIPE_DISABLED: "true"
+      ELECTIONS_BETA_ENABLED: "true"
+  elections:
+    profiles: [live]
+    build:
+      context: ../..
+      dockerfile: channels/elections/service/Dockerfile
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    environment:
+      ELECTIONS_BETA_ENABLED: "true"
+      DATABASE_URL: postgres://postgres:private-preview@db:5432/scrollr_preview?sslmode=disable
+      REDIS_URL: redis://redis:6379
+volumes:
+  pgdata:
+  gomod:
+  gobuild:

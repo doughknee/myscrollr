@@ -25,25 +25,29 @@ type CatalogResponse struct {
 // catalogOnce caches the serialized response and its version. The catalog is
 // compile-time constant, so this is computed once per process.
 var (
-	catalogOnce sync.Once
-	catalogBody CatalogResponse
-	catalogETag string
+	catalogOnce   sync.Once
+	catalogBody   CatalogResponse
+	catalogETag   string
+	electionsBody CatalogResponse
+	electionsETag string
 )
 
 func buildCatalog() {
-	widgets := platform.Catalog()
+	catalogBody, catalogETag = versionCatalog(platform.Catalog())
+	electionsBody, electionsETag = versionCatalog(platform.ElectionsCatalog())
+}
+
+func versionCatalog(widgets []platform.WidgetDef) (CatalogResponse, string) {
 	// Hash the marshalled catalog: any field change moves the version.
 	raw, err := json.Marshal(widgets)
 	if err != nil {
 		// Unreachable — the catalog is plain data. Fall back to an empty
 		// version rather than panicking a request path.
-		catalogBody = CatalogResponse{Widgets: widgets}
-		return
+		return CatalogResponse{Widgets: widgets}, ""
 	}
 	sum := sha256.Sum256(raw)
 	version := hex.EncodeToString(sum[:8])
-	catalogBody = CatalogResponse{Version: version, Widgets: widgets}
-	catalogETag = `"` + version + `"`
+	return CatalogResponse{Version: version, Widgets: widgets}, `"` + version + `"`
 }
 
 // HandleGetCatalog serves the widget catalog — the single authority for what
@@ -55,13 +59,18 @@ func buildCatalog() {
 func HandleGetCatalog(c *fiber.Ctx) error {
 	catalogOnce.Do(buildCatalog)
 
+	body, etag := catalogBody, catalogETag
+	if platform.ElectionsPreview(c.Query("preview")) {
+		body, etag = electionsBody, electionsETag
+	}
+
 	// Let a client with a warm cache revalidate for free.
-	if match := c.Get("If-None-Match"); match != "" && match == catalogETag {
-		c.Set("ETag", catalogETag)
+	if match := c.Get("If-None-Match"); match != "" && match == etag {
+		c.Set("ETag", etag)
 		return c.SendStatus(fiber.StatusNotModified)
 	}
 
-	c.Set("ETag", catalogETag)
+	c.Set("ETag", etag)
 	c.Set("Cache-Control", "public, max-age=300")
-	return c.JSON(catalogBody)
+	return c.JSON(body)
 }

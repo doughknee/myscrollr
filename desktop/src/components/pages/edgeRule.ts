@@ -21,6 +21,7 @@ import { MAX_PINS } from "../../preferences";
 import { catalogItemById, sourceForWidget } from "../../marketplace";
 import { teamShortName } from "../../utils/teamShortName";
 import { gameMinCol } from "./cells/GameCell";
+import { ELECTION_MIN_COL } from "./cells/ElectionCell";
 import { NEWS_PIN_W } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { BAND_W, DISPLAY_HEADER_H } from "./pagePlan";
@@ -49,7 +50,7 @@ export interface EdgeRoom {
 /** Pins with an edge-cell renderer; eligibility does not depend on live data. */
 export function eligibleEdgePins(pins: readonly WidgetPin[], activeTabs: readonly string[]) {
   return pins.filter(p => activeTabs.includes(p.widget) &&
-    ["sports", "finance", "rss"].includes(sourceForWidget(p.widget) ?? ""));
+    ["sports", "finance", "rss", "elections"].includes(sourceForWidget(p.widget) ?? ""));
 }
 
 /** Fixed-height header: reserve utilities first, then reclaim spare pin width for them. */
@@ -79,6 +80,7 @@ export function pinWidth(widget: string): number {
   if (source === "sports") return gameMinCol(leagueOf(widget));
   if (source === "finance") return QUOTE_MIN_COL;
   if (source === "rss") return NEWS_PIN_W;
+  if (source === "elections") return ELECTION_MIN_COL;
   return 0;
 }
 

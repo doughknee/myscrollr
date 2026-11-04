@@ -1,0 +1,12 @@
+**
+!api/
+!api/internal/
+!api/internal/ingestread/
+!api/internal/ingestread/elections_catalog.json
+!channels/
+!channels/elections/
+!channels/elections/service/
+!channels/elections/service/Cargo.toml
+!channels/elections/service/Cargo.lock
+!channels/elections/service/src/
+!channels/elections/service/src/**

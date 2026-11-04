@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -211,6 +212,9 @@ func (s *Server) setupRoutes() {
 
 	// The widget catalog — the single authority clients render from.
 	s.App.Get("/catalog", widgets.HandleGetCatalog)
+	if platform.ElectionsBetaEnabled() {
+		s.App.Get("/elections/races", ingestread.HandleElectionRaces)
+	}
 	// "Request it" from the catalog's zero-match card: one row per user
 	// and query, count across users. Authenticated; IP-rate-limited.
 	s.App.Post("/catalog/requests", platform.LogtoAuth, widgets.HandleCatalogRequest)
@@ -487,15 +491,16 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 	// desktop prefs and are never stored server-side (SCROLLR-9). Cloned
 	// because c.Query aliases fasthttp's pooled buffer.
 	pins := ingestread.ParsePinnedSubjects(strings.Clone(c.Query("pins")))
+	preview := platform.ElectionsPreview(c.Query("preview"))
 
 	// Check per-user Redis cache first
 	cacheKey := platform.RedisDashboardCachePrefix + userID
 	if val, err := platform.Rdb.Get(context.Background(), cacheKey).Result(); err == nil {
-		var cached platform.DashboardResponse
-		if json.Unmarshal([]byte(val), &cached) == nil {
-			ingestread.MergePinnedRows(context.Background(), userID, pins, cached.Data)
+		var res platform.DashboardResponse
+		if err := json.Unmarshal([]byte(val), &res); err == nil {
 			c.Set("X-Cache", "HIT")
-			return c.JSON(cached)
+			mergeDashboardForClient(&res, userID, pins, preview)
+			return c.JSON(res)
 		}
 	}
 
@@ -528,7 +533,8 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		// dashboard provider below (matched on intg.Name).
 		enabledSources := make(map[string]bool)
 		for _, ch := range widgets {
-			if ch.Enabled {
+			// Race data changes between aggregate cache fills. Merge it at send time.
+			if ch.Enabled && ch.WidgetType != "elections" {
 				enabledSources[platform.DataSourceForWidget(ch.WidgetType)] = true
 			}
 		}
@@ -547,36 +553,37 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Error: "dashboard fetch failed"})
 	}
 
-	c.Set("Content-Type", "application/json")
+	body := result.([]byte)
 	c.Set("X-Cache", "MISS")
-	return c.Send(withPinnedRows(result.([]byte), userID, pins))
-}
-
-// withPinnedRows guarantees one row per pinned subject on top of the
-// cached dashboard payload (SCROLLR-9).
-//
-// Deliberately outside the cache: the cached body stays on the single
-// `cache:dashboard:<sub>` key that every invalidation path deletes by
-// name, and a pin the user just set shows up on the next poll rather
-// than after the 30s TTL. A user with no pins pays nothing -- the bytes
-// go out untouched.
-//
-// Best-effort: if the merge cannot be done the original payload is sent.
-// A dashboard without a pinned row beats no dashboard.
-func withPinnedRows(body []byte, userID string, pins map[string][]string) []byte {
-	if len(pins) == 0 {
-		return body
+	// The cached JSON is encoded by this handler. A dashboard with no
+	// election widget or pins needs no client-specific projection.
+	if len(pins) == 0 && !bytes.Contains(body, []byte(`"elections"`)) {
+		c.Set("Content-Type", "application/json")
+		return c.Send(body)
 	}
+	// Decode a per-request copy: concurrent singleflight callers may have
+	// different pins and preview capabilities.
 	var res platform.DashboardResponse
 	if err := json.Unmarshal(body, &res); err != nil {
-		return body
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Error: "dashboard fetch failed"})
+	}
+	mergeDashboardForClient(&res, userID, pins, preview)
+	return c.JSON(res)
+}
+
+// Merge pins and the latest race results outside the shared aggregate cache.
+// Every caller for an account can use the same cache and invalidation key.
+func mergeDashboardForClient(res *platform.DashboardResponse, userID string, pins map[string][]string, preview bool) {
+	res.Widgets = platform.VisibleWidgets(res.Widgets, preview)
+	for _, row := range res.Widgets {
+		if row.Enabled && row.WidgetType == "elections" {
+			for k, v := range ingestread.LocalDashboard(context.Background(), userID, map[string]bool{"elections": true}) {
+				res.Data[k] = v
+			}
+			break
+		}
 	}
 	ingestread.MergePinnedRows(context.Background(), userID, pins, res.Data)
-	merged, err := json.Marshal(res)
-	if err != nil {
-		return body
-	}
-	return merged
 }
 
 // landingPage returns basic API info.

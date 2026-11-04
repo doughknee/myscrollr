@@ -110,7 +110,7 @@ function mergeWidgetRecords(
  * Listens for `sse-event` Tauri events and merges CDC records into
  * the dashboard QueryClient cache. Call once per window.
  */
-export function useDashboardCDC(): void {
+export function useDashboardCDC(ownsElectionRefresh = false): void {
   const queryClient = useQueryClient();
 
   // Debounce state for the safety-net refetch. Production SSE throughput
@@ -131,6 +131,14 @@ export function useDashboardCDC(): void {
     (event) => {
       const records = event.payload?.data;
       if (!Array.isArray(records) || records.length === 0) return;
+
+      // Election events are invalidations carrying an id only. The main window
+      // fetches the authoritative snapshot once and broadcasts it to every ticker.
+      // A busy sports stream must not keep postponing this refresh.
+      if (records.some(r => r.metadata?.table_name === "election_results")) {
+        if (ownsElectionRefresh) void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }, { cancelRefetch: false });
+        if (records.every(r => r.metadata?.table_name === "election_results")) return;
+      }
 
       // ── Merge into dashboard cache ──────────────────────────
       queryClient.setQueryData<DashboardResponse>(

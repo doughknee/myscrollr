@@ -53,6 +53,8 @@ var roots = []struct{ pkg, name string }{
 	{"internal/platform", "SubscribeResponse"},
 	{"internal/platform", "CheckoutReturnResponse"},
 	{"internal/platform", "WidgetDef"},
+	{"internal/ingestread", "ElectionRace"},
+	{"internal/ingestread", "ElectionResult"},
 	{"internal/widgets", "CatalogResponse"},
 	{"internal/widgets", "CatalogRequestResponse"},
 	{"internal/widgets", "TierLimitsResponse"},
