@@ -2,11 +2,11 @@
 
 Choosing **Stable** in Settings → Updates stops future Beta offers. It does not replace the installed app. A newer installed Beta can remain installed until a newer Stable release is available.
 
-The new **Return to Stable** action is being prepared in the unpublished 1.8.0-beta.2 candidate. It is not present in the published 1.8.0-beta.1. A separate confirmation shows the versions before any download or installation. Beta 2 must pass the qualification below before publication; its provisional source entry is not proof of a successful recovery.
+**Return to Stable** is available in 1.8.0-beta.2 for the supported packages below. In Settings → Updates, select Stable, check for updates, then choose **Return to Stable 1.7.3**. A separate confirmation shows the versions before any download or installation. The action is not present in 1.8.0-beta.1; use the manual instructions below if that version cannot be updated.
 
 ## If a Beta will not open
 
-Quit Scrollr completely, including its tray/menu-bar process. Use the official [Stable 1.7.3 release](https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.7.3) for recovery from **1.8.0-beta.1**. This removes Fill this display; the ticker returns to docking.
+Quit Scrollr completely, including its tray/menu-bar process. Use the official [Stable 1.7.3 release](https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.7.3) for recovery from **1.8.0-beta.1 or 1.8.0-beta.2**. This removes Fill this display; the ticker returns to docking.
 
 - **Windows x64, installed with the EXE:** run the signed 1.7.3 EXE installer over the existing installation. Use the same installation location. Do not uninstall or select an option to delete app data.
 - **Apple Silicon macOS:** replace Scrollr in Applications with the 1.7.3 app from the official DMG, then reopen it. Do not delete its Application Support data.
@@ -22,12 +22,12 @@ The native updater reads the existing protected Stable feed. A separate recovery
 
 The initial package set is NSIS on Windows x64, the app bundle on Apple Silicon macOS, and AppImage on Linux x64. Unknown/dev, MSI, DEB and RPM packages get guidance instead of an in-app recovery offer. Recovery must also meet the server's required minimum version. Confirmation is tied to an offer ID; cancellation, channel changes, failed verification and stale confirmations cannot install it.
 
-Before adding any source version (including the next Beta that ships this UI), run the signed source → target installation rehearsal and review changes to preferences, authentication, storage, app identifier and package layout. The exact published cohort is tested by `desktop-update-rehearsal.yml` with `recovery=true`. This verifies native replacement, signatures, packaged restart and synthetic preferences on disposable hosted runners. The test never installs on a developer's machine or copies a real profile. Record run IDs and limitations in the PR. Build/transport tests do not prove live login, physical displays or sleep/wake behavior.
+Before shipping any new source version, run the signed source → target installation rehearsal and review changes to preferences, authentication, storage, app identifier and package layout. The exact signed cohort is tested by `desktop-update-rehearsal.yml` with `recovery=true`. This verifies native replacement, signatures, packaged restart and synthetic preferences on disposable hosted runners. The test never installs on a developer's machine or copies a real profile. Record run IDs and limitations in the PR. Build/transport tests do not prove live login, physical displays or sleep/wake behavior.
 
-Do not broaden the allowlist automatically when bumping a version. Keep published releases immutable. A new Beta needs its own signed candidate and qualification before publication; this PR does not publish a build or change feeds.
+Do not broaden the allowlist automatically when bumping a version. Keep published releases immutable. A new Beta needs its own signed candidate and qualification before publication.
 
-### Beta 2 candidate qualification
+### Beta 2 qualification
 
-The 1.8.0-beta.2 source entry is provisional until its final signed build passes on all three supported packages. Published Stable 1.7.3 assets, signatures and build run `41688396593` stay fixed. The existing rehearsal's protected-main verification job can read the Beta 2 draft; branch recovery jobs remain read-only and limited to the published Beta 1 pair.
+The exact Beta 2 packages from [build 41742821548](https://github.com/doughknee/myscrollr/actions/runs/41742821548), source `6a0155363b9dd6f0a2ba5ff591c0cbbc0b85c9a9`, passed both [Stable → Beta installation](https://github.com/doughknee/myscrollr/actions/runs/41744773834) and [Beta → Stable recovery](https://github.com/doughknee/myscrollr/actions/runs/41744777329) on Windows x64 NSIS, macOS ARM64 and Linux x64 AppImage. Each passed signature/source verification, native replacement, packaged restart and synthetic preference retention. Stable 1.7.3 assets, signatures and build run `41688396593` remain fixed.
 
-After the candidate build succeeds, run the existing `desktop-update-rehearsal.yml` on main in both directions: Stable 1.7.3 → Beta 2 with `recovery=false`, then Beta 2 → Stable 1.7.3 with `recovery=true`. Bind both runs to the same final candidate build ID and use `from_version` matching the installed source. Review signature verification, actual replacement, packaged restart and synthetic preference retention. A candidate rebuild invalidates previous qualification evidence and needs both runs again. Keep the draft unpublished and feeds unchanged until qualification and Windows hands-on review pass.
+These rehearsals use a mock native updater host with actual signed packages. They do not exercise the source app controller, a real signed-in profile or physical hardware. The local signed-in Windows round trip was not performed for this Beta. A candidate rebuild invalidates previous qualification evidence and needs both runs again against the final bytes.
