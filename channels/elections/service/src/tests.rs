@@ -60,9 +60,11 @@ fn reject_bad_results_and_preserve_source_calls() {
     let mut value = raw(false);
     value["candidates"][0]["votes"] = json!(0);
     value["candidates"][0]["winner"] = json!(true);
+    value["candidates"][0]["party"] = Value::Null;
     value["percent_reporting"] = Value::Null;
     let snap = parse(&value, race).unwrap();
     assert!(snap.candidates[0].winner);
+    assert!(snap.candidates[0].party.is_empty());
     assert_eq!(snap.candidates[0].votes, 0);
     assert!(snap.percent_reporting.is_none());
     value["candidates"][1]["winner"] = json!(true);

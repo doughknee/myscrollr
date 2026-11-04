@@ -44,10 +44,16 @@ pub struct Candidate {
     #[serde(rename(deserialize = "candidate_id"))]
     pub id: i32,
     pub name: String,
+    #[serde(default, deserialize_with = "party_label")]
     pub party: String,
     pub votes: u64,
     pub percent: Option<f64>,
     pub winner: bool,
+}
+
+// A nonpartisan candidate can have no party label.
+fn party_label<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    Ok(Option::<String>::deserialize(d)?.unwrap_or_default())
 }
 
 #[derive(Debug, Serialize)]

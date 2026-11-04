@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { createServer as createPortProbe } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -16,11 +15,25 @@ const state = path.join(tmpdir(), "scrollr-election-tester");
 const publicKeys = path.join(state, "jwks");
 const warm = { api: "http://127.0.0.1:18439", web: "http://127.0.0.1:19439" };
 const fresh = { api: "http://127.0.0.1:18440", web: "http://127.0.0.1:19440" };
-const sub = "beta3-local-tester";
+const verifyReplay = process.argv.includes("--verify");
+const sub = verifyReplay ? "beta3-fixture-verifier" : "beta3-local-tester";
 const check = process.argv.includes("--check");
 mkdirSync(publicKeys, { recursive: true });
 
+let checkedLocalDocker = false;
 function compose(args, input, capture = false) {
+  if (!checkedLocalDocker) {
+    // Compose must never target an SSH/remote engine selected for deployment.
+    const contextHost = execFileSync(
+      "docker",
+      ["context", "inspect", "--format", "{{.Endpoints.docker.Host}}"],
+      { encoding: "utf8" },
+    ).trim();
+    const hosts = [contextHost, process.env.DOCKER_HOST].filter(Boolean);
+    if (hosts.some((host) => !host.startsWith("unix://") && !host.startsWith("npipe:////./pipe/")))
+      throw Error("Switch to the local Docker Desktop context before running the tester.");
+    checkedLocalDocker = true;
+  }
   return execFileSync(
     "docker",
     ["compose", "-p", "scrollr-election-tester", "-f", path.join(here, "compose.yaml"), ...args],
@@ -40,16 +53,6 @@ function replay(phase) {
     ["exec", "-T", "db", "psql", "-X", "-U", "postgres", "-d", "scrollr_preview", "-v", "phase=" + phase],
     readFileSync(path.join(here, "replay.sql")),
   );
-}
-
-async function requireFreeWebPort() {
-  const probe = createPortProbe();
-  await new Promise((resolve, reject) => {
-    probe.once("error", () =>
-      reject(Error("Port 19440 is in use. Close the existing tester window before starting another.")),
-    );
-    probe.listen(19440, "127.0.0.1", () => probe.close(resolve));
-  });
 }
 
 function npm(args) {
@@ -110,7 +113,7 @@ async function verified(api, session) {
   }
 }
 
-async function startWeb(mode) {
+async function startWeb(getMode) {
   // Vite's router plugin resolves generated paths from cwd. Isolate desktop
   // endpoints, analytics and auth even on a machine with a configured .env.
   process.chdir(desktop);
@@ -136,18 +139,31 @@ async function startWeb(mode) {
         configureServer(vite) {
           vite.middlewares.use("/__election_tester_mode", (_req, res) => {
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ project: "scrollr-election-tester", mode }));
+            res.end(JSON.stringify({ project: "scrollr-election-tester", mode: getMode() }));
           });
         },
       },
     ],
     server: { host: "127.0.0.1", port: 19440, strictPort: true },
   });
-  await server.listen();
-  return server;
+  try {
+    await server.listen();
+    return server;
+  } catch (err) {
+    await server.close();
+    throw err;
+  }
 }
 
 async function run() {
+  if (
+    verifyReplay &&
+    (!process.argv.includes("--fresh") ||
+      process.argv.includes("--live") ||
+      process.argv.includes("--stop") ||
+      process.argv.some((a) => a.startsWith("--phase=")))
+  )
+    throw Error("Browser verification requires --fresh --verify in replay mode.");
   if (process.argv.includes("--stop")) {
     compose(["--profile", "live", "stop"]);
     return;
@@ -184,7 +200,10 @@ async function run() {
       !((await verified(warm.api, session)) && (await verified(warm.web + "/__api", session)))
     ) {
       endpoints = fresh;
-      await requireFreeWebPort();
+      // Acquire the UI port before touching the issuer or any containers.
+      // A second double-click cannot restart a running or still-building tester.
+      let mode = "starting";
+      server = await startWeb(() => mode);
       session = mintSession();
       compose(["--profile", "live", "stop", "elections"]);
       compose(["up", "-d", "--force-recreate", "core"]);
@@ -220,6 +239,16 @@ async function run() {
         replay("reset");
         compose(["--profile", "live", "up", "-d", "--build", "elections"]);
         runningWorker = true;
+        // Probe from inside the Compose network. The worker has no host port.
+        compose([
+          "exec",
+          "-T",
+          "jwks",
+          "sh",
+          "-ec",
+          "for i in $(seq 1 20); do if wget -qO- -T 2 http://elections:3005/health/ready; then exit 0; fi; sleep 2; done; exit 1",
+        ]);
+
         console.log("Using civicAPI in the private tester. A provider outage will show delayed data.");
       } else {
         replay("first");
@@ -227,7 +256,7 @@ async function run() {
           "Using a fictional QA replay: Preview A and Preview B. See TESTING.md for additional phases.",
         );
       }
-      server = await startWeb(live ? "live" : "replay");
+      mode = live ? "live" : "replay";
       if (!(await verified(fresh.web + "/__api", session)))
         throw Error("Vite proxy did not reach the isolated API.");
     }
@@ -236,6 +265,29 @@ async function run() {
     );
     if (!catalog.widgets.some((w) => w.id === "elections"))
       throw Error("Private core did not offer Election Results.");
+    if (verifyReplay) {
+      const { verify } = requireDesktop(path.join(here, "verify-preview.cjs"));
+      await verify({
+        origin: endpoints.web,
+        session,
+        folder: state,
+        step: (phase, notify) => {
+          replay(phase);
+          if (notify) {
+            const event = {
+              data: [
+                { action: "update", record: {}, changes: {}, metadata: { table_name: "election_results" } },
+              ],
+            };
+            compose(
+              ["exec", "-T", "redis", "redis-cli", "-x", "PUBLISH", "cdc:elections:87476"],
+              JSON.stringify(event),
+            );
+          }
+        },
+      });
+      return;
+    }
     const { chromium } = requireDesktop("playwright");
     browser = await chromium.launch({
       headless: check,

@@ -29,9 +29,8 @@ function phase(name, notify = false) {
   }
 }
 
-async function verify() {
-  const session = JSON.parse(fs.readFileSync(path.join(folder, "tester.json"), "utf8"));
-  const browser = await chromium.launch({ channel: "msedge" });
+async function verify({ origin, session, folder, step }) {
+  const browser = await chromium.launch(process.platform === "win32" ? { channel: "msedge" } : {});
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.addInitScript(({ origin, session }) => {
@@ -59,7 +58,7 @@ async function verify() {
     await follow.waitFor();
     await follow.click();
     await unfollow.waitFor();
-    phase("first", true);
+    step("first", true);
     const article = main.getByRole("article");
     await article.getByText("Preview A leads by 40 votes").waitFor({ timeout: 45_000 });
     const raceButton = ticker.locator("[data-race-id='87476']").first();
@@ -68,11 +67,11 @@ async function verify() {
     assert(initial && initial.width > 0);
     await page.screenshot({ path: path.join(folder, "pages.png") });
     const start = Date.now();
-    phase("correction", true);
+    step("correction", true);
     await article.getByText("Preview B leads by 30 votes").waitFor({ timeout: 10_000 });
     console.log("SSE correction visible after", Date.now() - start, "ms");
     // Test the missed-event fallback without navigation or a simulated push.
-    phase("delayed");
+    step("delayed");
     await article.getByText(/Updates delayed/).waitFor({ timeout: 65_000 });
     assert.match(await article.innerText(), /Preview B leads by 30 votes/);
     // Change the same saved preference the native ticker consumes across windows.
@@ -85,7 +84,7 @@ async function verify() {
     const chip = ticker.locator("[data-race-id='87476']:not([data-chip])").first();
     await chip.waitFor({ timeout: 40_000 });
     const before = await chip.boundingBox();
-    phase("called", true);
+    step("called", true);
     await article.getByText("civicAPI calls it for Preview B").waitFor({ timeout: 10_000 });
     await chip.filter({ hasText: "civicAPI calls it for Preview B" }).waitFor({ timeout: 12_000 });
     const after = await chip.boundingBox();
@@ -94,7 +93,7 @@ async function verify() {
     await unfollow.click();
     await article.waitFor({ state: "detached" });
     await chip.waitFor({ state: "detached", timeout: 35_000 });
-    phase("first");
+    step("first");
     await follow.click();
     await article.getByText("Preview A leads by 40 votes").waitFor({ timeout: 40_000 });
     console.log("Follow, correction, delayed fallback, Pages, Continuous, call, unfollow and refollow passed.");
@@ -102,4 +101,8 @@ async function verify() {
     await browser.close();
   }
 }
-verify().catch(error => { console.error(error); process.exitCode = 1; });
+module.exports = { verify };
+if (require.main === module) {
+  const session = JSON.parse(fs.readFileSync(path.join(folder, "tester.json"), "utf8"));
+  verify({ origin, session, folder, step: phase }).catch(error => { console.error(error); process.exitCode = 1; });
+}

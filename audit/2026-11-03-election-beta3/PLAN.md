@@ -32,3 +32,10 @@ The fictional replay gives the same race two candidates, Preview A and Preview B
 ## Expansion after the private pilot
 
 Add a mayor or council contest only after verifying its provider ID, city, state, date, seat count, candidate identities and a real update. A council election with several winners or a ranked-choice count requires its own result rules. Retain the one-widget-per-account model as the race picker grows. Following additional contests within the widget uses the same slot. The beta currently supports one Tennessee statewide race.
+
+## Evidence from the private walkthrough
+
+- On Windows, an authenticated Edge session added the catalog entry, searched for Tennessee, followed the race, and rendered both ticker layouts. Two provider-shaped fixtures went through the Rust decoder, committed to Postgres and triggered the actual Redis/SSE notification. The corrected count appeared within one second during the warmed run. This measures local delivery after ingestion.
+- With the notification withheld, the dashboard refresh recovered the delayed phase and kept the count. The browser also verified the provider-call label, stable chip width, unfollow and refollow. The harness is `verify-preview.cjs --writer`; the click-through replay is described in [TESTING.md](TESTING.md).
+- The native Windows tester rendered the packaged ticker and opened the full candidate table in a separate window. It uses a dedicated test profile. Build and release qualifications are separate. [Native walkthrough](NATIVE.md)
+- Local checks passed for the desktop production build and type checker, desktop unit suite, native Windows tests, existing browser layout regressions, and the Go and Rust tests with a scratch database. The release Rust image started in the private stack. An upstream HTTP failure triggered the waiting/delayed path on a fresh account.
