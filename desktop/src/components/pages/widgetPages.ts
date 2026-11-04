@@ -31,6 +31,8 @@ import { isLive, isPre, leagueCode } from "../../utils/gameHelpers";
 import { teamShortName } from "../../utils/teamShortName";
 import { sourceTab } from "../../utils/rssText";
 import { gameMinCol } from "./cells/GameCell";
+import type { ElectionRace } from "../../datawidgets/elections/view";
+import { ELECTION_MIN_COL } from "./cells/ElectionCell";
 import { NEWS_MIN_COL } from "./cells/NewsCell";
 import { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { ALSO_MIN_COL } from "./cells/AlsoCell";
@@ -47,7 +49,7 @@ import {
   type WidgetPlan,
 } from "./pagePlan";
 
-export type PageWidgetKind = "sports" | "news" | "finance" | "github" | "also";
+export type PageWidgetKind = "sports" | "news" | "finance" | "github" | "elections" | "also";
 
 /** One quiet widget on the Also page. */
 export interface AlsoItem {
@@ -62,7 +64,7 @@ export interface PageItem {
   /** Stable across refetches: game id, article id, symbol, widget id. */
   key: string;
   tier: Tier;
-  data: Game | RssItem | Trade | GitHubChipData | GitHubThing | AlsoItem;
+  data: ElectionRace | Game | RssItem | Trade | GitHubChipData | GitHubThing | AlsoItem;
   /** One of the user's favourite teams is playing (GameCell's top line). */
   mine?: boolean;
   /** `data-pin-subject` JSON for the right-click menu (utils/pinTarget). */
@@ -193,6 +195,15 @@ export function buildPageWidgets(
           fill: [], // the pool is already the whole week
         };
       }
+    } else if (source === "elections") {
+      const pool = scopedRows<ElectionRace>(raw, ctx);
+      const races = dropPinned(pool, ctx, r => String(r.id));
+      pinnedAll = pool.length > 0 && !races.length;
+      if (races.length) widget = {
+        tab, kind: "elections", code: "RACES", hex, minCol: ELECTION_MIN_COL,
+        items: races.map(r => ({ key: "e:" + r.id, tier: TIER.fresh, data: r, pin: pinOf(tab, String(r.id), r.name) })),
+        fill: [],
+      };
     } else if (source === "rss") {
       const rows = scopedRows<RssItem>(raw, ctx);
       const pool = selectRssForPages(rows);

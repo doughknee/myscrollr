@@ -255,6 +255,7 @@ export function widgetManifest(
   if (!w) {
     // Not in the catalog: fall back to a directly-registered renderer, which
     // is how a client newer than the catalog still renders something.
+    if (id === "elections") return undefined; // availability requires the preview catalog
     return getDataWidget(id) ?? getWidget(id);
   }
   if (!w.source) return getWidget(w.id);

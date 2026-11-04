@@ -94,7 +94,7 @@ func GetWidgets(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{"widgets": widgets})
+	return c.JSON(fiber.Map{"widgets": platform.VisibleWidgets(widgets, platform.ElectionsPreview(c.Query("preview")))})
 }
 
 // Save the widget and its polling targets atomically, including quota checks.
@@ -128,6 +128,23 @@ func rssWriteFailure(c *fiber.Ctx, userID string, err *ingestread.RSSWriteError)
 		c.Set("Retry-After", strconv.Itoa(err.RetryAfter))
 	}
 	return c.Status(err.Status).JSON(platform.ErrorResponse{Status: "error", Error: err.Message})
+}
+
+func widgetVisibleToClient(c *fiber.Ctx, widgetType string) bool {
+	return widgetType != "elections" || platform.ElectionsPreview(c.Query("preview"))
+}
+
+func validateElectionConfig(cfg map[string]any) error {
+	ids, ok := platform.ElectionRaceIDs(cfg)
+	if !ok {
+		return errors.New("race_ids must be a list of up to 12 unique positive integers")
+	}
+	for _, id := range ids {
+		if !ingestread.ElectionRaceSupported(id) {
+			return errors.New("unsupported election race")
+		}
+	}
+	return nil
 }
 
 // CreateWidget adds a new widget for the authenticated user.
@@ -172,7 +189,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	// event, and could not render. The OR was added so coarse types
 	// ("sports") kept working during the widget/slot transition; that
 	// transition is over and those types no longer exist.
-	if !platform.IsKnownWidgetType(req.WidgetType) {
+	if !widgetVisibleToClient(c, req.WidgetType) || !platform.IsKnownWidgetType(req.WidgetType) {
 		log.Printf("[Widgets] create rejected for %s: unknown widget type %q", userID, req.WidgetType)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
@@ -197,6 +214,11 @@ func CreateWidget(c *fiber.Ctx) error {
 	}
 
 	req.Config = configOrDefault(req.WidgetType, req.Config)
+	if req.WidgetType == "elections" && req.Config != nil {
+		if err := validateElectionConfig(req.Config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
+		}
+	}
 	if platform.DataSourceForWidget(req.WidgetType) == "rss" {
 		if err := ingestread.ValidateRSSConfig(req.Config); err != nil {
 			ingestread.RecordRSSAbuse(userID, "invalid_destination")
@@ -340,7 +362,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 
 	widgetType := c.Params("type")
 	// Catalog-only, same as CreateWidget — see the note there.
-	if !platform.IsKnownWidgetType(widgetType) {
+	if !widgetVisibleToClient(c, widgetType) || !platform.IsKnownWidgetType(widgetType) {
 		log.Printf("[Widgets] update rejected for %s: unknown widget type %q", userID, widgetType)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
@@ -368,6 +390,11 @@ func UpdateWidget(c *fiber.Ctx) error {
 		req.LocalWidgets = 0
 	}
 
+	if widgetType == "elections" && req.Config != nil {
+		if err := validateElectionConfig(req.Config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: err.Error()})
+		}
+	}
 	if platform.DataSourceForWidget(widgetType) == "rss" && req.Config != nil {
 		if err := ingestread.ValidateRSSConfig(req.Config); err != nil {
 			ingestread.RecordRSSAbuse(userID, "invalid_destination")
@@ -491,6 +518,10 @@ func DeleteWidget(c *fiber.Ctx) error {
 	}
 
 	widgetType := c.Params("type")
+
+	if !widgetVisibleToClient(c, widgetType) {
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: "Unknown widget type"})
+	}
 
 	// Fetch the widget config before deleting (needed for cleanup hooks)
 	var configBytes []byte

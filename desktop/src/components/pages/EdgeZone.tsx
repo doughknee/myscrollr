@@ -46,6 +46,8 @@ import { formatTempRange } from "../../utils/format";
 import { teamShortName } from "../../utils/teamShortName";
 import { chipUrlForFinance, chipUrlForRss, chipUrlForSports } from "../../utils/chipUrl";
 import GameCell, { gameMinCol } from "./cells/GameCell";
+import type { ElectionRace } from "../../datawidgets/elections/view";
+import ElectionCell, { ELECTION_MIN_COL } from "./cells/ElectionCell";
 import NewsCell, { NEWS_PIN_W } from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import { Rule, accentFor, accentStyle, inkFor } from "./cells/parts";
@@ -78,8 +80,8 @@ export interface EdgeUtility {
 export interface EdgePin {
   widget: string;
   hex?: string;
-  kind: "sports" | "finance" | "news";
-  data: Game | Trade | RssItem;
+  kind: "sports" | "finance" | "news" | "elections";
+  data: ElectionRace | Game | Trade | RssItem;
   /** The family's minimum column: fixed for the pin's life. */
   width: number;
   /** `data-pin-subject`, so a right-click offers "Unpin". */
@@ -158,6 +160,9 @@ export function buildEdge(
     } else if (source === "finance") {
       const t = scopedRows<Trade>(raw, ctx).find((r) => r.symbol === p.subject);
       if (t) out.push({ widget: p.widget, hex, kind: "finance", data: t, width: QUOTE_MIN_COL, pin: pin(t.symbol) });
+    } else if (source === "elections") {
+      const r = scopedRows<ElectionRace>(raw, ctx).find(r => String(r.id) === p.subject);
+      if (r) out.push({ widget: p.widget, hex, kind: "elections", data: r, width: ELECTION_MIN_COL, pin: pin(r.name) });
     } else if (source === "rss") {
       const at = (r: RssItem) => Date.parse(r.published_at ?? r.created_at);
       const rows = scopedRows<RssItem>(raw, ctx).filter((r) => r.feed_url === p.subject);
@@ -242,6 +247,10 @@ function PinCell({ p, tick, onChipClick }: { p: EdgePin; tick: number; onChipCli
   if (p.kind === "sports") {
     const g = p.data as Game;
     return <GameCell game={g} width={p.width} onClick={() => onChipClick?.("sports", g.id, chipUrlForSports(g))} />;
+  }
+  if (p.kind === "elections") {
+    const r = p.data as ElectionRace;
+    return <ElectionCell race={r} onClick={() => onChipClick?.("elections", r.id)} />;
   }
   if (p.kind === "finance") {
     const t = p.data as Trade;

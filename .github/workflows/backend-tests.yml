@@ -194,7 +194,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
 
-  # ── Rust tests (3 independent jobs, run in parallel) ───────────
+  # ── Channel ingester tests ──────────────────────────────────────
   rust-tests:
     strategy:
       fail-fast: false
@@ -203,6 +203,7 @@ jobs:
           - dir: channels/finance/service
           - dir: channels/sports/service
           - dir: channels/rss/service
+          - dir: channels/elections/service
 
     runs-on: ubuntu-latest
     defaults:
@@ -241,9 +242,13 @@ jobs:
         with:
           cache-on-failure: "true"
 
+      - name: Start isolated Redis for election notification tests
+        if: matrix.dir == 'channels/elections/service'
+        run: docker run -d --name elections-test-redis -p 127.0.0.1:6379:6379 redis:7-alpine
       - run: cargo test --locked --quiet
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
+          TEST_REDIS_URL: ${{ matrix.dir == 'channels/elections/service' && 'redis://127.0.0.1:6379/' || '' }}
 
   # ── Desktop native tests ───────────────────────────────────────
   # desktop/src-tauri is the app's native half — the OAuth loopback

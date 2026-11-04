@@ -72,6 +72,8 @@ import {
   type Turn,
 } from "./widgetPages";
 import GameCell from "./cells/GameCell";
+import type { ElectionRace } from "../../datawidgets/elections/view";
+import ElectionCell from "./cells/ElectionCell";
 import NewsCell from "./cells/NewsCell";
 import QuoteCell, { QUOTE_MIN_COL } from "./cells/QuoteCell";
 import AlsoCell from "./cells/AlsoCell";
@@ -392,6 +394,10 @@ const Cell = memo(function Cell({ widget, item, colW, dark, onChipClick, fill = 
     case "sports": {
       const g = item.data as Game;
       return <GameCell game={g} width={colW} mine={item.mine} fill={fill} onClick={() => onChipClick?.("sports", g.id, chipUrlForSports(g))} />;
+    }
+    case "elections": {
+      const race = item.data as ElectionRace;
+      return <ElectionCell race={race} expanded={fill} onClick={() => onChipClick?.("elections", race.id)} />;
     }
     case "news": {
       const r = item.data as RssItem;

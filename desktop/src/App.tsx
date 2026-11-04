@@ -4,6 +4,7 @@ import { setCrashReports } from "./sentry";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTauriListener } from "./hooks/useTauriListener";
+import { followedRaceIds } from "./datawidgets/elections/view";
 import { useDashboardCDC } from "./hooks/useDashboardCDC";
 import { usePinnedSubjectsSync } from "./hooks/usePinnedSubjectsSync";
 import { useSharedSSE } from "./hooks/useSharedSSE";
@@ -209,6 +210,15 @@ export default function App() {
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
 
+  // A local pin can outlive a follow changed on another device. Reserve edge
+  // space only for races still followed by this account.
+  const tickerPins = useMemo(() => {
+    const pins = prefs.widgets.pins;
+    if (!pins.some(p => p.widget === "elections")) return pins;
+    const followed = followedRaceIds(widgets.find(w => w.widget_type === "elections")?.config);
+    return pins.filter(p => p.widget !== "elections" || followed.includes(Number(p.subject)));
+  }, [prefs.widgets.pins, widgets]);
+
   const activeTabs = useMemo(
     () => [...widgetTabs, ...prefs.widgets.widgetsOnTicker],
     [widgetTabs, prefs.widgets.widgetsOnTicker],
@@ -401,6 +411,7 @@ export default function App() {
       // No URL provided (widget chip, missing data) — open the desktop
       // app on the relevant widget page.
       savePref("activeItem", widgetType);
+      if (widgetType === "elections") setStore("scrollr:navigate", "/widget/elections");
       invoke("show_app_window").catch(() => {});
     },
     [],
@@ -781,7 +792,7 @@ export default function App() {
             // know we're about to (or already are) offering the NPR
             // default, showing "no sources yet" first would be a flash of
             // the wrong empty state, not a real one.
-            const hasAnyPinnedWidget = prefs.widgets.pins.length > 0;
+            const hasAnyPinnedWidget = tickerPins.length > 0;
             const showSourcelessCTA =
               authenticated &&
               widgets.length === 0 &&
@@ -821,7 +832,7 @@ export default function App() {
                   dashboard={dashboard ?? null}
                   activeTabs={activeTabs}
                   widgetData={widgetData}
-                  pins={prefs.widgets.pins}
+                  pins={tickerPins}
                   onChipClick={handleChipClick}
                   onDisplayedWidgetsChange={reportDisplayedWidgets}
                   pageControls={prefs.ticker.pageControls}
@@ -834,7 +845,7 @@ export default function App() {
                 activeTabs={activeTabs}
                 widgetData={widgetData}
                 onChipClick={handleChipClick}
-                pins={prefs.widgets.pins}
+                pins={tickerPins}
                 speed={prefs.ticker.tickerSpeed}
                 fitPins={filled}
                 onHover={filled ? "keep" : prefs.ticker.onHover}

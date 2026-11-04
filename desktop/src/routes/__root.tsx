@@ -57,6 +57,7 @@ import { useGitHubAutoPick } from "../widgets/github/useAutoPick";
 import { canonicalOrder } from "../marketplace";
 
 // Data
+import { followedRaceIds } from "../datawidgets/elections/view";
 import { dashboardQueryOptions } from "../api/queries";
 
 // Preferences
@@ -262,13 +263,24 @@ function RootLayout() {
   const auth = useAuthState();
 
   // ── Dashboard data (TanStack Query) ─────────────────────────
-  const { data: dashboard } = useQuery({
+  const queryClient = useQueryClient();
+  const previous = queryClient.getQueryData<import("../types").DashboardResponse>(queryKeys.dashboard);
+  const election = previous?.widgets?.find(w => w.widget_type === "elections" && w.enabled);
+  const followsElections = followedRaceIds(election?.config).length > 0;
+  const { data: lastDashboard, isRefetchError, fetchStatus } = useQuery({
     ...dashboardQueryOptions(),
-    refetchInterval: POLL_INTERVALS[auth.tier],
+    refetchInterval: followsElections ? Math.min(30_000, POLL_INTERVALS[auth.tier]) : POLL_INTERVALS[auth.tier],
+    // The main window owns polling even while hidden behind the ticker.
+    refetchIntervalInBackground: followsElections,
   });
+  const dashboard = useMemo(() => {
+    const races = lastDashboard?.data.elections;
+    if ((!isRefetchError && fetchStatus !== "paused") || !lastDashboard || !races?.length) return lastDashboard;
+    return { ...lastDashboard, data: { ...lastDashboard.data, elections: races.map(r => ({ ...r, delayed: true })) } };
+  }, [lastDashboard, isRefetchError, fetchStatus]);
 
   // ── CDC merge engine (processes SSE events into dashboard cache) ──
-  useDashboardCDC();
+  useDashboardCDC(true);
 
   // ── Broadcast dashboard to ticker window via store ──
   useEffect(() => {
@@ -465,8 +477,6 @@ function RootLayout() {
   useTauriListener("presence-auth-expired", () => {
     void getValidToken(true).catch(() => {});
   });
-
-  const queryClient = useQueryClient();
 
   // Shell-level weather polling — keeps data fresh regardless of which page is visible.
   // Permanent observer so refetchInterval runs even when WeatherFeedTab is unmounted.

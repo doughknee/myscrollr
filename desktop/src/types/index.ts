@@ -115,6 +115,7 @@ export interface RssItem {
 
 export interface DashboardResponse {
   data: {
+    elections?: import("./api.generated").ElectionResult[];
     finance?: Trade[];
     sports?: Game[];
     sports_meta?: SportsMeta;

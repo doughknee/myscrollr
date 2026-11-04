@@ -82,6 +82,10 @@ func parseCDCRecords(body []byte) ([]CDCRecord, error) {
 // to all subscribed clients in-memory.
 func routeCDCRecord(ctx context.Context, rec CDCRecord) {
 	table := rec.Metadata.TableName
+	if table == "user_widgets" && rec.Record["widget_type"] == "elections" {
+		RouteToRecordOwner(rec.Record, "logto_sub", []byte(electionInvalidation))
+		return
+	}
 
 	// A games row is relayed as the desktop's whole picture of that game,
 	// so it needs the standings the polled payload joins in (REL-235).

@@ -135,3 +135,61 @@ func TestHandleTopicMessage_CoreUserTopicStillDispatches(t *testing.T) {
 		t.Fatal("no dispatch job enqueued for core user topic")
 	}
 }
+
+func TestElectionResultSignalReachesOnlyFollowers(t *testing.T) {
+	h := swapHub(t)
+	const topic = "cdc:elections:87476"
+	h.registry.subscribe("follower", topic)
+	h.registry.subscribe("other", "cdc:elections:5")
+	// The dedicated ingester publishes a refetch signal after its DB commit.
+	h.handleTopicMessage(topic, []byte(electionInvalidation))
+	if len(h.dispatchCh) != 1 || (<-h.dispatchCh).userID != "follower" {
+		t.Fatal("expected only the follower to be notified")
+	}
+}
+
+func TestElectionWidgetCDCContainsNoFollowSelection(t *testing.T) {
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	sub := platform.Rdb.Subscribe(ctx, platform.TopicPrefixCore+"test-follow")
+	defer sub.Close()
+	if _, err := sub.Receive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rec := CDCRecord{Action: "update", Record: map[string]any{
+		"logto_sub": "test-follow", "widget_type": "elections", "config": map[string]any{"race_ids": []int{87476}},
+	}}
+	rec.Metadata.TableName = "user_widgets"
+	routeCDCRecord(ctx, rec)
+	msg, err := sub.ReceiveMessage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := parseCDCRecords([]byte(msg.Payload))
+	if err != nil || len(records) != 1 || records[0].Metadata.TableName != "election_results" ||
+		len(records[0].Record) != 0 || len(records[0].Changes) != 0 {
+		t.Fatalf("unexpected widget config signal %q", msg.Payload)
+	}
+}
+
+func TestElectionSubscriptionsFromStoredWidget(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	t.Setenv("ELECTIONS_BETA_ENABLED", "true")
+	h := swapHub(t)
+	const topic = "cdc:elections:87476"
+	testsupport.MustExec(t, `INSERT INTO user_widgets(logto_sub,widget_type,enabled,config) VALUES
+        ('follows-election','elections',true,'{"race_ids":[87476]}'),
+        ('disabled-election','elections',false,'{"race_ids":[87476]}'),
+        ('empty-election','elections',true,'{"race_ids":[]}')`)
+	for _, sub := range []string{"follows-election", "disabled-election", "empty-election"} {
+		subscribeUserToTopics(sub)
+	}
+	subs := h.registry.getUsersForTopic(topic)
+	if _, ok := subs["follows-election"]; !ok || len(subs) != 1 {
+		t.Fatalf("unexpected subscribers: %v", subs)
+	}
+}

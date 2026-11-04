@@ -52,6 +52,28 @@ Two artifacts ride along, both generated and both guarded by a Go test:
 - `desktop/src/types/api.generated.ts` — the wire types, from the Go
   structs (`go -C api run ./cmd/gents`).
 
+## Election Results private beta
+
+Set `ELECTIONS_BETA_ENABLED=true` on the private test API at startup. A beta
+client sends `preview=elections` on catalog, dashboard and widget requests.
+The stable catalog, bundled snapshot and public feed continue to use their
+existing sources. A tester adds Election Results in the Library and follows
+a supported race. The widget uses one account slot and starts with no races
+selected. Remove the widget in the beta to release its slot before switching
+the same account back to Stable.
+
+`GET /elections/races` lists the curated contests. The dedicated Rust ingester in
+`channels/elections/service/` polls civicAPI for followed races when enabled.
+It requests the explicit JSON race URL first. A timeout, server error, invalid
+payload or regressing source timestamp triggers one attempt via civicAPI's
+www hostname. A client error such as HTTP 429 goes straight to backoff.
+Two unsuccessful reads preserve the last verified count and its source time.
+A PostgreSQL lease shares the work across workers. After a committed change,
+the ingester publishes a refresh signal to the race's Redis
+topic. The next authenticated dashboard read merges the latest stored result
+outside the aggregate cache. The beta also polls the dashboard for recovery
+after a dropped update. This path needs no Sequin sink or provider key.
+
 ## Adding a widget
 
 **Reusing an existing source** (another league, another feed) — server only:

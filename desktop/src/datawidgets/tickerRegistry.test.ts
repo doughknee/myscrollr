@@ -21,9 +21,9 @@ function ctx(over: Partial<TickerContext> = {}): TickerContext {
 }
 
 describe("ticker source registry", () => {
-  it("covers every data source the catalog ships", () => {
+  it("registers stable and beta-capable source renderers", () => {
     expect(Object.keys(TICKER_SOURCES).sort()).toEqual(
-      ["finance", "rss", "sports"].sort(),
+      ["finance", "rss", "sports", "elections"].sort(),
     );
   });
 

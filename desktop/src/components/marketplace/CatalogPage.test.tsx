@@ -20,7 +20,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { Route } from "../../routes/catalog";
 import { buildBlocks } from "./CatalogDirectory";
-import { getCatalogItems } from "../../marketplace";
+import { getCatalogItems, refreshCatalog, widgetManifest } from "../../marketplace";
+import snapshot from "../../catalog.snapshot.json";
 import { ShellContext, ShellDataContext } from "../../shell-context";
 import { BarChassisProvider, BarChassisSlot } from "../widget-bar/BarChassis";
 import type { ShellState } from "../../shell-context";
@@ -45,6 +46,26 @@ vi.mock("../../api/client", async (importOriginal) => {
     requestCatalogWidget: vi.fn(async (query: string) => ({ query, count: 3 })),
     dataWidgetsApi: { ...mod.dataWidgetsApi, update: api.update, create: api.create },
   };
+});
+
+it("shows Election Results in News and search only after the server confirms preview availability", async () => {
+  expect(getCatalogItems().some(item => item.id === "elections")).toBe(false);
+  expect(widgetManifest("elections")).toBeUndefined();
+  const election = {
+    ...snapshot.widgets[0], id: "elections", source: "elections", name: "Election Results",
+    group: "Elections", category: "news", keywords: ["governor"], default_config: { race_ids: [] },
+  };
+  try {
+    await refreshCatalog(async () => ({ version: "preview-test", widgets: [...snapshot.widgets, election] }));
+    const items = getCatalogItems();
+    const shelf = buildBlocks(items, "news", "", undefined, new Set()).blocks.flatMap(b => b.shelves);
+    expect(shelf.find(s => s.key === "Elections")?.items.some(i => i.id === "elections")).toBe(true);
+    const hits = buildBlocks(items, "all", "governor", undefined, new Set()).blocks;
+    expect(hits.flatMap(b => b.shelves).flatMap(s => s.items).some(i => i.id === "elections")).toBe(true);
+  } finally {
+    await refreshCatalog(async () => snapshot);
+  }
+  expect(widgetManifest("elections")).toBeUndefined();
 });
 
 const row = (

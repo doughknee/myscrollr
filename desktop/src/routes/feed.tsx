@@ -23,9 +23,11 @@ import {
   Plus,
   TrendingUp,
   Trophy,
+  Vote,
 } from "lucide-react";
 import clsx from "clsx";
 import RouteError from "../components/RouteError";
+import { raceView, type ElectionRace } from "../datawidgets/elections/view";
 import SportsEmptyState from "../datawidgets/sports/EmptyState";
 import type { LeagueMeta } from "../api/queries";
 import { WidgetBar } from "../components/widget-bar/Bar";
@@ -169,6 +171,7 @@ function HomePage() {
     [resolved],
   );
 
+  const elections = bySource("elections");
   const sports = bySource("sports");
   const finance = bySource("finance");
   const rss = bySource("rss");
@@ -231,12 +234,16 @@ function HomePage() {
           text: item.title.slice(0, 42),
         });
     }
+    for (const r of elections) {
+      const race = (r.data as ElectionRace[])[0];
+      if (race) out.push({ id: r.row.widget_type, hex: r.manifest.hex, text: race.name + " · " + raceView(race).headline });
+    }
     for (const u of utilities) {
       const v = getWidgetValue(u.id, units);
       if (v) out.push({ id: u.id, hex: u.hex, text: v });
     }
     return out;
-  }, [sports, finance, rss, utilities, units]);
+  }, [sports, finance, rss, elections, utilities, units]);
 
   // A widget that returned no rows AND owns a config is unconfigured —
   // distinct from a zero-config source that simply has nothing on right
@@ -370,6 +377,7 @@ function HomePage() {
           sports={sports}
           finance={finance}
           rss={rss}
+          elections={elections}
           utilities={utilities}
           openWidget={openWidget}
         />
@@ -388,16 +396,18 @@ function BentoGrid({
   sports,
   finance,
   rss,
+  elections,
   utilities,
   openWidget,
 }: {
   sports: Resolved[];
   finance: Resolved[];
   rss: Resolved[];
+  elections: Resolved[];
   utilities: WidgetManifest[];
   openWidget: (id: string) => void;
 }) {
-  const left = sports.length > 0 || rss.length > 0 || utilities.length > 0;
+  const left = elections.length > 0 || sports.length > 0 || rss.length > 0 || utilities.length > 0;
   const right = finance.length > 0;
 
   return (
@@ -409,6 +419,11 @@ function BentoGrid({
     >
       {left && (
         <div className="flex flex-col gap-3.5">
+          {elections.map(({ row, manifest, data }) => (
+            <Card key={row.widget_type} title={manifest.name} icon={<Vote size={14} />}>
+              <manifest.HomeRows data={data} onConfigure={() => openWidget(row.widget_type)} />
+            </Card>
+          ))}
           {sports.length > 0 && (
             <ScoresCard items={sports} openWidget={openWidget} />
           )}

@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dir: [desktop/src-tauri, channels/finance/service, channels/sports/service, channels/rss/service]
+        dir: [desktop/src-tauri, channels/finance/service, channels/sports/service, channels/rss/service, channels/elections/service]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable

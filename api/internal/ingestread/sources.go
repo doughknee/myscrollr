@@ -45,9 +45,10 @@ type localSource struct {
 // localSources is keyed by data-source name (the values returned by
 // DataSourceForWidget).
 var LocalSources = map[string]localSource{
-	"finance": financeSource,
-	"sports":  sportsSource,
-	"rss":     rssSource,
+	"elections": electionsSource,
+	"finance":   financeSource,
+	"sports":    sportsSource,
+	"rss":       rssSource,
 }
 
 // isLocalSource reports whether a discovered channel name is served

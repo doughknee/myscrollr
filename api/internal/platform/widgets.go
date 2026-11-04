@@ -743,6 +743,9 @@ func Catalog() []WidgetDef { return catalog }
 
 // WidgetByID returns a catalog entry, if it exists.
 func WidgetByID(id string) (WidgetDef, bool) {
+	if id == "elections" && ElectionsBetaEnabled() {
+		return electionWidget, true
+	}
 	def, ok := widgetByID[id]
 	return def, ok
 }
@@ -762,7 +765,7 @@ var widgetSourcePrefixes = map[string]string{
 // with no data source). Subscription code switches on this so it never
 // hardcodes a source name.
 func DataSourceForWidget(widgetType string) string {
-	if def, ok := widgetByID[widgetType]; ok {
+	if def, ok := WidgetByID(widgetType); ok {
 		return def.Source
 	}
 	for prefix, src := range widgetSourcePrefixes {

@@ -1,3 +1,4 @@
+import { followedRaceIds, type ElectionRace } from "../datawidgets/elections/view";
 import type { Game, Trade, RssItem } from "../types";
 
 /**
@@ -16,6 +17,10 @@ export function scopeSourceData(
   data: unknown[],
   config: Record<string, unknown> | undefined,
 ): unknown[] {
+  if (source === "elections") {
+    const races = new Map((data as ElectionRace[]).map(r => [r.id, r]));
+    return followedRaceIds(config).flatMap(id => races.get(id) ?? []);
+  }
   if (!config) return data;
   switch (source) {
     case "sports": {

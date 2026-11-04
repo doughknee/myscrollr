@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -212,6 +213,7 @@ func (h *Hub) dispatchWorker(ctx context.Context) {
 // topic subscription registry.
 func (h *Hub) listenToTopics(ctx context.Context) {
 	pubsub := platform.PSubscribe(ctx,
+		platform.TopicPrefixElections+"*",
 		platform.TopicPrefixFinance+"*",
 		platform.TopicPrefixSports+"*",
 		platform.TopicPrefixRSS+"*",
@@ -223,9 +225,9 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 
 	ch := pubsub.Channel()
 
-	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* + %s",
+	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* %s* + %s",
 		platform.TopicPrefixFinance, platform.TopicPrefixSports, platform.TopicPrefixRSS,
-		platform.TopicPrefixCore, platform.TopicSSEControlResubscribe)
+		platform.TopicPrefixCore, platform.TopicPrefixElections, platform.TopicSSEControlResubscribe)
 
 	for {
 		select {
@@ -503,6 +505,11 @@ func PublishToTopic(topic string, payload []byte) {
 	}
 }
 
+// Both snapshot changes and election widget edits are refetch signals. Each
+// client gets its authorized projection of the latest dashboard. Nothing in
+// the signal can add a preview-only widget row to an older desktop.
+const electionInvalidation = `{"data":[{"action":"update","record":{},"changes":{},"metadata":{"table_name":"election_results"}}]}`
+
 // TopicForRSSFeed returns the topic channel for an RSS feed URL.
 // Uses FNV-1a hash because RSS URLs can contain characters that break
 // Redis channel patterns (:, *, ?).
@@ -534,6 +541,11 @@ func subscribeUserToTopics(userID string) {
 		// subscribe through the same per-source logic as the legacy coarse
 		// types. The per-league/per-symbol values still come from config.
 		switch platform.DataSourceForWidget(ch.WidgetType) {
+		case "elections":
+			ids, _ := platform.ElectionRaceIDs(ch.Config)
+			for _, id := range ids {
+				globalHub.registry.subscribe(userID, platform.TopicPrefixElections+strconv.Itoa(id))
+			}
 		case "finance":
 			symbols := platform.ExtractStringArray(ch.Config, "symbols")
 			for _, sym := range symbols {

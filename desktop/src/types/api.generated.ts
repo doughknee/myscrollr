@@ -41,6 +41,34 @@ export interface DashboardResponse {
   widgets?: Widget[];
 }
 
+export interface ElectionCandidate {
+  id: number;
+  name: string;
+  party: string;
+  votes: number;
+  percent: number | null;
+  winner: boolean;
+}
+
+export interface ElectionRace {
+  id: number;
+  name: string;
+  state: string;
+  election_date: string;
+}
+
+export interface ElectionResult {
+  id: number;
+  name: string;
+  state: string;
+  election_date: string;
+  source_updated_at: string | null;
+  percent_reporting: number | null;
+  delayed: boolean;
+  disputed: boolean;
+  candidates: ElectionCandidate[];
+}
+
 export interface ErrorResponse {
   status: string;
   error: string;

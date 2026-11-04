@@ -46,7 +46,8 @@ export function syncPinnedSubjects(
     // Single-chip utilities (clock, weather, …) are client-side: they
     // have no dashboard section, so there is nothing to ask the server
     // to guarantee.
-    if (!source || !p.subject) continue;
+    // Every followed election is already in the dashboard. A pin stays local.
+    if (!source || source === "elections" || !p.subject) continue;
     const key = `${source}\0${p.subject}`;
     if (seen.has(key)) continue;
     seen.add(key);

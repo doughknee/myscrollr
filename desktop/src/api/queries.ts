@@ -6,9 +6,10 @@
  */
 import { queryOptions } from "@tanstack/react-query";
 import { isAuthenticated, hasRefreshToken } from "../auth";
-import { authFetch, request, rssApi, fetchOverview } from "./client";
+import { ApiError, authFetch, request, rssApi, fetchOverview } from "./client";
+import { followedRaceIds } from "../datawidgets/elections/view";
 import { pinnedSubjectsQuery } from "./pinnedSubjects";
-import { DEMO } from "../config";
+import { DEMO, electionPreviewPath } from "../config";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game, Trade } from "../types";
 
@@ -55,7 +56,7 @@ async function fetchDashboard(): Promise<DashboardResponse> {
     const demo = await request<{
       data: DashboardResponse["data"];
       widgets?: DashboardResponse["widgets"];
-    }>("/dashboard");
+    }>(electionPreviewPath("/dashboard"));
     return { data: demo.data, widgets: demo.widgets } as DashboardResponse;
   }
 
@@ -73,14 +74,16 @@ async function fetchDashboard(): Promise<DashboardResponse> {
         data: DashboardResponse["data"];
         widgets?: DashboardResponse["widgets"];
         preferences?: DashboardResponse["preferences"];
-      }>(`/dashboard${pinnedSubjectsQuery()}`);
+      }>(electionPreviewPath(`/dashboard${pinnedSubjectsQuery()}`));
       return {
         data: data.data,
         widgets: data.widgets,
         preferences: data.preferences,
       } as DashboardResponse;
-    } catch {
-      // Token rejected or expired — fall back to public feed
+    } catch (err) {
+      // Keep the signed-in snapshot during transport or server failures.
+      // Only an expired session should switch to the public feed.
+      if (!(err instanceof ApiError && err.status === 401 && !hasRefreshToken())) throw err;
     }
   }
 
@@ -94,7 +97,20 @@ async function fetchDashboard(): Promise<DashboardResponse> {
 export function dashboardQueryOptions() {
   return queryOptions({
     queryKey: queryKeys.dashboard,
-    queryFn: fetchDashboard,
+    queryFn: async ({ client }) => {
+      const dashboard = await fetchDashboard();
+      // The other sources may succeed when an elections read times out. The
+      // missing slice must not clear the last verified count for the same row.
+      if (dashboard.data.elections !== undefined) return dashboard;
+      const widget = dashboard.widgets?.find(w => w.widget_type === "elections" && w.enabled);
+      const ids = followedRaceIds(widget?.config);
+      if (!widget || !ids.length) return dashboard;
+      const prior = client.getQueryData<DashboardResponse>(queryKeys.dashboard);
+      if (!prior?.widgets?.some(w => w.id === widget.id && w.widget_type === "elections")) return dashboard;
+      const retained = prior.data.elections?.filter(r => ids.includes(r.id));
+      if (retained?.length) dashboard.data = { ...dashboard.data, elections: retained.map(r => ({ ...r, delayed: true })) };
+      return dashboard;
+    },
     staleTime: 10_000,
   });
 }
