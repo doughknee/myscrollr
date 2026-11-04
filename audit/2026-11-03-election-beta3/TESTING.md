@@ -21,7 +21,7 @@ This opens the desktop app's web mode with its ticker and main window, already s
 
 **Live provider check.** Close the replay window, then run the same command with `--live` instead of `--fresh`. This resets the fixture and builds the dedicated Rust ingester in the isolated stack. Follow the race to request a shared upstream snapshot. If civicAPI is unavailable, the widget can show waiting or delayed results. Your race follows survive switching modes. Closing the tester window stops its live worker. The QA replay uses fictional candidates for repeatable visual tests.
 
-**Automated browser verification.** Close the private tester, then run `node audit/2026-11-03-election-beta3/tester.mjs --fresh --verify`. It exercises the real desktop UI on a separate synthetic account. It verifies follow/unfollow, both ticker layouts, corrections, delayed and disputed results, a call and recovery after a missed notification. The fixture results are shared only inside the disposable test database.
+**Automated browser verification.** Close the private tester, then run `node audit/2026-11-03-election-beta3/tester.mjs --fresh --verify`. It exercises the real desktop UI on a separate synthetic account. It verifies follow/unfollow, both ticker layouts, corrections, delayed results, a call and recovery after a missed notification. The fixture results are shared only inside the disposable test database.
 
 **Existing preview.** Omit `--fresh` to use the already-running local review stack on ports 18439/19439 while its synthetic session is valid. The launcher verifies the session through core and the desktop proxy. If that stack is unavailable it starts the isolated replay on ports 18440/19440 instead. Replay phase commands target only the isolated replay database.
 

@@ -267,25 +267,42 @@ async function run() {
       throw Error("Private core did not offer Election Results.");
     if (verifyReplay) {
       const { verify } = requireDesktop(path.join(here, "verify-preview.cjs"));
-      await verify({
-        origin: endpoints.web,
-        session,
-        folder: state,
-        step: (phase, notify) => {
-          replay(phase);
-          if (notify) {
-            const event = {
-              data: [
-                { action: "update", record: {}, changes: {}, metadata: { table_name: "election_results" } },
-              ],
-            };
-            compose(
-              ["exec", "-T", "redis", "redis-cli", "-x", "PUBLISH", "cdc:elections:87476"],
-              JSON.stringify(event),
-            );
-          }
-        },
-      });
+      try {
+        await verify({
+          origin: endpoints.web,
+          session,
+          folder: state,
+          step: (phase, notify) => {
+            replay(phase);
+            if (notify) {
+              const event = {
+                data: [
+                  {
+                    action: "update",
+                    record: {},
+                    changes: {},
+                    metadata: { table_name: "election_results" },
+                  },
+                ],
+              };
+              compose(
+                ["exec", "-T", "redis", "redis-cli", "-x", "PUBLISH", "cdc:elections:87476"],
+                JSON.stringify(event),
+              );
+            }
+          },
+        });
+      } finally {
+        // A test follow must not become demand for a future live worker.
+        const removed = await fetch(fresh.api + "/users/me/widgets/elections?preview=elections", {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + session.accessToken },
+          redirect: "error",
+        });
+        replay("first");
+        if (!removed.ok && removed.status !== 404)
+          throw Error("Could not clean up the verification account.");
+      }
       return;
     }
     const { chromium } = requireDesktop("playwright");
