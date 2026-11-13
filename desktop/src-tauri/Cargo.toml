@@ -7,7 +7,7 @@ rust-version = "1.90"
 description = "Scrollr desktop app — pinned live ticker for sports, finance, and RSS."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/brandon-relentnet/myscrollr"
+repository = "https://github.com/doughknee/myscrollr"
 homepage = "https://myscrollr.com"
 readme = "../../README.md"
 

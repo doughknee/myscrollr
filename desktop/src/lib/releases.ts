@@ -59,11 +59,11 @@ export interface RawGitHubRelease {
 // The repo was renamed to doughknee/myscrollr; GitHub redirects and fetch
 // follows redirects by default, so the old owner keeps working.
 export const RELEASES_API_URL =
-  "https://api.github.com/repos/brandon-relentnet/myscrollr/releases?per_page=50";
+  "https://api.github.com/repos/doughknee/myscrollr/releases?per_page=50";
 
 /** Human-facing releases page — used by empty/error states. */
 export const RELEASES_PAGE_URL =
-  "https://github.com/brandon-relentnet/myscrollr/releases";
+  "https://github.com/doughknee/myscrollr/releases";
 
 export const RELEASES_CACHE_KEY = "scrollr-releases-cache";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes

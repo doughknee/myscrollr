@@ -407,7 +407,7 @@ jobs:
           tagName: desktop-v__VERSION__
           releaseCommitish: ${{ github.sha }}
           releaseName: "Scrollr desktop-v__VERSION__"
-          releaseBody: "See the [full changelog](https://github.com/brandon-relentnet/myscrollr/commits/desktop-v__VERSION__) for details."
+          releaseBody: "See the [full changelog](https://github.com/doughknee/myscrollr/commits/desktop-v__VERSION__) for details."
           releaseDraft: true
           prerelease: ${{ needs.preflight.outputs.prerelease }}
 
