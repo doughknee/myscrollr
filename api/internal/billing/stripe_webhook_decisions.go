@@ -18,8 +18,10 @@ import (
 //   - Trialing users always get Ultimate access regardless of selected plan.
 //   - Lifetime purchases grant Ultimate access.
 //   - cancel_at_period_end is stored as "canceling" and never changes roles.
-//   - Only active/trialing subscriptions touch roles; past_due, canceled,
-//     incomplete, etc. leave roles as-is.
+//   - active/trialing grant a role; incomplete_expired, unpaid and canceled
+//     remove every paid role; past_due (dunning grace) and incomplete (first
+//     payment still settling) leave roles as-is.
+//   - Lifetime members never have roles changed by a subscription event.
 
 // Tier identifiers returned by the decision helpers. These match the Logto
 // role names and the tier strings PruneWidgetsForTier expects.
@@ -67,9 +69,21 @@ type subscriptionUpdateAction struct {
 }
 
 // decideSubscriptionUpdate computes the DB status and role changes for a
-// customer.subscription.updated event.
-func decideSubscriptionUpdate(status string, cancelAtPeriodEnd bool, plan string) subscriptionUpdateAction {
+// customer.subscription.updated event. isLifetime is the stripe_customers
+// lifetime flag: lifetime is permanent Ultimate, so a subscription event never
+// adds, clears or prunes anything for it.
+func decideSubscriptionUpdate(status string, cancelAtPeriodEnd bool, plan string, isLifetime bool) subscriptionUpdateAction {
 	action := subscriptionUpdateAction{DBStatus: status}
+	if isLifetime {
+		return action
+	}
+	switch status {
+	case "incomplete_expired", "unpaid", "canceled":
+		// Stripe has stopped trying to collect: no paid access, even if
+		// cancel_at_period_end is still set on the object.
+		action.ClearPaidRoles = true
+		return action
+	}
 	if cancelAtPeriodEnd {
 		action.DBStatus = "canceling"
 		return action
@@ -99,6 +113,39 @@ func decideStripPaidRoles(isLifetime bool, lookupErr error) bool {
 		return false
 	}
 	return !isLifetime
+}
+
+// subscriptionGrantsAccess reports whether a subscription status Stripe
+// returned at creation may grant a paid role: only a paid (active) or
+// trialing subscription. "incomplete" means the first charge was declined or
+// still needs the customer (3-D Secure).
+func subscriptionGrantsAccess(status string) bool {
+	return status == "active" || status == "trialing"
+}
+
+// checkoutPaid reports whether a Checkout Session's payment_status lets the
+// session grant access. "unpaid" means a delayed payment method has not
+// settled yet; checkout.session.async_payment_succeeded grants it later.
+func checkoutPaid(paymentStatus string) bool {
+	return paymentStatus == "paid" || paymentStatus == "no_payment_required"
+}
+
+// isStaleSubscription reports whether a subscription event is about a
+// subscription other than the one stored for the customer. Only a stored,
+// non-empty id can make an event stale: with none stored there is no current
+// subscription the event could clobber.
+func isStaleSubscription(storedSubID *string, eventSubID string) bool {
+	return storedSubID != nil && *storedSubID != "" && *storedSubID != eventSubID
+}
+
+// hadSubscription reports whether a stripe_customers row shows the account
+// has had a subscription, which ends trial eligibility. A row that never
+// subscribed is the one getOrCreateStripeCustomer writes: plan 'free', the
+// column-default status 'active', no subscription id. Every path that ends a
+// subscription leaves a mark: subscription.deleted and the trial cancel store
+// status 'canceled', the subscription self-heal stores 'none'.
+func hadSubscription(plan, status string, subID *string) bool {
+	return plan != "free" || status == "canceled" || status == "none" || (subID != nil && *subID != "")
 }
 
 // assignTierRole assigns the Logto role for the given tier.

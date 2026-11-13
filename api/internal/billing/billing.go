@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v82"
 	billingportalsession "github.com/stripe/stripe-go/v82/billingportal/session"
 	checkoutsession "github.com/stripe/stripe-go/v82/checkout/session"
@@ -155,6 +157,24 @@ func hasLifetimeCheckoutConflict(existingPlan, existingStatus string, isLifetime
 	return existingStatus == "active" || existingStatus == "trialing"
 }
 
+// hadPriorSubscription answers "has this account had a subscription before?"
+// for trial eligibility. It stays true after a cancellation; see
+// hadSubscription for the rule.
+func hadPriorSubscription(userID string) (bool, error) {
+	var plan, status string
+	var subID *string
+	err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT plan, status, stripe_subscription_id FROM stripe_customers WHERE logto_sub = $1`, userID,
+	).Scan(&plan, &status, &subID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return hadSubscription(plan, status, subID), nil
+}
+
 // getOrCreateStripeCustomer looks up or creates a Stripe customer for the user.
 // If a cached customer ID is stale (e.g. Stripe mode switch, deleted customer),
 // it deletes the stale record and creates a fresh customer.
@@ -277,12 +297,14 @@ func HandleCreateCheckoutSession(c *fiber.Ctx) error {
 	frontendURL := getFrontendURL(c)
 
 	// Only offer a 7-day trial to first-time subscribers.
-	// Users who have had any prior paid plan (active, canceled, or past_due) skip the trial.
-	var hadPriorSub bool
-	_ = platform.DBPool.QueryRow(context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM stripe_customers WHERE logto_sub = $1 AND plan != 'free')`,
-		userID,
-	).Scan(&hadPriorSub)
+	// Users who have had any prior subscription (current or ended) skip the trial.
+	hadPriorSub, err := hadPriorSubscription(userID)
+	if err != nil {
+		log.Printf("[Billing] Trial eligibility lookup failed for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to create checkout session",
+		})
+	}
 
 	params := &stripe.CheckoutSessionParams{
 		Customer: stripe.String(customerID),
@@ -446,11 +468,13 @@ func HandleCreateSetupIntent(c *fiber.Ctx) error {
 	}
 
 	// Check trial eligibility
-	var hadPriorSub bool
-	_ = platform.DBPool.QueryRow(context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM stripe_customers WHERE logto_sub = $1 AND plan != 'free')`,
-		userID,
-	).Scan(&hadPriorSub)
+	hadPriorSub, err := hadPriorSubscription(userID)
+	if err != nil {
+		log.Printf("[Billing] Trial eligibility lookup failed for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to initialize payment setup",
+		})
+	}
 
 	// Create SetupIntent
 	siParams := &stripe.SetupIntentParams{
@@ -604,11 +628,13 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 	}
 
 	// Check trial eligibility
-	var hadPriorSub bool
-	_ = platform.DBPool.QueryRow(context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM stripe_customers WHERE logto_sub = $1 AND plan != 'free')`,
-		userID,
-	).Scan(&hadPriorSub)
+	hadPriorSub, err := hadPriorSubscription(userID)
+	if err != nil {
+		log.Printf("[Billing] Trial eligibility lookup failed for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to create subscription",
+		})
+	}
 
 	// Create subscription
 	subParams := &stripe.SubscriptionParams{
@@ -624,6 +650,10 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 	if !hadPriorSub {
 		subParams.TrialPeriodDays = stripe.Int64(7)
 	}
+	// One subscription per confirmed SetupIntent: a double submit, a second
+	// tab or a client retry gets the first subscription back from Stripe
+	// instead of creating (and billing) another.
+	subParams.SetIdempotencyKey("subscribe-" + req.SetupIntentID)
 
 	sub, err := stripesubscription.New(subParams)
 	if err != nil {
@@ -633,8 +663,23 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Upsert DB record
 	subStatus := string(sub.Status)
+	if !subscriptionGrantsAccess(subStatus) {
+		// The first charge was declined or needs 3-D Secure, which this flow
+		// cannot complete. Grant nothing, record nothing, and cancel the
+		// subscription so Stripe stops trying to collect it.
+		log.Printf("[Billing] Subscription %s for %s came back %s; canceling it", sub.ID, userID, subStatus)
+		if _, err := stripesubscription.Cancel(sub.ID, nil); err != nil {
+			// Already canceled by an earlier identical request, or Stripe is
+			// unreachable: an unpaid first invoice expires on its own (23 h).
+			log.Printf("[Billing] Failed to cancel %s subscription %s for %s: %v", subStatus, sub.ID, userID, err)
+		}
+		return c.Status(fiber.StatusPaymentRequired).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Your payment did not go through, so your subscription was not started. Please try another card.",
+		})
+	}
+
+	// Upsert DB record
 	_, err = platform.DBPool.Exec(context.Background(),
 		`INSERT INTO stripe_customers (logto_sub, stripe_customer_id, stripe_subscription_id, plan, status)
 		 VALUES ($1, $2, $3, $4, $5)
@@ -647,19 +692,10 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		log.Printf("[Billing] Failed to upsert subscription record for %s: %v", userID, err)
 	}
 
-	// Assign Logto role
-	if subStatus == "trialing" || isUltimatePlan(plan) {
-		if err := accounts.AssignUltimateRole(userID); err != nil {
-			log.Printf("[Billing] Failed to assign ultimate role to %s: %v", userID, err)
-		}
-	} else if isProPlan(plan) {
-		if err := accounts.AssignProRole(userID); err != nil {
-			log.Printf("[Billing] Failed to assign pro role to %s: %v", userID, err)
-		}
-	} else {
-		if err := accounts.AssignUplinkRole(userID); err != nil {
-			log.Printf("[Billing] Failed to assign uplink role to %s: %v", userID, err)
-		}
+	// Assign Logto role (Ultimate during a trial, else the plan's tier)
+	tier := decideCheckoutTier(subStatus, plan)
+	if err := assignTierRole(userID, tier); err != nil {
+		log.Printf("[Billing] Failed to assign %s role to %s: %v", tier, userID, err)
 	}
 
 	var trialEnd *int64
@@ -811,12 +847,11 @@ func HandleGetSubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if user has ever had a paid subscription (for trial eligibility display)
-	var hadPriorSub bool
-	_ = platform.DBPool.QueryRow(context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM stripe_customers WHERE logto_sub = $1 AND plan != 'free')`,
-		userID,
-	).Scan(&hadPriorSub)
+	// Check if user has ever had a subscription (for trial eligibility display)
+	hadPriorSub, err := hadPriorSubscription(userID)
+	if err != nil {
+		log.Printf("[Billing] Trial eligibility lookup failed for %s: %v", userID, err)
+	}
 
 	resp := platform.SubscriptionResponse{
 		Plan:             sc.Plan,

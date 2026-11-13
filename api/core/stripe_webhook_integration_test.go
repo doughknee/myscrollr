@@ -104,7 +104,7 @@ func TestIntegrationCheckoutCompletedLifetime(t *testing.T) {
 
 	billing.HandleCheckoutCompleted(stripeEvent("checkout.session.completed", `{
 		"id": "cs_life_1", "object": "checkout.session", "mode": "payment",
-		"customer": "cus_life_1",
+		"payment_status": "paid", "customer": "cus_life_1",
 		"metadata": {"logto_sub": "user_hook_life", "plan": "lifetime"}
 	}`))
 
@@ -133,7 +133,7 @@ func TestIntegrationCheckoutCompletedTrialGrantsUltimate(t *testing.T) {
 
 	billing.HandleCheckoutCompleted(stripeEvent("checkout.session.completed", `{
 		"id": "cs_trial_1", "object": "checkout.session", "mode": "subscription",
-		"customer": "cus_trial_1", "subscription": "sub_trial_1",
+		"payment_status": "no_payment_required", "customer": "cus_trial_1", "subscription": "sub_trial_1",
 		"metadata": {"logto_sub": "user_hook_trial", "plan": "monthly"}
 	}`))
 
