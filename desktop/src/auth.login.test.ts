@@ -79,7 +79,7 @@ beforeEach(() => {
 describe("login", () => {
   it("D2-12: ignores a callback with another state, then accepts the real one", async () => {
     const p = auth.login();
-    await flush();
+    await vi.waitFor(() => expect(h.opened).toHaveLength(1));
     callback({ state: "forged", error: "x", error_description: "Visit evil.example" });
     await flush();
     expect(h.listeners.size).toBe(1); // still waiting
@@ -95,7 +95,8 @@ describe("login", () => {
     try {
       const controller = new AbortController();
       const p = auth.login(undefined, controller.signal);
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.waitFor(() => expect(h.opened).toHaveLength(1));
+      expect(vi.getTimerCount()).toBe(1); // the 5-minute timer
       expect(h.listeners.size).toBe(1);
       controller.abort();
       expect(await p).toBeNull();
@@ -110,11 +111,11 @@ describe("login", () => {
   it("CN-8: opens the browser only once the callback listener is ready", async () => {
     h.listenReady = () => {};
     const p = auth.login();
+    await vi.waitFor(() => expect(h.listeners.size).toBe(1)); // listening, not yet ready
     await flush();
     expect(h.opened).toEqual([]);
     h.listenReady!();
-    await flush();
-    expect(h.opened).toHaveLength(1);
+    await vi.waitFor(() => expect(h.opened).toHaveLength(1));
     callback({ state: stateOf(), code: "c" });
     expect(await p).not.toBeNull();
   });
