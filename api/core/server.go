@@ -345,7 +345,7 @@ func (s *Server) setupRoutes() {
 
 	// Invite (no auth — user isn't logged in yet, token-verified server-side)
 	s.App.Post("/invite/complete", accounts.HandleCompleteInvite)
-	s.App.Get("/invite/username-available", accounts.HandleCheckUsernameAvailable)
+	s.App.Post("/invite/username-available", accounts.HandleCheckUsernameAvailable)
 
 	// Billing Routes
 	s.App.Post("/checkout/session", platform.LogtoAuth, billing.HandleCreateCheckoutSession)

@@ -68,7 +68,11 @@ function InvitePage() {
 
     setUsernameState('checking')
     try {
-      const result = await inviteApi.checkUsernameAvailable(email, username)
+      const result = await inviteApi.checkUsernameAvailable(
+        email,
+        token,
+        username,
+      )
       if (result.available) {
         setUsernameState('available')
       } else {
