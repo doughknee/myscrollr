@@ -35,6 +35,11 @@ const h = vi.hoisted(() => {
     issued: 0,
     errors: [] as string[],
     successes: 0,
+    calls: 0,
+    /** Server clock minus local clock (RC-6). */
+    skewMs: 0,
+    /** Answer every refresh with this instead (RC-12), or hold it open (RC-7). */
+    override: null as null | "hang" | { status: number; body: unknown },
   };
   return { disk, changeListeners, logto, labels: [] as string[] };
 });
@@ -82,7 +87,7 @@ function b64url(obj: unknown): string {
 function issueTokens() {
   const rt = `R${h.logto.issued++}`;
   h.logto.tokens.set(rt, {});
-  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const exp = Math.floor((Date.now() + h.logto.skewMs) / 1000) + 3600;
   return {
     access_token: `${b64url({ alg: "none" })}.${b64url({ sub: "u1", exp })}.sig`,
     refresh_token: rt,
@@ -92,9 +97,26 @@ function issueTokens() {
 }
 
 vi.mock("@tauri-apps/plugin-http", () => ({
-  fetch: async (_url: string, init: { body: string }) => {
+  fetch: async (_url: string, init: { body: string; signal?: AbortSignal }) => {
     const { refresh_token: rt } = JSON.parse(init.body) as { refresh_token: string };
+    h.logto.calls++;
+    if (h.logto.override === "hang") {
+      // A peer that holds the connection open; only the abort ends it.
+      return new Promise((_, reject) =>
+        init.signal?.addEventListener("abort", () => reject(new Error("Request cancelled"))),
+      );
+    }
     await new Promise((r) => setTimeout(r, LOGTO_LATENCY_MS / 2));
+    const override = h.logto.override;
+    if (override) {
+      await new Promise((r) => setTimeout(r, LOGTO_LATENCY_MS / 2));
+      return {
+        ok: false,
+        status: override.status,
+        json: async () => override.body,
+        text: async () => JSON.stringify(override.body),
+      };
+    }
     const t = h.logto.tokens.get(rt);
     let res: { status: number; body: unknown };
     if (t && (t.usedAt === undefined || Date.now() - t.usedAt <= GRACE_MS)) {
@@ -184,6 +206,9 @@ beforeEach(() => {
   h.logto.issued = 0;
   h.logto.errors = [];
   h.logto.successes = 0;
+  h.logto.calls = 0;
+  h.logto.skewMs = 0;
+  h.logto.override = null;
 });
 
 afterEach(() => {
@@ -265,5 +290,73 @@ describe("SCROLLR-248: the session survives restarts, many windows and sleep", (
     expect(await token(ticker)).toBeNull();
     expect(h.disk.get("scrollr:auth")).toBeUndefined();
     expect(main.auth.isSignedOut()).toBe(true);
+  });
+});
+
+describe("SCROLLR-472: refresh failures that are not a dead token keep the session", () => {
+  it.each([
+    ["429", { status: 429, body: { error: "too many requests" } }],
+    ["408", { status: 408, body: "" }],
+    ["a proxy's 403", { status: 403, body: "<html>Forbidden</html>" }],
+    ["a 400 that is not invalid_grant", { status: 400, body: { error: "invalid_request" } }],
+  ])("RC-12: a %s on refresh does not sign the user out", async (_, answer) => {
+    const [ticker] = await restartApp(["ticker"]);
+    h.logto.override = answer;
+    expect(await token(ticker, true)).toBeNull();
+    expect(h.disk.get("scrollr:auth")).toBeDefined();
+    expect(ticker.auth.isSignedOut()).toBe(false);
+  });
+
+  it("RC-7: a refresh the server never answers gives up after 15 s and keeps the session", async () => {
+    const [ticker] = await restartApp(["ticker"]);
+    h.logto.override = "hang";
+    const p = ticker.auth.getValidToken(true);
+    await tick(15_000);
+    expect(await p).toBeNull();
+    expect(h.disk.get("scrollr:auth")).toBeDefined();
+    // The single-flight refresh cleared, so the next one is sent.
+    h.logto.override = null;
+    expect(await token(ticker, true)).not.toBeNull();
+  });
+});
+
+describe("SCROLLR-472 (RC-6): a clock far ahead of the server's", () => {
+  it("does not refresh in a loop", async () => {
+    const [ticker] = await restartApp(["ticker"]);
+    // The local clock is two hours ahead: every token Logto issues already
+    // looks expired here.
+    h.logto.skewMs = -2 * HOUR;
+    expect(await token(ticker, true)).not.toBeNull();
+    const after = h.logto.calls;
+    for (let i = 0; i < 60; i++) await token(ticker); // a minute of polling
+    await tick(60_000); // and the proactive timer
+    expect(h.logto.calls - after).toBe(0);
+    // A refusal from the server still gets a forced refresh through.
+    expect(await token(ticker, true)).not.toBeNull();
+    expect(h.logto.calls - after).toBe(1);
+    expect(h.logto.errors).toEqual([]);
+  });
+});
+
+describe("SCROLLR-472 (D2-6): sign-out during a refresh", () => {
+  it("is not undone by the refresh's answer", async () => {
+    const [main] = await restartApp(["main"]);
+    const p = main.auth.getValidToken(true); // refresh in flight
+    await tick(LOGTO_LATENCY_MS / 4);
+    await main.auth.logout();
+    await tick(LOGTO_LATENCY_MS + IPC_EVENT_MS);
+    expect(await p).toBeNull();
+    expect(h.disk.get("scrollr:auth")).toBeUndefined();
+    expect(main.auth.isSignedOut()).toBe(true);
+  });
+
+  it("is not undone when the sign-out happened in another window", async () => {
+    const [ticker, main] = await restartApp(["ticker", "main"]);
+    const p = ticker.auth.getValidToken(true); // the owner refreshes
+    await tick(LOGTO_LATENCY_MS / 4);
+    await main.auth.logout(); // the user signs out in the main window
+    await tick(LOGTO_LATENCY_MS + IPC_EVENT_MS);
+    expect(await p).toBeNull();
+    expect(h.disk.get("scrollr:auth")).toBeUndefined();
   });
 });

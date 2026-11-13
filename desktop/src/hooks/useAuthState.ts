@@ -60,6 +60,18 @@ export function useAuthState(): UseAuthStateReturn {
     if (!v) setAuthUrl(null);
   }, []);
 
+  // The attempt in flight. Setting loggingIn to false from outside (Cancel
+  // on the overlay, Escape) aborts it, so its listener, timer and callback
+  // server go with it (D2-11).
+  const loginAbortRef = useRef<AbortController | null>(null);
+  const cancelableSetLoggingIn = useCallback((v: boolean) => {
+    if (!v) {
+      loginAbortRef.current?.abort();
+      loginAbortRef.current = null;
+    }
+    setLoggingIn(v);
+  }, [setLoggingIn]);
+
   const authenticatedRef = useRef(authenticated);
   authenticatedRef.current = authenticated;
 
@@ -86,14 +98,20 @@ export function useAuthState(): UseAuthStateReturn {
       return;
     }
 
+    loginAbortRef.current?.abort();
+    const controller = new AbortController();
+    loginAbortRef.current = controller;
     setLoggingIn(true);
     try {
-      const result = await authLogin(setAuthUrl);
+      const result = await authLogin(setAuthUrl, controller.signal);
+      if (controller.signal.aborted) return; // cancelled: no toast
       if (result) {
         setAuthenticated(true);
         setTier(getTier());
         setSessionExpired(false);
-        void forgetAccountData(queryClient);
+        // Fetch the new account's profile and GitHub data now, not on
+        // their next poll (SCROLLR-472).
+        void forgetAccountData(queryClient, { refetch: true });
       } else {
         const detail = getLastLoginError();
         toast.error(detail
@@ -101,7 +119,12 @@ export function useAuthState(): UseAuthStateReturn {
           : "Sign-in failed — please try again");
       }
     } finally {
-      setLoggingIn(false);
+      // A cancelled attempt ends after the user may have started a new one:
+      // only the current attempt may close the overlay.
+      if (loginAbortRef.current === controller) {
+        loginAbortRef.current = null;
+        setLoggingIn(false);
+      }
     }
   }, [queryClient, setLoggingIn]);
 
@@ -152,7 +175,7 @@ export function useAuthState(): UseAuthStateReturn {
     authenticated,
     tier,
     loggingIn,
-    setLoggingIn,
+    setLoggingIn: cancelableSetLoggingIn,
     authUrl,
     sessionExpired,
     setSessionExpired,

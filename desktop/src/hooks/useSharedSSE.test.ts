@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   owns: false,
   token: "tok" as string | null,
   signedOut: false,
+  gen: 0,
   handlers: new Map<string, (e?: unknown) => unknown>(),
 }));
 
@@ -25,6 +26,7 @@ vi.mock("../auth", () => ({
   getValidToken: vi.fn(async () => h.token),
   isSignedOut: () => h.signedOut,
   rearmRefresh: vi.fn(),
+  signOutGeneration: () => h.gen,
 }));
 vi.mock("../preferences", () => ({ loadPref: (_k: string, d: unknown) => d }));
 vi.mock("../config", () => ({ API_BASE: "http://x", DEMO: false }));
@@ -171,5 +173,27 @@ describe("useSharedSSE backs off a refused stream", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     // Starts at 0, 4, 12, 28 and 60 s (the gaps double).
     expect(startCalls()).toBe(5);
+  });
+});
+
+// SCROLLR-472 (D2-6): a sign-out while the token was being fetched used to
+// be followed by a stream start anyway.
+describe("useSharedSSE after a sign-out mid-start", () => {
+  beforeEach(() => {
+    vi.mocked(invoke).mockClear();
+    h.owns = true;
+    h.signedOut = false;
+  });
+  afterEach(() => vi.mocked(getValidToken).mockImplementation(async () => h.token));
+
+  it("does not start the stream when the user signed out during the token await", async () => {
+    vi.mocked(getValidToken).mockImplementation(async () => {
+      h.gen++; // signed out while the refresh was in flight
+      h.signedOut = true;
+      return "tok";
+    });
+    renderHook(() => useSharedSSE({ tickerShown: true }));
+    await act(async () => {});
+    expect(startCalls()).toBe(0);
   });
 });

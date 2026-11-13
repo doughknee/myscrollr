@@ -127,9 +127,13 @@ function savedDashboard(): DashboardResponse | undefined {
  * On sign-in and sign-out, forget everything fetched for the account that
  * was signed in (SCROLLR-470): the saved dashboard and every per-account
  * query (dashboard, profile, GitHub). Preferences live in the store and
- * are not touched.
+ * are not touched. `refetch` (a sign-in, in the window that polls them)
+ * also fetches the emptied queries that are on screen now.
  */
-export async function forgetAccountData(queryClient: QueryClient): Promise<void> {
+export async function forgetAccountData(
+  queryClient: QueryClient,
+  { refetch = false }: { refetch?: boolean } = {},
+): Promise<void> {
   removeStore(SAVED_DASHBOARD_KEY);
   const filters = {
     predicate: ({ queryKey: [key] }: { queryKey: readonly unknown[] }) =>
@@ -154,10 +158,12 @@ export async function forgetAccountData(queryClient: QueryClient): Promise<void>
       isInvalidated: true,
     });
   }
-  // Only the dashboard refetches now: profile and GitHub wait for their
-  // page, which fetches them once signed in (a fetch now, signed out, would
-  // 401 and raise the "session expired" banner after a plain sign-out).
+  // Signed out, only the dashboard refetches: profile and GitHub wait for
+  // their page (a fetch now would 401 and raise the "session expired"
+  // banner after a plain sign-out). Signed in, every one in use refetches,
+  // or a GitHub chip sits on its loading state until its next poll.
   await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+  if (refetch) await queryClient.refetchQueries({ ...filters, type: "active" }, { cancelRefetch: false });
 }
 
 /** Query options for the dashboard — usable in route loaders and components. */

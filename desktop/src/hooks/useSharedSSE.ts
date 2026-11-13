@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTauriListener } from "./useTauriListener";
 import { ownsSharedConnection } from "../lib/windowRole";
-import { getValidToken, isSignedOut, rearmRefresh } from "../auth";
+import { getValidToken, isSignedOut, rearmRefresh, signOutGeneration } from "../auth";
 import { loadPref } from "../preferences";
 import { API_BASE, DEMO } from "../config";
 import type { DeliveryMode } from "../types";
@@ -101,9 +101,11 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
     // (a clock behind the server's, a key rotated), so refresh it.
     const force = forceRefreshRef.current;
     forceRefreshRef.current = false;
+    const gen = signOutGeneration();
     const token = DEMO ? "demo" : await getValidToken(force);
-    // Ownership can move while the silent refresh is in flight.
-    if (!token || !ownsRef.current) {
+    // Ownership can move while the silent refresh is in flight, and the
+    // user can sign out (D2-6): a stream started now would outlive it.
+    if (!token || !ownsRef.current || gen !== signOutGeneration()) {
       activeRef.current = false;
       forceRefreshRef.current = force; // the refresh did not happen: still owed
       scheduleRetry(); // a refresh that failed once may work in a moment
