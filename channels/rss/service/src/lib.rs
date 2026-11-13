@@ -109,16 +109,21 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
                 health_state.lock().await.record_success(count as u64);
             }
             Ok((feed_name, feed_url, prev_failures, Err(e))) => {
-                let err_msg = format!("{}", e);
-                failure_urls.push(feed_url.clone());
-                failure_errors.push(err_msg);
-                let new_failures = prev_failures + 1;
                 let log_url = feed_http::redact_feed_url(&feed_url);
-                if new_failures == 3 {
-                    warn!("Feed {} ({}) hidden from catalog after 3 consecutive failures", feed_name, log_url);
-                } else if new_failures == 288 {
-                    warn!("Feed {} ({}) quarantined after 288 consecutive failures (24h)", feed_name, log_url);
+                if e.counts_against_feed() {
+                    failure_urls.push(feed_url.clone());
+                    failure_errors.push(format!("{}", e));
+                    let new_failures = prev_failures + 1;
+                    if new_failures == 3 {
+                        warn!("Feed {} ({}) hidden from catalog after 3 consecutive failures", feed_name, log_url);
+                    } else if new_failures == 288 {
+                        warn!("Feed {} ({}) quarantined after 288 consecutive failures (24h)", feed_name, log_url);
+                    }
                 }
+                // A store failure is ours: logged and in health, but neither a
+                // failure nor a success for the feed. It still counts toward
+                // `mostly_failed`, because a database that rejects most writes
+                // is exactly the own-outage case that guard exists for.
                 error!("Error polling feed {} ({}): {}", feed_name, log_url, e);
                 health_state.lock().await.record_error(format!("{}: {}", feed_name, e));
             }
@@ -176,7 +181,44 @@ fn in_backoff(failures: i32, cycle: u64) -> bool {
     !cycle.is_multiple_of(gap)
 }
 
-async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> anyhow::Result<usize> {
+/// Why a poll failed. Only `Feed` is the feed's fault and counts against it
+/// (hidden from the catalog at 3, auto-removed by the core janitor at 100).
+/// `Store` is our own database refusing the write: it is logged and shown in
+/// health, but the feed's failure counter is left alone.
+#[derive(Debug)]
+enum PollError {
+    Feed(anyhow::Error),
+    Store(anyhow::Error),
+}
+
+impl PollError {
+    fn counts_against_feed(&self) -> bool {
+        matches!(self, PollError::Feed(_))
+    }
+}
+
+impl std::fmt::Display for PollError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PollError::Feed(e) => write!(f, "{e}"),
+            PollError::Store(e) => write!(f, "failed to store feed items: {e}"),
+        }
+    }
+}
+
+async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> Result<usize, PollError> {
+    let articles = fetch_articles(client, feed).await.map_err(PollError::Feed)?;
+    if articles.is_empty() {
+        return Ok(0);
+    }
+    let count = articles.len();
+    batch_upsert_rss_items(pool, articles)
+        .await
+        .map_err(PollError::Store)?;
+    Ok(count)
+}
+
+async fn fetch_articles(client: &Client, feed: &TrackedFeed) -> anyhow::Result<Vec<ParsedArticle>> {
     // Stream the body into a bounded buffer so a hostile or misbehaving feed
     // can't OOM the pod. `.error_for_status()?` also surfaces 4xx/5xx as
     // errors up front so we don't try to parse an HTML error page as RSS.
@@ -264,18 +306,7 @@ async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> a
         });
     }
 
-    if articles.is_empty() {
-        return Ok(0);
-    }
-
-    let count = articles.len();
-    // A failed write is a failed poll: the caller logs it with the feed name,
-    // counts it against the feed and records it in health.
-    batch_upsert_rss_items(pool, articles)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to store feed items: {e}"))?;
-
-    Ok(count)
+    Ok(articles)
 }
 
 /// Basic HTML tag stripper — removes angle-bracketed tags.
@@ -300,6 +331,16 @@ fn strip_html_tags(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn store_failure_does_not_count_against_the_feed() {
+        assert!(PollError::Feed(anyhow::anyhow!("HTTP 404")).counts_against_feed());
+        assert!(!PollError::Store(anyhow::anyhow!("db down")).counts_against_feed());
+        assert_eq!(
+            PollError::Store(anyhow::anyhow!("x")).to_string(),
+            "failed to store feed items: x"
+        );
+    }
 
     #[test]
     fn test_mostly_failed_detects_own_outage() {
