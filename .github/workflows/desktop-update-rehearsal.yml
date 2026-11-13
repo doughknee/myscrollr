@@ -32,7 +32,7 @@ jobs:
   verify:
     # Draft recovery is allowed only from protected main for this exact candidate.
     # Branch rehearsals below retain read-only access to published Beta 1 bytes.
-    if: github.ref == 'refs/heads/main' && (!inputs.recovery || (inputs.tag == 'desktop-v1.7.3' && inputs.run_id == '41688396593' && inputs.source_tag == 'desktop-v1.8.0-beta.2' && inputs.source_run_id != '' && inputs.from_version == '1.8.0-beta.2'))
+    if: github.ref == 'refs/heads/main' && (!inputs.recovery || (inputs.tag == 'desktop-v1.7.3' && inputs.run_id == '41688396593' && inputs.source_tag == 'desktop-v1.8.0-beta.3' && inputs.source_run_id != '' && inputs.from_version == '1.8.0-beta.3'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Authenticated draft visibility requires push access. Only read commands run.
