@@ -424,6 +424,22 @@ func TestIntegrationLateActiveUpdateAfterDeletionGrantsNothing(t *testing.T) {
 	if got := logto.assignedRoles(); len(got) != 0 {
 		t.Errorf("assigned roles = %v, want none", got)
 	}
+
+	// Stripe has no such subscription at all: acknowledged (no retry can
+	// succeed), and nothing changes.
+	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","message":"No such subscription"}}`))
+	})
+	if err := billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", event)); err != nil {
+		t.Errorf("handler = %v for a subscription Stripe does not have, want nil so Stripe stops retrying", err)
+	}
+	if got := logto.assignedRoles(); len(got) != 0 {
+		t.Errorf("assigned roles = %v, want none", got)
+	}
+	if row := readStripeCustomer(t, sub); row.Plan != "free" || row.Status != "canceled" || row.SubscriptionID != nil {
+		t.Errorf("row = %+v, want untouched free/canceled", row)
+	}
 }
 
 // SCROLLR-465 B2-3: only a customer Stripe says is gone is replaced; any other

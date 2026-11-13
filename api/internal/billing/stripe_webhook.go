@@ -248,6 +248,13 @@ func HandleSubscriptionUpdated(event stripe.Event) error {
 	// retried or late event can describe a state a later event already
 	// replaced (SCROLLR-465). Stripe is unreachable: retry the event.
 	current, err := stripesubscription.Get(sub.ID, nil)
+	var se *stripe.Error
+	if errors.As(err, &se) && se.Code == stripe.ErrorCodeResourceMissing {
+		// Gone at Stripe (mode switch, test-data clean-up): no retry can
+		// succeed, so acknowledge it like an unknown customer.
+		log.Printf("[Stripe Webhook] Ignoring subscription.updated for %s: Stripe has no such subscription", sub.ID)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("fetch subscription %s: %w", sub.ID, err)
 	}
