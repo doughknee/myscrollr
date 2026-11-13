@@ -54,3 +54,35 @@ func TestClientCloseChIdempotent(t *testing.T) {
 		t.Error("channel should be closed after closeCh")
 	}
 }
+
+// SCROLLR-459 / SB-4: one account cannot hold more than MaxStreamsPerAccount
+// streams. The newest connection always wins; the oldest are closed.
+func TestRegisterEvictsOldestStreamsPastTheCap(t *testing.T) {
+	h := swapHub(t)
+	const user = "stream-cap-user"
+	var clients []*Client
+	for i := 0; i < MaxStreamsPerAccount+3; i++ {
+		c := &Client{UserID: user, Ch: make(chan []byte, 1)}
+		h.register(c)
+		clients = append(clients, c)
+	}
+	if got := h.clientCount.Load(); got != MaxStreamsPerAccount {
+		t.Fatalf("clientCount = %d, want %d", got, MaxStreamsPerAccount)
+	}
+	for i, c := range clients {
+		closed := false
+		select {
+		case _, ok := <-c.Ch:
+			closed = !ok
+		default:
+		}
+		if closed != (i < 3) {
+			t.Fatalf("client %d: closed=%v, want %v", i, closed, i < 3)
+		}
+	}
+	// The evicted streams' own deferred unregister must be a harmless no-op.
+	h.unregister(clients[0])
+	if got := h.clientCount.Load(); got != MaxStreamsPerAccount {
+		t.Fatalf("unregister of an evicted client changed the count to %d", got)
+	}
+}

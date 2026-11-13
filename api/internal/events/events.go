@@ -325,8 +325,21 @@ func (h *Hub) dispatchToUser(userID string, payload []byte) {
 	}
 }
 
-// register adds an authenticated client to the hub.
+// MaxStreamsPerAccount caps concurrent SSE streams one account may hold on
+// one replica (SCROLLR-459). The desktop opens ONE stream per process and the
+// staff console one more, so a person with a desktop, a laptop and a browser
+// tab holds 3-4; 8 leaves room for reconnect overlap (the new stream arrives
+// before the old one is torn down) without letting one account exhaust the
+// pod's goroutines and file descriptors. Per replica, so the fleet-wide
+// ceiling is 8 x replicas, with no shared state to build.
+const MaxStreamsPerAccount = 8
+
+// register adds an authenticated client to the hub. Past MaxStreamsPerAccount
+// the account's OLDEST streams are closed to make room: a refused new
+// connection would look like an outage, while a dropped stale one is just a
+// reconnect the client already handles.
 func (h *Hub) register(client *Client) {
+	var evicted []*Client
 	for {
 		existing, loaded := h.clients.Load(client.UserID)
 		if loaded {
@@ -339,6 +352,10 @@ func (h *Hub) register(client *Client) {
 			entries := make([]*Client, len(old.entries)+1)
 			copy(entries, old.entries)
 			entries[len(old.entries)] = client
+			evicted = nil
+			if over := len(entries) - MaxStreamsPerAccount; over > 0 {
+				evicted, entries = entries[:over], entries[over:]
+			}
 			newList := &clientList{entries: entries}
 			if h.clients.CompareAndSwap(client.UserID, old, newList) {
 				break
@@ -353,6 +370,12 @@ func (h *Hub) register(client *Client) {
 		}
 	}
 	h.clientCount.Add(1)
+	// Closing the channel ends the evicted stream's loop; its deferred
+	// unregister then finds nothing to remove.
+	for _, c := range evicted {
+		c.closeCh()
+		h.clientCount.Add(-1)
+	}
 }
 
 // unregister removes a client from the hub, closes its channel, and removes
