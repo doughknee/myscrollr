@@ -17,12 +17,14 @@ import { Fragment, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTauriListener } from "../../hooks/useTauriListener";
 import {
+  ActionRow,
   RowList,
   SegmentedRow,
   SettingsButton,
   ToggleRow,
 } from "./SettingsControls";
 import { DEFAULT_DISPLAY } from "../../lib/tickerDisplay";
+import { usePlacementFailures } from "../../lib/tickerPlacement";
 import { Row } from "./pages/Row";
 import type { DisplayPreference } from "../../lib/tickerDisplay";
 
@@ -157,7 +159,34 @@ export function MonitorsRows({
   onDisplayChange?: (name: string, pref: DisplayPreference) => void;
 }) {
   const monitors = useMonitors();
+  const failures = usePlacementFailures();
+  const [retrying, setRetrying] = useState(false);
   if (monitors.length === 0) return null;
+
+  // A bar that could not be placed stays hidden, so this page is where the
+  // failure is seen (SCROLLR-405). Retrying re-runs the same sync the app
+  // runs at launch and on a monitor change: serialized and repeatable, and
+  // one at a time here.
+  const retry = () => {
+    if (retrying) return;
+    setRetrying(true);
+    invoke("sync_ticker_windows", { monitors: chosen, displays })
+      .catch(() => {})
+      .finally(() => window.setTimeout(() => setRetrying(false), 1500));
+  };
+  const failedRow = (key: string, label: string) => (
+    <ActionRow
+      key={key}
+      label={label}
+      description="The bar stays hidden until it is placed."
+      action={retrying ? "Trying again…" : "Try again"}
+      tone="accent"
+      muted={retrying}
+      onClick={retry}
+    />
+  );
+  const failedOn = (name: string) => failures.some((f) => f.monitor === name);
+  const unplaced = failures.filter((f) => !monitors.some((m) => m.name === f.monitor));
 
   const primary = monitors.find((m) => m.isPrimary) ?? monitors[0];
   const on = new Set(chosen.filter((n) => monitors.some((m) => m.name === n)));
@@ -178,6 +207,7 @@ export function MonitorsRows({
 
   return (
     <Row id="tickerMonitors">
+      {unplaced.length > 0 && failedRow("unplaced", "Couldn’t place the bar")}
       <div className="border-b border-edge/60 px-4 py-3">
         <MonitorMap monitors={monitors} on={on} onToggle={toggle} />
       </div>
@@ -197,6 +227,7 @@ export function MonitorsRows({
                   title={locked ? "Keep at least one" : undefined}
                   onChange={(v) => toggle(m.name, v)}
                 />
+                {failedOn(m.name) && failedRow(`${m.name}-failed`, `Couldn’t place the bar on Display ${i + 1}`)}
                 {on.has(m.name) && onDisplayChange && (
                   <>
                     <SegmentedRow

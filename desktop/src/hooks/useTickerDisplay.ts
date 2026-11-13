@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTauriListener } from "./useTauriListener";
 import { DEFAULT_DISPLAY } from "../lib/tickerDisplay";
+import { PLACEMENT_ASK, reportPlacement } from "../lib/tickerPlacement";
+import type { Placement } from "../lib/tickerPlacement";
 import { TICKER_HEIGHT } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import type { TickerDisplay } from "../lib/tickerDisplay";
@@ -19,6 +21,13 @@ export function useTickerDisplay(prefs: AppPreferences) {
   const latest = useRef(prefs);
   latest.current = prefs;
   const pending = useRef(Promise.resolve());
+  const label = getCurrentWindow().label;
+  // The last placement result, for the main window's monitors page (SCROLLR-405).
+  const placement = useRef<Placement>({ label, monitor: "", failed: false });
+  const report = (patch: Partial<Placement>) => {
+    placement.current = { ...placement.current, ...patch };
+    reportPlacement(placement.current);
+  };
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -40,12 +49,14 @@ export function useTickerDisplay(prefs: AppPreferences) {
             pageLeader: getCurrentWindow().label === "ticker",
           };
         if (!mounted.current) return;
+        placement.current.monitor = next.monitor;
         setDisplay(next);
         const win = getCurrentWindow();
         const visible = p.ticker.showTicker && !next.suspended;
         await invoke("set_ticker_visible", { visible });
         if (!visible) {
           await win.hide();
+          report({ failed: false });
           return;
         }
         // Fullscreen remains a normal focusable window so Settings can open above it.
@@ -60,8 +71,10 @@ export function useTickerDisplay(prefs: AppPreferences) {
         await win.show();
         await invoke("position_ticker", args);
         if (mounted.current) setError(null);
+        report({ failed: false });
       })
       .catch(() => {
+        report({ failed: true });
         if (mounted.current)
           setError(
             "Could not place this display. Open Scrollr to choose a display again.",
@@ -75,6 +88,7 @@ export function useTickerDisplay(prefs: AppPreferences) {
   ]);
   useEffect(place, [place, key]);
   useTauriListener("ticker-reposition", place);
+  useTauriListener(PLACEMENT_ASK, () => reportPlacement(placement.current));
   useEffect(() => {
     void invoke("set_hide_on_fullscreen", {
       value: prefs.window.hideOnFullscreen,
