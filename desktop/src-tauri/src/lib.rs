@@ -111,6 +111,12 @@ fn before_send(
         }
     }
     event.user = None;
+    // SCROLLR-449 (SC-2): the `contexts` integration fills this with the
+    // computer's hostname, which often holds the user's real name.
+    event.server_name = None;
+    if let Some(sentry::protocol::Context::Device(device)) = event.contexts.get_mut("device") {
+        device.name = None;
+    }
     Some(event)
 }
 
@@ -447,6 +453,24 @@ mod crash_reports_tests {
         assert!(before_send(event.clone()).is_none());
         set_crash_reports(true);
         assert!(before_send(event).is_some());
+    }
+
+    #[test]
+    fn before_send_drops_the_hostname() {
+        let mut event = sentry::protocol::Event::default();
+        event.server_name = Some("Janes-MacBook-Pro".into());
+        let device = sentry::protocol::DeviceContext {
+            name: Some("Janes-MacBook-Pro".into()),
+            ..Default::default()
+        };
+        event.contexts.insert("device".into(), device.into());
+        set_crash_reports(true);
+        let sent = before_send(event).unwrap();
+        assert!(sent.server_name.is_none());
+        match sent.contexts.get("device") {
+            Some(sentry::protocol::Context::Device(d)) => assert!(d.name.is_none()),
+            _ => panic!("device context missing"),
+        }
     }
 }
 

@@ -76,7 +76,7 @@ async fn sse_loop(
                 backoff_secs = 1; // Reset on success
 
                 let mut stream = res.bytes_stream();
-                let mut buffer = String::new();
+                let mut buffer: Vec<u8> = Vec::new();
                 let mut overflow = false;
                 const MAX_BUFFER: usize = 10 * 1024 * 1024; // 10 MB
 
@@ -85,7 +85,7 @@ async fn sse_loop(
                         chunk = stream.next() => {
                             match chunk {
                                 Some(Ok(bytes)) => {
-                                    buffer.push_str(&String::from_utf8_lossy(&bytes));
+                                    buffer.extend_from_slice(&bytes);
                                     if buffer.len() > MAX_BUFFER {
                                         log::warn!("SSE buffer exceeded {MAX_BUFFER} bytes, reconnecting");
                                         buffer.clear();
@@ -93,9 +93,7 @@ async fn sse_loop(
                                         break;
                                     }
                                     // Process complete SSE frames (delimited by \n\n)
-                                    while let Some(pos) = buffer.find("\n\n") {
-                                        let frame = buffer[..pos].to_string();
-                                        buffer.drain(..pos + 2);
+                                    for frame in take_frames(&mut buffer) {
                                         process_sse_frame(&app, &frame);
                                     }
                                 }
@@ -176,6 +174,44 @@ async fn sse_loop(
         // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s max
         tokio::time::sleep(std::time::Duration::from_secs(backoff_secs)).await;
         backoff_secs = (backoff_secs * 2).min(30);
+    }
+}
+
+/// Remove every complete frame (ending in a blank line) from `buffer` and
+/// return it decoded. The buffer holds raw bytes and is decoded only here,
+/// per frame, so a multibyte character split across two network chunks is
+/// never cut: a newline byte cannot occur inside a multibyte UTF-8 sequence.
+fn take_frames(buffer: &mut Vec<u8>) -> Vec<String> {
+    let mut frames = Vec::new();
+    while let Some(pos) = buffer.windows(2).position(|w| w == b"\n\n") {
+        frames.push(String::from_utf8_lossy(&buffer[..pos]).into_owned());
+        buffer.drain(..pos + 2);
+    }
+    frames
+}
+
+#[cfg(test)]
+mod tests {
+    use super::take_frames;
+
+    #[test]
+    fn multibyte_character_split_across_chunks_survives() {
+        let text = "data: {\"t\":\"€ café 日本\"}";
+        let full = format!("{text}\n\n").into_bytes();
+        // Split inside the 3-byte euro sign.
+        let cut = full.iter().position(|&b| b == 0xE2).unwrap() + 1;
+        let mut buf = full[..cut].to_vec();
+        assert!(take_frames(&mut buf).is_empty());
+        buf.extend_from_slice(&full[cut..]);
+        assert_eq!(take_frames(&mut buf), vec![text.to_string()]);
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn keeps_partial_frame_and_splits_several() {
+        let mut buf = b"data: 1\n\ndata: 2\n\ndata: 3".to_vec();
+        assert_eq!(take_frames(&mut buf), vec!["data: 1", "data: 2"]);
+        assert_eq!(buf, b"data: 3");
     }
 }
 
