@@ -226,6 +226,26 @@ func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	return c.ID, nil
 }
 
+// RefuseWhileDeletionPending stops every purchase route while the account is
+// scheduled for deletion: the purge would otherwise remove an account that
+// Stripe keeps charging (SCROLLR-465). Mounted after LogtoAuth.
+func RefuseWhileDeletionPending(c *fiber.Ctx) error {
+	pending, err := accounts.DeletionPending(context.Background(), platform.GetUserID(c))
+	if err != nil {
+		log.Printf("[Billing] Deletion status lookup failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to initialize billing",
+		})
+	}
+	if pending {
+		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "Your account is scheduled for deletion. Cancel the deletion on your account page before you subscribe or buy.",
+		})
+	}
+	return c.Next()
+}
+
 // getFrontendURL determines the frontend origin for Stripe return URLs.
 // Prefers the request's Origin header so redirects always match the caller.
 func getFrontendURL(c *fiber.Ctx) string {

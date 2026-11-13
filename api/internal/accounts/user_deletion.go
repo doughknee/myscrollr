@@ -13,6 +13,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/stripe/stripe-go/v82"
+	stripesubscription "github.com/stripe/stripe-go/v82/subscription"
 )
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -516,6 +518,16 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 	})
 }
 
+// DeletionPending reports whether the account has a deletion request waiting
+// for its purge. Billing refuses new purchases meanwhile.
+func DeletionPending(ctx context.Context, logtoSub string) (bool, error) {
+	var pending bool
+	err := platform.DBPool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'pending')`,
+		logtoSub).Scan(&pending)
+	return pending, err
+}
+
 // HandleCancelAccountDeletion cancels a pending purge. Returns 404 if no
 // pending row exists (idempotent: calling cancel when already canceled
 // returns 404 so the UI stays in sync with reality).
@@ -725,6 +737,44 @@ func purgeEmail(ctx context.Context, logtoSub string) (string, error) {
 	return *kept, nil
 }
 
+// cancelLiveSubscriptions cancels every subscription Stripe still lists for
+// the account's customer that has not ended. Stripe is asked, not the stored
+// subscription id, because a second subscription is never stored. Any Stripe
+// error is returned so the purge stops and the next pass retries. A lifetime
+// purchase is a payment, not a subscription, and is not touched.
+func cancelLiveSubscriptions(ctx context.Context, logtoSub string) error {
+	var customerID string
+	err := platform.DBPool.QueryRow(ctx,
+		`SELECT stripe_customer_id FROM stripe_customers WHERE logto_sub = $1`, logtoSub,
+	).Scan(&customerID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && customerID == "") {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read stripe customer: %w", err)
+	}
+	if stripe.Key == "" {
+		// Billing is switched off (STRIPE_DISABLED): this deployment cannot
+		// have started a subscription.
+		return nil
+	}
+	params := &stripe.SubscriptionListParams{Customer: stripe.String(customerID), Status: stripe.String("all")}
+	params.Context = ctx
+	iter := stripesubscription.List(params)
+	for iter.Next() {
+		sub := iter.Subscription()
+		switch sub.Status {
+		case stripe.SubscriptionStatusCanceled, stripe.SubscriptionStatusIncompleteExpired:
+			continue
+		}
+		if _, err := stripesubscription.Cancel(sub.ID, nil); err != nil {
+			return fmt.Errorf("cancel %s: %w", sub.ID, err)
+		}
+		log.Printf("[GDPR Purge] Canceled %s subscription %s for %s", sub.Status, sub.ID, logtoSub)
+	}
+	return iter.Err()
+}
+
 // purgeUserAccount executes the full cascade for one user, in order:
 // Logto first (revokes sign-in access immediately), then local DB
 // rows, then marks the request as purged. Stripe records for lifetime
@@ -738,6 +788,14 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	email, err := purgeEmail(ctx, logtoSub)
 	if err != nil {
 		return fmt.Errorf("read logto email: %w", err)
+	}
+
+	// A subscription started during the grace period would keep charging an
+	// account nobody can sign in to: cancel it at Stripe while the billing row
+	// still names the customer. This runs before the Logto delete and is safe
+	// to repeat, so a failed pass retries it.
+	if err := cancelLiveSubscriptions(ctx, logtoSub); err != nil {
+		return fmt.Errorf("cancel stripe subscriptions: %w", err)
 	}
 
 	// Step 1: Logto delete. Doing this first guarantees the user can't

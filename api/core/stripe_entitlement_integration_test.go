@@ -350,3 +350,33 @@ func TestIntegrationSubscribeActiveGrantsWithIdempotencyKey(t *testing.T) {
 		t.Errorf("row = %+v, want ultimate_monthly active sub_new", row)
 	}
 }
+
+func TestIntegrationPurchaseRefusedWhileDeletionPending(t *testing.T) {
+	setupIntegrationDB(t)
+	const pendingSub, otherSub = "user_buy_pending", "user_buy_free"
+	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
+		VALUES ($1, now(), now() + interval '30 days', 'pending'), ($2, now(), now() + interval '30 days', 'canceled')`,
+		pendingSub, otherSub)
+
+	for _, tc := range []struct {
+		sub        string
+		wantStatus int
+	}{{pendingSub, fiber.StatusConflict}, {otherSub, fiber.StatusOK}} {
+		app := fiber.New()
+		app.Post("/checkout/subscribe", func(c *fiber.Ctx) error {
+			c.Locals("user_id", tc.sub)
+			return c.Next()
+		}, billing.RefuseWhileDeletionPending, func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+		resp, err := app.Test(httptest.NewRequest(fiber.MethodPost, "/checkout/subscribe", nil), -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != tc.wantStatus {
+			t.Errorf("%s: status = %d (%s), want %d", tc.sub, resp.StatusCode, body, tc.wantStatus)
+		}
+		if tc.wantStatus == fiber.StatusConflict && !strings.Contains(string(body), `"error":"Your account is scheduled for deletion. Cancel the deletion`) {
+			t.Errorf("body = %s, want the cancel-the-deletion message", body)
+		}
+	}
+}

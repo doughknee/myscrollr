@@ -346,11 +346,11 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/invite/username-available", accounts.HandleCheckUsernameAvailable)
 
 	// Billing Routes
-	s.App.Post("/checkout/session", platform.LogtoAuth, billing.HandleCreateCheckoutSession)
-	s.App.Post("/checkout/lifetime", platform.LogtoAuth, billing.HandleCreateLifetimeCheckout)
-	s.App.Post("/checkout/setup-intent", platform.LogtoAuth, billing.HandleCreateSetupIntent)
-	s.App.Post("/checkout/subscribe", platform.LogtoAuth, billing.HandleConfirmSubscription)
-	s.App.Post("/checkout/payment-intent", platform.LogtoAuth, billing.HandleCreatePaymentIntent)
+	s.App.Post("/checkout/session", platform.LogtoAuth, billing.RefuseWhileDeletionPending, billing.HandleCreateCheckoutSession)
+	s.App.Post("/checkout/lifetime", platform.LogtoAuth, billing.RefuseWhileDeletionPending, billing.HandleCreateLifetimeCheckout)
+	s.App.Post("/checkout/setup-intent", platform.LogtoAuth, billing.RefuseWhileDeletionPending, billing.HandleCreateSetupIntent)
+	s.App.Post("/checkout/subscribe", platform.LogtoAuth, billing.RefuseWhileDeletionPending, billing.HandleConfirmSubscription)
+	s.App.Post("/checkout/payment-intent", platform.LogtoAuth, billing.RefuseWhileDeletionPending, billing.HandleCreatePaymentIntent)
 	s.App.Get("/checkout/return", platform.LogtoAuth, billing.HandleCheckoutReturn)
 	s.App.Get("/users/me/subscription", platform.LogtoAuth, billing.HandleGetSubscription)
 	s.App.Get("/users/me/overview", platform.LogtoAuth, accounts.HandleGetOverview)
