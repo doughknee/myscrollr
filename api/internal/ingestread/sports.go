@@ -471,7 +471,7 @@ func loadLeagueMeta(ctx context.Context, names []string) ([]LeagueMeta, error) {
 			PollingHealthy: pollingHealthy,
 		})
 	}
-	return meta
+	return meta, nil
 }
 
 // allEnabledLeagueNames returns the names of every enabled tracked league.
