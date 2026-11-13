@@ -406,8 +406,12 @@ function RootLayout() {
   // The ticker window normally owns the SSE connection; this hook makes the
   // main window take it over when there is no ticker window at all, and
   // gives every window the live status either way (hooks/useSharedSSE.ts).
+  // After a reconnect it refetches the dashboard: this window owns the poll
+  // every ticker window reads, and events missed while the stream was down
+  // are not replayed (RC-4).
   const { deliveryMode } = useSharedSSE({
     tickerShown: prefs.ticker.showTicker,
+    onReconnect: retryDashboard,
   });
   const [billingBannerDismissed, setBillingBannerDismissed] = useState(false);
 
