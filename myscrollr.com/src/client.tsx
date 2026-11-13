@@ -10,10 +10,12 @@ import { initSentry } from './sentry'
 import type { LogtoConfig } from '@logto/react'
 import { ScrollrAuthProvider } from '@/hooks/useScrollrAuth'
 import { WebsiteAnalyticsGate } from '@/components/WebsiteAnalyticsGate'
+import { installStaleBuildReload } from '@/lib/staleBuildReload'
 
 import '@/styles.css'
 
 initSentry()
+installStaleBuildReload()
 
 // Logto configuration — values come from VITE_ env vars (see .env.example)
 const logtoResource =
