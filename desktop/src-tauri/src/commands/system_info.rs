@@ -16,7 +16,9 @@ fn shared_reading(
     ttl: Duration,
     read: impl FnOnce() -> Result<serde_json::Value, String>,
 ) -> Result<serde_json::Value, String> {
-    let mut last = slot.lock().map_err(|e| format!("lock: {e}"))?;
+    // A panic inside one reading must not freeze every later one: the slot only
+    // holds the last good reading, so take it back from a poisoned lock.
+    let mut last = slot.lock().unwrap_or_else(|p| p.into_inner());
     if let Some((at, value)) = last.as_ref() {
         if at.elapsed() < ttl {
             return Ok(value.clone());
@@ -443,6 +445,23 @@ mod tests {
             assert_eq!(v["n"], 1);
         }
         assert_eq!(probes, 1);
+    }
+
+    #[test]
+    fn a_poisoned_slot_still_serves_a_reading() {
+        let slot = Mutex::new(None);
+        let _ = std::thread::scope(|s| {
+            s.spawn(|| {
+                let _ = shared_reading(&slot, Duration::ZERO, || panic!("probe blew up"));
+            })
+            .join()
+        });
+        assert!(slot.is_poisoned());
+        let v = shared_reading(&slot, Duration::from_secs(60), || Ok(serde_json::json!({ "n": 1 }))).unwrap();
+        assert_eq!(v["n"], 1);
+        // and the next caller shares it
+        let again = shared_reading(&slot, Duration::from_secs(60), || Err("probed again".into())).unwrap();
+        assert_eq!(again["n"], 1);
     }
 
     #[test]
