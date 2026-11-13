@@ -142,7 +142,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Privacy',
     icon: Shield,
     category: 'data',
-    lastUpdated: 'September 11, 2026',
+    lastUpdated: 'November 13, 2026',
     effectiveDate: 'September 11, 2026',
     sections: [
       {
@@ -183,7 +183,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Third-Party Services',
         content: [
           'The Platform integrates with several third-party services. Each has its own privacy policy that we encourage you to review:',
-          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. RSS feed publishers provide news content through their public feeds. PostHog receives only the limited analytics described above; website analytics default on only in the US and can be turned off in the footer, while other locations are asked first. The desktop also provides an opt-out control.',
+          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. api-sports.io provides sports scores and game data (MLB games are also checked against the public MLB Stats API). RSS feed publishers provide news content through their public feeds. PostHog receives only the limited analytics described above; website analytics default on only in the US and can be turned off in the footer, while other locations are asked first. The desktop also provides an opt-out control.',
           'We send your user identifier to our channel APIs via internal HTTP headers (X-User-Sub) to route data to your account. Third-party data providers do not receive your personal information directly from us.',
         ],
       },
@@ -410,7 +410,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Third-Party',
     icon: Link2,
     category: 'data',
-    lastUpdated: 'July 2026',
+    lastUpdated: 'November 2026',
     effectiveDate: 'July 2, 2026',
     sections: [
       {
@@ -427,10 +427,10 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         ],
       },
       {
-        heading: 'Sports Data — ESPN',
+        heading: 'Sports Data — api-sports.io',
         content: [
-          "Live sports scores, game schedules, and team information are sourced from ESPN's publicly available APIs. This data covers NFL, NBA, NHL, MLB, College Football, Men's College Basketball, Women's College Basketball, and College Baseball. ESPN is a trademark of ESPN Inc. We are not affiliated with or endorsed by ESPN.",
-          'Sports data is polled at regular intervals (approximately every 60 seconds) and may not reflect the absolute latest scores during live games.',
+          'Live sports scores, game schedules, and team information are sourced from api-sports.io, and cover the leagues listed in our widget catalog. MLB game results are also checked against the public MLB Stats API (statsapi.mlb.com). We are not affiliated with or endorsed by api-sports.io, the MLB or any league shown.',
+          'Sports data is polled at regular intervals and may not reflect the absolute latest scores during live games.',
         ],
       },
       {
@@ -526,7 +526,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Refunds',
     icon: RotateCcw,
     category: 'commerce',
-    lastUpdated: 'February 2026',
+    lastUpdated: 'November 2026',
     effectiveDate: 'February 11, 2026',
     sections: [
       {
@@ -551,7 +551,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Non-Refundable Circumstances',
         content: [
-          'Refunds will not be granted for: requests made after the applicable refund window; dissatisfaction with third-party data accuracy (we do not control data from TwelveData, ESPN, or RSS publishers); temporary service outages or maintenance periods; or features that are clearly documented as not included in Uplink.',
+          'Refunds will not be granted for: requests made after the applicable refund window; dissatisfaction with third-party data accuracy (we do not control data from TwelveData, api-sports.io, or RSS publishers); temporary service outages or maintenance periods; or features that are clearly documented as not included in Uplink.',
         ],
       },
       {
@@ -783,7 +783,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Security',
     icon: Lock,
     category: 'compliance',
-    lastUpdated: 'February 2026',
+    lastUpdated: 'November 2026',
     effectiveDate: 'February 11, 2026',
     sections: [
       {
@@ -806,7 +806,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Scope',
         content: [
           'The following are in scope for security reports: the Scrollr web application (myscrollr.com), the Scrollr desktop application, the core API and channel APIs, authentication and authorization flows, and data storage and encryption implementations.',
-          'The following are out of scope: third-party services we integrate with (TwelveData, ESPN, Logto itself), denial-of-service attacks, social engineering of Scrollr maintainers, and any testing against production systems without permission.',
+          'The following are out of scope: third-party services we integrate with (TwelveData, api-sports.io, Logto itself), denial-of-service attacks, social engineering of Scrollr maintainers, and any testing against production systems without permission.',
         ],
       },
       {

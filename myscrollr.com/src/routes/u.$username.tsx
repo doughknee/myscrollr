@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { AlertCircle, Loader2, Shield } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { pageVariants, sectionVariants } from '@/lib/animations'
@@ -76,19 +76,23 @@ function ProfilePage() {
         return
       }
 
-      // Get current user's identity
-      let ownUsername = ''
+      // Core's GET /users/:username echoes any name back as a profile, so it
+      // proves nothing. The only profile this page can vouch for is the
+      // signed-in visitor's own; every other name is "not found".
+      let own: Array<string> = []
       if (isAuthenticated) {
         const claims = await getIdTokenClaims()
-        ownUsername = claims?.username || ''
+        own = [claims?.username, claims?.sub].filter(
+          (v): v is string => typeof v === 'string' && v !== '',
+        )
+      }
+      if (!own.includes(username)) {
+        setProfile(null)
+        setLoading(false)
+        return
       }
 
-      // Build profile from Logto data
-      const profileData: ProfileData = {
-        username,
-        display_name: ownUsername || username,
-        avatar: '',
-      }
+      const profileData: ProfileData = { username, display_name: username }
 
       setProfile(profileData)
       setLoading(false)
@@ -167,7 +171,8 @@ function ProfilePage() {
             Profile Not Found
           </h1>
           <p className="text-base-content/45 text-sm leading-relaxed">
-            {error || `Unable to load profile for @${username}.`}
+            {error ||
+              'There is no public profile at this address. Profiles are only shown to the person who owns them.'}
           </p>
         </motion.div>
       </div>
@@ -202,7 +207,9 @@ function ProfilePage() {
             </motion.div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              <span className="text-gradient-primary">@{profile.username}</span>
+              <span className="text-gradient-primary [overflow-wrap:anywhere]">
+                @{profile.username}
+              </span>
             </h1>
 
             {profile.display_name &&
@@ -211,12 +218,6 @@ function ProfilePage() {
                   {profile.display_name}
                 </p>
               )}
-
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-success/10 text-success text-xs font-semibold rounded-full border border-success/20">
-                <Shield size={12} /> Active
-              </span>
-            </div>
           </motion.div>
         </div>
       </section>

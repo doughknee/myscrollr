@@ -78,7 +78,7 @@ function renderNotes(markdown: string): string {
 // `.release-notes` so nothing leaks into the rest of the page.
 // Radii follow the terminal system: 4px controls, 8px cards.
 const RELEASE_NOTES_CSS = `
-.release-notes { font-size: 0.875rem; line-height: 1.7; color: color-mix(in srgb, var(--color-base-content) 70%, transparent); }
+.release-notes { overflow-wrap: anywhere; font-size: 0.875rem; line-height: 1.7; color: color-mix(in srgb, var(--color-base-content) 70%, transparent); }
 .release-notes > :first-child { margin-top: 0; }
 .release-notes > :last-child { margin-bottom: 0; }
 .release-notes h1, .release-notes h2 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; color: var(--color-base-content); margin: 1.75em 0 0.6em; }
@@ -400,7 +400,7 @@ function ReleaseRow({
               e.stopPropagation()
               onToggle()
             }}
-            className="flex cursor-pointer items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.01em] text-base-content"
+            className="flex min-w-0 cursor-pointer items-center gap-2 [overflow-wrap:anywhere] text-left font-display text-lg font-bold uppercase tracking-[0.01em] text-base-content"
           >
             v{release.version}
             <span
@@ -437,7 +437,7 @@ function ReleaseRow({
 
         {/* Headline */}
         <span
-          className={`min-w-0 text-sm md:truncate ${
+          className={`min-w-0 text-sm [overflow-wrap:anywhere] md:truncate ${
             release.headline
               ? 'text-base-content/55'
               : 'italic text-base-content/30'

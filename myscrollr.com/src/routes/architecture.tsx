@@ -70,10 +70,10 @@ const PIPELINE_STEPS: Array<PipelineStep> = [
   {
     title: 'Data Sources',
     description:
-      'TwelveData WebSocket for market data, ESPN API for scores, RSS/Atom feeds for news.',
+      'TwelveData WebSocket for market data, api-sports.io for scores, RSS/Atom feeds for news.',
     hex: HEX.primary,
     label: 'INGEST',
-    items: ['TwelveData WS', 'ESPN HTTP', 'RSS Feeds'],
+    items: ['TwelveData WS', 'api-sports.io HTTP', 'RSS Feeds'],
   },
   {
     title: 'Ingestion Services',
@@ -181,7 +181,7 @@ const TECH_STACK: Array<TechGroup> = [
     items: [
       { name: 'Rust', detail: 'tokio async runtime' },
       { name: 'WebSocket', detail: 'TwelveData persistent connection' },
-      { name: 'HTTP Polling', detail: 'ESPN 60s, RSS 5min' },
+      { name: 'HTTP Polling', detail: 'api-sports.io, RSS 5min' },
     ],
   },
   {
