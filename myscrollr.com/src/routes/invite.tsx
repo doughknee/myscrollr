@@ -22,7 +22,8 @@ export const Route = createFileRoute('/invite')({
 })
 
 type PageState = 'form' | 'submitting' | 'signing-in' | 'error'
-type UsernameState = 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+type UsernameState =
+  'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'failed'
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
 
@@ -79,7 +80,7 @@ function InvitePage() {
         setUsernameState(result.reason === 'invalid' ? 'invalid' : 'taken')
       }
     } catch {
-      setUsernameState('idle')
+      setUsernameState('failed')
     }
   }
 
@@ -197,9 +198,7 @@ function InvitePage() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Welcome, {email}</h1>
           <p className="text-base-content/60 text-sm">
-            You&apos;ve been invited as a{' '}
-            <span className="text-primary font-semibold">Super User</span>.
-            Let&apos;s set up your account.
+            You&apos;ve been invited to Scrollr. Let&apos;s set up your account.
           </p>
         </div>
 
@@ -272,7 +271,8 @@ function InvitePage() {
                     <Check className="w-4 h-4 text-success" />
                   )}
                   {(usernameState === 'taken' ||
-                    usernameState === 'invalid') && (
+                    usernameState === 'invalid' ||
+                    usernameState === 'failed') && (
                     <X className="w-4 h-4 text-error" />
                   )}
                 </div>
@@ -287,6 +287,13 @@ function InvitePage() {
                 {usernameState === 'taken' && (
                   <span className="text-error">
                     Username is taken, try another
+                  </span>
+                )}
+                {usernameState === 'failed' && (
+                  <span className="text-error">
+                    Could not check this username. Wait a moment and click out
+                    of the box to try again. If it keeps failing, the invite
+                    link may have expired.
                   </span>
                 )}
                 {usernameState === 'invalid' && (

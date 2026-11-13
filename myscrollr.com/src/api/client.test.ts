@@ -66,3 +66,28 @@ describe('API shape guards fall back instead of crashing a page', () => {
     expect(parseCatalog(ok)).toBe(ok)
   })
 })
+
+describe('a hung API ends in an error, not a spinner', () => {
+  it('gives up at the deadline with a plain sentence', async () => {
+    const deadline = new AbortController()
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(deadline.signal)
+    vi.stubGlobal(
+      'fetch',
+      (_u: string, init: RequestInit) =>
+        new Promise((_, reject) =>
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          ),
+        ),
+    )
+    const result = expect(businessApi.submit(payload)).rejects.toThrow(
+      'taking too long',
+    )
+    deadline.abort()
+    await result
+    expect(timeout).toHaveBeenCalledWith(30_000)
+    timeout.mockRestore()
+  })
+})

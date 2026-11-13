@@ -27,9 +27,18 @@ type RequestOptions = RequestInit
  * sentence a visitor can act on. Every request below routes through it.
  */
 async function send(url: string, init: RequestInit): Promise<Response> {
+  // Same 30 s bound as the staff console's requests: a hung API ends in an
+  // error the screen can offer a retry for, never in a spinner.
+  const timeout = AbortSignal.timeout(30_000)
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout
   try {
-    return await fetch(url, init)
+    return await fetch(url, { ...init, signal })
   } catch {
+    if (timeout.aborted) {
+      throw new Error(
+        'Scrollr is taking too long to answer. Try again in a minute.',
+      )
+    }
     throw new Error(
       'Could not reach Scrollr. Check your connection and try again in a moment.',
     )
