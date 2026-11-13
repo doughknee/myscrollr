@@ -6,7 +6,7 @@
  * store so the ticker window can read it via cross-window sync.
  *
  * Setup flow: paste URL → fetch → display monitors.
- * Connected state: auto-refresh via TanStack Query every POLL_INTERVAL
+ * Connected state: auto-refresh via TanStack Query every UPTIME_POLL_INTERVAL
  * seconds (fixed — REL-206 dropped the bar's Refresh select), sync
  * results to the store for the ticker.
  */
@@ -19,7 +19,7 @@ import Tooltip from "../../components/Tooltip";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
 import LoadingGlyph from "../../components/LoadingGlyph";
 import type { KumaMonitor } from "./types";
-import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
+import { fetchKumaStatus, loadMonitors, saveMonitors, uptimeQuery, UPTIME_POLL_INTERVAL, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
 import { useShell } from "../../shell-context";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
@@ -50,9 +50,6 @@ export const uptimeWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-/** Seconds between status-page fetches. Not a user setting (REL-206). */
-const POLL_INTERVAL = 60;
-
 function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
@@ -68,10 +65,10 @@ function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
     storeKey: LS_UPTIME_MONITORS,
     loadFn: loadMonitors,
     saveFn: saveMonitors,
-    queryKey: ["uptime-kuma", url],
+    queryKey: uptimeQuery(url).queryKey,
     queryFn: () => fetchKumaStatus(url),
     enabled: url.length > 0,
-    pollInterval: POLL_INTERVAL,
+    pollInterval: UPTIME_POLL_INTERVAL,
   });
 
   // ── Connect handler ───────────────────────────────────────────
