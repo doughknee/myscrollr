@@ -2,6 +2,28 @@ use crate::state::SseHandle;
 use tauri::{Emitter, Manager};
 use tokio::sync::watch;
 
+/// The server sends a `: ping` comment every 15 s
+/// (`api/internal/platform/constants.go`, `SSEHeartbeatInterval`). Three
+/// missed pings means the connection is dead even if TCP has not noticed,
+/// as after a sleep (D2-5): reconnect instead of saying "live" for hours.
+const IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
+
+/// The next chunk of `stream`, or `None` if it ended or sent nothing for
+/// `idle` (any bytes reset the wait, pings included).
+async fn next_or_idle<S>(stream: &mut S, idle: std::time::Duration) -> Option<S::Item>
+where
+    S: futures_util::Stream + Unpin,
+{
+    use futures_util::StreamExt;
+    match tokio::time::timeout(idle, stream.next()).await {
+        Ok(item) => item,
+        Err(_) => {
+            log::warn!("SSE stream silent for {}s, reconnecting", idle.as_secs());
+            None
+        }
+    }
+}
+
 /// Connect to the SSE endpoint and stream CDC events to the webview.
 /// Cancels any existing SSE connection first. Runs in a background
 /// tokio task with automatic reconnection and exponential backoff.
@@ -47,8 +69,6 @@ async fn sse_loop(
     sse_url: String,
     mut cancel_rx: watch::Receiver<bool>,
 ) {
-    use futures_util::StreamExt;
-
     let client = reqwest::Client::new();
     let mut backoff_secs = 1u64;
     let mut consecutive_overflows = 0u32;
@@ -82,7 +102,7 @@ async fn sse_loop(
 
                 loop {
                     tokio::select! {
-                        chunk = stream.next() => {
+                        chunk = next_or_idle(&mut stream, IDLE_TIMEOUT) => {
                             match chunk {
                                 Some(Ok(bytes)) => {
                                     buffer.extend_from_slice(&bytes);
@@ -98,7 +118,7 @@ async fn sse_loop(
                                     }
                                 }
                                 Some(Err(_)) => break, // Stream error, reconnect
-                                None => break,         // Stream ended
+                                None => break,         // Stream ended or went silent
                             }
                         }
                         _ = cancel_rx.changed() => {
@@ -192,7 +212,19 @@ fn take_frames(buffer: &mut Vec<u8>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::take_frames;
+    use super::{next_or_idle, take_frames};
+    use std::time::Duration;
+
+    #[test]
+    fn silent_stream_gives_up_and_a_chunk_does_not() {
+        tauri::async_runtime::block_on(async {
+            let mut silent = futures_util::stream::pending::<u8>();
+            assert_eq!(next_or_idle(&mut silent, Duration::from_millis(20)).await, None);
+
+            let mut ping = futures_util::stream::iter([b':']);
+            assert_eq!(next_or_idle(&mut ping, Duration::from_millis(20)).await, Some(b':'));
+        });
+    }
 
     #[test]
     fn multibyte_character_split_across_chunks_survives() {

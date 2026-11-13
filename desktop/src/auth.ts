@@ -12,7 +12,6 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { fetch } from "@tauri-apps/plugin-http";
 import {
   getStore,
   onStoreChange,
@@ -22,6 +21,7 @@ import {
 } from "./lib/store";
 import { ownsSharedConnection } from "./lib/windowRole";
 import { openExternal } from "./lib/openExternal";
+import { fetchWithTimeout } from "./api/fetchWithTimeout";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -48,6 +48,11 @@ interface AuthState {
   refreshToken: string | null;
   expiresAt: number;
   userSub: string | null;
+  /**
+   * When this token was obtained, by the local clock (RC-6). Absent in a
+   * session saved before it existed, which then behaves as it always did.
+   */
+  refreshedAt?: number;
 }
 
 function assertAuthConfig(): void {
@@ -100,7 +105,18 @@ async function saveAuth(state: AuthState): Promise<void> {
   scheduleRefresh();
 }
 
+/**
+ * Moves on every sign-out, in this window or another (D2-6). Anything that
+ * awaited across one (a token refresh, a stream start) checks it before
+ * acting on the result, so a sign-out is never undone by a late answer.
+ */
+let signOutGen = 0;
+export function signOutGeneration(): number {
+  return signOutGen;
+}
+
 async function clearAuth(): Promise<void> {
+  signOutGen++;
   if (refreshTimer !== null) {
     clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -139,35 +155,45 @@ async function exchangeCode(
   code: string,
   codeVerifier: string,
 ): Promise<TokenResponse> {
-  const res = await fetch(`${API_RESOURCE}/extension/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      code,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: codeVerifier,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Token exchange failed: ${res.status} ${text}`);
-  }
-
-  return res.json();
+  // The whole exchange is under the client's usual deadline (RC-7).
+  return fetchWithTimeout(
+    `${API_RESOURCE}/extension/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: codeVerifier,
+      }),
+    },
+    async (res) => {
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Token exchange failed: ${res.status} ${text}`);
+      }
+      return res.json() as Promise<TokenResponse>;
+    },
+  );
 }
 
 async function refreshTokenRequest(
   refreshToken: string,
 ): Promise<TokenResponse> {
-  const res = await fetch(`${API_RESOURCE}/extension/token/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      refresh_token: refreshToken,
-    }),
-  });
+  // Under the client's usual deadline (RC-7): a timeout is a network
+  // failure, which keeps the session and retries.
+  return fetchWithTimeout(
+    `${API_RESOURCE}/extension/token/refresh`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    },
+    readRefreshResponse,
+  );
+}
 
+async function readRefreshResponse(res: Response): Promise<TokenResponse> {
   if (!res.ok) {
     // Capture Logto's actual error body so the diagnostic events can
     // tell us EXACTLY why the refresh failed. Logto returns standard
@@ -305,6 +331,27 @@ export function getLastLoginError(): string | null {
 const PROACTIVE_LEAD_MS = 2 * REFRESH_BUFFER_MS;
 
 /**
+ * A token obtained less than this long ago is not refreshed again, whatever
+ * the local clock says about its expiry (RC-6). With a clock running ahead
+ * of the server's by more than the token's life, every new token already
+ * looks expired, and the timer and every getValidToken() refreshed in a
+ * tight loop. A forced refresh (the server refused the token) still runs.
+ */
+const MIN_REFRESH_INTERVAL_MS = 5 * 60_000;
+
+/** Obtained moments ago by the local clock (a clock that jumped back is not "moments"). */
+function justRefreshed(auth: AuthState): boolean {
+  if (auth.refreshedAt === undefined) return false;
+  const age = Date.now() - auth.refreshedAt;
+  return age >= 0 && age < MIN_REFRESH_INTERVAL_MS;
+}
+
+/** Good to use without asking Logto: not near expiry, or just obtained. */
+function looksFresh(auth: AuthState): boolean {
+  return auth.expiresAt - Date.now() > REFRESH_BUFFER_MS || justRefreshed(auth);
+}
+
+/**
  * Exported as `rearmRefresh` for the election: a window that just BECAME the
  * owner still holds the spent, non-null timer of its non-owner days, so
  * nothing else would re-arm it.
@@ -336,9 +383,12 @@ function scheduleRefresh(): void {
     // If it succeeded, saveAuth() or the store change already re-scheduled.
   };
 
+  const untilFloor = justRefreshed(auth)
+    ? auth.refreshedAt! + MIN_REFRESH_INTERVAL_MS - Date.now()
+    : 0;
   refreshTimer = setTimeout(
     performRefresh,
-    Math.max(0, auth.expiresAt - Date.now() - PROACTIVE_LEAD_MS),
+    Math.max(0, untilFloor, auth.expiresAt - Date.now() - PROACTIVE_LEAD_MS),
   );
 }
 
@@ -357,9 +407,14 @@ function scheduleRefresh(): void {
  * URL right before it's opened — the caller uses it to power the "copy
  * the sign-in link" fallback (SCROLLR-8) for when the opener silently
  * fails to launch a browser (the AppImage env-injection trap).
+ *
+ * `signal`, when aborted (Cancel on the sign-in overlay), ends the attempt:
+ * the callback listener and the 5-minute timer go, the callback server
+ * stops, and nothing is saved (D2-11).
  */
 export async function login(
   onAuthUrl?: (url: string) => void,
+  signal?: AbortSignal,
 ): Promise<AuthState | null> {
   let cleanupPendingAuth = () => {};
   let hasPendingAuthCleanup = false;
@@ -367,22 +422,30 @@ export async function login(
 
   lastLoginError = null;
 
+  const cancelled = () => new Error("Sign-in cancelled");
+  const throwIfCancelled = () => {
+    if (signal?.aborted) throw cancelled();
+  };
+
   try {
     assertAuthConfig();
 
     const codeVerifier = generateRandomHex(64);
     const codeChallenge = await generateCodeChallenge(codeVerifier);
     const state = generateRandomHex(16);
+    throwIfCancelled();
 
-    // Start the callback server (returns immediately, listens in background)
+    // Start the callback server (returns immediately, listens in background).
+    // It only answers a callback carrying this attempt's state (D2-12).
+    const startArgs = { expectedState: state };
     try {
-      await invoke("start_auth_server");
+      await invoke("start_auth_server", startArgs);
     } catch (err) {
       const msg = String(err);
       if (msg.includes("already running")) {
         // Previous login attempt didn't clean up — stop and retry once
         await invoke("stop_auth_server").catch(() => {});
-        await invoke("start_auth_server");
+        await invoke("start_auth_server", startArgs);
       } else if (msg.includes("Failed to bind")) {
         throw new Error(
           "Another application is using the sign-in port (19284). " +
@@ -393,6 +456,7 @@ export async function login(
       }
     }
     authServerStarted = true;
+    throwIfCancelled();
 
     // Build the authorization URL
     const params = new URLSearchParams({
@@ -411,11 +475,9 @@ export async function login(
     const authUrl = `${authBase}/oidc/auth?${params.toString()}`;
     onAuthUrl?.(authUrl);
 
-    let resolveListenerReady: (() => void) | null = null;
-    let rejectListenerReady: ((error: unknown) => void) | null = null;
-    const listenerReadyPromise = new Promise<void>((resolve, reject) => {
+    let resolveListenerReady: () => void = () => {};
+    const listenerReadyPromise = new Promise<void>((resolve) => {
       resolveListenerReady = resolve;
-      rejectListenerReady = reject;
     });
 
     const payloadPromise = new Promise<AuthCallbackPayload>(
@@ -427,7 +489,12 @@ export async function login(
           settled = true;
           clearTimeout(timer);
           unlisten?.();
+          signal?.removeEventListener("abort", onAbort);
           hasPendingAuthCleanup = false;
+        };
+        const onAbort = () => {
+          dispose();
+          reject(cancelled());
         };
 
         cleanupPendingAuth = dispose;
@@ -437,8 +504,13 @@ export async function login(
           dispose();
           reject(new Error("Login timed out after 5 minutes"));
         }, 300_000);
+        signal?.addEventListener("abort", onAbort, { once: true });
 
         listen<AuthCallbackPayload>("auth-callback", (event) => {
+          // Only this attempt's callback counts, checked before anything
+          // in it is read: another local page can request /callback with
+          // an `error` of its choosing (D2-12). Keep waiting for the real one.
+          if (event.payload.state !== state) return;
           dispose();
           resolve(event.payload);
         })
@@ -447,23 +519,25 @@ export async function login(
               fn(); // already resolved/rejected — clean up immediately
             } else {
               unlisten = fn;
-              resolveListenerReady?.();
+              resolveListenerReady();
             }
           })
           .catch((err) => {
             dispose();
-            rejectListenerReady?.(err);
             reject(err);
           });
       },
     );
 
-    // Open in system browser after the callback listener is ready.
+    // Open in system browser after the callback listener is ready (CN-8):
+    // a callback that arrived before it would be lost. A listener that
+    // failed rejects payloadPromise, which the race surfaces.
     // Routed through the Rust `open_external` command (not
     // `@tauri-apps/plugin-shell`'s `open`) so Linux gets a cleaned
     // environment — inside an AppImage, `xdg-open` run with the
     // AppRun-injected env silently fails to launch a browser
     // (SCROLLR-8). Windows/macOS still delegate to plugin-shell there.
+    await Promise.race([listenerReadyPromise, payloadPromise]);
     await openExternal(authUrl);
 
     // Wait for the callback event from Rust.
@@ -474,19 +548,16 @@ export async function login(
       throw new Error(detail ?? "No authorization code received");
     }
 
-    // Validate state to prevent CSRF
-    if (payload.state !== state) {
-      throw new Error("State mismatch — possible CSRF attack");
-    }
-
     // Exchange code for tokens
     const tokenRes = await exchangeCode(payload.code, codeVerifier);
+    throwIfCancelled(); // Cancel while the code was being exchanged
 
     const authState: AuthState = {
       accessToken: tokenRes.access_token,
       refreshToken: tokenRes.refresh_token ?? null,
       expiresAt: expiryOf(tokenRes.access_token, tokenRes.expires_in),
       userSub: extractSub(tokenRes.access_token),
+      refreshedAt: Date.now(),
     };
 
     // Await the disk write — same rationale as the refresh path.
@@ -519,8 +590,8 @@ export async function getValidToken(forceRefresh = false): Promise<string | null
   const auth = loadAuth();
   if (!auth) return null;
 
-  // Token still valid (with buffer) — skip if forced
-  if (!forceRefresh && auth.expiresAt - Date.now() > REFRESH_BUFFER_MS) {
+  // Token still valid (with buffer), or just obtained — skip if forced
+  if (!forceRefresh && looksFresh(auth)) {
     // After a restart the store loads after this module, so the first
     // token read is where the proactive timer gets armed.
     if (refreshTimer === null) scheduleRefresh();
@@ -558,20 +629,25 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
   if (stored.refreshToken !== refreshToken) {
     // Another window already rotated: use its token, and only spend the
     // current refresh token if even that access token is near expiry.
-    if (stored.expiresAt - Date.now() > REFRESH_BUFFER_MS) {
+    if (looksFresh(stored)) {
       return stored.accessToken;
     }
     refreshToken = stored.refreshToken;
   }
 
+  const gen = signOutGen;
   try {
     const tokenRes = await refreshTokenRequest(refreshToken);
+    // Signed out while the answer was on its way: writing it back would
+    // sign the user in again (D2-6).
+    if (gen !== signOutGen) return null;
 
     const authState: AuthState = {
       accessToken: tokenRes.access_token,
       refreshToken: tokenRes.refresh_token ?? null,
       expiresAt: expiryOf(tokenRes.access_token, tokenRes.expires_in),
       userSub: extractSub(tokenRes.access_token),
+      refreshedAt: Date.now(),
     };
 
     // CRITICAL: await the persistence. Pre-fix this was fire-and-
@@ -583,11 +659,13 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
     await saveAuth(authState);
     return authState.accessToken;
   } catch (err) {
-    // Only clear auth if the refresh token was explicitly rejected
-    // (4xx). Network errors preserve state so the proactive timer
-    // can retry.
+    // Only clear auth if Logto said the refresh token is dead: a 400/401
+    // naming `invalid_grant` (expired, revoked, already used; matched
+    // anywhere in the body, so `"error"` or Logto's `"code":"oidc.…"` both
+    // count). Any other failure, a 429, a 408, a proxy's 403, a timeout,
+    // keeps the session so the proactive timer can retry (RC-12).
     const message = (err as Error).message ?? "";
-    if (/Token refresh failed: 4\d\d/.test(message)) {
+    if (/^Token refresh failed: 40[01] .*invalid_grant/s.test(message)) {
       // A refusal ends the session only if the refused token is the one
       // the shared store still holds. If another window rotated while
       // ours was in flight we merely lost a race — clearing here would
@@ -715,4 +793,7 @@ scheduleRefresh();
 
 // Another window signed in, refreshed or signed out: this window's cache
 // has already moved (lib/store), so re-arm the timer against the new expiry.
-onStoreChange(STORAGE_KEY, () => scheduleRefresh());
+onStoreChange<AuthState | null | undefined>(STORAGE_KEY, (value) => {
+  if (!value) signOutGen++; // signed out in another window (D2-6)
+  scheduleRefresh();
+});
