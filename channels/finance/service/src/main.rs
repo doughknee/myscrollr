@@ -16,8 +16,8 @@ use finance_service::{
 /// Freshness window for `/health/ready`. If the WebSocket hasn't processed
 /// any batches within this window the pod is marked NotReady so Kubernetes
 /// stops routing traffic. 5 minutes is generous: the WS reconnect backoff
-/// is 5 minutes, so anything longer than 2x that means ingest is genuinely
-/// broken.
+/// is capped at 5 minutes, so anything longer than 2x that means ingest is
+/// genuinely broken.
 const MAX_POLL_STALENESS: Duration = Duration::from_secs(10 * 60);
 
 /// How often the bridge loop checks `FinanceHealth.batch_number` for
@@ -220,12 +220,11 @@ async fn run_service() -> Result<()> {
         //
         // Silent-wedge detection: a websocket that's TCP-alive but not
         // receiving messages is NOT caught by this bridge loop (by design
-        // of the OR). The reconnect logic in `start_finance_services`
-        // handles it — tungstenite surfaces the stalled connection as an
-        // error eventually (e.g. TCP keepalive failure) and we tear down
-        // and reconnect with error_count incremented. Operators who want
-        // stricter detection should watch `snap.batch_number` via the
-        // `/health/ready` JSON payload and alert on flat-lining.
+        // of the OR). `ws_read` handles it: nothing read for
+        // READ_IDLE_TIMEOUT ends the connection and `start_finance_services`
+        // reconnects with backoff. Operators who want stricter detection
+        // can watch `snap.batch_number` via the `/health/ready` JSON payload
+        // and alert on flat-lining.
         let bridge_health = health_bg.clone();
         let bridge_readiness = readiness_bg.clone();
         let bridge_cancel = cancel_bg.clone();

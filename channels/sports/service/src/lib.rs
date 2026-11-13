@@ -176,6 +176,30 @@ fn adopt_rate_headers(headers: &header::HeaderMap, host: &str, rate_limiter: &Ra
     rate_limiter.note_minute_headers(host, read("x-ratelimit-limit"), read("x-ratelimit-remaining"));
 }
 
+/// What the `errors` member of an api-sports envelope says.
+#[derive(Debug, PartialEq)]
+pub enum InBandErrors {
+    None,
+    RateLimit,
+    Other(String),
+}
+
+/// api-sports reports problems as HTTP 200 plus `errors`: an object when
+/// something is wrong, but an empty array (`[]`) or empty object on success.
+pub fn classify_errors(body: &serde_json::Value) -> InBandErrors {
+    match body.get("errors") {
+        Some(serde_json::Value::Object(m)) if !m.is_empty() => {
+            if m.contains_key("rateLimit") {
+                InBandErrors::RateLimit
+            } else {
+                InBandErrors::Other(body["errors"].to_string())
+            }
+        }
+        Some(serde_json::Value::Array(a)) if !a.is_empty() => InBandErrors::Other(body["errors"].to_string()),
+        _ => InBandErrors::None,
+    }
+}
+
 /// One api-sports request, gated by the per-minute bucket.
 ///
 /// Waits for a token, sends, feeds the rate headers back, and unwraps the
@@ -204,13 +228,16 @@ pub async fn fetch_response(
     }
 
     let body: serde_json::Value = resp.json().await?;
-    if let Some(errors) = body.get("errors").and_then(|e| e.as_object())
-        && !errors.is_empty()
-    {
-        if errors.contains_key("rateLimit") {
+    match classify_errors(&body) {
+        InBandErrors::None => {}
+        InBandErrors::RateLimit => {
             return Err(PollError::Throttled(rate_limiter.note_throttled(host)));
         }
-        warn!("[{}] API returned errors: {}", label, serde_json::Value::Object(errors.clone()));
+        // Bad or expired key, exhausted daily quota, plan restriction: HTTP 200
+        // with a body that says so. That is a failed poll, not an empty result.
+        InBandErrors::Other(detail) => {
+            return Err(anyhow::anyhow!("[{}] API returned errors: {}", label, detail).into());
+        }
     }
     rate_limiter.note_minute_ok();
 
@@ -252,6 +279,8 @@ pub async fn poll_live(
     let mut total_upserted = 0u32;
     let mut total_failed = 0u32;
     let mut leagues_with_live = 0u32;
+    let mut polls_ok = 0u32;
+    let mut polls_failed = 0u32;
 
     let current_month = now.month() as i32;
 
@@ -287,6 +316,7 @@ pub async fn poll_live(
                     }
                     total_upserted += upserted;
                     total_failed += failed;
+                    polls_ok += 1;
                     crate::database::record_poll_success(pool, &league.name).await;
                 }
                 Err(PollError::Throttled(backoff)) => {
@@ -297,6 +327,7 @@ pub async fn poll_live(
                 }
                 Err(PollError::Other(e)) => {
                     error!("[{}] {} error: {}", league.name, what, e);
+                    polls_failed += 1;
                     health_state.lock().await.record_error(e.to_string());
                     crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
                 }
@@ -305,7 +336,11 @@ pub async fn poll_live(
     }
 
     let mut health = health_state.lock().await;
-    health.record_success(leagues.len() as u32, leagues_with_live);
+    // A cycle where every poll failed (bad key, spent quota) is not a success:
+    // leave last_poll alone so /health/ready goes stale by its usual rule.
+    if polls_ok > 0 || polls_failed == 0 {
+        health.record_success(leagues.len() as u32, leagues_with_live);
+    }
     health.set_rate_limits(rate_limiter.all_remaining());
 
     if total_failed > 0 {
@@ -1376,6 +1411,7 @@ fn build_client(api_key: &str) -> Result<Client> {
 
     Client::builder()
         .default_headers(headers)
+        .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .context("reqwest client build failed (TLS stack? DNS resolver?)")

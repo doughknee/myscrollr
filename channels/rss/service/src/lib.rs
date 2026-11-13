@@ -95,7 +95,7 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
             Ok((feed_name, feed_url, prev_failures, Ok(count))) => {
                 success_urls.push(feed_url.clone());
                 if prev_failures >= 3 {
-                    info!("Feed {} ({}) recovered after {} consecutive failures", feed_name, feed_url, prev_failures);
+                    info!("Feed {} ({}) recovered after {} consecutive failures", feed_name, feed_http::redact_feed_url(&feed_url), prev_failures);
                 }
                 health_state.lock().await.record_success(count as u64);
             }
@@ -104,12 +104,13 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
                 failure_urls.push(feed_url.clone());
                 failure_errors.push(err_msg);
                 let new_failures = prev_failures + 1;
+                let log_url = feed_http::redact_feed_url(&feed_url);
                 if new_failures == 3 {
-                    warn!("Feed {} ({}) hidden from catalog after 3 consecutive failures", feed_name, feed_url);
+                    warn!("Feed {} ({}) hidden from catalog after 3 consecutive failures", feed_name, log_url);
                 } else if new_failures == 288 {
-                    warn!("Feed {} ({}) quarantined after 288 consecutive failures (24h)", feed_name, feed_url);
+                    warn!("Feed {} ({}) quarantined after 288 consecutive failures (24h)", feed_name, log_url);
                 }
-                error!("Error polling feed {} ({}): {}", feed_name, feed_url, e);
+                error!("Error polling feed {} ({}): {}", feed_name, log_url, e);
                 health_state.lock().await.record_error(format!("{}: {}", feed_name, e));
             }
             Err(panic_err) => {
@@ -147,7 +148,7 @@ async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> a
     // errors up front so we don't try to parse an HTML error page as RSS.
     let mut response = feed_http::get(client, &feed.url).await?;
     let mut buf = BytesMut::with_capacity(64 * 1024);
-    while let Some(chunk) = response.chunk().await? {
+    while let Some(chunk) = response.chunk().await.map_err(reqwest::Error::without_url)? {
         if buf.len() + chunk.len() > MAX_FEED_BODY_BYTES {
             anyhow::bail!(
                 "feed body exceeded {}MiB cap",

@@ -176,25 +176,14 @@ pub async fn update_day_range(pool: Arc<PgPool>, symbol: String, low: f64, high:
     Ok(())
 }
 
-/// Widen the stored range to include a live price.
-///
-/// The quote that seeds the range is fetched once a day, so without this the
-/// stored range is yesterday's for the whole of the next session and every
-/// price sits outside it — the marker would clamp to one end and never move.
-/// LEAST/GREATEST over COALESCE also handles the first tick for a symbol that
-/// has no range yet.
-pub async fn widen_day_range(pool: Arc<PgPool>, symbol: String, price: f64) -> Result<()> {
-    if price <= 0.0 {
-        return Ok(());
-    }
-    let statement = "UPDATE trades SET          day_low  = LEAST(COALESCE(day_low, $1), $1),          day_high = GREATEST(COALESCE(day_high, $1), $1)          WHERE symbol = $2";
-    let mut connection = pool.acquire().await?;
-    query(statement).bind(price).bind(symbol).execute(&mut *connection).await?;
-    Ok(())
-}
-
+/// Also keeps the session range honest (it used to be a second UPDATE, which
+/// doubled every CDC event). The quote that seeds day_low/day_high is fetched
+/// once a day, so without widening here the stored range is yesterday's for the
+/// whole next session and the rail's marker clamps to one end. LEAST/GREATEST
+/// over COALESCE also handles the first tick for a symbol with no range yet.
+/// Callers only pass price > 0.
 pub async fn update_trade(pool: Arc<PgPool>, symbol: String, price: f64, price_change: f64, percentage_change: f64, direction: &str, day_volume: Option<u64>) -> Result<()> {
-    let statement = "UPDATE trades SET price = $1, price_change = $2, percentage_change = $3, direction = $4, day_volume = COALESCE($5, day_volume), last_updated = CURRENT_TIMESTAMP WHERE symbol = $6";
+    let statement = "UPDATE trades SET price = $1, price_change = $2, percentage_change = $3, direction = $4, day_volume = COALESCE($5, day_volume), day_low = LEAST(COALESCE(day_low, $1), $1), day_high = GREATEST(COALESCE(day_high, $1), $1), last_updated = CURRENT_TIMESTAMP WHERE symbol = $6";
     let mut connection = pool.acquire().await?;
     let day_volume = day_volume.and_then(|value| i64::try_from(value).ok());
     query(statement).bind(price).bind(price_change).bind(percentage_change).bind(direction).bind(day_volume).bind(symbol).execute(&mut *connection).await?;
