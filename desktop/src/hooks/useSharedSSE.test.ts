@@ -164,7 +164,8 @@ describe("useSharedSSE backs off a refused stream", () => {
     expect(startCalls()).toBe(1);
     await status({ status: "auth-expired" });
     expect(startCalls()).toBe(2);
-    expect(getValidToken).toHaveBeenLastCalledWith(true);
+    // With the token the server refused, so a refresh is spent only if needed (D3-6).
+    expect(getValidToken).toHaveBeenLastCalledWith(true, "tok");
   });
 
   it("waits longer after each oversized-data abort", async () => {

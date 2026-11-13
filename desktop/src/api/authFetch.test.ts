@@ -82,7 +82,8 @@ describe("authFetch on 401", () => {
       .resolves.toEqual({ status: "ok" });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(getValidToken).toHaveBeenLastCalledWith(true);
+    // With the refused token, so a refresh is spent only if needed (D3-6).
+    expect(getValidToken).toHaveBeenLastCalledWith(true, "T");
     expect(expired).not.toHaveBeenCalled();
   });
 

@@ -65,6 +65,9 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
   // leave a visible gap); a second 401 before a connection waits.
   const quickRetryUsedRef = useRef(false);
   const forceRefreshRef = useRef(false);
+  // The token the stream was last started with: on a 401 it is the one the
+  // server refused, so a refresh is spent only if nobody has made one (D3-6).
+  const startedTokenRef = useRef<string | undefined>(undefined);
   // Oversized-frame aborts follow a "connected", which resets the backoff,
   // so they count on their own. ponytail: kept until stopSSE; a server that
   // misbehaved once waits longer next time, capped at RETRY_MAX_MS.
@@ -102,7 +105,7 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
     const force = forceRefreshRef.current;
     forceRefreshRef.current = false;
     const gen = signOutGeneration();
-    const token = DEMO ? "demo" : await getValidToken(force);
+    const token = DEMO ? "demo" : await getValidToken(force, startedTokenRef.current);
     // Ownership can move while the silent refresh is in flight, and the
     // user can sign out (D2-6): a stream started now would outlive it.
     if (!token || !ownsRef.current || gen !== signOutGeneration()) {
@@ -112,6 +115,7 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
       return;
     }
     setDeliveryMode("sse");
+    startedTokenRef.current = token;
     await invoke("start_sse", { token, apiBase: API_BASE }).catch(() => {
       activeRef.current = false;
       setDeliveryMode("polling");

@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
   invokes: [] as [string, unknown][],
   opened: [] as string[],
   listenReady: null as null | (() => void),
+  /** Hold the code exchange open until its signal aborts. */
+  hangExchange: false,
 }));
 
 vi.mock("./config", () => ({
@@ -54,11 +56,16 @@ vi.mock("@tauri-apps/api/event", () => ({
   },
 }));
 vi.mock("@tauri-apps/plugin-http", () => ({
-  fetch: async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({ access_token: "a.e30.s", refresh_token: "r", expires_in: 3600, token_type: "Bearer" }),
-  }),
+  fetch: async (_url: string, init: { signal?: AbortSignal }) =>
+    h.hangExchange
+      ? new Promise((_, reject) =>
+          init.signal?.addEventListener("abort", () => reject(new Error("Request cancelled"))),
+        )
+      : {
+          ok: true,
+          status: 200,
+          json: async () => ({ access_token: "a.e30.s", refresh_token: "r", expires_in: 3600, token_type: "Bearer" }),
+        },
 }));
 
 const auth = await import("./auth");
@@ -74,6 +81,7 @@ beforeEach(() => {
   h.invokes = [];
   h.opened = [];
   h.listenReady = null;
+  h.hangExchange = false;
 });
 
 describe("login", () => {
@@ -106,6 +114,18 @@ describe("login", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("D3-8: Cancel during the code exchange ends it now and stops only this attempt's server", async () => {
+    h.hangExchange = true;
+    const controller = new AbortController();
+    const p = auth.login(undefined, controller.signal);
+    await vi.waitFor(() => expect(h.opened).toHaveLength(1));
+    callback({ state: stateOf(), code: "c" }); // the exchange starts and hangs
+    await flush();
+    controller.abort();
+    expect(await p).toBeNull();
+    expect(h.invokes.at(-1)).toEqual(["stop_auth_server", { expectedState: stateOf() }]);
   });
 
   it("CN-8: opens the browser only once the callback listener is ready", async () => {

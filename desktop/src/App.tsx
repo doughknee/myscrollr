@@ -317,10 +317,13 @@ export default function App() {
 
       // Signed out, or another account: nothing of the previous one may
       // stay on this bar (SCROLLR-470). A token refresh keeps the account.
+      // The main window fetches and broadcasts the next account's dashboard;
+      // this window only empties its own copy and waits for it (D3-3).
       const account = currentUserSub();
-      if (account !== accountRef.current) {
+      const accountChanged = account !== accountRef.current;
+      if (accountChanged) {
         accountRef.current = account;
-        void forgetAccountData(queryClient);
+        void forgetAccountData(queryClient, { ticker: true });
       }
 
       if (!isAuth && wasAuth) {
@@ -328,7 +331,7 @@ export default function App() {
         stopSSE();
         setTier("free");
         tierRef.current = "free";
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+        if (!accountChanged) queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
         return;
       }
 
@@ -342,7 +345,7 @@ export default function App() {
         if (!wasAuth) {
           // Fresh login — invalidate dashboard and open the stream.
           // Tier no longer affects delivery (real-time is universal).
-          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+          if (!accountChanged) queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
           startSSE();
         }
       }

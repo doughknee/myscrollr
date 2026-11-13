@@ -10,6 +10,10 @@ pub struct SseHandle(pub Mutex<Option<watch::Sender<bool>>>);
 #[derive(Clone)]
 pub struct AuthServerRunning(pub Arc<Mutex<bool>>);
 
+/// The `state` of the sign-in attempt whose callback server is running, so a
+/// cancelled attempt stops only its own server, never the next one's (D3-8).
+pub struct AuthServerAttempt(pub Mutex<Option<String>>);
+
 /// Signals the OAuth callback server thread to stop waiting for a callback.
 #[derive(Clone)]
 pub struct AuthServerStop(pub Arc<AtomicBool>);

@@ -24,6 +24,15 @@ where
     }
 }
 
+/// How long to wait before the next connection attempt, and the wait after
+/// that. Only a connection that delivered bytes resets it (D3-7): one that
+/// answered and then stayed silent until the idle timeout (a proxy holding
+/// the stream back) is a failure, so those reconnects back off too.
+fn reconnect_wait(backoff_secs: u64, delivered: bool) -> (u64, u64) {
+    let wait = if delivered { 1 } else { backoff_secs };
+    (wait, (wait * 2).min(30))
+}
+
 /// Connect to the SSE endpoint and stream CDC events to the webview.
 /// Cancels any existing SSE connection first. Runs in a background
 /// tokio task with automatic reconnection and exponential backoff.
@@ -65,7 +74,7 @@ fn stop_sse_internal(app: &tauri::AppHandle) {
 /// Main SSE loop: connect → stream → reconnect on error.
 async fn sse_loop(
     app: tauri::AppHandle,
-    token: String,
+    mut token: String,
     sse_url: String,
     mut cancel_rx: watch::Receiver<bool>,
 ) {
@@ -74,10 +83,22 @@ async fn sse_loop(
     let mut consecutive_overflows = 0u32;
     const MAX_CONSECUTIVE_OVERFLOWS: u32 = 3;
 
+    let mut first_attempt = true;
     loop {
         if *cancel_rx.borrow() {
             break;
         }
+
+        // A reconnect presents the token stored now, not the one the stream
+        // was started with: that one may have expired while the stream was
+        // up, and a 401 for it would spend a refresh (D3-6).
+        if !first_attempt {
+            if let Some(stored) = crate::presence::read_store(&app).access_token {
+                token = stored;
+            }
+        }
+        first_attempt = false;
+        let mut delivered = false;
 
         let response = client
             .get(&sse_url)
@@ -93,7 +114,6 @@ async fn sse_loop(
                     serde_json::json!({ "status": "connected" }),
                 )
                 .ok();
-                backoff_secs = 1; // Reset on success
 
                 let mut stream = res.bytes_stream();
                 let mut buffer: Vec<u8> = Vec::new();
@@ -105,6 +125,7 @@ async fn sse_loop(
                         chunk = next_or_idle(&mut stream, IDLE_TIMEOUT) => {
                             match chunk {
                                 Some(Ok(bytes)) => {
+                                    delivered |= !bytes.is_empty();
                                     buffer.extend_from_slice(&bytes);
                                     if buffer.len() > MAX_BUFFER {
                                         log::warn!("SSE buffer exceeded {MAX_BUFFER} bytes, reconnecting");
@@ -192,8 +213,9 @@ async fn sse_loop(
         .ok();
 
         // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s max
-        tokio::time::sleep(std::time::Duration::from_secs(backoff_secs)).await;
-        backoff_secs = (backoff_secs * 2).min(30);
+        let (wait, next) = reconnect_wait(backoff_secs, delivered);
+        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+        backoff_secs = next;
     }
 }
 
@@ -212,8 +234,23 @@ fn take_frames(buffer: &mut Vec<u8>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{next_or_idle, take_frames};
+    use super::{next_or_idle, reconnect_wait, take_frames};
     use std::time::Duration;
+
+    #[test]
+    fn silent_connections_back_off_and_data_resets_it() {
+        // Connected every time, never a byte (the idle timeout each time).
+        let mut backoff = 1;
+        let mut waits = Vec::new();
+        for _ in 0..7 {
+            let (wait, next) = reconnect_wait(backoff, false);
+            waits.push(wait);
+            backoff = next;
+        }
+        assert_eq!(waits, [1, 2, 4, 8, 16, 30, 30]);
+        // A connection that delivered data starts over at 1 s.
+        assert_eq!(reconnect_wait(backoff, true), (1, 2));
+    }
 
     #[test]
     fn silent_stream_gives_up_and_a_chunk_does_not() {

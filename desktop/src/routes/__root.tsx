@@ -56,7 +56,7 @@ import { useGitHubAutoPick } from "../widgets/github/useAutoPick";
 import { canonicalOrder } from "../marketplace";
 
 // Data
-import { dashboardState, dashboardToSave } from "../api/queries";
+import { catchUpAfterReconnect, dashboardState, dashboardToSave } from "../api/queries";
 
 // Preferences
 import {
@@ -411,7 +411,7 @@ function RootLayout() {
   // are not replayed (RC-4).
   const { deliveryMode } = useSharedSSE({
     tickerShown: prefs.ticker.showTicker,
-    onReconnect: retryDashboard,
+    onReconnect: () => catchUpAfterReconnect(retryDashboard),
   });
   const [billingBannerDismissed, setBillingBannerDismissed] = useState(false);
 
