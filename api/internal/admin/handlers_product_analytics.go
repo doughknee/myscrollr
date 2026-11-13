@@ -40,12 +40,6 @@ type RetentionSummary struct {
 	D30 RetentionMetric `json:"d30"`
 }
 
-type FeatureUsage struct {
-	Category string  `json:"category"`
-	Accounts int     `json:"accounts"`
-	Share    float64 `json:"share"`
-}
-
 // ProductAnalyticsResponse is the legacy first-party series: one fact per
 // account and UTC day once a visible ticker with an enabled widget had been
 // shown for 30 continuous seconds. It predates presence (SCROLLR-210) and is
@@ -59,7 +53,6 @@ type ProductAnalyticsResponse struct {
 	Activity            ActivitySummary   `json:"activity"`
 	Activation          ActivationSummary `json:"activation"`
 	Retention           RetentionSummary  `json:"retention"`
-	Features            []FeatureUsage    `json:"features"`
 	PopulationNote      string            `json:"population_note"`
 	RecentPresence      int               `json:"recent_presence"`
 	RecentPresenceNote  string            `json:"recent_presence_note"`
@@ -90,7 +83,6 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time, excludeS
 		GeneratedAt: now.UTC().Format(time.RFC3339), Days: days, StaffExcluded: excludeStaff,
 		PopulationNote:     "Signed-in accounts with usage analytics enabled. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
 		Activation:         ActivationSummary{Definition: "First observed successful configured ticker use; not original signup date."},
-		Features:           []FeatureUsage{},
 		RecentPresenceNote: "Customer accounts with analytics enabled, seen by the desktop app in the last 15 minutes; presence does not prove attention.",
 	}
 	if platform.Rdb != nil {
@@ -200,28 +192,5 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time, excludeS
 		}
 	}
 
-	var active, sports, markets, news, fantasy, predictions, utilities int
-	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(DISTINCT a.logto_sub),
-		       count(DISTINCT a.logto_sub) FILTER (WHERE a.sports),
-		       count(DISTINCT a.logto_sub) FILTER (WHERE a.markets),
-		       count(DISTINCT a.logto_sub) FILTER (WHERE a.news),
-		       count(DISTINCT a.logto_sub) FILTER (WHERE a.fantasy),
-		       count(DISTINCT a.logto_sub) FILTER (WHERE a.predictions),
-		       count(DISTINCT a.logto_sub) FILTER (WHERE a.utilities)
-		  FROM product_activity_daily a
-		  JOIN product_analytics_enrollments e ON e.logto_sub = a.logto_sub
-		 WHERE a.day BETWEEN $2 AND $3 AND (NOT $1 OR e.internal = false)`, excludeStaff, start, today).
-		Scan(&active, &sports, &markets, &news, &fantasy, &predictions, &utilities); err != nil {
-		return report, err
-	}
-	for i, category := range []string{"sports", "markets", "news", "fantasy", "predictions", "utilities"} {
-		count := []int{sports, markets, news, fantasy, predictions, utilities}[i]
-		share := 0.0
-		if active > 0 {
-			share = float64(count) / float64(active)
-		}
-		report.Features = append(report.Features, FeatureUsage{Category: category, Accounts: count, Share: share})
-	}
 	return report, nil
 }

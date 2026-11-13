@@ -37,7 +37,6 @@ export interface ProductAnalytics {
     d7: RetentionMetric
     d30: RetentionMetric
   }
-  features: Array<{ category: string; accounts: number; share: number }>
   population_note: string
   recent_presence: number
   recent_presence_note: string
