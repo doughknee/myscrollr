@@ -242,7 +242,34 @@ pub async fn batch_record_feed_failures(pool: &Arc<PgPool>, feed_urls: &[String]
 
 // ── Batch upsert RSS items ──────────────────────────────────────
 
+/// Make a batch safe for the upsert below: strip NUL bytes (Postgres text
+/// rejects them) and keep only the last article per conflict key
+/// `(feed_url, guid)` (a repeated key makes `ON CONFLICT DO UPDATE` fail the
+/// whole statement). NULs go first so two guids that differ only by a NUL
+/// are treated as the same row. Order of the survivors is preserved.
+pub fn sanitize_articles(articles: Vec<ParsedArticle>) -> Vec<ParsedArticle> {
+    let strip = |s: String| if s.contains('\0') { s.replace('\0', "") } else { s };
+    let mut seen = std::collections::HashSet::new();
+    let mut out: Vec<ParsedArticle> = articles
+        .into_iter()
+        .rev()
+        .map(|a| ParsedArticle {
+            feed_url: strip(a.feed_url),
+            guid: strip(a.guid),
+            title: strip(a.title),
+            link: strip(a.link),
+            description: strip(a.description),
+            source_name: strip(a.source_name),
+            published_at: a.published_at,
+        })
+        .filter(|a| seen.insert((a.feed_url.clone(), a.guid.clone())))
+        .collect();
+    out.reverse();
+    out
+}
+
 pub async fn batch_upsert_rss_items(pool: &Arc<PgPool>, articles: Vec<ParsedArticle>) -> Result<()> {
+    let articles = sanitize_articles(articles);
     if articles.is_empty() {
         return Ok(());
     }
@@ -315,4 +342,39 @@ pub async fn cleanup_old_articles(pool: &Arc<PgPool>) -> Result<u64> {
         }
     }
     Ok(total)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn art(guid: &str, title: &str) -> ParsedArticle {
+        ParsedArticle {
+            feed_url: "https://f.example/rss".into(),
+            guid: guid.into(),
+            title: title.into(),
+            link: String::new(),
+            description: String::new(),
+            source_name: "S".into(),
+            published_at: None,
+        }
+    }
+
+    #[test]
+    fn repeated_guid_keeps_last_occurrence_in_order() {
+        let out = sanitize_articles(vec![art("a", "old"), art("b", "b"), art("a", "new")]);
+        let got: Vec<_> = out.iter().map(|x| (x.guid.as_str(), x.title.as_str())).collect();
+        assert_eq!(got, vec![("b", "b"), ("a", "new")]);
+    }
+
+    #[test]
+    fn nul_bytes_are_stripped_before_dedupe() {
+        let mut dirty = art("a\0", "ti\0tle");
+        dirty.description = "d\0".into();
+        let out = sanitize_articles(vec![art("a", "first"), dirty]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].guid, "a");
+        assert_eq!(out[0].title, "title");
+        assert_eq!(out[0].description, "d");
+    }
 }

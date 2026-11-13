@@ -360,15 +360,16 @@ func TestIntegrationSubscribeActiveGrantsWithIdempotencyKey(t *testing.T) {
 
 func TestIntegrationPurchaseRefusedWhileDeletionPending(t *testing.T) {
 	setupIntegrationDB(t)
-	const pendingSub, otherSub = "user_buy_pending", "user_buy_free"
+	const pendingSub, otherSub, purgedSub = "user_buy_pending", "user_buy_free", "user_buy_purged"
 	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
-		VALUES ($1, now(), now() + interval '30 days', 'pending'), ($2, now(), now() + interval '30 days', 'canceled')`,
-		pendingSub, otherSub)
+		VALUES ($1, now(), now() + interval '30 days', 'pending'), ($2, now(), now() + interval '30 days', 'canceled'),
+		       ($3, now() - interval '31 days', now() - interval '1 day', 'purged')`,
+		pendingSub, otherSub, purgedSub)
 
 	for _, tc := range []struct {
 		sub        string
 		wantStatus int
-	}{{pendingSub, fiber.StatusConflict}, {otherSub, fiber.StatusOK}} {
+	}{{pendingSub, fiber.StatusConflict}, {otherSub, fiber.StatusOK}, {purgedSub, fiber.StatusConflict}} {
 		app := fiber.New()
 		app.Post("/checkout/subscribe", func(c *fiber.Ctx) error {
 			c.Locals("user_id", tc.sub)
@@ -382,9 +383,54 @@ func TestIntegrationPurchaseRefusedWhileDeletionPending(t *testing.T) {
 		if resp.StatusCode != tc.wantStatus {
 			t.Errorf("%s: status = %d (%s), want %d", tc.sub, resp.StatusCode, body, tc.wantStatus)
 		}
-		if tc.wantStatus == fiber.StatusConflict && !strings.Contains(string(body), `"error":"Your account is scheduled for deletion. Cancel the deletion`) {
+		if tc.sub == pendingSub && !strings.Contains(string(body), `"error":"Your account is scheduled for deletion. Cancel the deletion`) {
 			t.Errorf("body = %s, want the cancel-the-deletion message", body)
 		}
+	}
+}
+
+// SCROLLR-477 B3-1: a Stripe error while the subscription page refreshes keeps
+// the billing row (so the account cannot buy a second subscription) and
+// answers from it; only "no such subscription" resets the row to free.
+func TestIntegrationSubscriptionPageKeepsRowThroughStripeError(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "stripe error", true: "subscription missing"}[missing], func(t *testing.T) {
+			setupIntegrationDB(t)
+			const sub = "user_sub_page"
+			seedStripeCustomer(t, sub, "cus_sub_page", "ultimate_monthly", "active", false)
+			testsupport.MustExec(t, `UPDATE stripe_customers SET stripe_subscription_id = 'sub_live' WHERE logto_sub = $1`, sub)
+			stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if missing {
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","message":"No such subscription"}}`))
+					return
+				}
+				w.Header().Set("Stripe-Should-Retry", "false")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"error":{"type":"api_error","message":"timeout"}}`))
+			})
+
+			resp, err := asUser(fiber.MethodGet, "/users/me/subscription", sub, billing.HandleGetSubscription).
+				Test(httptest.NewRequest(fiber.MethodGet, "/users/me/subscription", nil), -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			row := readStripeCustomer(t, sub)
+			if missing {
+				if !strings.Contains(string(body), `"plan":"free"`) || row.Plan != "free" || row.SubscriptionID != nil {
+					t.Errorf("body = %s, row = %+v; want the row reset to free", body, row)
+				}
+				return
+			}
+			if resp.StatusCode != fiber.StatusOK || !strings.Contains(string(body), `"plan":"ultimate_monthly"`) || !strings.Contains(string(body), `"status":"active"`) {
+				t.Errorf("status = %d body = %s, want the stored ultimate_monthly/active", resp.StatusCode, body)
+			}
+			if row.Plan != "ultimate_monthly" || row.Status != "active" || row.SubscriptionID == nil || *row.SubscriptionID != "sub_live" {
+				t.Errorf("row = %+v, want ultimate_monthly/active/sub_live untouched", row)
+			}
+		})
 	}
 }
 
