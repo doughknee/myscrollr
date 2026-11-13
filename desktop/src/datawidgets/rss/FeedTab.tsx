@@ -32,6 +32,7 @@ import {
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { barPillClasses } from "../../components/widget-bar/Menu";
+import { openLinkOnClick } from "../../lib/openExternal";
 import FeedManager from "./FeedManager";
 import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
@@ -619,7 +620,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
     return (
       <a
         href={item.link}
-        target="_blank"
+        onClick={openLinkOnClick}
         rel="noopener noreferrer"
         className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover  cursor-pointer"
       >
@@ -641,7 +642,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
   return (
     <a
       href={item.link}
-      target="_blank"
+      onClick={openLinkOnClick}
       rel="noopener noreferrer"
       className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "block")}
     >

@@ -17,7 +17,7 @@ import {
   getTier,
   onSessionExpired,
 } from "../auth";
-import { queryKeys } from "../api/queries";
+import { forgetAccountData } from "../api/queries";
 import type { SubscriptionTier } from "../auth";
 import type { DashboardResponse } from "../types";
 
@@ -93,7 +93,7 @@ export function useAuthState(): UseAuthStateReturn {
         setAuthenticated(true);
         setTier(getTier());
         setSessionExpired(false);
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+        void forgetAccountData(queryClient);
       } else {
         const detail = getLastLoginError();
         toast.error(detail
@@ -115,7 +115,7 @@ export function useAuthState(): UseAuthStateReturn {
     setAuthenticated(false);
     setTier("free");
     setSessionExpired(false);
-    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+    void forgetAccountData(queryClient);
   }, [queryClient]);
 
   const syncAuthFromDashboard = useCallback(

@@ -5,11 +5,12 @@
  * Every remote data fetch uses this layer — no manual fetch + useState.
  */
 import { queryOptions } from "@tanstack/react-query";
-import { isAuthenticated, hasRefreshToken, isSignedOut } from "../auth";
+import { isAuthenticated, hasRefreshToken, isSignedOut, currentUserSub } from "../auth";
 import { ApiError, authFetch, request, rssApi, fetchOverview } from "./client";
 import { pinnedSubjectsQuery } from "./pinnedSubjects";
-import { getStore } from "../lib/store";
+import { getStore, removeStore } from "../lib/store";
 import { DEMO } from "../config";
+import type { QueryClient } from "@tanstack/react-query";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game, Trade } from "../types";
 
@@ -97,16 +98,66 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   return { data: data.data } as DashboardResponse;
 }
 
+const SAVED_DASHBOARD_KEY = "scrollr:dashboard";
+
+/** The dashboard as the main window saves it: tagged with whose it is. */
+export type SavedDashboard = DashboardResponse & { userSub?: string | null };
+
+/** Tag a dashboard with the account it was fetched for, before saving it. */
+export function dashboardToSave(dashboard: DashboardResponse): SavedDashboard {
+  return { ...dashboard, userSub: currentUserSub() };
+}
+
 /**
  * The last dashboard this install saw (the main window writes every good
  * one to the store), so a restart during an outage opens on it rather than
- * on nothing. Never another session's: a signed-in payload carries
- * `preferences`, the public feed does not.
+ * on nothing. Never another session's: signed out, only a public feed saved
+ * by nobody; signed in, only a copy saved by this same account. A copy from
+ * before SCROLLR-470 carries no account, so a signed-in user ignores it.
  */
 function savedDashboard(): DashboardResponse | undefined {
-  const saved = getStore<DashboardResponse | null>("scrollr:dashboard", null);
+  const saved = getStore<SavedDashboard | null>(SAVED_DASHBOARD_KEY, null);
   if (!saved?.data) return undefined;
-  return !isSignedOut() === Boolean(saved.preferences) ? saved : undefined;
+  if (isSignedOut()) return saved.preferences || saved.userSub ? undefined : saved;
+  const sub = currentUserSub();
+  return saved.preferences && sub && saved.userSub === sub ? saved : undefined;
+}
+
+/**
+ * On sign-in and sign-out, forget everything fetched for the account that
+ * was signed in (SCROLLR-470): the saved dashboard and every per-account
+ * query (dashboard, profile, GitHub). Preferences live in the store and
+ * are not touched.
+ */
+export async function forgetAccountData(queryClient: QueryClient): Promise<void> {
+  removeStore(SAVED_DASHBOARD_KEY);
+  const filters = {
+    predicate: ({ queryKey: [key] }: { queryKey: readonly unknown[] }) =>
+      key === queryKeys.dashboard[0] ||
+      key === queryKeys.userOverview[0] ||
+      (typeof key === "string" && key.startsWith("github-")),
+  };
+  // A fetch still running for the old account must not land.
+  await queryClient.cancelQueries(filters);
+  // Empty them in place, so every observer sees it at once. Not
+  // `resetQueries`: that restores the state from when the query was made,
+  // which can be the old account's saved dashboard.
+  for (const query of queryClient.getQueryCache().findAll(filters)) {
+    query.setState({
+      data: undefined,
+      dataUpdatedAt: 0,
+      error: null,
+      errorUpdatedAt: 0,
+      fetchFailureCount: 0,
+      fetchFailureReason: null,
+      status: "pending",
+      isInvalidated: true,
+    });
+  }
+  // Only the dashboard refetches now: profile and GitHub wait for their
+  // page, which fetches them once signed in (a fetch now, signed out, would
+  // 401 and raise the "session expired" banner after a plain sign-out).
+  await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
 }
 
 /** Query options for the dashboard — usable in route loaders and components. */

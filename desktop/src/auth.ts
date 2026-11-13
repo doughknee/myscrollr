@@ -673,6 +673,11 @@ export function isSignedOut(): boolean {
   return loadAuth() === null;
 }
 
+/** The signed-in account's id (the token's `sub`), or null. */
+export function currentUserSub(): string | null {
+  return loadAuth()?.userSub ?? null;
+}
+
 // ── Session-expired signal ───────────────────────────────────────
 //
 // A 401 nobody can refresh past means the session is over, but until

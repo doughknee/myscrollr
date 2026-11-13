@@ -39,6 +39,7 @@ import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
 import { controlTransition } from "../../lib/motion";
+import { openLinkOnClick } from "../../lib/openExternal";
 import {
   useAutoPagination,
   useSetToggle,
@@ -550,7 +551,7 @@ const TradeItem = memo(function TradeItem({
     return (
       <a
         href={trade.link}
-        target="_blank"
+        onClick={openLinkOnClick}
         rel="noopener noreferrer"
         className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono hover:bg-surface-hover"
       >
@@ -583,7 +584,7 @@ const TradeItem = memo(function TradeItem({
     >
       <a
         href={trade.link}
-        target="_blank"
+        onClick={openLinkOnClick}
         rel="noopener noreferrer"
         aria-label={`Open ${trade.symbol} on Google Finance`}
         className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"

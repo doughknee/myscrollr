@@ -56,7 +56,7 @@ import { useGitHubAutoPick } from "../widgets/github/useAutoPick";
 import { canonicalOrder } from "../marketplace";
 
 // Data
-import { dashboardState } from "../api/queries";
+import { dashboardState, dashboardToSave } from "../api/queries";
 
 // Preferences
 import {
@@ -278,7 +278,7 @@ function RootLayout() {
   // ── Broadcast dashboard to ticker window via store ──
   useEffect(() => {
     if (dashboard) {
-      setStore("scrollr:dashboard", dashboard);
+      setStore("scrollr:dashboard", dashboardToSave(dashboard));
     }
   }, [dashboard]);
 
