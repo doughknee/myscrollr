@@ -793,6 +793,28 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		return fmt.Errorf("read logto email: %w", err)
 	}
 
+	// The cascade's transaction opens here, before anything irreversible,
+	// and locks the request row: this is the last point where a cancel can
+	// still be honoured. A cancel that landed since the scan is seen now and
+	// stops the purge; one that arrives from here on waits on the row lock
+	// and, once the purge commits, finds nothing pending and answers 404
+	// instead of a "canceled" that is no longer true.
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	var stillPending bool
+	if err := tx.QueryRow(ctx, `
+		SELECT true FROM user_deletion_requests
+		 WHERE logto_sub = $1 AND status = 'pending' FOR UPDATE`, logtoSub,
+	).Scan(&stillPending); errors.Is(err, pgx.ErrNoRows) {
+		log.Printf("[GDPR Purge] %s no longer pending (canceled); skipped", logtoSub)
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("lock deletion request: %w", err)
+	}
+
 	// A subscription started during the grace period would keep charging an
 	// account nobody can sign in to: cancel it at Stripe while the billing row
 	// still names the customer. This runs before the Logto delete and is safe
@@ -811,12 +833,7 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	// effort: GitHub being down must not block a purge).
 	githubapp.RevokeGrant(ctx, logtoSub)
 
-	// Step 2: Local DB cascade in a transaction.
-	tx, err := platform.DBPool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
+	// Step 2: Local DB cascade, in the transaction opened above.
 	if err := lockAccountMutation(ctx, tx, logtoSub); err != nil {
 		return fmt.Errorf("lock account mutation: %w", err)
 	}

@@ -5,12 +5,14 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -34,18 +36,10 @@ func ConnectDB() {
 		databaseURL = strings.Replace(databaseURL, "postgresql:", "postgresql://", 1)
 	}
 
-	config, err := pgxpool.ParseConfig(databaseURL)
+	config, err := poolConfig(databaseURL)
 	if err != nil {
 		log.Fatalf("Unable to parse DATABASE_URL (redacted)")
 	}
-
-	config.MaxConns = DBMaxConns
-	config.MinConns = DBMinConns
-	config.MaxConnIdleTime = DBMaxConnIdleTime
-	// Cap individual connection attempts at 5 seconds. Without this, a
-	// transient Postgres blip lets requests pile up behind indefinitely
-	// pending connection dials — the default is effectively unbounded.
-	config.ConnConfig.ConnectTimeout = 5 * time.Second
 
 	var pool *pgxpool.Pool
 	retries := DBMaxRetries
@@ -120,6 +114,35 @@ func ConnectDB() {
 	// Best-effort initial prune so the table doesn't sit with stale rows
 	// until the first periodic tick fires. Errors are logged inside.
 	pruneWebhookEvents(context.Background())
+}
+
+// poolConfig is the DBPool configuration for a normalised DATABASE_URL.
+func poolConfig(databaseURL string) (*pgxpool.Config, error) {
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	config.MaxConns = DBMaxConns
+	config.MinConns = DBMinConns
+	config.MaxConnIdleTime = DBMaxConnIdleTime
+	// Cap individual connection attempts at 5 seconds. Without this, a
+	// transient Postgres blip lets requests pile up behind indefinitely
+	// pending connection dials — the default is effectively unbounded.
+	config.ConnConfig.ConnectTimeout = 5 * time.Second
+	config.AfterConnect = setStatementTimeout
+	return config, nil
+}
+
+// setStatementTimeout applies DBStatementTimeout to a new pool connection. It
+// is a SET after connecting rather than a startup-packet runtime parameter so
+// that it cannot stop a connection from opening (a pooler may reject unknown
+// startup parameters); a failure is logged and the connection is still used.
+func setStatementTimeout(ctx context.Context, conn *pgx.Conn) error {
+	ms := strconv.FormatInt(DBStatementTimeout.Milliseconds(), 10)
+	if _, err := conn.Exec(ctx, "SET statement_timeout = "+ms); err != nil {
+		log.Printf("[Database] set statement_timeout: %v", err)
+	}
+	return nil
 }
 
 // isLoopbackDB reports whether a Postgres URL points at this machine, where

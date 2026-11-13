@@ -93,3 +93,23 @@ func TestSubscribeUserToTopics_RetriesFailedLoad(t *testing.T) {
 		t.Fatal("user was not subscribed after the retry succeeded")
 	}
 }
+
+// The shared secret is compared in constant time; a wrong or partial bearer
+// is still refused before anything is parsed.
+func TestSequinWebhook_RejectsWrongSecret(t *testing.T) {
+	t.Setenv("SEQUIN_WEBHOOK_SECRET", "s3cret")
+	app := fiber.New()
+	app.Post("/webhooks/sequin", HandleSequinWebhook)
+	for _, auth := range []string{"", "Bearer s3cre", "Bearer s3cretX", "s3cret"} {
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/sequin", strings.NewReader(tradeBody))
+		req.Header.Set("Authorization", auth)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("Authorization %q: want 401, got %d", auth, resp.StatusCode)
+		}
+	}
+}

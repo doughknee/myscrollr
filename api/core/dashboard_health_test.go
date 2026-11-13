@@ -87,7 +87,7 @@ func TestDashboardDatabaseErrorIsNotAnEmptyAccount(t *testing.T) {
 }
 
 // RB-1 / SCROLLR-367: liveness is the process alone; readiness is Postgres
-// and Redis only.
+// only. B2-6: Redis is reported in the readiness body but never fails it.
 func TestProbesDoNotDependOnIngesters(t *testing.T) {
 	if !testsupport.DBAvailable(t) {
 		return
@@ -123,8 +123,17 @@ func TestProbesDoNotDependOnIngesters(t *testing.T) {
 	if got := get("/health/live"); got != fiber.StatusOK {
 		t.Fatalf("/health/live with Redis down: got %d, want 200", got)
 	}
-	if got := get("/health/ready"); got != fiber.StatusServiceUnavailable {
-		t.Fatalf("/health/ready with Redis down: got %d, want 503", got)
+	resp, err := s.App.Test(httptest.NewRequest("GET", "/health/ready", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var ready map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&ready); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK || ready["redis"] != "unhealthy" {
+		t.Fatalf("/health/ready with Redis down: got %d %v, want 200 with redis unhealthy", resp.StatusCode, ready)
 	}
 }
 
