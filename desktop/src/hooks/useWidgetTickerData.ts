@@ -73,6 +73,23 @@ const EMPTY: WidgetTickerData = {
 
 // ── Time formatting helpers ─────────────────────────────────────
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * One formatter per locale, zone and option set. Constructing one costs far
+ * more than formatting with it, and the clock rebuilds every chip each second
+ * (four formatters per zone). A bad zone throws before it is stored.
+ */
+export function formatterFor(locale: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(opts)}`;
+  let f = formatters.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, opts);
+    formatters.set(key, f);
+  }
+  return f;
+}
+
 function formatTime(
   date: Date,
   tz: string | undefined,
@@ -84,7 +101,7 @@ function formatTime(
     hour12: format === "12h",
     ...(tz ? { timeZone: tz } : {}),
   };
-  return new Intl.DateTimeFormat("en-US", opts).format(date);
+  return formatterFor("en-US", opts).format(date);
 }
 
 /**
@@ -97,7 +114,7 @@ function formatTime(
  * again. The offset is the one that is unambiguous; the name goes.
  */
 function formatDetail(date: Date, tz: string | undefined): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return formatterFor("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -188,7 +205,7 @@ function formatEndTime(ts: number): string {
 function isNightIn(now: Date, tz: string | undefined): boolean {
   try {
     const hour = Number(
-      new Intl.DateTimeFormat("en-US", {
+      formatterFor("en-US", {
         hour: "numeric",
         hour12: false,
         timeZone: tz,
@@ -206,7 +223,7 @@ function isNightIn(now: Date, tz: string | undefined): boolean {
 /** "UTC-4" for the detail row. Empty when the zone can't be resolved. */
 function utcOffsetLabel(now: Date, tz: string | undefined): string {
   try {
-    const parts = new Intl.DateTimeFormat("en-US", {
+    const parts = formatterFor("en-US", {
       timeZone: tz,
       timeZoneName: "shortOffset",
     }).formatToParts(now);
