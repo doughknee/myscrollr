@@ -12,7 +12,7 @@
  *   - Description copy matches state.
  */
 import { describe, it, expect, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { useDeliveryHealth } from "./useDeliveryHealth";
@@ -69,10 +69,25 @@ function setupHook(args: {
 describe("useDeliveryHealth — state machine", () => {
   const NOW = 1_700_000_000_000;
 
-  it("returns offline when no data has ever loaded", () => {
+  // SCROLLR-464: "no data yet" is not "offline". While the first load is
+  // going the chip says it is connecting; only a failed load is a failure.
+  it("says connecting while the first load is still going", () => {
     const { result } = setupHook({ now: NOW });
-    expect(result.current.state).toBe("offline");
+    expect(result.current.state).toBe("connecting");
+    expect(result.current.label).toBe("Connecting");
     expect(result.current.ageMs).toBeNull();
+  });
+
+  it("says it can't load after a failed first load, not offline", async () => {
+    const { wrapper } = buildHarness({});
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    const { result } = renderHook(
+      () => useDeliveryHealth({ deliveryMode: "polling", now: NOW }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.state).toBe("failed"));
+    expect(result.current.label).toBe("Can't load");
+    vi.unstubAllGlobals();
   });
 
   it("returns offline when last update was >5 minutes ago", () => {
@@ -182,7 +197,10 @@ describe("useDeliveryHealth — descriptions", () => {
   // limit. The state-machine block asserts the replacement copy.
 
   it("describes the offline state as a connection problem", () => {
-    const { result } = setupHook({});
+    const { result } = setupHook({
+      now: 1_700_000_000_000,
+      dataUpdatedAt: 1_700_000_000_000 - 6 * 60_000,
+    });
     expect(result.current.description.toLowerCase()).toMatch(/no connection|network/);
   });
 });

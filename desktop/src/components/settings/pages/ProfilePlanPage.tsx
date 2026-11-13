@@ -104,7 +104,11 @@ export default function ProfilePlanPage({
 
   const jwtIdentity = authenticated ? getUserIdentity() : null;
 
-  const { data: overview } = useQuery({
+  const {
+    data: overview,
+    isError: overviewFailed,
+    refetch: refetchOverview,
+  } = useQuery({
     ...userOverviewQueryOptions(),
     enabled: authenticated,
   });
@@ -279,23 +283,43 @@ export default function ProfilePlanPage({
       {/* ── Profile ────────────────────────────────────────── */}
       <SettingsGroup label="Profile">
         <RowList>
-          <Row id="displayName">
-            <ProfileField
-              label={R.displayName.label}
-              value={overview?.identity.name ?? ""}
-              placeholder="Add a display name"
-              onSave={(next) => handleProfileSave({ name: next }, "Display name")}
-            />
-          </Row>
-          <Row id="email">
-            <ProfileField
-              label={R.email.label}
-              type="email"
-              value={overview?.identity.email ?? ""}
-              placeholder="you@example.com"
-              onSave={async (next) => setPendingEmail(next)}
-            />
-          </Row>
+          {/* The editable fields hold the server's copy. Until it has loaded
+              they would read as an empty profile (and a save would write over
+              one the user cannot see), so they wait (UD-10). */}
+          {overview ? (
+            <>
+              <Row id="displayName">
+                <ProfileField
+                  label={R.displayName.label}
+                  value={overview.identity.name ?? ""}
+                  placeholder="Add a display name"
+                  onSave={(next) => handleProfileSave({ name: next }, "Display name")}
+                />
+              </Row>
+              <Row id="email">
+                <ProfileField
+                  label={R.email.label}
+                  type="email"
+                  value={overview.identity.email ?? ""}
+                  placeholder="you@example.com"
+                  onSave={async (next) => setPendingEmail(next)}
+                />
+              </Row>
+            </>
+          ) : overviewFailed ? (
+            <Row id="displayName">
+              <ActionRow
+                label="Couldn’t load your profile"
+                description="Your name and email can’t be edited until it loads."
+                action="Try again"
+                onClick={() => void refetchOverview()}
+              />
+            </Row>
+          ) : (
+            <Row id="displayName">
+              <DisplayRow label="Profile" value="Loading…" />
+            </Row>
+          )}
           <Row id="password">
             <ActionRow
               label={R.password.label}

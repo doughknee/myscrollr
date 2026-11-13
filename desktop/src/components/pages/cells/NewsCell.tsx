@@ -64,7 +64,10 @@ const NewsCell = memo(function NewsCell({ item, now, line, expanded = false, onC
         className={clsx(
           "min-w-0 self-start text-left font-sans font-semibold text-fg",
           expanded ? "line-clamp-3 text-[18px] leading-[22px]" : "text-[15px] leading-[19px]",
-          !expanded && (line ? "truncate" : "line-clamp-2"),
+          // A URL or a long token breaks inside the lines reserved for it
+          // (SCROLLR-413); the pin's one line keeps its ellipsis.
+          !expanded && (line ? "truncate" : "line-clamp-2 [overflow-wrap:anywhere]"),
+          expanded && "[overflow-wrap:anywhere]",
         )}
       >
         {plainText(item.title)}
@@ -77,7 +80,7 @@ const NewsCell = memo(function NewsCell({ item, now, line, expanded = false, onC
         >
           {age(item, now)}
         </span>
-        <span data-part="summary" className={clsx("min-w-0 text-left font-sans text-fg-3", expanded ? "line-clamp-3" : "truncate")}>
+        <span data-part="summary" className={clsx("min-w-0 text-left font-sans text-fg-3", expanded ? "line-clamp-3 [overflow-wrap:anywhere]" : "truncate")}>
           {(!line && summary) || item.source_name}
         </span>
       </span>

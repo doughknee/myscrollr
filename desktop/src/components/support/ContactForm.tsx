@@ -59,7 +59,7 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
 ];
 
 const CATEGORY_SUBTITLES: Record<Category, string> = {
-  bug: "Describe the issue and we'll include diagnostics automatically",
+  bug: "Describe the issue. System diagnostics are added when they can be collected",
   feature: "Tell us what you'd like to see in Scrollr",
   feedback: "Share your thoughts and suggestions",
   billing: "Questions about charges, plan changes, or cancellations",
@@ -176,6 +176,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // One send at a time: `submitting` only reaches the next render, so a double
+  // click or Enter plus click could start two before the button disables (RC-14).
+  const inFlight = useRef(false);
+  // Why the last send did not go through, shown beside the button until the next try.
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // Auth state
   const authenticated = isAuthenticated();
@@ -265,9 +270,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || inFlight.current) return;
 
+    inFlight.current = true;
     setSubmitting(true);
+    setSendError(null);
 
     try {
       let payload: Record<string, unknown>;
@@ -341,8 +348,18 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         startCooldown(60);
         return;
       }
-      toast.error(`Failed to submit ${SUBMIT_LABELS[category].toLowerCase()} — please try again`);
+      // The server answered with a refusal: nothing was created. No answer at
+      // all (the 15 s deadline, a dropped connection) or a 5xx: it may have
+      // been created, and sending again could make a second ticket (RC-14).
+      // Either way the text stays in the form.
+      const unknown = !(err instanceof ApiError) || err.status >= 500;
+      const message = unknown
+        ? "We couldn’t confirm this was sent, and it may have arrived. Check your email for a confirmation before sending it again. Your text is still here."
+        : "This wasn’t sent. Your text is still here, so you can try again.";
+      setSendError(message);
+      toast.error(unknown ? "Couldn’t confirm your message was sent" : "Couldn’t send your message");
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -545,7 +562,9 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               <summary className="text-xs font-medium text-fg-3 cursor-pointer hover:text-fg-2 select-none">
                 {diagnosticsLoading
                   ? "Collecting system diagnostics..."
-                  : "System diagnostics will be included"}
+                  : diagnostics
+                    ? "System diagnostics will be included"
+                    : "System diagnostics could not be collected"}
               </summary>
               <div className="mt-2">
                 {diagnosticsLoading ? (
@@ -559,7 +578,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                   </pre>
                 ) : (
                   <p className="text-xs text-fg-4 py-2">
-                    Diagnostics could not be collected.
+                    Your report will be sent without them.
                   </p>
                 )}
               </div>
@@ -664,6 +683,12 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               />
             </div>
           </>
+        )}
+
+        {sendError && (
+          <p role="alert" className="text-ui-meta text-error">
+            {sendError}
+          </p>
         )}
 
         {/* Submit */}

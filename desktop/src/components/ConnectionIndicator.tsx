@@ -15,4 +15,6 @@ export const DELIVERY_STATE_META: Record<
   polling: { icon: RefreshCw, text: "text-accent", bg: "bg-accent/10" },
   stale: { icon: Clock, text: "text-warning", bg: "bg-warning/10" },
   offline: { icon: WifiOff, text: "text-error", bg: "bg-error/10" },
+  connecting: { icon: RefreshCw, text: "text-fg-3", bg: "bg-surface-hover" },
+  failed: { icon: WifiOff, text: "text-error", bg: "bg-error/10" },
 };
