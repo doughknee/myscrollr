@@ -12,7 +12,7 @@ vi.mock("../../api/client", async (importActual) => ({
   authFetch: (...a: unknown[]) => authFetch(...a),
   request: (...a: unknown[]) => publicRequest(...a),
 }));
-vi.mock("../../auth", () => ({ getUserIdentity: () => ({}), isAuthenticated: () => session.signedIn }));
+vi.mock("../../auth", () => ({ getUserIdentity: () => ({}), isSignedOut: () => !session.signedIn }));
 
 import ContactForm from "./ContactForm";
 import { ApiError } from "../../api/client";
@@ -114,6 +114,32 @@ describe("ContactForm signed out (D3-1)", () => {
     expect(JSON.parse(init.body).message).toContain("Account & Login");
   });
 
+  it("keeps a user with a stored session on the signed-in route (D4-1)", async () => {
+    session.signedIn = true;
+    authFetch.mockResolvedValue({});
+    render(<ContactForm onBack={() => {}} />);
+    expect(screen.queryByLabelText("Email address")).toBeNull();
+    fill();
+    fireEvent.submit(form());
+    await waitFor(() => expect(authFetch).toHaveBeenCalledTimes(1));
+    expect(publicRequest).not.toHaveBeenCalled();
+  });
+
+  it("measures the public limits in bytes (D4-2)", async () => {
+    session.signedIn = false;
+    publicRequest.mockResolvedValue({});
+    render(<ContactForm onBack={() => {}} />);
+    fireEvent.click(screen.getByText("Account & Login"));
+    fireEvent.change(screen.getByLabelText("Describe your account issue"), { target: { value: "я".repeat(120) } });
+    fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "me@example.com" } });
+    fireEvent.submit(form());
+    await waitFor(() => expect(publicRequest).toHaveBeenCalledTimes(1));
+    const subject = JSON.parse(publicRequest.mock.calls[0][1].body).subject as string;
+    expect(new TextEncoder().encode(subject).length).toBeLessThanOrEqual(200);
+    fireEvent.change(screen.getByLabelText("Describe your account issue"), { target: { value: "я".repeat(2600) } });
+    expect(screen.getByText(/too long to send without signing in/)).toBeInTheDocument();
+  });
+
   it("does not offer attachments or diagnostics it cannot send", () => {
     session.signedIn = false;
     render(<ContactForm onBack={() => {}} />);
@@ -151,5 +177,6 @@ describe("ContactForm attachments (D3-2, D3-16)", () => {
     fireEvent.click(screen.getByText("Sometimes"));
     expect(screen.getByText("Sometimes")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Always")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Bug Report")).toHaveAttribute("aria-pressed", "true");
   });
 });

@@ -13,7 +13,7 @@ import clsx from "clsx";
 import { toast } from "sonner";
 import { authFetch, request, ApiError } from "../../api/client";
 import { SelectMenu } from "../widget-bar/SelectMenu";
-import { getUserIdentity, isAuthenticated } from "../../auth";
+import { getUserIdentity, isSignedOut } from "../../auth";
 import { getCatalogItems } from "../../marketplace";
 import { useCatalog } from "../../hooks/useCatalog";
 import LoadingGlyph from "../LoadingGlyph";
@@ -126,6 +126,18 @@ const PUBLIC_CATEGORY: Record<Category, string> = {
 };
 const PUBLIC_MESSAGE_MIN = 10;
 const PUBLIC_MESSAGE_MAX = 5000;
+// The public route counts bytes (Go `len`), so the form must too.
+const byteLength = (s: string) => new TextEncoder().encode(s).length;
+function clipBytes(s: string, max: number) {
+  let out = "";
+  let n = 0;
+  for (const ch of s) {
+    n += byteLength(ch);
+    if (n > max) break;
+    out += ch;
+  }
+  return out;
+}
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const TOO_LARGE_MESSAGE = `This wasn’t sent because it was too large. Remove an attachment, or use a smaller one (the limit is ${formatMB(MAX_TOTAL_BYTES)} in total). Your text is still here.`;
@@ -205,7 +217,8 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   const [sendError, setSendError] = useState<string | null>(null);
 
   // Auth state
-  const authenticated = isAuthenticated();
+  // Any stored session counts: authFetch refreshes a lapsed token itself.
+  const authenticated = !isSignedOut();
   const uid = useId();
   const id = (name: string) => `${uid}-${name}`;
   const [fileError, setFileError] = useState<string | null>(null);
@@ -305,10 +318,10 @@ export default function ContactForm({ onBack }: ContactFormProps) {
     ? null
     : !EMAIL_PATTERN.test(email.trim())
       ? "Enter the email address we should reply to."
-      : publicMessage.length < PUBLIC_MESSAGE_MIN && description.trim().length > 0
+      : byteLength(publicMessage) < PUBLIC_MESSAGE_MIN && description.trim().length > 0
         ? `Write at least ${PUBLIC_MESSAGE_MIN} characters so we can help.`
-        : publicMessage.length > PUBLIC_MESSAGE_MAX
-          ? `That is too long to send without signing in (${PUBLIC_MESSAGE_MAX} characters at most).`
+        : byteLength(publicMessage) > PUBLIC_MESSAGE_MAX
+          ? `That is too long to send without signing in (about ${PUBLIC_MESSAGE_MAX} letters at most, fewer in languages that use accents or other scripts).`
           : null;
 
   const canSubmit = (() => {
@@ -405,7 +418,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           body: JSON.stringify({
             email: email.trim(),
             category: PUBLIC_CATEGORY[category],
-            subject: `${label}: ${firstLine}`.slice(0, 200),
+            subject: clipBytes(`${label}: ${firstLine}`, 200),
             message: publicMessage,
             name: name.trim() || undefined,
           }),
@@ -499,6 +512,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                 key={opt.value}
                 type="button"
                 onClick={() => setCategory(opt.value)}
+                aria-pressed={category === opt.value}
                 className={clsx(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-ui-chip font-medium cursor-pointer border",
                   category === opt.value
