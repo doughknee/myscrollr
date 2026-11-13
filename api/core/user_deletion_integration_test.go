@@ -47,7 +47,8 @@ func setupIntegrationDB(t *testing.T) {
 		testsupport.SharedMiniRedis.FlushAll()
 	}
 	_, err := platform.DBPool.Exec(context.Background(), `
-		TRUNCATE TABLE product_analytics_enrollments, user_widgets, user_preferences, stripe_customers,
+		TRUNCATE TABLE support_messages, support_drafts, support_cases, support_ticket_threads,
+		               osticket_message_ids, business_leads, product_analytics_enrollments, user_widgets, user_preferences, stripe_customers,
 		               stripe_webhook_events, user_deletion_requests, github_connections,
 		               user_custom_feeds, tracked_feeds CASCADE
 	`)
@@ -65,6 +66,7 @@ type logtoStub struct {
 	assigned   []string
 	removed    []string
 	failDelete bool
+	emails     map[string]string // sub -> verified primary email; absent = 404
 }
 
 func (s *logtoStub) deletedSubs() []string {
@@ -116,6 +118,17 @@ func newLogtoStub(t *testing.T) *logtoStub {
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
+		// GET /api/users/{sub} — account read (verified primary email)
+		case len(parts) == 1 && r.Method == http.MethodGet:
+			s.mu.Lock()
+			email, ok := s.emails[parts[0]]
+			s.mu.Unlock()
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": parts[0], "primaryEmail": email, "isSuspended": false})
 		// POST /api/users/{sub}/roles — assign roles
 		case len(parts) == 2 && parts[1] == "roles" && r.Method == http.MethodPost:
 			var body struct {
@@ -467,5 +480,76 @@ func TestIntegrationStripeWebhookIdempotency(t *testing.T) {
 
 	if n := queryCount(t, `SELECT count(*) FROM stripe_webhook_events WHERE event_id = $1`, "evt_integration_dup"); n != 1 {
 		t.Errorf("idempotency rows for replayed event = %d, want 1", n)
+	}
+}
+
+// SCROLLR-453: the purge removes the account's support history, matched by sub
+// or by the Logto-verified email, and touches nobody else's.
+func TestIntegrationPurgeRemovesSupportData(t *testing.T) {
+	setupIntegrationDB(t)
+	stub := newLogtoStub(t)
+	const sub, other = "support-purge-owner", "support-purge-other"
+	stub.emails = map[string]string{sub: "Owner@Example.com"}
+	seedPurgeableUser(t, sub, false)
+	ctx := context.Background()
+	testsupport.MustExec(t, `TRUNCATE support_messages, support_drafts, support_cases, support_ticket_threads, osticket_message_ids, business_leads CASCADE`)
+
+	// Mine: one by sub (address differs), one by verified email (different case, no sub),
+	// each with a message, a draft, a thread copy and a mail id.
+	// Decoys: another address, a look-alike address, and the same address stamped with another account.
+	for _, c := range []struct{ ticket, email, sub string }{
+		{"T-SUB", "elsewhere@example.com", sub},
+		{"T-MAIL", "owner@EXAMPLE.com", ""},
+		{"T-OTHER", "someone@example.com", ""},
+		{"T-LOOK", "owner@example.com.evil.test", ""},
+		{"T-LOOK2", "xowner@example.com", ""},
+		{"T-OTHERSUB", "owner@example.com", other},
+	} {
+		testsupport.MustExec(t, `INSERT INTO support_cases (ticket_number,user_email,logto_sub,subject,summary,category,status,account_source,contact_source,discord_thread_id)
+			VALUES ($1,$2,NULLIF($3,''),'Secret subject','Secret summary','bug','open','authenticated','form','thr-'||$1)`, c.ticket, c.email, c.sub)
+		testsupport.MustExec(t, `INSERT INTO support_drafts (ticket_number,user_email,original_subject,draft_body_html,status) VALUES ($1,$2,'s','<p>draft</p>','pending')`, c.ticket, c.email)
+		testsupport.MustExec(t, `INSERT INTO support_messages (ticket_number,kind,body_text) VALUES ($1,'user','hello')`, c.ticket)
+		testsupport.MustExec(t, `INSERT INTO support_ticket_threads (ticket_number,discord_thread_id,channel_id) VALUES ($1,'thr-'||$1,'chan')`, c.ticket)
+		testsupport.MustExec(t, `INSERT INTO osticket_message_ids (ticket_number,message_id,recipient_email,direction) VALUES ($1,'<'||$1||'@x>',$2,'outbound_ai')`, c.ticket, c.email)
+	}
+	// A draft with no case row, from the verified address.
+	testsupport.MustExec(t, `INSERT INTO support_drafts (ticket_number,user_email,original_subject,draft_body_html,status) VALUES ('T-ORPHAN','OWNER@example.com','s','x','skipped')`)
+	for _, e := range []string{"owner@example.com", "OWNER@example.com.evil.test", "other@example.com"} {
+		testsupport.MustExec(t, `INSERT INTO business_leads (name,email,company,use_case,message) VALUES ('N',$1,'C','U','M')`, e)
+	}
+
+	if err := accounts.PurgeUserAccount(ctx, sub); err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+
+	mine := `('T-SUB','T-MAIL','T-ORPHAN')`
+	decoys := `('T-OTHER','T-LOOK','T-LOOK2','T-OTHERSUB')`
+	for _, tbl := range []string{"support_messages", "support_drafts", "support_ticket_threads", "osticket_message_ids"} {
+		if n := queryCount(t, `SELECT count(*) FROM `+tbl+` WHERE ticket_number IN `+mine); n != 0 {
+			t.Errorf("%s: %d of the account's rows survive", tbl, n)
+		}
+		if n := queryCount(t, `SELECT count(*) FROM `+tbl+` WHERE ticket_number IN `+decoys); n != 4 {
+			t.Errorf("%s: decoy rows = %d, want 4", tbl, n)
+		}
+	}
+	// Cases survive as anonymous counters, dismissed, with nothing identifying.
+	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number IN ('T-SUB','T-MAIL')
+		AND user_email IS NULL AND user_name IS NULL AND logto_sub IS NULL AND subject='' AND summary IS NULL
+		AND discord_thread_id IS NULL AND account_source IS NULL AND contact_source IS NULL
+		AND console_status='dismissed' AND category='bug'`); n != 2 {
+		t.Errorf("anonymised cases = %d, want 2", n)
+	}
+	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number IN `+decoys+`
+		AND subject='Secret subject' AND summary='Secret summary' AND console_status='' AND user_email IS NOT NULL`); n != 4 {
+		t.Errorf("decoy cases changed: %d unchanged, want 4", n)
+	}
+	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number='T-OTHERSUB' AND logto_sub=$1`, other); n != 1 {
+		t.Error("another account's case lost its sub")
+	}
+	if n := queryCount(t, `SELECT count(*) FROM business_leads WHERE lower(email)='owner@example.com'`); n != 0 {
+		t.Error("account's business lead survives")
+	}
+	if n := queryCount(t, `SELECT count(*) FROM business_leads`); n != 2 {
+		t.Errorf("decoy leads = %d, want 2", n)
 	}
 }

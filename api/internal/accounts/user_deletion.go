@@ -94,6 +94,19 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export custom feeds"})
 	}
 	archive["custom_feeds"] = customFeeds
+	// Support history (SCROLLR-453): cases and replies, and any business lead,
+	// tied to this account by its sub or its Logto-verified email.
+	email, err := verifiedAccountEmail(userID)
+	if err != nil {
+		log.Printf("[Export] verified email for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export support history"})
+	}
+	supportExport, err := loadSupportExport(ctx, userID, email)
+	if err != nil {
+		log.Printf("[Export] support history for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export support history"})
+	}
+	archive["support"] = supportExport
 	if actor := platform.HashUserSub(userID); actor != "" {
 		var audit json.RawMessage
 		if err := platform.DBPool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -163,6 +176,128 @@ func HandleExportUserData(c *fiber.Ctx) error {
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	return c.JSON(archive)
+}
+
+// ─── Support history (SCROLLR-453) ──────────────────────────────────
+
+// verifiedAccountEmail returns the primary email Logto holds for the account.
+// Logto only sets it on an address the user proved they control, so it is the
+// one address that may tie email-keyed support rows to this account; the JWT
+// claim and anything a form submitted are not. A suspended account keeps its
+// address (it is still the person's data). "" means Logto has no such user or
+// no email.
+func verifiedAccountEmail(logtoSub string) (string, error) {
+	user, err := GetLogtoUser(logtoSub)
+	if err != nil || user == nil {
+		return "", err
+	}
+	return user.PrimaryEmail, nil
+}
+
+type rowQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+// accountSupportTickets lists the account's support tickets. A case is the
+// account's when it carries the account's logto_sub, or when it carries no sub
+// at all and its address equals the verified email (case-insensitive, whole
+// string). A case stamped with a different sub is never taken by email. A draft
+// with no case row at all is matched by address the same way.
+func accountSupportTickets(ctx context.Context, q rowQuerier, logtoSub, email string) ([]string, error) {
+	rows, err := q.Query(ctx, `
+		SELECT ticket_number FROM support_cases
+		 WHERE logto_sub = $1
+		    OR ($2 <> '' AND logto_sub IS NULL AND lower(user_email) = lower($2))
+		UNION
+		SELECT d.ticket_number FROM support_drafts d
+		 WHERE $2 <> '' AND lower(d.user_email) = lower($2)
+		   AND NOT EXISTS (SELECT 1 FROM support_cases c WHERE c.ticket_number = d.ticket_number)`,
+		logtoSub, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tickets := []string{}
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		tickets = append(tickets, t)
+	}
+	return tickets, rows.Err()
+}
+
+// loadSupportExport returns the account's cases with the messages the user
+// wrote or was sent, and its business leads. Staff material (internal notes,
+// drafts that were never sent, model summaries and reasoning) is left out: it
+// is ours, not the user's.
+func loadSupportExport(ctx context.Context, logtoSub, email string) (map[string]any, error) {
+	tickets, err := accountSupportTickets(ctx, platform.DBPool, logtoSub, email)
+	if err != nil {
+		return nil, fmt.Errorf("find tickets: %w", err)
+	}
+	var cases, leads json.RawMessage
+	if err := platform.DBPool.QueryRow(ctx, `
+		SELECT COALESCE(jsonb_agg(jsonb_build_object(
+			'ticket_number', c.ticket_number, 'subject', c.subject, 'category', c.category,
+			'status', c.status, 'email', c.user_email, 'name', c.user_name,
+			'app_version', c.app_version, 'os', c.os,
+			'opened_at', c.opened_at, 'closed_at', c.closed_at,
+			'messages', (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+					'from', CASE m.kind WHEN 'user' THEN 'you' ELSE 'scrollr' END,
+					'body', m.body_text, 'at', m.created_at) ORDER BY m.created_at, m.id), '[]'::jsonb)
+				FROM support_messages m
+				WHERE m.ticket_number = c.ticket_number AND m.kind IN ('user', 'sent'))
+		) ORDER BY c.opened_at, c.ticket_number), '[]'::jsonb)
+		FROM support_cases c WHERE c.ticket_number = ANY($1)`, tickets).Scan(&cases); err != nil {
+		return nil, fmt.Errorf("read cases: %w", err)
+	}
+	if err := platform.DBPool.QueryRow(ctx, `
+		SELECT COALESCE(jsonb_agg(jsonb_build_object(
+			'name', name, 'email', email, 'company', company, 'use_case', use_case,
+			'message', message, 'user_agent', user_agent, 'created_at', created_at)
+			ORDER BY created_at, id), '[]'::jsonb)
+		FROM business_leads WHERE $1 <> '' AND lower(email) = lower($1)`, email).Scan(&leads); err != nil {
+		return nil, fmt.Errorf("read business leads: %w", err)
+	}
+	return map[string]any{"cases": cases, "business_leads": leads}, nil
+}
+
+// purgeSupportData removes what the account's support history says about the
+// person. Messages, drafts, the Discord thread copy, mail threading ids and
+// business leads are deleted. The case row stays as a counter (category,
+// status, app/OS, linked issue, dates) with every identifying field cleared,
+// and is dismissed so the bot never drafts to it again. Messages go before
+// drafts: support_messages.ai_draft_id references support_drafts.
+func purgeSupportData(ctx context.Context, tx pgx.Tx, logtoSub, email string) error {
+	tickets, err := accountSupportTickets(ctx, tx, logtoSub, email)
+	if err != nil {
+		return fmt.Errorf("find support tickets: %w", err)
+	}
+	if len(tickets) > 0 {
+		for _, q := range []struct{ what, sql string }{
+			{"delete support messages", `DELETE FROM support_messages WHERE ticket_number = ANY($1)`},
+			{"delete support drafts", `DELETE FROM support_drafts WHERE ticket_number = ANY($1)`},
+			{"delete support thread copies", `DELETE FROM support_ticket_threads WHERE ticket_number = ANY($1)`},
+			{"delete osticket message ids", `DELETE FROM osticket_message_ids WHERE ticket_number = ANY($1)`},
+			{"anonymise support cases", `UPDATE support_cases
+				   SET user_email = NULL, user_name = NULL, logto_sub = NULL, subject = '', summary = NULL,
+				       discord_thread_id = NULL, contact_source = NULL, contact_observed_at = NULL,
+				       account_source = NULL, console_status = 'dismissed'
+				 WHERE ticket_number = ANY($1)`},
+		} {
+			if _, err := tx.Exec(ctx, q.sql, tickets); err != nil {
+				return fmt.Errorf("%s: %w", q.what, err)
+			}
+		}
+	}
+	if email != "" {
+		if _, err := tx.Exec(ctx, `DELETE FROM business_leads WHERE lower(email) = lower($1)`, email); err != nil {
+			return fmt.Errorf("delete business leads: %w", err)
+		}
+	}
+	return nil
 }
 
 func loadProductAnalyticsExport(ctx context.Context, userID string) (map[string]any, error) {
@@ -564,6 +699,15 @@ func RunGDPRPurgePass(ctx context.Context) {
 func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	log.Printf("[GDPR Purge] Starting purge for %s", logtoSub)
 
+	// Email-keyed support rows are matched on the address Logto verified, and
+	// Logto is about to forget it: read it first. A failed read aborts before
+	// anything is deleted, so the next pass retries. "" (account already gone
+	// from Logto after an earlier partial pass) matches by sub only.
+	email, err := verifiedAccountEmail(logtoSub)
+	if err != nil {
+		return fmt.Errorf("read logto email: %w", err)
+	}
+
 	// Step 1: Logto delete. Doing this first guarantees the user can't
 	// sign in even if the local cascade partially fails.
 	if err := DeleteLogtoUser(logtoSub); err != nil {
@@ -641,6 +785,10 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		`DELETE FROM github_connections WHERE logto_sub = $1`, logtoSub,
 	); err != nil {
 		return fmt.Errorf("delete github_connections: %w", err)
+	}
+
+	if err := purgeSupportData(ctx, tx, logtoSub, email); err != nil {
+		return err
 	}
 
 	// Catalog requests ("tell me when X ships") are keyed on the user.
