@@ -1,5 +1,4 @@
 use std::{sync::Arc, fs};
-use anyhow::Context;
 use bytes::BytesMut;
 use reqwest::Client;
 use tokio::sync::Mutex;
@@ -45,7 +44,15 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
     }
 
     let mut feeds = get_tracked_feeds(pool.clone()).await;
-    feeds.retain(|f| !in_backoff(f.consecutive_failures, cycle));
+    let (prev_ok, prev_failed) = {
+        let h = health_state.lock().await;
+        (h.feeds_polled, h.cycle_failures)
+    };
+    if mostly_failed(prev_ok, prev_failed) {
+        info!("Last cycle failed for {} of {} feeds; assuming our own outage and polling every feed this cycle", prev_failed, prev_ok + prev_failed);
+    } else {
+        feeds.retain(|f| !in_backoff(f.consecutive_failures, cycle));
+    }
 
     // On cycle 0 (startup) and every 288 cycles (~24 hours) afterwards, retry
     // quarantined feeds to see if they've recovered. Retrying at cycle 0 is
@@ -151,6 +158,14 @@ const MAX_BACKOFF_CYCLES: u64 = 12;
 /// a multiple of min(2^failures, 12), so a success (which resets the counter)
 /// puts it back on every cycle. Cycle 0 always polls everything. The cap
 /// divides 288, so quarantined feeds still get their daily retry.
+/// True when most of the previous cycle failed (more than half, from at least
+/// 5 feeds): that points at our own network, not at the feeds, so backoff is
+/// skipped for one cycle and everything recovers as fast as it did before.
+fn mostly_failed(ok: u64, failed: u64) -> bool {
+    let total = ok + failed;
+    total >= 5 && failed * 2 > total
+}
+
 fn in_backoff(failures: i32, cycle: u64) -> bool {
     if failures <= 0 {
         return false;
@@ -258,7 +273,7 @@ async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> a
     // counts it against the feed and records it in health.
     batch_upsert_rss_items(pool, articles)
         .await
-        .context("failed to store feed items")?;
+        .map_err(|e| anyhow::anyhow!("failed to store feed items: {e}"))?;
 
     Ok(count)
 }
@@ -285,6 +300,15 @@ fn strip_html_tags(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mostly_failed_detects_own_outage() {
+        assert!(!mostly_failed(0, 0)); // nothing polled yet
+        assert!(!mostly_failed(96, 1)); // healthy cycle, one bad feed
+        assert!(!mostly_failed(1, 1)); // too few to judge
+        assert!(!mostly_failed(5, 5)); // exactly half
+        assert!(mostly_failed(0, 97)); // everything failing
+    }
 
     #[test]
     fn test_in_backoff_grows_caps_and_resets() {
