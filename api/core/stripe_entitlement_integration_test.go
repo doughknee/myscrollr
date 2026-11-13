@@ -245,6 +245,7 @@ type subscribeStripeStub struct {
 	idempotencyKey string
 	trialRequested bool
 	canceled       []string
+	created        int
 }
 
 func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribeStripeStub {
@@ -252,8 +253,8 @@ func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribe
 	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/setup_intents/seti_1":
-			_, _ = w.Write([]byte(`{"id":"seti_1","object":"setup_intent","status":"succeeded",
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/setup_intents/"):
+			_, _ = w.Write([]byte(`{"id":"` + strings.TrimPrefix(r.URL.Path, "/v1/setup_intents/") + `","object":"setup_intent","status":"succeeded",
 				"payment_method":"pm_1","customer":"cus_subscribe","metadata":{"logto_sub":"` + logtoSub + `"}}`))
 		case r.URL.Path == "/v1/payment_methods/pm_1/attach":
 			_, _ = w.Write([]byte(`{"id":"pm_1","object":"payment_method"}`))
@@ -264,7 +265,9 @@ func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribe
 			s.mu.Lock()
 			s.idempotencyKey = r.Header.Get("Idempotency-Key")
 			s.trialRequested = strings.Contains(string(form), "trial_period_days")
+			s.created++
 			s.mu.Unlock()
+			time.Sleep(100 * time.Millisecond) // widen the window a second tab could race through
 			_, _ = w.Write([]byte(`{"id":"sub_new","object":"subscription","status":"` + subStatus + `"}`))
 		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v1/subscriptions/"):
 			s.mu.Lock()
@@ -280,10 +283,14 @@ func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribe
 }
 
 func postSubscribe(t *testing.T, sub string) (int, string) {
+	return postSubscribeWith(t, sub, "seti_1")
+}
+
+func postSubscribeWith(t *testing.T, sub, setupIntentID string) (int, string) {
 	t.Helper()
 	app := asUser(fiber.MethodPost, "/checkout/subscribe", sub, billing.HandleConfirmSubscription)
 	req := httptest.NewRequest(fiber.MethodPost, "/checkout/subscribe",
-		strings.NewReader(`{"setup_intent_id":"seti_1","price_id":"price_ultimate_monthly_t"}`))
+		strings.NewReader(`{"setup_intent_id":"`+setupIntentID+`","price_id":"price_ultimate_monthly_t"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, -1)
 	if err != nil {
@@ -336,8 +343,8 @@ func TestIntegrationSubscribeActiveGrantsWithIdempotencyKey(t *testing.T) {
 	if status != fiber.StatusOK {
 		t.Fatalf("status = %d (%s), want 200", status, body)
 	}
-	if stripeStub.idempotencyKey != "subscribe-seti_1" {
-		t.Errorf("Idempotency-Key = %q, want subscribe-seti_1", stripeStub.idempotencyKey)
+	if stripeStub.idempotencyKey != "subscribe-seti_1-price_ultimate_monthly_t" {
+		t.Errorf("Idempotency-Key = %q, want subscribe-seti_1-price_ultimate_monthly_t", stripeStub.idempotencyKey)
 	}
 	if len(stripeStub.canceled) != 0 {
 		t.Errorf("canceled at Stripe = %v, want none", stripeStub.canceled)
@@ -471,5 +478,43 @@ func TestIntegrationStripeCustomerReplacedOnlyWhenMissing(t *testing.T) {
 				t.Errorf("row = %+v, want cus_kept/canceled untouched", row)
 			}
 		})
+	}
+}
+
+// SCROLLR-465 B2-4: two tabs, each with its own SetupIntent, subscribe at the
+// same time. One subscription is created; the other tab gets the conflict.
+func TestIntegrationConcurrentSubscribesCreateOne(t *testing.T) {
+	setupIntegrationDB(t)
+	newLogtoStub(t)
+	setStripePriceEnv(t)
+	const sub = "user_two_tabs"
+	seedStripeCustomer(t, sub, "cus_subscribe", "free", "canceled", false)
+	stripeStub := newSubscribeStripeStub(t, sub, "active")
+
+	var wg sync.WaitGroup
+	statuses := make([]int, 2)
+	for i, seti := range []string{"seti_tab1", "seti_tab2"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			statuses[i], _ = postSubscribeWith(t, sub, seti)
+		}()
+	}
+	wg.Wait()
+
+	if stripeStub.created != 1 {
+		t.Errorf("subscriptions created at Stripe = %d, want 1", stripeStub.created)
+	}
+	ok, conflict := 0, 0
+	for _, st := range statuses {
+		switch st {
+		case fiber.StatusOK:
+			ok++
+		case fiber.StatusConflict:
+			conflict++
+		}
+	}
+	if ok != 1 || conflict != 1 {
+		t.Errorf("statuses = %v, want one 200 and one 409", statuses)
 	}
 }

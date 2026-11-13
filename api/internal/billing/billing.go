@@ -578,11 +578,31 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Re-check for active subscription (guards against concurrent tab race condition)
+	// One subscribe at a time per account: the check below, the Stripe calls
+	// and the upsert run under a transaction-scoped lock, so a second tab with
+	// its own SetupIntent waits, then sees the first tab's subscription and
+	// gets the conflict answer instead of creating a second one.
+	ctx := context.Background()
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		log.Printf("[Billing] Subscribe lock for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to create subscription",
+		})
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('subscribe:' || $1, 0))`, userID); err != nil {
+		log.Printf("[Billing] Subscribe lock for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to create subscription",
+		})
+	}
+
+	// Re-check for active subscription, under the lock.
 	var existingPlan string
 	var existingStatus string
 	var existingLifetime bool
-	err := platform.DBPool.QueryRow(context.Background(),
+	err = tx.QueryRow(ctx,
 		`SELECT plan, status, lifetime FROM stripe_customers WHERE logto_sub = $1`, userID,
 	).Scan(&existingPlan, &existingStatus, &existingLifetime)
 
@@ -677,10 +697,11 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 	if !hadPriorSub {
 		subParams.TrialPeriodDays = stripe.Int64(7)
 	}
-	// One subscription per confirmed SetupIntent: a double submit, a second
-	// tab or a client retry gets the first subscription back from Stripe
-	// instead of creating (and billing) another.
-	subParams.SetIdempotencyKey("subscribe-" + req.SetupIntentID)
+	// One subscription per confirmed SetupIntent and price: a double submit
+	// or a client retry gets the first subscription back from Stripe instead
+	// of creating (and billing) another. The price is in the key so a retry
+	// with another price is a new request, not an idempotency error.
+	subParams.SetIdempotencyKey("subscribe-" + req.SetupIntentID + "-" + req.PriceID)
 
 	sub, err := stripesubscription.New(subParams)
 	if err != nil {
@@ -706,8 +727,8 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Upsert DB record
-	_, err = platform.DBPool.Exec(context.Background(),
+	// Upsert DB record, then release the lock.
+	_, err = tx.Exec(ctx,
 		`INSERT INTO stripe_customers (logto_sub, stripe_customer_id, stripe_subscription_id, plan, status)
 		 VALUES ($1, $2, $3, $4, $5)
 		 ON CONFLICT (logto_sub) DO UPDATE SET
@@ -715,6 +736,9 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		   plan = $4, status = $5, updated_at = now()`,
 		userID, customerID, sub.ID, plan, subStatus,
 	)
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
 	if err != nil {
 		log.Printf("[Billing] Failed to upsert subscription record for %s: %v", userID, err)
 	}
