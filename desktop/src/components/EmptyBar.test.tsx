@@ -22,6 +22,19 @@ describe("EmptyBar", () => {
     }
   });
 
+  it("failed: says the data could not load, never 'no sources', and retries (SCROLLR-406)", () => {
+    for (const pages of [false, true]) {
+      const onRetry = vi.fn();
+      const { container, unmount } = render(<EmptyBar kind="failed" pages={pages} onRetry={onRetry} />);
+      expect(screen.getByText(/couldn.t load your sources/i)).toBeTruthy();
+      expect(screen.queryByText(/haven.t added any sources/i)).toBeNull();
+      expect(container.querySelector("[data-empty=failed]")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+      expect(onRetry).toHaveBeenCalledOnce();
+      unmount();
+    }
+  });
+
   it("installed-off: one quick-link per widget opens that widget", () => {
     const onOpenWidget = vi.fn();
     render(<EmptyBar kind="installedOff" pages installedWidgets={installed} onOpenWidget={onOpenWidget} />);

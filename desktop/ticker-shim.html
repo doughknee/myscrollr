@@ -48,6 +48,8 @@
                       its spare columns filled from the fixture's queue and
                       what shipped (?fixture=github is many).
     ?gh=<a,b>         quiet=HH:MM-HH:MM (quiet hours), -flash (the flash off).
+    ?starter=fail     POST /users/me/widgets/starter answers 500 (SCROLLR-448:
+                      the first-run starter failing must still leave a next step).
     ?weather=alert    only the alerted city, so the edge slot never rotates away
                       from the alert (the contrast spec reads it at rest).
 
@@ -312,6 +314,7 @@
         function reply(url, method) {
           if (method && method !== "GET") window.__shimRequests.push(method + " " + url);
           if (method === "POST" && /\/users\/me\/widgets\/starter/.test(url)) {
+            if (params.get("starter") === "fail") return Promise.resolve([500, '{"error":"starter failed"}']);
             return fixture.then(function (cur) {
               var applied = JSON.parse(cur[1]).preferences.default_widgets_applied === false;
               if (!applied) return [200, '{"applied":false,"widgets":[]}'];

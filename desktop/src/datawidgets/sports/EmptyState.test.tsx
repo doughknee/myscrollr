@@ -8,8 +8,8 @@
  * would not answer. These pin the answers, and the single-league phrasing
  * a per-league page (/widget/sports_mls) needs.
  */
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import SportsEmptyState from "./EmptyState";
 import type { LeagueMeta } from "../../api/queries";
 
@@ -26,6 +26,18 @@ function league(over: Partial<LeagueMeta> & { name: string }): LeagueMeta {
 const MARCH = new Date(Date.now() + 120 * 86_400_000).toISOString();
 
 describe("SportsEmptyState", () => {
+  it("a failed or pending read is never 'no leagues configured' (UD-7)", () => {
+    const onRetry = vi.fn();
+    const { unmount } = render(<SportsEmptyState leagues={[]} status="failed" onRetry={onRetry} />);
+    expect(screen.queryByText(/No leagues configured/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    unmount();
+    render(<SportsEmptyState leagues={[]} status="loading" />);
+    expect(screen.queryByText(/No leagues configured/i)).toBeNull();
+    expect(screen.getByText(/Loading scores/i)).toBeTruthy();
+  });
+
   it("names the league when only one is off-season", () => {
     render(<SportsEmptyState leagues={[league({ name: "MLS", is_offseason: true, next_game: MARCH })]} />);
     expect(screen.getByText(/MLS is off-season/i)).toBeTruthy();

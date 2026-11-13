@@ -82,3 +82,39 @@ test("[default] an account with the default already applied shows an NPR chip", 
   const npr = page.locator('.ticker-item [data-rotate-slot^="rss-news_npr-"]');
   await expect(npr.first()).toBeVisible();
 });
+
+/**
+ * SCROLLR-448 / SCROLLR-406: a signed-in account with no data source always
+ * has a next step, and a dashboard that could not load is never dressed up
+ * as an empty account.
+ */
+test("[fresh, starter fails, pages] the add-a-source step shows beside the Clock", async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.setViewportSize({ width: 1280, height: 80 });
+  // Default utils: the Clock is on, as on a fresh install.
+  await page.goto("/ticker-shim.html?fixture=fresh&pages=1&starter=fail");
+  await expect(page.getByText(CTA)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-edge]")).toContainText(/\d{1,2}:\d{2}/);
+  // The step sits in the page block, left of the edge, and is not cut off.
+  const button = (await page.getByRole("button", { name: /browse the catalog/i }).boundingBox())!;
+  const edge = (await page.locator("[data-edge]").boundingBox())!;
+  expect(button.x + button.width).toBeLessThanOrEqual(edge.x);
+});
+
+test("[empty, pages] a lone default Clock no longer hides the step", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 80 });
+  await page.goto("/ticker-shim.html?fixture=empty&pages=1");
+  await expect(page.getByText(CTA)).toBeVisible();
+  await expect(page.locator("[data-edge]")).toContainText(/\d{1,2}:\d{2}/);
+});
+
+for (const mode of ["pages=1", "pages=0"]) {
+  test(`[dashboard fails, ${mode}] says it could not load and offers a retry, not "no sources"`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 80 });
+    // An unknown fixture makes /dashboard answer 500.
+    await page.goto(`/ticker-shim.html?fixture=missing-on-purpose&${mode}`);
+    await expect(page.getByText("Couldn’t load your sources.")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(CTA)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /try again/i })).toBeVisible();
+  });
+}

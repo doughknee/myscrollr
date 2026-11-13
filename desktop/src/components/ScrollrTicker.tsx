@@ -81,6 +81,9 @@ interface ScrollrTickerProps {
   showSourcelessCTA?: boolean;
   /** Click handler for the sourceless CTA (opens the catalog). */
   onAddSources?: () => void;
+  /** No dashboard at all and the last load failed (SCROLLR-406): say so, offer `onRetry`. */
+  showFailedCTA?: boolean;
+  onRetry?: () => void;
   /**
    * When true, this row should render the "you have widgets installed
    * but none are currently on the ticker" CTA — a row of per-widget
@@ -273,6 +276,8 @@ export default function ScrollrTicker({
   widgetDisplay,
   showSourcelessCTA = false,
   onAddSources,
+  showFailedCTA = false,
+  onRetry,
   showInstalledOffCTA = false,
   installedWidgets = [],
   onOpenWidget,
@@ -608,11 +613,10 @@ export default function ScrollrTicker({
   // the user wonder what they're supposed to do next), render an empty
   // bar with a single inline CTA that opens the catalog. The decision
   // of *when* to show this is hoisted to App.tsx — see `showSourcelessCTA`.
-  const isSourceless =
-    !hasScrollingChips &&
-    !hasPinnedLeft &&
-    !hasPinnedRight &&
-    showSourcelessCTA;
+  // With no data widget the tape can only hold utilities, and App.tsx passes
+  // the flag only when those are the starter Clock at most and nothing is
+  // pinned: a lone clock is not a bar anyone chose (SCROLLR-448).
+  const isSourceless = showSourcelessCTA;
 
   // Installed-but-ticker-off CTA: signed-in user has widgets installed
   // but none are currently flagged for the ticker (every widget's
@@ -629,6 +633,7 @@ export default function ScrollrTicker({
 
   const containerClass = `ticker-container h-16 flex items-center bg-base-150 border-b border-edge/50 flex-shrink-0 relative w-full overflow-hidden`;
 
+  if (showFailedCTA) return <EmptyBar kind="failed" onRetry={onRetry} />;
   if (isSourceless) return <EmptyBar kind="sourceless" onAddSources={onAddSources} />;
   if (isInstalledButTickerOff) {
     return <EmptyBar kind="installedOff" installedWidgets={installedWidgets} onOpenWidget={onOpenWidget} />;

@@ -23,6 +23,7 @@ import { addConfigForWidget } from "../../marketplace";
 import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
 import { StandingsTab } from "./StandingsTab";
+import SportsEmptyState from "./EmptyState";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
 import WidgetStateTransition from "../../components/WidgetStateTransition";
 import FreshnessPill from "../../components/FreshnessPill";
@@ -99,7 +100,9 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   // Full widget page reads from /sports directly (not /dashboard), which
   // returns every game for the user's selected leagues without per-league
   // fair-share capping.
-  const { data: sportsData } = useQuery(sportsFullQueryOptions());
+  const { data: sportsData, isError, refetch } = useQuery(sportsFullQueryOptions());
+  // No answer yet, or a failed one: say that, never "no leagues" (UD-7).
+  const readStatus = sportsData ? undefined : isError ? ("failed" as const) : ("loading" as const);
   const games = useMemo(() => {
     const all = sportsData?.sports ?? [];
     return scopedLeague ? all.filter((g) => g.league === scopedLeague) : all;
@@ -166,6 +169,10 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               loadingNoun="scores"
               actionHint="pick your leagues"
             />
+          </div>
+        ) : readStatus && tab !== "standings" ? (
+          <div className="flex items-center justify-center py-12">
+            <SportsEmptyState leagues={[]} status={readStatus} onRetry={() => void refetch()} />
           </div>
         ) : (
           <>
