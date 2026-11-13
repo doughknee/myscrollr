@@ -37,8 +37,14 @@ export default function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
-    dialogRef.current?.showModal();
+    const dialog = dialogRef.current;
+    dialog?.showModal();
     cancelRef.current?.focus();
+    // AnimatePresence keeps the element in the top layer while it animates
+    // out, and everything behind a modal dialog is inert, so focus handed
+    // back at the end of the exit went nowhere (the Stable recovery cancel
+    // case). End the modal as soon as `open` turns false; the exit still plays.
+    return () => dialog?.close();
   }, [open]);
 
   return (
