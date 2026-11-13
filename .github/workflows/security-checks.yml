@@ -5,6 +5,10 @@ on:
     branches: [main, release/desktop-1.7]
   push:
     branches: [main, release/desktop-1.7]
+  # Advisories are published while nobody pushes; a failed scheduled run emails the owner.
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
