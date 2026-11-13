@@ -149,7 +149,7 @@ jobs:
               echo "has_linux=false" >> "$GITHUB_OUTPUT"
               ;;
             macos)
-              echo 'matrix={"include":[{"platform":"macos-14","rust_target":"aarch64-apple-darwin","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
+              echo 'matrix={"include":[{"platform":"macos-15","rust_target":"aarch64-apple-darwin","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
               echo "has_linux=false" >> "$GITHUB_OUTPUT"
               ;;
             linux)
@@ -157,7 +157,7 @@ jobs:
               echo "has_linux=true" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo 'matrix={"include":[{"platform":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu","tauri_args":""},{"platform":"windows-latest","rust_target":"x86_64-pc-windows-msvc","tauri_args":"--config src-tauri/tauri.windows-signing.conf.json"},{"platform":"macos-14","rust_target":"aarch64-apple-darwin","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
+              echo 'matrix={"include":[{"platform":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu","tauri_args":""},{"platform":"windows-latest","rust_target":"x86_64-pc-windows-msvc","tauri_args":"--config src-tauri/tauri.windows-signing.conf.json"},{"platform":"macos-15","rust_target":"aarch64-apple-darwin","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
               echo "has_linux=true" >> "$GITHUB_OUTPUT"
               ;;
           esac
@@ -220,7 +220,7 @@ jobs:
       # installed differently there. See run #25767628199 for the
       # original failure.
       - name: Prefer $CARGO_HOME/bin on PATH (macOS-14 Homebrew rustup workaround)
-        if: matrix.platform == 'macos-14'
+        if: matrix.platform == 'macos-15'
         shell: bash
         working-directory: .
         run: |
@@ -491,7 +491,7 @@ jobs:
       # The DMG was already Developer ID-signed by tauri-action; stapling
       # attaches the notarization ticket without re-signing.
       - name: Notarize and staple DMG
-        if: matrix.platform == 'macos-14'
+        if: matrix.platform == 'macos-15'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -558,7 +558,7 @@ jobs:
         run: ./scripts/smoke-release-windows.ps1
 
       - name: Smoke test packaged macOS application
-        if: matrix.platform == 'macos-14'
+        if: matrix.platform == 'macos-15'
         run: bash scripts/smoke-release-unix.sh
 
       - name: Smoke test packaged Linux application
@@ -578,7 +578,7 @@ jobs:
         id: proof
         shell: bash
         env:
-          TARGET: ${{ matrix.platform == 'windows-latest' && 'windows-x86_64' || matrix.platform == 'macos-14' && 'darwin-aarch64' || 'linux-x86_64' }}
+          TARGET: ${{ matrix.platform == 'windows-latest' && 'windows-x86_64' || matrix.platform == 'macos-15' && 'darwin-aarch64' || 'linux-x86_64' }}
         run: |
           node scripts/release-policy.mjs record "$TARGET" src-tauri/target/release/bundle proof.json
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
