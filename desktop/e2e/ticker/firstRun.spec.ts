@@ -118,3 +118,15 @@ for (const mode of ["pages=1", "pages=0"]) {
     await expect(page.getByRole("button", { name: /try again/i })).toBeVisible();
   });
 }
+
+test("[dashboard fails, Fill grid with a utility] the body says so and Try again is in it (SCROLLR-464)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/ticker-shim.html?fixture=missing-on-purpose&pages=1&fill=grid&utils=clock");
+  const body = page.locator("[data-display-empty]");
+  await expect(body.getByText("Couldn’t load your sources.")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-display-header]")).toContainText(/\d{1,2}:\d{2}/);
+  const retry = body.getByRole("button", { name: /try again/i });
+  await expect(retry).toBeVisible();
+  const box = (await body.boundingBox())!;
+  expect(box.height).toBeGreaterThan(500);
+});
