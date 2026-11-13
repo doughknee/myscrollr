@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # Full history: the check diffs against the merge base to look at
           # only the migrations this change introduces. The squashed baseline
@@ -110,8 +110,8 @@ jobs:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: api/go.mod
           cache: true
@@ -167,13 +167,13 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       # Read the Go version from go.mod instead of pinning it here.
       # setup-go@v6 defaults GOTOOLCHAIN=local, so a stale pin fails hard
       # ("go.mod requires go >= X") rather than silently auto-downloading
       # the right toolchain like v5 did.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: api/go.mod
           cache: true
@@ -233,11 +233,11 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           cache-on-failure: "true"
 
@@ -279,7 +279,7 @@ jobs:
         working-directory: desktop/src-tauri
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       # Same package set desktop-release.yml installs for its Linux build.
       - name: Install Linux dependencies
@@ -288,7 +288,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       # GitHub's macOS runners ship a Homebrew rustup-init stub at
       # /opt/homebrew/bin/cargo which shadows the real cargo that
@@ -301,7 +301,7 @@ jobs:
         working-directory: .
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           # Not at the repo root, so point the cache at the crate.
           workspaces: desktop/src-tauri
