@@ -29,6 +29,32 @@ fn shared_reading(
     Ok(value)
 }
 
+/// How long a GPU probe may run. A hung `nvidia-smi` would otherwise hold the
+/// reading locks, and with them every System Monitor poll and the support
+/// form's diagnostics (D3-14).
+const PROBE_LIMIT: Duration = Duration::from_secs(3);
+
+/// Run `cmd` and collect its output, or kill it and return `None` after `limit`.
+fn output_within(cmd: &mut std::process::Command, limit: Duration) -> Option<std::process::Output> {
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(None) if start.elapsed() < limit => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+}
+
 /// Build a `std::process::Command` for `name` that won't pop a
 /// console window on Windows. No-op on every other platform.
 ///
@@ -97,10 +123,11 @@ fn probe_gpu_static() -> (Option<std::path::PathBuf>, Option<String>, Option<u64
     }
 
     // Fallback: try nvidia-smi once for static values
-    if let Ok(out) = quiet_command("nvidia-smi")
-        .args(["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"])
-        .output()
-    {
+    if let Some(out) = output_within(
+        quiet_command("nvidia-smi")
+            .args(["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]),
+        PROBE_LIMIT,
+    ) {
         if out.status.success() {
             let line = String::from_utf8_lossy(&out.stdout);
             let f: Vec<&str> = line.trim().splitn(2, ", ").collect();
@@ -132,13 +159,13 @@ fn read_gpu_dynamic_sysfs(dev: &std::path::Path) -> GpuDynamic {
 /// ticket #484052). `quiet_command` adds CREATE_NO_WINDOW to suppress
 /// that on Windows; behavior is unchanged on Linux/macOS.
 fn read_gpu_dynamic_nvidia() -> GpuDynamic {
-    if let Ok(out) = quiet_command("nvidia-smi")
-        .args([
+    if let Some(out) = output_within(
+        quiet_command("nvidia-smi").args([
             "--query-gpu=utilization.gpu,memory.used,power.draw,power.limit,clocks.current.graphics",
             "--format=csv,noheader,nounits",
-        ])
-        .output()
-    {
+        ]),
+        PROBE_LIMIT,
+    ) {
         if out.status.success() {
             let line = String::from_utf8_lossy(&out.stdout);
             let f: Vec<&str> = line.trim().splitn(5, ", ").collect();
@@ -285,9 +312,9 @@ pub async fn get_system_info(
 
 /// All the actual work — runs inside `spawn_blocking`.
 fn get_system_info_blocking(inner: &SysInfoInner) -> Result<serde_json::Value, String> {
-    let mut sys = inner.sys.lock().map_err(|e| format!("lock: {e}"))?;
-    let mut components = inner.components.lock().map_err(|e| format!("lock: {e}"))?;
-    let mut networks = inner.networks.lock().map_err(|e| format!("lock: {e}"))?;
+    let mut sys = inner.sys.lock().unwrap_or_else(|p| p.into_inner());
+    let mut components = inner.components.lock().unwrap_or_else(|p| p.into_inner());
+    let mut networks = inner.networks.lock().unwrap_or_else(|p| p.into_inner());
 
     sys.refresh_cpu_usage();
     sys.refresh_memory();
@@ -295,7 +322,7 @@ fn get_system_info_blocking(inner: &SysInfoInner) -> Result<serde_json::Value, S
     networks.refresh(false);
 
     // ── Static info (cached after first poll) ────────────────────
-    let mut static_guard = inner.static_info.lock().map_err(|e| format!("lock: {e}"))?;
+    let mut static_guard = inner.static_info.lock().unwrap_or_else(|p| p.into_inner());
     let cached = static_guard.get_or_insert_with(|| {
         let cpu_name = sys.cpus().first().map(|c| c.brand().to_string()).unwrap_or_default();
         let cpu_cores = sys.cpus().len();
@@ -431,6 +458,21 @@ fn get_system_info_blocking(inner: &SysInfoInner) -> Result<serde_json::Value, S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_hung_probe_is_killed_at_its_limit() {
+        #[cfg(windows)]
+        let mut cmd = quiet_command("ping");
+        #[cfg(windows)]
+        cmd.args(["-n", "10", "127.0.0.1"]);
+        #[cfg(not(windows))]
+        let mut cmd = quiet_command("sleep");
+        #[cfg(not(windows))]
+        cmd.arg("10");
+        let start = Instant::now();
+        assert!(output_within(&mut cmd, Duration::from_millis(200)).is_none());
+        assert!(start.elapsed() < Duration::from_secs(5));
+    }
 
     #[test]
     fn windows_polling_together_share_one_reading() {

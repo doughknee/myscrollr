@@ -9,10 +9,10 @@ vi.mock("../lib/updateController", () => ({
   updateController: new Proxy({}, { get: (_, key) => shared.controller![key as keyof UpdateController] }),
 }));
 const fetchMinimum = vi.fn();
+vi.mock("@tauri-apps/plugin-http", () => ({ fetch: (...a: unknown[]) => fetchMinimum(...a) }));
 let candidate: UpdateCandidate;
 beforeEach(() => {
   fetchMinimum.mockReset();
-  vi.stubGlobal("fetch", fetchMinimum);
   candidate = { version: "1.7.3", download: vi.fn(async () => {}), install: vi.fn(async () => {}), close: vi.fn(async () => {}) };
   shared.controller = new UpdateController({
     load: async () => ({ version: "1.8.0-beta.1", channel: "stable", fresh: false }),
@@ -21,7 +21,7 @@ beforeEach(() => {
     prepareRecovery: async () => ({ feedVersion: "1.7.3", update: candidate, recoveryVersion: "1.7.3" }),
   });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); });
 function respond(minimum: unknown) {
   fetchMinimum.mockResolvedValue({ ok: true, json: async () => ({ min_desktop_version: minimum }) });
 }

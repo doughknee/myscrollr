@@ -6,7 +6,7 @@
  * since self-hosted Kuma instances may not set CORS headers.
  *
  */
-import { fetch } from "@tauri-apps/plugin-http";
+import { fetchWithTimeout } from "../../api/fetchWithTimeout";
 import { LS_UPTIME_MONITORS } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 
@@ -136,16 +136,16 @@ function parseStatusPageUrl(
 
 /** Internal helper: fetch JSON with error handling. */
 async function kumaFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Uptime Kuma returned ${res.status}: ${res.statusText}`);
-  }
-
-  return (await res.json()) as T;
+  return fetchWithTimeout(
+    url,
+    { method: "GET", headers: { Accept: "application/json" } },
+    async (res) => {
+      if (!res.ok) {
+        throw new Error(`Uptime Kuma returned ${res.status}: ${res.statusText}`);
+      }
+      return (await res.json()) as T;
+    },
+  );
 }
 
 /**

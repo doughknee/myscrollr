@@ -40,6 +40,7 @@ function CardWrapper({
       <a
         href={link}
         onClick={openLinkOnClick}
+        onAuxClick={openLinkOnClick}
         rel="noopener noreferrer"
         className={className}
       >

@@ -621,6 +621,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
       <a
         href={item.link}
         onClick={openLinkOnClick}
+        onAuxClick={openLinkOnClick}
         rel="noopener noreferrer"
         className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover  cursor-pointer"
       >
@@ -643,6 +644,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
     <a
       href={item.link}
       onClick={openLinkOnClick}
+      onAuxClick={openLinkOnClick}
       rel="noopener noreferrer"
       className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "block")}
     >

@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
-import { loadPrefs } from "../preferences";
+import { loadPrefs, savePrefs } from "../preferences";
 import type { AppPreferences } from "../preferences";
 
 const h = vi.hoisted(() => ({
@@ -134,10 +134,11 @@ describe("adding a widget (D2-15)", () => {
 describe("removing a widget (D2-14)", () => {
   it("drops its pins, and Undo puts them back", async () => {
     const pins = [
-      { widget: "finance", subject: "AAPL" },
-      { widget: "sports_nfl", subject: "42" },
+      { widget: "finance", subject: "AAPL", side: "right" },
+      { widget: "sports_nfl", subject: "42", side: "right" },
     ];
     const prefs = { ...h.shell.prefs, widgets: { ...h.shell.prefs.widgets, pins } } as AppPreferences;
+    savePrefs(prefs);
     qc.setQueryData(queryKeys.dashboard, dash(row("finance")));
     h.del.mockResolvedValue(undefined);
     h.create.mockResolvedValue(undefined);
@@ -151,6 +152,27 @@ describe("removing a widget (D2-14)", () => {
     await act(async () => undo());
     await waitFor(() => expect(h.shell.onPrefsChange).toHaveBeenCalledTimes(2));
     expect((h.shell.onPrefsChange.mock.calls[1][0] as AppPreferences).widgets.pins).toEqual([pins[1], pins[0]]);
+  });
+
+  it("Undo keeps a preference changed while the toast was up (D3-11)", async () => {
+    const pins = [{ widget: "finance", subject: "AAPL", side: "right" }];
+    const prefs = { ...h.shell.prefs, widgets: { ...h.shell.prefs.widgets, pins } } as AppPreferences;
+    savePrefs(prefs);
+    qc.setQueryData(queryKeys.dashboard, dash(row("finance")));
+    h.del.mockResolvedValue(undefined);
+    h.create.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useRemoveWidget({ prefs, onPrefsChange: h.shell.onPrefsChange }), { wrapper });
+    await act(async () => result.current({ id: "finance", name: "Stocks", source: "finance" } as never));
+    // Another change lands while the toast is still on screen.
+    const other = { ...prefs, widgets: { ...prefs.widgets, pins: [{ widget: "sports_nfl", subject: "42", side: "right" }] } } as AppPreferences;
+    savePrefs(other);
+    const undo = h.toast.success.mock.calls[0][1].action.onClick as () => void;
+    await act(async () => undo());
+    await waitFor(() => expect(h.shell.onPrefsChange).toHaveBeenCalledTimes(2));
+    expect((h.shell.onPrefsChange.mock.calls[1][0] as AppPreferences).widgets.pins).toEqual([
+      { widget: "sports_nfl", subject: "42", side: "right" },
+      pins[0],
+    ]);
   });
 });
 

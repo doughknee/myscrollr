@@ -19,7 +19,7 @@ import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { CatalogItem } from "../marketplace";
 import { slotWidgetCount } from "../marketplace";
-import { disableWidget, dropPinsForWidget, MAX_PINS } from "../preferences";
+import { disableWidget, dropPinsForWidget, loadPrefs, MAX_PINS } from "../preferences";
 import { ShellContext } from "../shell-context";
 import type { DashboardResponse } from "../types";
 import { useUndoableAction } from "./useUndoableAction";
@@ -35,7 +35,6 @@ export function useRemoveWidget(
   const queryClient = useQueryClient();
   const undoable = useUndoableAction(shell);
   const ctx = useContext(ShellContext);
-  const prefs = (shell ?? ctx)?.prefs;
   const onPrefsChange = (shell ?? ctx)?.onPrefsChange;
 
   return useCallback(
@@ -56,11 +55,14 @@ export function useRemoveWidget(
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
           // Its pins go with it: a pin for a widget that no longer exists can
           // never render a chip, yet still counts against MAX_PINS.
-          const droppedPins = (prefs?.widgets.pins ?? []).filter(
+          // Read the preferences as they are now, not as they were at click
+          // time: the delete took a round trip, and the Undo below runs up
+          // to a toast's lifetime later (D3-11).
+          const droppedPins = loadPrefs().widgets.pins.filter(
             (p) => p.widget === item.id,
           );
-          if (prefs && onPrefsChange && droppedPins.length > 0) {
-            onPrefsChange(dropPinsForWidget(prefs, item.id));
+          if (onPrefsChange && droppedPins.length > 0) {
+            onPrefsChange(dropPinsForWidget(loadPrefs(), item.id));
           }
           toast.success(`${item.name} removed`, {
             description: "Its page is free for another widget.",
@@ -71,14 +73,14 @@ export function useRemoveWidget(
                   .create(
                     item.id,
                     row?.config ?? item.addConfig ?? {},
-                    slotWidgetCount(prefs?.widgets.enabledWidgets ?? []),
+                    slotWidgetCount(loadPrefs().widgets.enabledWidgets),
                   )
                   .then(() => {
                     queryClient.invalidateQueries({
                       queryKey: queryKeys.dashboard,
                     });
-                    if (prefs && onPrefsChange && droppedPins.length > 0) {
-                      const kept = dropPinsForWidget(prefs, item.id);
+                    if (onPrefsChange && droppedPins.length > 0) {
+                      const kept = dropPinsForWidget(loadPrefs(), item.id);
                       onPrefsChange({
                         ...kept,
                         widgets: {
@@ -110,6 +112,6 @@ export function useRemoveWidget(
         );
       }
     },
-    [queryClient, undoable, prefs, onPrefsChange],
+    [queryClient, undoable, onPrefsChange],
   );
 }

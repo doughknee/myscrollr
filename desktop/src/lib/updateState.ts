@@ -20,6 +20,8 @@ export interface UpdateDependencies {
   check: (channel: UpdateChannel) => Promise<UpdateCheck>;
   prepareRecovery?: () => Promise<UpdateCheck>;
   restart: () => Promise<void>;
+  /** The installer could not be launched and the app is still running. */
+  installFailed?: () => void;
 }
 export type UpdatePhase = "idle" | "initializing" | "selecting" | "checking" | "current" | "waiting" | "available" | "recovery" | "downloading" | "installing" | "ready" | "restarting" | "error";
 export interface UpdateSnapshot {
@@ -179,6 +181,9 @@ export class UpdateController {
         this.candidate = null;
         this.set({ phase: "ready" });
       } catch (error) {
+        // On Windows the before-exit hook has already released the docked
+        // bar's screen space; the app is staying, so the bar must take it back.
+        if (this.state.phase === "installing") this.deps.installFailed?.();
         await this.discard();
         throw new Error(`Could not install the update. Check your connection and retry. ${errorText(error)}`);
       }

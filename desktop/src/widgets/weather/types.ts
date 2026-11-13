@@ -7,6 +7,7 @@
 import type { TempUnit } from "../../preferences";
 import { LS_WEATHER_CITIES } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
+import { fetchWithTimeout } from "../../api/fetchWithTimeout";
 
 export type { TempUnit };
 
@@ -117,17 +118,19 @@ export function saveCities(cities: SavedCity[]): void {
 export async function searchCities(query: string): Promise<WeatherLocation[]> {
   if (query.trim().length < 2) return [];
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en&format=json`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = (await res.json()) as {
-    results?: Array<{
-      name: string;
-      latitude: number;
-      longitude: number;
-      country: string;
-      admin1?: string;
-    }>;
-  };
+  const data = await fetchWithTimeout(url, {}, async (res) =>
+    res.ok
+      ? ((await res.json()) as {
+          results?: Array<{
+            name: string;
+            latitude: number;
+            longitude: number;
+            country: string;
+            admin1?: string;
+          }>;
+        })
+      : {},
+  );
   if (!data.results) return [];
   return data.results.map((r) => ({
     name: r.name,
@@ -150,9 +153,11 @@ export async function fetchWeather(
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day` +
     `&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Weather API ${res.status}`);
-  const data = (await res.json()) as {
+  const data = await fetchWithTimeout(url, {}, async (res) => {
+    if (!res.ok) throw new Error(`Weather API ${res.status}`);
+    return (await res.json()) as WeatherResponse;
+  });
+  type WeatherResponse = {
     current: {
       temperature_2m: number;
       relative_humidity_2m: number;

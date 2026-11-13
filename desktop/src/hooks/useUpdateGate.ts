@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { valid } from "semver";
+import { fetchWithTimeout } from "../api/fetchWithTimeout";
 import { API_BASE } from "../config";
 import { requiresUpdate } from "../lib/releases";
 import { updateController } from "../lib/updateController";
@@ -35,9 +36,11 @@ export function useUpdateGate(appVersion: string): UpdateGate {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(`${API_BASE}/app/min-version`);
-        if (!res.ok) return;
-        const body: unknown = await res.json();
+        const body = await fetchWithTimeout(
+          `${API_BASE}/app/min-version`,
+          {},
+          async (res): Promise<unknown> => (res.ok ? res.json() : undefined),
+        );
         const min =
           body && typeof body === "object"
             ? (body as Record<string, unknown>).min_desktop_version

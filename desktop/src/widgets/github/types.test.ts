@@ -171,6 +171,20 @@ describe("fetchBoard", () => {
     expect(got[0].workflows[0]).toMatchObject({ name: "CI", state: "running", at: "2026-10-02T11:58:00Z" });
     expect(board).not.toHaveBeenCalled();
   });
+
+  it("signed out: a stalled GitHub call is cut off at a deadline and reads as unavailable (D3-12)", async () => {
+    vi.useFakeTimers();
+    try {
+      signedOut.mockReturnValue(true);
+      directFetch.mockImplementation((_url: string, init: RequestInit) =>
+        new Promise((_, reject) => init.signal!.addEventListener("abort", () => reject(new Error("aborted")))));
+      const pending = fetchBoard(tracked);
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect((await pending).repos[0].available).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("the picker's first load and URLs", () => {

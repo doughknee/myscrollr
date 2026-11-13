@@ -9,7 +9,7 @@
  * core session to ask, so the app calls GitHub directly for public repos.
  * Either way the bar draws the same pills.
  */
-import { fetch } from "@tauri-apps/plugin-http";
+import { fetchWithTimeout } from "../../api/fetchWithTimeout";
 import { LS_GITHUB_BOARD } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
@@ -72,12 +72,17 @@ export function fromRun(repo: string, row: GitHubRunRow | undefined): GitHubBoar
 /** Signed out: GitHub's public API, one call per repo. Errors read as unavailable. */
 async function fetchDirect(repo: string): Promise<GitHubBoardRepo> {
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=1`, {
-      method: "GET",
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "Scrollr/1.0" },
-    });
-    if (!res.ok) return fromRun(repo, undefined);
-    const run = ((await res.json()) as { workflow_runs?: Array<Record<string, string | null>> }).workflow_runs?.[0];
+    const run = await fetchWithTimeout(
+      `https://api.github.com/repos/${repo}/actions/runs?per_page=1`,
+      {
+        method: "GET",
+        headers: { Accept: "application/vnd.github+json", "User-Agent": "Scrollr/1.0" },
+      },
+      async (res) =>
+        res.ok
+          ? ((await res.json()) as { workflow_runs?: Array<Record<string, string | null>> }).workflow_runs?.[0]
+          : undefined,
+    );
     if (!run) return fromRun(repo, undefined);
     return fromRun(repo, {
       repo,

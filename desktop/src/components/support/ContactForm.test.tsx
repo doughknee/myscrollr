@@ -3,13 +3,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const invoke = vi.fn();
 const authFetch = vi.fn();
+const publicRequest = vi.fn();
+const session = vi.hoisted(() => ({ signedIn: true }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("../../api/client", async (importActual) => ({
   ...(await importActual<typeof import("../../api/client")>()),
   authFetch: (...a: unknown[]) => authFetch(...a),
+  request: (...a: unknown[]) => publicRequest(...a),
 }));
-vi.mock("../../auth", () => ({ getUserIdentity: () => ({}), isAuthenticated: () => true }));
+vi.mock("../../auth", () => ({ getUserIdentity: () => ({}), isAuthenticated: () => session.signedIn }));
 
 import ContactForm from "./ContactForm";
 import { ApiError } from "../../api/client";
@@ -23,6 +26,8 @@ const form = () => document.querySelector("form")!;
 beforeEach(() => {
   invoke.mockReset();
   authFetch.mockReset();
+  publicRequest.mockReset();
+  session.signedIn = true;
   invoke.mockResolvedValue({ os: "windows" });
 });
 
@@ -87,5 +92,64 @@ describe("ContactForm submit (RC-14)", () => {
     fireEvent.submit(form());
     expect(await screen.findByRole("alert")).toHaveTextContent("wasn’t sent");
     expect(screen.getByPlaceholderText("Describe what you were doing...")).toHaveValue("Opened Home");
+  });
+});
+
+describe("ContactForm signed out (D3-1)", () => {
+  it("sends to the public route with the email, never through the signed-in one", async () => {
+    session.signedIn = false;
+    publicRequest.mockResolvedValue({});
+    render(<ContactForm onBack={() => {}} />);
+    fireEvent.click(screen.getByText("Account & Login"));
+    const text = screen.getByLabelText("Describe your account issue");
+    fireEvent.change(text, { target: { value: "I cannot sign in at all" } });
+    expect(screen.getByText("Submit Account Question")).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "me@example.com" } });
+    fireEvent.submit(form());
+    await waitFor(() => expect(publicRequest).toHaveBeenCalledTimes(1));
+    expect(authFetch).not.toHaveBeenCalled();
+    const [path, init] = publicRequest.mock.calls[0];
+    expect(path).toBe("/support/ticket/public");
+    expect(JSON.parse(init.body)).toMatchObject({ email: "me@example.com", category: "feedback" });
+    expect(JSON.parse(init.body).message).toContain("Account & Login");
+  });
+
+  it("does not offer attachments or diagnostics it cannot send", () => {
+    session.signedIn = false;
+    render(<ContactForm onBack={() => {}} />);
+    expect(screen.queryByText("Attach files")).toBeNull();
+    expect(screen.getByText(/only sent when you are signed in/)).toBeInTheDocument();
+  });
+});
+
+describe("ContactForm attachments (D3-2, D3-16)", () => {
+  const pick = (...sizes: number[]) =>
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: sizes.map((n, i) => new File([new Uint8Array(n)], `shot${i}.png`, { type: "image/png" })) },
+    });
+
+  it("refuses a file that would pass the total limit and names the limit", async () => {
+    render(<ContactForm onBack={() => {}} />);
+    pick(1.5 * 1024 * 1024);
+    expect(screen.getByText(/Attached: 1.5 MB of 2.5 MB/)).toBeInTheDocument();
+    pick(1.5 * 1024 * 1024);
+    expect(await screen.findByRole("alert")).toHaveTextContent("limit is 2.5 MB in total");
+    expect(document.querySelectorAll("[aria-label^='Remove']")).toHaveLength(1);
+  });
+
+  it("says plainly what a 413 means", async () => {
+    authFetch.mockRejectedValueOnce(new ApiError(413, "Request failed"));
+    render(<ContactForm onBack={() => {}} />);
+    fill();
+    fireEvent.submit(form());
+    expect(await screen.findByRole("alert")).toHaveTextContent("too large");
+  });
+
+  it("ties labels to fields and marks the chosen chip", () => {
+    render(<ContactForm onBack={() => {}} />);
+    expect(screen.getByLabelText("What went wrong?")).toBeInstanceOf(HTMLTextAreaElement);
+    fireEvent.click(screen.getByText("Sometimes"));
+    expect(screen.getByText("Sometimes")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Always")).toHaveAttribute("aria-pressed", "false");
   });
 });

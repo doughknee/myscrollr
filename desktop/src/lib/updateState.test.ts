@@ -82,6 +82,20 @@ describe("shared update controller", () => {
     await controller.check(); await controller.install();
     expect(controller.getSnapshot().phase).toBe("ready");
   });
+  it("tells the bar to re-place itself when the installer could not be launched (D3-13)", async () => {
+    const { controller, deps, candidate } = setup();
+    deps.installFailed = vi.fn();
+    await controller.check();
+    vi.mocked(candidate.install).mockRejectedValueOnce(new Error("blocked"));
+    await controller.install();
+    expect(deps.installFailed).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot().phase).toBe("error");
+    // A failed download never reached the installer: nothing was released.
+    vi.mocked(deps.installFailed!).mockClear();
+    await controller.check(); vi.mocked(candidate.download).mockRejectedValueOnce(new Error("offline"));
+    await controller.install();
+    expect(deps.installFailed).not.toHaveBeenCalled();
+  });
   it("restart failure preserves ready state and retries restart without redownloading", async () => {
     const { controller, deps, candidate } = setup();
     await controller.check(); await controller.install();

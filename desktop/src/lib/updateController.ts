@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
+import { emit } from "@tauri-apps/api/event";
 import { Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { useRef, useSyncExternalStore } from "react";
@@ -39,6 +40,7 @@ export const updateController = new UpdateController({
     return { ...result, update: result.update ? new Update(result.update) : null };
   },
   restart: relaunch,
+  installFailed: () => void emit("ticker-reposition").catch(() => {}),
 });
 const sameValue = (a: unknown, b: unknown) =>
   Object.is(a, b) ||
