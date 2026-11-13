@@ -206,9 +206,10 @@ func (s *Server) setupRoutes() {
 
 	// Extension auth proxy
 	s.App.Options("/extension/token", accounts.HandleExtensionAuthPreflight)
-	s.App.Post("/extension/token", accounts.HandleExtensionTokenExchange)
+	extLimit := accounts.ExtensionTokenLimiter(platform.NewRedisLimiterStorage("ratelimit:"))
+	s.App.Post("/extension/token", extLimit, accounts.HandleExtensionTokenExchange)
 	s.App.Options("/extension/token/refresh", accounts.HandleExtensionAuthPreflight)
-	s.App.Post("/extension/token/refresh", accounts.HandleExtensionTokenRefresh)
+	s.App.Post("/extension/token/refresh", extLimit, accounts.HandleExtensionTokenRefresh)
 
 	// The "I did it" page that finishes a stalled desktop release
 	// (SCROLLR-305). No JWT: OPS_RELEASE_KEY in the query gates all three,
