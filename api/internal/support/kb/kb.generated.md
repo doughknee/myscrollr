@@ -4,9 +4,11 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.8.0-beta.2**.
+Current desktop version: **1.7.3**.
 
-<!-- source: desktop/package.json @ e313253e1969 -->
+Current Beta version: **1.8.0-beta.2** (opt-in Beta channel, newer than Stable).
+
+<!-- source: github.com/doughknee/myscrollr/releases (newest published desktop release per channel) @ desktop-v1.7.3 -->
 
 ## Policies
 

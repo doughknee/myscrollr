@@ -1001,7 +1001,7 @@ func adminUserContext(ctx context.Context, ticket string) AdminUserContext {
 	out := AdminUserContext{
 		Tier:             tc.Tier,
 		AppVersion:       tc.AppVersion,
-		CurrentVersion:   currentDesktopVersion(),
+		CurrentVersion:   currentVersionFor(tc.AppVersion),
 		OS:               tc.OS,
 		MonitorsAttached: tc.MonitorCount,
 		MonitorsChosen:   tc.ChosenMonitors,
@@ -1010,9 +1010,9 @@ func adminUserContext(ctx context.Context, ticket string) AdminUserContext {
 		Note:             "Rebuilt from the case row and this account's widgets, by the same function that builds the prompt's WHO IS WRITING block. Being behind is a diagnostic and never permission to tell someone to update — that needs a fix on record.",
 	}
 	switch {
-	case tc.AppVersion == "" || out.CurrentVersion == "":
+	case !platform.ValidVersion(tc.AppVersion) || out.CurrentVersion == "":
 		out.VersionState = "unknown"
-	case compareVersions(tc.AppVersion, out.CurrentVersion) < 0:
+	case platform.CompareVersions(tc.AppVersion, out.CurrentVersion) < 0:
 		out.VersionState = "behind"
 	default:
 		out.VersionState = "current"

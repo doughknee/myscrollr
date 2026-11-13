@@ -203,23 +203,55 @@ func TestEnsureSignOff(t *testing.T) {
 	}
 }
 
-func TestCompareVersions(t *testing.T) {
+// SCROLLR-445: which release a user is measured against. Stable users against
+// the newest Stable; Beta users against the newest of Beta and Stable.
+func TestPickCurrent(t *testing.T) {
+	const stable, beta = "1.7.3", "1.8.0-beta.2"
 	for _, c := range []struct {
-		a, b string
-		want int
+		name, user, stable, beta, want string
+		behind                         bool
 	}{
-		{"1.6.1", "1.6.2", -1},
-		{"1.6.2", "1.6.2", 0},
-		{"1.6.2", "1.6.1", 1},
-		{"1.0.19", "1.6.2", -1},
-		{"1.10.0", "1.9.0", 1}, // numeric, not lexical
-		{"1.6", "1.6.0", 0},
-		{"1.6.2-beta", "1.6.2", 0},
-		{"", "1.6.2", -1},
+		{"stable user on newest stable", "1.7.3", stable, beta, "1.7.3", false},
+		{"stable user behind", "1.7.2", stable, beta, "1.7.3", true},
+		{"stable user is not behind the beta", "1.7.3", stable, beta, "1.7.3", false},
+		{"beta user on newest beta", "1.8.0-beta.2", stable, beta, "1.8.0-beta.2", false},
+		{"beta user behind on beta", "1.8.0-beta.1", stable, beta, "1.8.0-beta.2", true},
+		{"beta user, no newer beta than stable", "1.8.0-beta.2", "1.8.0", "", "1.8.0", true},
+		{"beta user ahead of stable, no beta line", "1.8.0-beta.2", stable, "", "1.7.3", false},
+		{"unparseable user version", "junk", stable, beta, "1.7.3", true}, // render() reports it as unrecognised before comparing
 	} {
-		if got := compareVersions(c.a, c.b); got != c.want {
-			t.Errorf("compareVersions(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
+		got := pickCurrent(c.user, c.stable, c.beta)
+		if got != c.want {
+			t.Errorf("%s: pickCurrent = %q, want %q", c.name, got, c.want)
 		}
+		if behind := platform.CompareVersions(c.user, got) < 0; behind != c.behind {
+			t.Errorf("%s: behind = %v, want %v", c.name, behind, c.behind)
+		}
+	}
+}
+
+// The reported bug: a user on the newest Stable was called out of date because
+// the KB's "current" was the Beta.
+func TestContextStableUserOnNewestStableIsCurrent(t *testing.T) {
+	out := TicketContext{Tier: "free", AppVersion: currentDesktopVersion(), HasDiagnostics: true}.render()
+	if strings.Contains(out, "OUT OF DATE") {
+		t.Errorf("a user on the newest Stable was called out of date:
+%s", out)
+	}
+	if beta := kbVersion(currentBetaVersionRe); beta != "" {
+		out = TicketContext{Tier: "free", AppVersion: beta, HasDiagnostics: true}.render()
+		if strings.Contains(out, "OUT OF DATE") {
+			t.Errorf("a user on the current Beta was called out of date:
+%s", out)
+		}
+	}
+}
+
+func TestContextUnparseableVersionIsNotOutOfDate(t *testing.T) {
+	out := TicketContext{Tier: "free", AppVersion: "junk", HasDiagnostics: true}.render()
+	if strings.Contains(out, "OUT OF DATE") || !strings.Contains(out, "not a recognisable version") {
+		t.Errorf("unparseable version mishandled:
+%s", out)
 	}
 }
 

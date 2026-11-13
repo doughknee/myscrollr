@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
@@ -133,20 +132,31 @@ func (tc TicketContext) render() string {
 	b.WriteString("WHO IS WRITING (server-side facts, not the user's claims)\n")
 	fmt.Fprintf(&b, "Plan: %s\n", tc.Tier)
 
-	current := currentDesktopVersion()
+	current := currentVersionFor(tc.AppVersion)
 	if current == "" {
 		current = "unknown"
 	}
+	channel := "release"
+	if platform.IsPrerelease(tc.AppVersion) {
+		channel = "Beta"
+	}
 	switch {
 	case tc.AppVersion == "":
-		fmt.Fprintf(&b, "App version: unknown. Current release is %s.\n", current)
-	case compareVersions(tc.AppVersion, current) < 0:
-		fmt.Fprintf(&b, "Current release is %s; this user is on %s. THEY ARE OUT OF DATE.\n", current, tc.AppVersion)
+		fmt.Fprintf(&b, "App version: unknown. Current release is %s.
+", current)
+	case !platform.ValidVersion(tc.AppVersion):
+		fmt.Fprintf(&b, "App version: reported as %q, which is not a recognisable version. Current release is %s.
+", tc.AppVersion, current)
+	case platform.CompareVersions(tc.AppVersion, current) < 0:
+		fmt.Fprintf(&b, "Current %s is %s; this user is on %s. THEY ARE OUT OF DATE.
+", channel, current, tc.AppVersion)
 		b.WriteString("That is a useful diagnostic and nothing more. Do NOT tell them updating will " +
 			"fix what they reported unless the FIX ON RECORD block below names a version; the release " +
-			"notes do not record which report a change closed.\n")
+			"notes do not record which report a change closed.
+")
 	default:
-		fmt.Fprintf(&b, "Current release is %s; this user is on %s. They are up to date.\n", current, tc.AppVersion)
+		fmt.Fprintf(&b, "Current %s is %s; this user is on %s. They are up to date.
+", channel, current, tc.AppVersion)
 	}
 
 	if tc.OS != "" {
@@ -183,35 +193,6 @@ func (tc TicketContext) render() string {
 	return b.String()
 }
 
-// compareVersions compares dotted numeric versions. Returns -1 when a is
-// older. Non-numeric junk sorts as 0, so "1.6.2-beta" reads as 1.6.2 and a
-// version we cannot parse never claims to be newer than one we can.
-func compareVersions(a, b string) int {
-	as, bs := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < len(as) || i < len(bs); i++ {
-		av, bv := versionPart(as, i), versionPart(bs, i)
-		if av != bv {
-			if av < bv {
-				return -1
-			}
-			return 1
-		}
-	}
-	return 0
-}
-
-func versionPart(parts []string, i int) int {
-	if i >= len(parts) {
-		return 0
-	}
-	digits := strings.TrimLeft(parts[i], "v")
-	if cut := strings.IndexFunc(digits, func(r rune) bool { return r < '0' || r > '9' }); cut >= 0 {
-		digits = digits[:cut]
-	}
-	n, _ := strconv.Atoi(digits)
-	return n
-}
-
 // renderFixRecord is the FIX ON RECORD block: the one place in the prompt
 // permitted to say a fix exists, and the one place the drafter may read that
 // from (REL-259). It is a server-computed fact, never something to infer.
@@ -243,7 +224,7 @@ func renderFixRecord(pf *ProvenFix, staleDays int, userVersion string) string {
 		pf.IssueKey, pf.Version)
 	fmt.Fprintf(&b, "You MAY say the fix for what they reported went out in %s and point them at the "+
 		"update. Never put the issue key in the reply.\n", pf.Version)
-	if userVersion != "" && compareVersions(userVersion, pf.Version) >= 0 {
+	if userVersion != "" && platform.CompareVersions(userVersion, pf.Version) >= 0 {
 		fmt.Fprintf(&b, "They are already on %s, which carries that fix, so updating is NOT the answer "+
 			"for them. Say the fix shipped in %s and ask what they are still seeing.\n",
 			userVersion, pf.Version)
