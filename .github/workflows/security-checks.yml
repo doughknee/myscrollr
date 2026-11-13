@@ -22,6 +22,14 @@ jobs:
       - run: python3 scripts/check-workload-security.py
       - run: python3 scripts/doks-firewall.test.py
 
+  # db-ip.com removes old monthly files, so the pin in api/Dockerfile goes stale
+  # while nobody pushes; the daily run turns that into a red check, not a broken build.
+  dbip-pin-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: bash scripts/ci/check-dbip-pin.sh
+
   committed-secrets:
     runs-on: ubuntu-latest
     steps:
