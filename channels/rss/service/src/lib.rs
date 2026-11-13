@@ -151,13 +151,6 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
     );
 }
 
-/// Longest gap between attempts on a failing feed: 12 cycles of 5 minutes = 1 hour.
-const MAX_BACKOFF_CYCLES: u64 = 12;
-
-/// A feed with `failures` consecutive failures is polled only on cycles that are
-/// a multiple of min(2^failures, 12), so a success (which resets the counter)
-/// puts it back on every cycle. Cycle 0 always polls everything. The cap
-/// divides 288, so quarantined feeds still get their daily retry.
 /// True when most of the previous cycle failed (more than half, from at least
 /// 5 feeds): that points at our own network, not at the feeds, so backoff is
 /// skipped for one cycle and everything recovers as fast as it did before.
@@ -166,6 +159,13 @@ fn mostly_failed(ok: u64, failed: u64) -> bool {
     total >= 5 && failed * 2 > total
 }
 
+/// Longest gap between attempts on a failing feed: 12 cycles of 5 minutes = 1 hour.
+const MAX_BACKOFF_CYCLES: u64 = 12;
+
+/// A feed with `failures` consecutive failures is polled only on cycles that are
+/// a multiple of min(2^failures, 12), so a success (which resets the counter)
+/// puts it back on every cycle. Cycle 0 always polls everything. The cap
+/// divides 288, so quarantined feeds still get their daily retry.
 fn in_backoff(failures: i32, cycle: u64) -> bool {
     if failures <= 0 {
         return false;
