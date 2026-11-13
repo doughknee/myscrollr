@@ -237,6 +237,27 @@ async function invoke(cmd: string, args: Args = {}): Promise<unknown> {
 
     case "plugin:window|get_all_windows":
       return [LABEL];
+
+    // The bar is docked in the page: what the shared ticker asks Rust
+    // for at boot (useTickerDisplay). Keep embed.test.ts in step.
+    case "ticker_display":
+      return { mode: "docked", readingSize: 100, monitor: "Browser", suspended: false, pageLeader: true };
+    // Window, tray, stream and presence commands: nothing to do in a page.
+    case "set_ticker_visible":
+    case "pin_window":
+    case "position_ticker":
+    case "set_hide_on_fullscreen":
+    case "sync_tray_ticker":
+    case "report_screen_state":
+    case "set_crash_reports":
+    case "start_sse":
+    case "stop_sse":
+    case "show_app_window":
+    case "quit_app":
+    case "configure_presence":
+    case "sync_ticker_windows":
+    case "get_system_info":
+      return null;
   }
   // Window, tray, stream and webview commands: Rust's work in the app,
   // nothing to do in a page.
