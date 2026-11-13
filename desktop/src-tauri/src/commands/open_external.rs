@@ -35,13 +35,26 @@ const APPIMAGE_ENV_VARS: &[&str] = &[
 ];
 
 #[cfg(target_os = "linux")]
-fn spawn_clean(program: &str, args: &[&str]) -> std::io::Result<std::process::Child> {
+fn spawn_clean(program: &str, args: &[&str]) -> std::io::Result<()> {
     let mut cmd = std::process::Command::new(program);
     cmd.args(args);
     for var in APPIMAGE_ENV_VARS {
         cmd.env_remove(var);
     }
-    cmd.spawn()
+    let child = cmd.spawn()?;
+    reap_detached(child);
+    Ok(())
+}
+
+/// D2-9: a spawned opener that is never waited on stays a zombie until
+/// Scrollr exits. Wait on a throwaway thread so the command returns at once.
+#[cfg(target_os = "linux")]
+fn reap_detached(mut child: std::process::Child) {
+    let _ = std::thread::Builder::new()
+        .name("reap-opener".into())
+        .spawn(move || {
+            let _ = child.wait();
+        });
 }
 
 /// SCROLLR-449 (SC-5): the one gate every platform branch goes through.
@@ -72,7 +85,6 @@ fn open_external_linux(url: &str) -> Result<(), String> {
         }
     }
     spawn_clean("gio", &["open", url])
-        .map(|_child| ())
         .map_err(|e| format!("open external url: no opener available: {e}"))
 }
 
@@ -120,6 +132,23 @@ mod tests {
         ] {
             assert!(validate_external_url(bad).is_err(), "{bad:?}");
         }
+    }
+
+    /// D2-9: the opener's child must not linger as a zombie (state `Z` in
+    /// `/proc/<pid>/stat`) once it has exited.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_finished_opener_is_reaped() {
+        let child = std::process::Command::new("true").spawn().unwrap();
+        let stat = format!("/proc/{}/stat", child.id());
+        reap_detached(child);
+        for _ in 0..100 {
+            if std::fs::read_to_string(&stat).is_err() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        panic!("child was never reaped");
     }
 
     /// Runs on every platform (Windows included — no Linux box in CI/dev

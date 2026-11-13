@@ -347,9 +347,13 @@ export function installWebAdapter(label: Label): void {
       case "open_external":
       case "plugin:shell|open": {
         const url = new URL(args.url ?? args.path);
-        if (url.searchParams.get("redirect_uri") === REDIRECT_URI) {
-          url.searchParams.set("redirect_uri", WEB_REDIRECT_URI);
+        // D2-10: only a sign-in carries the desktop callback; any other link
+        // (news, release notes) opens a tab and leaves a pending sign-in alone.
+        if (url.searchParams.get("redirect_uri") !== REDIRECT_URI) {
+          window.open(url, "_blank", "noopener");
+          return;
         }
+        url.searchParams.set("redirect_uri", WEB_REDIRECT_URI);
         if (replayed) {
           emit("auth-callback", replayed); // resuming: Logto already answered
           replayed = null;
