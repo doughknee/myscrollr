@@ -418,3 +418,58 @@ func TestIntegrationLateActiveUpdateAfterDeletionGrantsNothing(t *testing.T) {
 		t.Errorf("assigned roles = %v, want none", got)
 	}
 }
+
+// SCROLLR-465 B2-3: only a customer Stripe says is gone is replaced; any other
+// Stripe error fails the request and keeps the billing row.
+func TestIntegrationStripeCustomerReplacedOnlyWhenMissing(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "stripe error", true: "customer missing"}[missing], func(t *testing.T) {
+			setupIntegrationDB(t)
+			setStripePriceEnv(t)
+			const sub = "user_customer_check"
+			seedStripeCustomer(t, sub, "cus_kept", "free", "canceled", false)
+			stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/customers/cus_kept" && missing:
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","message":"No such customer"}}`))
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/customers/cus_kept":
+					w.Header().Set("Stripe-Should-Retry", "false")
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`{"error":{"type":"api_error","message":"timeout"}}`))
+				case r.Method == http.MethodPost && r.URL.Path == "/v1/customers":
+					if !missing {
+						t.Error("a new customer was created after a transient error")
+					}
+					_, _ = w.Write([]byte(`{"id":"cus_new","object":"customer"}`))
+				default:
+					// Stop the handler after the customer step.
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","message":"stop"}}`))
+				}
+			})
+
+			app := asUser(fiber.MethodPost, "/checkout/setup-intent", sub, billing.HandleCreateSetupIntent)
+			req := httptest.NewRequest(fiber.MethodPost, "/checkout/setup-intent", strings.NewReader(`{"price_id":"price_ultimate_monthly_t"}`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != fiber.StatusInternalServerError {
+				t.Errorf("status = %d, want 500", resp.StatusCode)
+			}
+			row := readStripeCustomer(t, sub)
+			if missing {
+				if row.CustomerID != "cus_new" {
+					t.Errorf("customer = %q, want the replacement cus_new", row.CustomerID)
+				}
+				return
+			}
+			if row.CustomerID != "cus_kept" || row.Status != "canceled" {
+				t.Errorf("row = %+v, want cus_kept/canceled untouched", row)
+			}
+		})
+	}
+}

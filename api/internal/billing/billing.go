@@ -3,6 +3,7 @@ package billing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -176,8 +177,10 @@ func hadPriorSubscription(userID string) (bool, error) {
 }
 
 // getOrCreateStripeCustomer looks up or creates a Stripe customer for the user.
-// If a cached customer ID is stale (e.g. Stripe mode switch, deleted customer),
-// it deletes the stale record and creates a fresh customer.
+// Only a customer Stripe reports deleted or missing (e.g. after a Stripe mode
+// switch) is replaced: its record is deleted and a fresh customer created. Any
+// other Stripe error fails the request and leaves the record alone, so a
+// timeout cannot cost the account its trial history or its subscription link.
 func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	// Check DB first
 	var customerID string
@@ -187,6 +190,10 @@ func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	if err == nil && customerID != "" {
 		// Verify the cached customer still exists in Stripe and isn't deleted
 		c, stripeErr := stripecustomer.Get(customerID, nil)
+		var se *stripe.Error
+		if stripeErr != nil && !(errors.As(stripeErr, &se) && se.Code == stripe.ErrorCodeResourceMissing) {
+			return "", fmt.Errorf("check stripe customer %s: %w", customerID, stripeErr)
+		}
 		if stripeErr == nil && !c.Deleted {
 			// Backfill email if the Stripe customer was created without one
 			if c.Email == "" && email != "" {
