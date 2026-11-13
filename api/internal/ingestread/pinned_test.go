@@ -190,11 +190,16 @@ func TestMergePinnedRowsRSSIsScopedToTheCallersFeeds(t *testing.T) {
 	const mine, theirs, user = "https://pin-test.example/mine.xml", "https://pin-test.example/theirs.xml", "pin-scope-user"
 	clean := func() {
 		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM rss_items WHERE feed_url LIKE 'https://pin-test.example/%'`)
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM tracked_feeds WHERE url LIKE 'https://pin-test.example/%'`)
 		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM user_widgets WHERE logto_sub = $1`, user)
 	}
 	clean()
 	defer clean()
 	for _, u := range []string{mine, theirs} {
+		if _, err := platform.DBPool.Exec(ctx,
+			`INSERT INTO tracked_feeds (url, name) VALUES ($1, 'pin test')`, u); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := platform.DBPool.Exec(ctx,
 			`INSERT INTO rss_items (feed_url, guid, title, published_at) VALUES ($1, 'g', 'headline', now())`, u); err != nil {
 			t.Fatal(err)
