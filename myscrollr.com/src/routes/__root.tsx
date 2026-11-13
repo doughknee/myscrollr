@@ -103,11 +103,24 @@ function NotFound() {
   )
 }
 
-function RootDocument({ children }: { children: ReactNode }) {
+function RootDocument({
+  children,
+  htmlClass,
+  themeFamily,
+}: {
+  children: ReactNode
+  htmlClass?: string
+  themeFamily?: string
+}) {
   return (
     // suppressHydrationWarning: the inline theme script legitimately adds
     // `class="dark"` to <html> before React hydrates.
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={htmlClass || undefined}
+      data-theme-family={themeFamily}
+      suppressHydrationWarning
+    >
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -141,10 +154,34 @@ function RootDocument({ children }: { children: ReactNode }) {
   )
 }
 
+// The error boundary swaps in a fresh <html>, which would drop the `dark` class
+// and theme family the pre-hydration script put on the old one. Read them off
+// the live element (still there while this renders) and hand them to the new
+// one. On the server there is no document and `suppressHydrationWarning` on
+// <html> covers the difference. The site chrome stays so the visitor keeps
+// the menu, the footer and a way back.
 function RootErrorDocument(props: { error: unknown }) {
+  const live = typeof document === 'undefined' ? null : document.documentElement
   return (
-    <RootDocument>
-      <RootErrorComponent {...props} />
+    <RootDocument
+      htmlClass={live?.className}
+      themeFamily={live?.getAttribute('data-theme-family') ?? undefined}
+    >
+      <MotionConfig reducedMotion="user">
+        <LazyMotion features={loadMotionFeatures}>
+          <div className="min-h-dvh relative overflow-x-clip bg-base-75 scanlines">
+            <Header hasBar={false} />
+            <main
+              id="main-content"
+              className="relative min-h-[calc(100dvh-60px)]"
+              tabIndex={-1}
+            >
+              <RootErrorComponent {...props} />
+            </main>
+            <Footer />
+          </div>
+        </LazyMotion>
+      </MotionConfig>
     </RootDocument>
   )
 }
@@ -222,75 +259,75 @@ function RootLayout() {
     <RootDocument>
       <MotionConfig reducedMotion="user">
         <LazyMotion features={loadMotionFeatures}>
-        <div
-          className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
-            hasBar ? 'pb-[88px]' : ''
-          } ${
-            // Top-pinned bar is fixed; pad the page so it doesn't sit
-            // on top of the (sticky) header at scroll 0.
-            hasBar && pos === 'top' ? 'pt-16' : ''
-          }`}
-        >
-          {/* Skip to main content — first focusable element */}
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:text-primary-content focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
+          <div
+            className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
+              hasBar ? 'pb-[88px]' : ''
+            } ${
+              // Top-pinned bar is fixed; pad the page so it doesn't sit
+              // on top of the (sticky) header at scroll 0.
+              hasBar && pos === 'top' ? 'pt-16' : ''
+            }`}
           >
-            Skip to main content
-          </a>
+            {/* Skip to main content — first focusable element */}
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:text-primary-content focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
+            >
+              Skip to main content
+            </a>
 
-          {/* Navigation */}
-          {!isConsole && <Header hasBar={hasBar} />}
+            {/* Navigation */}
+            {!isConsole && <Header hasBar={hasBar} />}
 
-          {/* Reserve the viewport below the 60px header, even while Outlet is
+            {/* Reserve the viewport below the 60px header, even while Outlet is
               empty. The console reserves nothing — AdminChrome's own 48px bar
               is inside the Outlet. */}
-          <main
-            ref={mainRef}
-            id="main-content"
-            onFocus={(event) => {
-              // Both the skip link and route focus enter here. The console's
-              // navigation lives inside this shared shell; skip past it.
-              if (isConsole && event.target === event.currentTarget) {
-                event.currentTarget
-                  .querySelector<HTMLElement>('[data-admin-workspace]')
-                  ?.focus({ preventScroll: true })
+            <main
+              ref={mainRef}
+              id="main-content"
+              onFocus={(event) => {
+                // Both the skip link and route focus enter here. The console's
+                // navigation lives inside this shared shell; skip past it.
+                if (isConsole && event.target === event.currentTarget) {
+                  event.currentTarget
+                    .querySelector<HTMLElement>('[data-admin-workspace]')
+                    ?.focus({ preventScroll: true })
+                }
+              }}
+              className={
+                isConsole ? 'relative' : 'relative min-h-[calc(100dvh-60px)]'
               }
-            }}
-            className={
-              isConsole ? 'relative' : 'relative min-h-[calc(100dvh-60px)]'
-            }
-            tabIndex={-1}
-          >
-            <Outlet />
-          </main>
-
-          {/* Footer */}
-          {!isConsole && <Footer />}
-          {!isConsole && (
-            <ClientOnly>
-              <AnalyticsConsent />
-            </ClientOnly>
-          )}
-
-          {/* The app's own ticker, live, pinned like the app pins it: one
-              height (64px), the visitor's edge, theme, widgets and mode. */}
-          {hasBar && (
-            <div
-              data-demo-ticker-bar={pos}
-              className={`fixed left-0 right-0 z-50 h-16 ${
-                pos === 'bottom' ? 'bottom-0' : 'top-0'
-              }`}
+              tabIndex={-1}
             >
-              <LiveBar
-                theme={`${demoFamily}-${mode}`}
-                widgets={customized ? active : undefined}
-                mode={scroll}
-              />
-            </div>
-          )}
-        </div>
-      </LazyMotion>
+              <Outlet />
+            </main>
+
+            {/* Footer */}
+            {!isConsole && <Footer />}
+            {!isConsole && (
+              <ClientOnly>
+                <AnalyticsConsent />
+              </ClientOnly>
+            )}
+
+            {/* The app's own ticker, live, pinned like the app pins it: one
+              height (64px), the visitor's edge, theme, widgets and mode. */}
+            {hasBar && (
+              <div
+                data-demo-ticker-bar={pos}
+                className={`fixed left-0 right-0 z-50 h-16 ${
+                  pos === 'bottom' ? 'bottom-0' : 'top-0'
+                }`}
+              >
+                <LiveBar
+                  theme={`${demoFamily}-${mode}`}
+                  widgets={customized ? active : undefined}
+                  mode={scroll}
+                />
+              </div>
+            )}
+          </div>
+        </LazyMotion>
       </MotionConfig>
     </RootDocument>
   )

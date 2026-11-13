@@ -32,8 +32,8 @@ export function TerminalHero() {
 function HeroActions() {
   const navigate = useNavigate()
   // SSR + first client render use the generic label; the real platform
-  // resolves in the mount effect (same hydration-safety pattern as
-  // DownloadButton — see that file for the React #418 rationale).
+  // resolves in the mount effect (avoids a React #418
+  // hydration mismatch).
   const [info, setInfo] = useState<PlatformInfo | null>(null)
 
   useEffect(() => {
