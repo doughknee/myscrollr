@@ -61,6 +61,14 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
   const attemptRef = useRef(0);
   const startRef = useRef<() => Promise<void>>(async () => {});
   const connectedRef = useRef(false);
+  // A 401 gets one immediate retry (the normal token rotation must not
+  // leave a visible gap); a second 401 before a connection waits.
+  const quickRetryUsedRef = useRef(false);
+  const forceRefreshRef = useRef(false);
+  // Oversized-frame aborts follow a "connected", which resets the backoff,
+  // so they count on their own. ponytail: kept until stopSSE; a server that
+  // misbehaved once waits longer next time, capped at RETRY_MAX_MS.
+  const oversizeAbortsRef = useRef(0);
   const everConnectedRef = useRef(false);
   const onReconnectRef = useRef(onReconnect);
   onReconnectRef.current = onReconnect;
@@ -89,10 +97,15 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
     activeRef.current = true;
     // Demo mode talks to the no-auth bridge, which ignores the Bearer —
     // use a placeholder so the SSE stream still starts without Logto.
-    const token = DEMO ? "demo" : await getValidToken();
+    // After a 401 the stored token is wrong whatever its local expiry says
+    // (a clock behind the server's, a key rotated), so refresh it.
+    const force = forceRefreshRef.current;
+    forceRefreshRef.current = false;
+    const token = DEMO ? "demo" : await getValidToken(force);
     // Ownership can move while the silent refresh is in flight.
     if (!token || !ownsRef.current) {
       activeRef.current = false;
+      forceRefreshRef.current = force; // the refresh did not happen: still owed
       scheduleRetry(); // a refresh that failed once may work in a moment
       return;
     }
@@ -109,6 +122,7 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
     if (!ownsRef.current) return;
     clearRetry();
     attemptRef.current = 0;
+    oversizeAbortsRef.current = 0;
     activeRef.current = false;
     setDeliveryMode("polling");
     await invoke("stop_sse").catch(() => {});
@@ -160,6 +174,7 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
       setDeliveryMode(status === "connected" ? "sse" : "polling");
       if (status === "connected") {
         attemptRef.current = 0;
+        quickRetryUsedRef.current = false;
         const wasConnected = connectedRef.current;
         connectedRef.current = true;
         // Events missed while the stream was down are gone: catch up once.
@@ -170,10 +185,20 @@ export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
       connectedRef.current = false; // anything but "connected" is a gap
       // Rust has given up on the stream: a 401, or repeated oversized frames
       // (the only "error" it sends with a message). The owner reopens it
-      // with a fresh token, retrying if that cannot be had yet.
-      if (status === "auth-expired" || (status === "error" && message)) {
+      // with a fresh token, through the backoff so a server that keeps
+      // refusing is not hammered (SCROLLR-470).
+      if (status === "auth-expired") {
         activeRef.current = false;
-        await startSSE();
+        forceRefreshRef.current = true;
+        if (!quickRetryUsedRef.current) {
+          quickRetryUsedRef.current = true;
+          await startSSE();
+        } else scheduleRetry();
+      } else if (status === "error" && message) {
+        activeRef.current = false;
+        oversizeAbortsRef.current += 1;
+        attemptRef.current = Math.max(attemptRef.current, oversizeAbortsRef.current);
+        scheduleRetry();
       }
     },
   );

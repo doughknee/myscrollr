@@ -30,7 +30,7 @@ vi.mock("../preferences", () => ({ loadPref: (_k: string, d: unknown) => d }));
 vi.mock("../config", () => ({ API_BASE: "http://x", DEMO: false }));
 
 import { useSharedSSE } from "./useSharedSSE";
-import { rearmRefresh } from "../auth";
+import { getValidToken, rearmRefresh } from "../auth";
 import { invoke } from "@tauri-apps/api/core";
 
 describe("useSharedSSE election", () => {
@@ -119,5 +119,57 @@ describe("useSharedSSE keeps the stream alive (RC-4)", () => {
     await status({ status: "reconnecting" });
     await status({ status: "connected" });
     expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
+});
+
+// SCROLLR-470 (D2-2): a server that keeps answering 401 used to get a new
+// connection the moment it refused the last one, with no delay at all.
+describe("useSharedSSE backs off a refused stream", () => {
+  const rustReplies = (payloads: object[]) => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd !== "start_sse") return;
+      for (const payload of payloads) {
+        queueMicrotask(() => void h.handlers.get("sse-status")!({ payload }));
+      }
+    });
+  };
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(invoke).mockClear();
+    vi.mocked(getValidToken).mockClear();
+    h.owns = true;
+    h.token = "tok";
+    h.signedOut = false;
+  });
+  afterEach(() => {
+    vi.mocked(invoke).mockImplementation(async () => {});
+    vi.useRealTimers();
+  });
+
+  it("bounds the starts when every attempt is refused, refreshing the token each time", async () => {
+    rustReplies([{ status: "auth-expired" }]);
+    renderHook(() => useSharedSSE({ tickerShown: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    // 0 s, the one quick retry, then 2, 4, 8, 16 and 32 s apart.
+    expect(startCalls()).toBe(6);
+    expect(vi.mocked(getValidToken).mock.calls.filter(([force]) => force === true).length).toBe(5);
+  });
+
+  it("reconnects at once with a refreshed token after a single 401", async () => {
+    renderHook(() => useSharedSSE({ tickerShown: true }));
+    await act(async () => {});
+    await status({ status: "connected" });
+    expect(startCalls()).toBe(1);
+    await status({ status: "auth-expired" });
+    expect(startCalls()).toBe(2);
+    expect(getValidToken).toHaveBeenLastCalledWith(true);
+  });
+
+  it("waits longer after each oversized-data abort", async () => {
+    rustReplies([{ status: "connected" }, { status: "error", message: "Connection aborted: server sending oversized data" }]);
+    renderHook(() => useSharedSSE({ tickerShown: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    // Starts at 0, 4, 12, 28 and 60 s (the gaps double).
+    expect(startCalls()).toBe(5);
   });
 });
