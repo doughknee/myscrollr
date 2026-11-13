@@ -51,9 +51,20 @@ func HandleSequinWebhook(c *fiber.Ctx) error {
 		})
 	}
 
+	// A failed publish answers 503 so Sequin redelivers the batch (a
+	// swallowed failure used to lose the change for good, RB-7). Redelivery
+	// is safe: a CDC record replaces the client's copy of the row, so a
+	// repeat is a no-op. A record that can never be processed is logged and
+	// skipped inside routeCDCRecord, so it cannot loop.
 	ctx := context.Background()
 	for _, rec := range records {
-		routeCDCRecord(ctx, rec)
+		if err := routeCDCRecord(ctx, rec); err != nil {
+			log.Printf("[Sequin] Publish failed, asking Sequin to redeliver: %v", err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{
+				Status: "error",
+				Error:  "Event publish failed, retry",
+			})
+		}
 	}
 
 	return c.JSON(fiber.Map{"status": "ok", "processed": len(records)})
@@ -79,8 +90,10 @@ func parseCDCRecords(body []byte) ([]CDCRecord, error) {
 
 // routeCDCRecord publishes a CDC event to the appropriate topic channel.
 // The Hub's listenToTopics goroutine receives the message and fans out
-// to all subscribed clients in-memory.
-func routeCDCRecord(ctx context.Context, rec CDCRecord) {
+// to all subscribed clients in-memory. It returns an error only for a
+// transient failure worth redelivering (the Redis publish); a record that
+// can never be routed is logged and acknowledged.
+func routeCDCRecord(ctx context.Context, rec CDCRecord) error {
 	table := rec.Metadata.TableName
 
 	// A games row is relayed as the desktop's whole picture of that game,
@@ -103,17 +116,20 @@ func routeCDCRecord(ctx context.Context, rec CDCRecord) {
 	payload, err := json.Marshal(envelope)
 	if err != nil {
 		log.Printf("[Sequin] Failed to marshal payload for table %s: %v", table, err)
-		return
+		return nil
 	}
 
 	// Determine the topic channel based on the table and record content
 	topic := topicForRecord(table, rec.Record)
 	if topic == "" {
-		return
+		return nil
 	}
 
 	// Single PUBLISH to the topic channel -- Hub handles fan-out in memory
-	PublishToTopic(topic, payload)
+	if err := platform.PublishRaw(topic, payload); err != nil {
+		return fmt.Errorf("publish to %s: %w", topic, err)
+	}
+	return nil
 }
 
 // topicForRecord maps a CDC table + record to the correct topic channel.
