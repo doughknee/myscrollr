@@ -109,6 +109,13 @@ func MergePinnedRows(ctx context.Context, userSub string, pins map[string][]stri
 	// Leagues are only read if a sports pin actually needs them.
 	var leagues []string
 	leaguesLoaded := false
+	// RSS pins are read from rss_items by URL alone, so the URL must be one
+	// the caller could already see: a feed in their own widgets or a curated
+	// one (SCROLLR-459 / SB-11). Without this a pin was a membership oracle
+	// and an unscoped read of another user's custom feed. Sports pins are
+	// bounded by the caller's leagues (pinnedGame); finance pins read the
+	// public quote table, which /finance/public already serves to anyone.
+	var rssAllowed map[string]bool
 
 	for source, subjects := range pins {
 		section, ok := data[source]
@@ -121,6 +128,14 @@ func MergePinnedRows(ctx context.Context, userSub string, pins map[string][]stri
 		for _, subject := range subjects {
 			if rowsHaveSubject(rows, fields, subject) {
 				continue
+			}
+			if source == "rss" {
+				if rssAllowed == nil {
+					rssAllowed = pinnableFeeds(ctx, userSub)
+				}
+				if !rssAllowed[subject] {
+					continue
+				}
 			}
 			if source == "sports" && !leaguesLoaded {
 				leagues, _ = getUserSportsLeagues(ctx, userSub)
@@ -137,6 +152,24 @@ func MergePinnedRows(ctx context.Context, userSub string, pins map[string][]stri
 			data[source] = rows
 		}
 	}
+}
+
+// pinnableFeeds is the set of feed URLs a user may pin: those in their own
+// news and custom-feed widgets plus every curated feed. A failed lookup
+// yields only the curated set, so an error never widens access.
+func pinnableFeeds(ctx context.Context, userSub string) map[string]bool {
+	allowed := map[string]bool{}
+	for _, u := range curatedFeedURLs() {
+		allowed[u] = true
+	}
+	own, err := getUserRSSFeedURLs(ctx, userSub)
+	if err != nil {
+		log.Printf("[RSS] Pinned feed scope lookup failed: %v", err)
+	}
+	for _, u := range own {
+		allowed[u] = true
+	}
+	return allowed
 }
 
 // rowsHaveSubject reports whether the already-selected rows cover this
