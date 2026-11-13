@@ -44,7 +44,7 @@ mod tests {
     #[test]
     fn only_qualified_pairs_and_signed_artifacts_are_accepted() {
         let p = policy();
-        for source in ["1.8.0-beta.1", "1.8.0-beta.2", "1.8.0-beta.3"] {
+        for source in ["1.8.0-beta.1", "1.8.0-beta.2", "1.8.0-beta.3", "1.8.0-beta.4"] {
             for target in ["windows-x86_64-nsis", "darwin-aarch64", "linux-x86_64"] {
                 let artifact = &p["platforms"][target];
                 assert!(matches_artifact(
@@ -72,7 +72,7 @@ mod tests {
         }
         for (source, target) in [
             ("1.8.0", "1.7.3"),
-            ("1.8.0-beta.4", "1.7.3"),
+            ("1.8.0-beta.5", "1.7.3"),
             ("1.8.0-beta.1", "1.7.2"),
             ("1.8.0-beta.1", "1.9.0"),
         ] {

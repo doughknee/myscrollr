@@ -96,7 +96,7 @@ test('all publication/recovery entry points retain the readiness and monotonic L
   }
 });
 
-test('draft recovery verification is restricted to protected main and the exact Beta 3 pair', async () => {
+test('draft recovery verification is restricted to protected main and the exact Beta 3 and Beta 4 pairs', async () => {
   const text = await readFile(new URL('../../.github/workflows/desktop-update-rehearsal.yml', import.meta.url), 'utf8');
   const draftJob = text.split('  verify:')[1].split('  verify-recovery:')[0];
   const publishedJob = text.split('  verify-recovery:')[1].split('  transport:')[0];
@@ -106,9 +106,11 @@ test('draft recovery verification is restricted to protected main and the exact 
   const inputs = { recovery: true, tag: 'desktop-v1.7.3', run_id: '41688396593',
     source_tag: 'desktop-v1.8.0-beta.3', source_run_id: '12345', from_version: '1.8.0-beta.3' };
   assert(allowed({ ref: 'refs/heads/main' }, inputs));
+  // Beta 4 is the second candidate waiting for its rehearsal.
+  assert(allowed({ ref: 'refs/heads/main' }, { ...inputs, source_tag: 'desktop-v1.8.0-beta.4', from_version: '1.8.0-beta.4' }));
   assert(!allowed({ ref: 'refs/heads/feature/unreviewed' }, inputs));
   for (const changed of [{ tag: 'desktop-v1.7.2' }, { run_id: '12345' },
-    { source_tag: 'desktop-v1.8.0-beta.4' }, { source_run_id: '' }, { from_version: '1.8.0-beta.1' }]) {
+    { source_tag: 'desktop-v1.8.0-beta.4' }, { source_tag: 'desktop-v1.8.0-beta.5', from_version: '1.8.0-beta.5' }, { source_run_id: '' }, { from_version: '1.8.0-beta.1' }]) {
     assert(!allowed({ ref: 'refs/heads/main' }, { ...inputs, ...changed }));
   }
   assert(draftJob.includes('contents: write'));
