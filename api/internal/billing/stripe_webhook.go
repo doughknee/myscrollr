@@ -244,6 +244,28 @@ func HandleSubscriptionUpdated(event stripe.Event) error {
 		return nil
 	}
 
+	// Act on the subscription as it is now, not as the event saw it: a
+	// retried or late event can describe a state a later event already
+	// replaced (SCROLLR-465). Stripe is unreachable: retry the event.
+	current, err := stripesubscription.Get(sub.ID, nil)
+	var se *stripe.Error
+	if errors.As(err, &se) && se.Code == stripe.ErrorCodeResourceMissing {
+		// Gone at Stripe (mode switch, test-data clean-up): no retry can
+		// succeed, so acknowledge it like an unknown customer.
+		log.Printf("[Stripe Webhook] Ignoring subscription.updated for %s: Stripe has no such subscription", sub.ID)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("fetch subscription %s: %w", sub.ID, err)
+	}
+	sub = *current
+	if storedSubID == nil && !subscriptionGrantsAccess(string(sub.Status)) {
+		// The row stores no subscription: this one's end was already
+		// applied, or it never started. Nothing to change.
+		log.Printf("[Stripe Webhook] Ignoring subscription.updated for %s: user=%s has no stored subscription and it is %s", sub.ID, logtoSub, sub.Status)
+		return nil
+	}
+
 	status := string(sub.Status)
 	// In stripe-go v82, CurrentPeriodEnd moved to SubscriptionItem
 	var periodEndUnix int64

@@ -53,6 +53,24 @@ func stubStripeAPI(t *testing.T, handler http.HandlerFunc) {
 	})
 }
 
+// serveSubscription stubs Stripe so that fetching any subscription returns
+// raw: the subscription.updated handler acts on Stripe's current copy.
+func serveSubscription(t *testing.T, raw string) {
+	t.Helper()
+	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(raw))
+	})
+}
+
+// deliverSubscriptionUpdate hands the handler a subscription.updated event
+// whose payload is also what Stripe currently returns.
+func deliverSubscriptionUpdate(t *testing.T, raw string) error {
+	t.Helper()
+	serveSubscription(t, raw)
+	return billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", raw))
+}
+
 // setStripePriceEnv configures the price-ID → plan mapping used by
 // planFromPriceID.
 func setStripePriceEnv(t *testing.T) {
@@ -158,7 +176,7 @@ func TestIntegrationSubscriptionUpdatedPlanChange(t *testing.T) {
 	seedStripeCustomer(t, sub, "cus_up_1", "monthly", "active", false)
 
 	periodEnd := int64(1781136000)
-	billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	deliverSubscriptionUpdate(t, `{
 		"id": "sub_up_1", "object": "subscription", "status": "active",
 		"cancel_at_period_end": false, "customer": "cus_up_1",
 		"items": {"object": "list", "data": [{
@@ -166,7 +184,7 @@ func TestIntegrationSubscriptionUpdatedPlanChange(t *testing.T) {
 			"current_period_end": 1781136000,
 			"price": {"id": "price_pro_monthly_t", "object": "price"}
 		}]}
-	}`))
+	}`)
 
 	row := readStripeCustomer(t, sub)
 	if row.Plan != "pro_monthly" || row.Status != "active" {
@@ -195,7 +213,7 @@ func TestIntegrationSubscriptionUpdatedCancelAtPeriodEnd(t *testing.T) {
 	const sub = "user_hook_cancel"
 	seedStripeCustomer(t, sub, "cus_cancel_1", "pro_monthly", "active", false)
 
-	billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	deliverSubscriptionUpdate(t, `{
 		"id": "sub_cancel_1", "object": "subscription", "status": "active",
 		"cancel_at_period_end": true, "customer": "cus_cancel_1",
 		"items": {"object": "list", "data": [{
@@ -203,7 +221,7 @@ func TestIntegrationSubscriptionUpdatedCancelAtPeriodEnd(t *testing.T) {
 			"current_period_end": 1781136000,
 			"price": {"id": "price_pro_monthly_t", "object": "price"}
 		}]}
-	}`))
+	}`)
 
 	row := readStripeCustomer(t, sub)
 	if row.Status != "canceling" {
