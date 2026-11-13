@@ -296,13 +296,27 @@ func handleGetSports(c *fiber.Ctx) error {
 		return c.JSON(resp)
 	}
 
-	leagues, _ := getUserSportsLeagues(ctx, userSub)
+	leagues, err := getUserSportsLeagues(ctx, userSub)
+	if err != nil {
+		log.Printf("[Sports] user leagues unreadable: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "Internal server error",
+		})
+	}
 	if len(leagues) == 0 {
 		// Even with no leagues, return the shape — empty arrays both sides.
 		return c.JSON(SportsResponse{Sports: []Game{}, Meta: SportsMeta{Leagues: []LeagueMeta{}}})
 	}
 
-	favoriteTeams, _ := getUserFavoriteTeams(ctx, userSub)
+	favoriteTeams, err := getUserFavoriteTeams(ctx, userSub)
+	if err != nil {
+		log.Printf("[Sports] favorite teams unreadable: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "Internal server error",
+		})
+	}
 	// /sports (full channel page) returns every game for every selected
 	// league. The page already has league + status filter chips for the
 	// user to narrow down — we surface all the data and let them control it.
