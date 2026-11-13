@@ -2,11 +2,11 @@
 
 Choosing **Stable** in Settings → Updates stops future Beta offers. It does not replace the installed app. A newer installed Beta can remain installed until a newer Stable release is available.
 
-**Return to Stable** is available in 1.8.0-beta.2 and in the unpublished 1.8.0-beta.3 candidate for the supported packages below. In Settings → Updates, select Stable, check for updates, then choose **Return to Stable 1.7.3**. A separate confirmation shows the versions before any download or installation. The action is not present in 1.8.0-beta.1; use the manual instructions below if that version cannot be updated.
+**Return to Stable** is available in 1.8.0-beta.2 and in the unpublished 1.8.0-beta.3 and 1.8.0-beta.4 candidates for the supported packages below. In Settings → Updates, select Stable, check for updates, then choose **Return to Stable 1.7.3**. A separate confirmation shows the versions before any download or installation. The action is not present in 1.8.0-beta.1; use the manual instructions below if that version cannot be updated.
 
 ## If a Beta will not open
 
-Quit Scrollr completely, including its tray/menu-bar process. Use the official [Stable 1.7.3 release](https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.7.3) for recovery from **1.8.0-beta.1, 1.8.0-beta.2 or 1.8.0-beta.3**. This removes Fill this display; the ticker returns to docking.
+Quit Scrollr completely, including its tray/menu-bar process. Use the official [Stable 1.7.3 release](https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.7.3) for recovery from **1.8.0-beta.1, 1.8.0-beta.2, 1.8.0-beta.3 or 1.8.0-beta.4**. This removes Fill this display; the ticker returns to docking.
 
 - **Windows x64, installed with the EXE:** run the signed 1.7.3 EXE installer over the existing installation. Use the same installation location. Do not uninstall or select an option to delete app data.
 - **Apple Silicon macOS:** replace Scrollr in Applications with the 1.7.3 app from the official DMG, then reopen it. Do not delete its Application Support data.
@@ -37,3 +37,13 @@ These rehearsals use a mock native updater host with actual signed packages. The
 The 1.8.0-beta.3 source entry is provisional until its final signed build passes on all three supported packages. Published Stable 1.7.3 assets, signatures and build run `41688396593` stay fixed. Beta 3 changes no storage keys, app identifier, package layout or sign-in storage relative to Beta 2: it adds failure and first-run states, a retrying event stream, one link opener, and moves the updater endpoint to the repository's current owner.
 
 After the candidate build succeeds, run `desktop-update-rehearsal.yml` on main in both directions: Stable 1.7.3 → Beta 3 with `recovery=false`, then Beta 3 → Stable 1.7.3 with `recovery=true`. Bind both runs to the same final candidate build and record their run IDs here before the draft is published. Preparing this candidate does not publish a build or change a feed.
+
+Status on 13 November 2026: the Beta 3 candidate is commit `30ac577a5631a6ff4289e3cf2e8f38a3c2b332c4`, [build 43513775231](https://github.com/doughknee/myscrollr/actions/runs/43513775231). Windows x64 and Linux x64 are built and signed. The macOS build is signed but not notarized: Apple's notary service refuses the account until its updated developer agreement is accepted. Re-running the failed job of that build completes the cohort; both rehearsals follow. Until then Beta 3 is not qualified.
+
+### Beta 4 candidate qualification
+
+The 1.8.0-beta.4 source entry is provisional on the same terms: its final signed build must pass on all three supported packages, with Stable 1.7.3 assets, signatures and build run `41688396593` fixed. Beta 4 changes no storage keys, app identifier or package layout relative to Beta 3. It does change sign-in handling (a cancellable sign-in, stricter refresh rules, account data cleared on an account change), so the signed-in round trip listed below matters more for this candidate than for the last.
+
+The rehearsal workflow's main-only draft recovery condition accepts both candidates, Beta 3 and Beta 4, because Beta 3's rehearsal had not run when Beta 4 was prepared. Run both directions for each candidate against its own final build and record the run IDs here before either draft is published. Preparing these candidates does not publish a build or change a feed.
+
+Not covered by the rehearsals, and to check by hand on Beta 4: a normal browser sign-in, Cancel then sign in again, wake from sleep with the bar reconnecting within about 45 seconds, and on Windows with the bar docked, the screen work area before and after an in-app update from this version.
