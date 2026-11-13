@@ -78,7 +78,7 @@ func TestDashboardDatabaseErrorIsNotAnEmptyAccount(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Widgets == nil || len(body.Widgets) != 0 || len(body.Preferences) == 0 {
+	if len(body.Widgets) != 0 || len(body.Preferences) == 0 {
 		t.Fatalf("empty account body wrong: widgets=%v prefs=%s", body.Widgets, body.Preferences)
 	}
 	if !mr.Exists(platform.RedisDashboardCachePrefix + sub) {
