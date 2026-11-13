@@ -14,6 +14,8 @@ jobs:
           fetch-depth: 0
       - name: Fixture test
         run: bash scripts/ci/check-repo-shape.test.sh
+      - name: Smoke test checks
+        run: bash scripts/smoke/production-readiness.test.sh
       - name: Doc paths still exist
         run: |
           bash scripts/ci/check-doc-paths.test.sh
