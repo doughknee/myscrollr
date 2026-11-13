@@ -19,6 +19,7 @@ import { useCallback, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
+  CloudOff,
   Newspaper,
   Plus,
   TrendingUp,
@@ -34,6 +35,10 @@ import PageLayout from "../components/layout/PageLayout";
 import { useShell, useShellData } from "../shell-context";
 import { useCatalog } from "../hooks/useCatalog";
 import { useAddWidget } from "../hooks/useAddWidget";
+import {
+  shouldOfferDefaultWidget,
+  useAwaitingStarter,
+} from "../lib/firstRunDefaultWidget";
 import {
   widgetManifest,
   sourceForWidget,
@@ -102,11 +107,16 @@ function HomePage() {
   const navigate = useNavigate();
   const shell = useShell();
   const units = shell.prefs.appearance.units;
-  const { widgets, dashboard } = useShellData();
+  const { widgets, dashboard, dashboardState, retryDashboard } = useShellData();
   const catalogVersion = useCatalog();
   const addWidget = useAddWidget();
   const { allWidgets, authenticated, onLogin } = shell;
   const enabledWidgets = shell.prefs.widgets.enabledWidgets;
+  // While the bar's starter (NPR + Stocks) is on its way, the welcome would
+  // flash and race it; bounded, because only the bar hears it fail.
+  const awaitingStarter = useAwaitingStarter(
+    shouldOfferDefaultWidget(authenticated, dashboard),
+  );
 
   const openWidget = useCallback(
     (id: string) => void navigate({ to: "/widget/$id", params: { id } }),
@@ -173,7 +183,11 @@ function HomePage() {
   const finance = bySource("finance");
   const rss = bySource("rss");
 
-  const hasAnything = resolved.length > 0 || utilities.length > 0;
+  // The welcome is for an account with no data source, once the dashboard
+  // has said so: not while it loads, not when it failed (SCROLLR-406), and
+  // not hidden by the default Clock (SCROLLR-448, UD-1).
+  const welcome =
+    dashboardState === "ready" && resolved.length === 0 && !awaitingStarter;
 
   // ── Happening now ─────────────────────────────────────────────
   //
@@ -247,7 +261,7 @@ function HomePage() {
   );
 
   // ── First run ─────────────────────────────────────────────────
-  if (!hasAnything) {
+  if (welcome) {
     return (
       <PageLayout title="Home" width="wide" noTopPadding>
         <WidgetBar>
@@ -262,6 +276,12 @@ function HomePage() {
           }}
           onBrowse={() => void navigate({ to: "/catalog" })}
         />
+        {/* Utilities you have (the Clock) stay, under the step to take. */}
+        {utilities.length > 0 && (
+          <div className="mx-auto w-full max-w-[620px] px-6 pb-8">
+            <UtilityTiles items={utilities} openWidget={openWidget} />
+          </div>
+        )}
       </PageLayout>
     );
   }
@@ -293,6 +313,19 @@ function HomePage() {
             })}
           </span>
         </header>
+
+        {/* ── Could not load (SCROLLR-406) ─────────────────── */}
+        {dashboardState === "failed" && (
+          <div className="mb-4">
+            <Card title="Couldn't load your sources" icon={<CloudOff size={14} />}>
+              <SetupBody
+                message="The last attempt failed. Scrollr keeps trying in the background, or you can try now."
+                cta="Try again"
+                onCta={retryDashboard}
+              />
+            </Card>
+          </div>
+        )}
 
         {/* ── Needs setup ──────────────────────────────────── */}
         {needsSetup.length > 0 && (
@@ -332,7 +365,7 @@ function HomePage() {
                     key={h.id}
                     type="button"
                     onClick={() => openWidget(h.id)}
-                    className="flex cursor-pointer flex-col items-start gap-1.5 rounded-xl p-3.5 text-left"
+                    className="flex min-w-0 cursor-pointer flex-col items-start gap-1.5 rounded-xl p-3.5 text-left [overflow-wrap:anywhere]"
                     style={{
                       background: `linear-gradient(135deg, ${h.hex} 0%, ${h.hex}d8 100%)`,
                     }}
@@ -404,11 +437,13 @@ function BentoGrid({
     <div
       className={clsx(
         "grid items-start gap-3.5",
-        left && right ? "grid-cols-[3fr_2fr]" : "grid-cols-1",
+        // minmax(0, …): a bare fr track grows to its longest nowrap line,
+        // so one long headline pushed Markets off the window (UD-2, UD-9).
+        left && right ? "grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : "grid-cols-1",
       )}
     >
       {left && (
-        <div className="flex flex-col gap-3.5">
+        <div className="flex min-w-0 flex-col gap-3.5">
           {sports.length > 0 && (
             <ScoresCard items={sports} openWidget={openWidget} />
           )}
@@ -421,7 +456,7 @@ function BentoGrid({
         </div>
       )}
       {right && (
-        <div className="flex flex-col gap-3.5">
+        <div className="flex min-w-0 flex-col gap-3.5">
           {finance.length > 0 && (
             <MarketsCard items={finance} openWidget={openWidget} />
           )}

@@ -57,7 +57,7 @@ import { useGitHubAutoPick } from "../widgets/github/useAutoPick";
 import { canonicalOrder } from "../marketplace";
 
 // Data
-import { dashboardQueryOptions } from "../api/queries";
+import { dashboardQueryOptions, dashboardState } from "../api/queries";
 
 // Preferences
 import {
@@ -262,10 +262,20 @@ function RootLayout() {
   const auth = useAuthState();
 
   // ── Dashboard data (TanStack Query) ─────────────────────────
-  const { data: dashboard } = useQuery({
+  const dashboardQuery = useQuery({
     ...dashboardQueryOptions(),
     refetchInterval: POLL_INTERVALS[auth.tier],
   });
+  const dashboard = dashboardQuery.data;
+  const dashState = dashboardState(dashboardQuery);
+  // Data on screen, last refresh failed: the data stays (SCROLLR-448), and
+  // the banner below says how old it is. Hidden by Dismiss until it recovers.
+  const refreshFailed = dashState === "ready" && dashboardQuery.isError;
+  const [refreshBannerDismissed, setRefreshBannerDismissed] = useState(false);
+  useEffect(() => {
+    if (!dashboardQuery.isError) setRefreshBannerDismissed(false);
+  }, [dashboardQuery.isError]);
+  const retryDashboard = useCallback(() => void dashboardQuery.refetch(), [dashboardQuery.refetch]);
 
   // ── CDC merge engine (processes SSE events into dashboard cache) ──
   useDashboardCDC();
@@ -977,8 +987,8 @@ function RootLayout() {
   );
 
   const shellDataValue = useMemo(
-    () => ({ widgets, dashboard }),
-    [widgets, dashboard],
+    () => ({ widgets, dashboard, dashboardState: dashState, retryDashboard }),
+    [widgets, dashboard, dashState, retryDashboard],
   );
 
   // ── Render ──────────────────────────────────────────────────
@@ -1086,7 +1096,26 @@ function RootLayout() {
                  route.isUpdates
                }
              >
-              <ConnectionBanner deliveryMode={deliveryMode} />
+              {/* A failed load outranks the stream's state. Cold, Home says
+                  it (feed.tsx); warm, this banner does. */}
+              {dashboardQuery.isError ? (
+                refreshFailed &&
+                !refreshBannerDismissed && (
+                  <BillingBanner
+                    tone="warn"
+                    cta="Try again"
+                    onCta={retryDashboard}
+                    onDismiss={() => setRefreshBannerDismissed(true)}
+                  >
+                    Couldn&rsquo;t refresh your sources.{" "}
+                    {dashboardQuery.dataUpdatedAt > 0
+                      ? `Showing what loaded at ${new Date(dashboardQuery.dataUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`
+                      : "Showing what was saved last time."}
+                  </BillingBanner>
+                )
+              ) : (
+                <ConnectionBanner deliveryMode={deliveryMode} />
+              )}
 
               {auth.sessionExpired && (
                 <BillingBanner

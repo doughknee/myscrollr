@@ -17,6 +17,7 @@ import type { AppPreferences } from "./preferences";
 import type { SubscriptionTier } from "./auth";
 import type { DataWidgetRow, SubscriptionInfo } from "./api/client";
 import type { DashboardResponse } from "./types";
+import type { DashboardState } from "./api/queries";
 import type { DataWidgetManifest, WidgetManifest } from "./types";
 
 // ── Stable context (prefs, auth, callbacks, manifests) ──────────
@@ -56,6 +57,9 @@ export interface ShellDataState {
   widgets: DataWidgetRow[];
   /** Dashboard query response (for initial data snapshots). */
   dashboard: DashboardResponse | undefined;
+  /** Loading, failed with nothing to show, or ready (SCROLLR-406). */
+  dashboardState: DashboardState;
+  retryDashboard: () => void;
 }
 
 export const ShellDataContext = createContext<ShellDataState | null>(null);

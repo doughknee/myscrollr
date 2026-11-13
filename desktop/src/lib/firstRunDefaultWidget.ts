@@ -82,6 +82,26 @@ export function withStarterClock(prefs: AppPreferences): AppPreferences {
 export const DEFAULT_WIDGET_RETRY_MS = 30_000;
 
 /**
+ * The longest any window holds back the "no sources" step for the starter.
+ * Only the owning window hears the starter fail; every other window (the
+ * main window, a second monitor's bar) would otherwise wait for a broadcast
+ * that never comes and show nothing to do, forever (SCROLLR-448, UD-1). A
+ * starter that lands after this still lands: its widgets replace the step.
+ */
+export const STARTER_GRACE_MS = 10_000;
+
+/** `eligible`, but for at most STARTER_GRACE_MS from when it became true. */
+export function useAwaitingStarter(eligible: boolean): boolean {
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    if (!eligible) return;
+    const timer = setTimeout(() => setExpired(true), STARTER_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [eligible]);
+  return eligible && !expired;
+}
+
+/**
  * Runs the first-run starter for this window and returns `awaiting`: true
  * while the empty-state CTA should stay suppressed. The call itself only
  * runs from the window that owns the shared connection, so N ticker windows
@@ -95,7 +115,8 @@ export const DEFAULT_WIDGET_RETRY_MS = 30_000;
  * If the apply throws (offline, 5xx) the CTA stops being suppressed at once,
  * so a failed first run degrades to the normal "no sources yet" state, and
  * exactly ONE retry is scheduled after DEFAULT_WIDGET_RETRY_MS. There is no
- * loop: after the retry the account simply keeps the CTA.
+ * loop: after the retry the account simply keeps the CTA. Windows that do
+ * not own the call stop suppressing after STARTER_GRACE_MS.
  */
 export function useFirstRunDefaultWidget(
   authenticated: boolean,
@@ -130,5 +151,5 @@ export function useFirstRunDefaultWidget(
     return () => clearTimeout(timer);
   }, [eligible]);
 
-  return eligible && !failed;
+  return useAwaitingStarter(eligible) && !failed;
 }

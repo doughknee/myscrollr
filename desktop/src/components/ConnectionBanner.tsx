@@ -102,7 +102,8 @@ export default function ConnectionBanner({
   const message =
     settledMode === "offline"
       ? "You appear to be offline. Data shown is from the last successful fetch."
-      : "Live updates paused — using polling. Data is still current.";
+      : // Not "data is still current": this banner cannot know that (RC-9).
+        "Live updates paused. Scrollr is checking for new data on a timer instead.";
 
   return (
     <div

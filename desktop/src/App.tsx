@@ -10,10 +10,10 @@ import { useSharedSSE } from "./hooks/useSharedSSE";
 import { useProductActivity } from "./hooks/useProductActivity";
 import { usePostHogActivity } from "./hooks/usePostHogActivity";
 import { isPrimaryTicker } from "./lib/windowRole";
-import { useFirstRunDefaultWidget, withStarterClock } from "./lib/firstRunDefaultWidget";
+import { STARTER_EDGE_WIDGET, useFirstRunDefaultWidget, withStarterClock } from "./lib/firstRunDefaultWidget";
 import { emit } from "@tauri-apps/api/event";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
-import { dashboardQueryOptions, queryKeys } from "./api/queries";
+import { dashboardQueryOptions, dashboardState, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
 import PagedBar from "./components/pages/PagedBar";
@@ -86,10 +86,18 @@ export default function App() {
   // This query has no refetchInterval; it only serves as the TanStack Query
   // cache holder so child components can useQuery(dashboardQueryOptions()).
   // Data arrives via: (1) store broadcast from main window, (2) CDC merge.
-  const { data: dashboard } = useQuery({
+  const dashboardQuery = useQuery({
     ...dashboardQueryOptions(),
     refetchInterval: false,
   });
+  const dashboard = dashboardQuery.data;
+  const dashState = dashboardState(dashboardQuery);
+  // Try again from the bar: this window refetches, and the main window (which
+  // polls and broadcasts) is asked to as well.
+  const retryDashboard = useCallback(() => {
+    void dashboardQuery.refetch();
+    void emit("dashboard-invalidate").catch(() => {});
+  }, [dashboardQuery.refetch]);
 
   // ── CDC merge engine (processes SSE events into dashboard cache) ──
   useDashboardCDC();
@@ -121,7 +129,9 @@ export default function App() {
   // On success, refetch here and tell the main window to do the same: its
   // next CDC merge would otherwise re-broadcast a copy without the widgets.
   // The Clock (a local utility) is enabled here, only after the server's NPR +
-  // Stocks landed, so a failed start never leaves a lone clock.
+  // Stocks landed. A fresh install's prefs carry the Clock already
+  // (preferences.ts), so a failed start can still leave one; the "no sources"
+  // step therefore shows beside it (SCROLLR-448).
   const awaitingDefaultWidget = useFirstRunDefaultWidget(
     authenticated,
     dashboard,
@@ -781,25 +791,34 @@ export default function App() {
             // know we're about to (or already are) offering the NPR
             // default, showing "no sources yet" first would be a flash of
             // the wrong empty state, not a real one.
+            //
+            // Both need a dashboard (SCROLLR-406): while it loads the bar
+            // says nothing, and if it could not load at all it says that
+            // and offers a retry. A failed refresh keeps the last data.
             const hasAnyPinnedWidget = prefs.widgets.pins.length > 0;
-            const showSourcelessCTA =
+            const showFailedCTA = dashState === "failed";
+            const sourceless =
+              dashState === "ready" &&
               authenticated &&
               widgets.length === 0 &&
-              !hasAnyPinnedWidget &&
               !awaitingDefaultWidget;
             const showInstalledOffCTA =
+              dashState === "ready" &&
               authenticated &&
               installedWidgetsMeta.length > 0 &&
               !hasAnyPinnedWidget;
-            // Widget pages (SCROLLR-272), the default. They get the same two
+            // Widget pages (SCROLLR-272), the default. They get the same
             // empty states as the chips bar (SCROLLR-274); utilities and
-            // pins sit on the fixed edge zone (SCROLLR-273).
+            // pins sit on the fixed edge zone (SCROLLR-273), and a docked
+            // bar keeps its edge beside the message (PagedBar).
             if (display.mode === "grid" || prefs.ticker.scrollMode === "pages") {
-              const emptyKind = showSourcelessCTA
-                ? "sourceless"
-                : showInstalledOffCTA && installedWidgetsMeta.length > 0
-                  ? "installedOff"
-                  : null;
+              const emptyKind = showFailedCTA
+                ? "failed"
+                : sourceless
+                  ? "sourceless"
+                  : showInstalledOffCTA
+                    ? "installedOff"
+                    : null;
               return (
                 <PagedBar
                   key={`${display.mode}:${display.pageLeader}:${fillHeight !== undefined}`}
@@ -815,6 +834,7 @@ export default function App() {
                         installedWidgets={installedWidgetsMeta}
                         onAddSources={handleAddSources}
                         onOpenWidget={handleOpenWidget}
+                        onRetry={retryDashboard}
                       />
                     )
                   }
@@ -839,8 +859,18 @@ export default function App() {
                 fitPins={filled}
                 onHover={filled ? "keep" : prefs.ticker.onHover}
                 widgetDisplay={prefs.widgetDisplay}
-                showSourcelessCTA={showSourcelessCTA}
+                // The rail has no page block to put the step beside, so it
+                // replaces a tape that holds the starter Clock at most (and
+                // the Timer that older installs split off it, preferences.ts);
+                // a utility the user added or a pin is a bar they chose.
+                showSourcelessCTA={
+                  sourceless &&
+                  !hasAnyPinnedWidget &&
+                  prefs.widgets.widgetsOnTicker.every((id) => id === STARTER_EDGE_WIDGET || id === "timer")
+                }
                 onAddSources={handleAddSources}
+                showFailedCTA={showFailedCTA}
+                onRetry={retryDashboard}
                 showInstalledOffCTA={showInstalledOffCTA}
                 installedWidgets={installedWidgetsMeta}
                 onOpenWidget={handleOpenWidget}

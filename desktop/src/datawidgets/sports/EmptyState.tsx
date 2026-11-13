@@ -6,7 +6,7 @@
  * "no leagues selected" CTA. Driven entirely by the LeagueMeta array
  * served alongside the games payload.
  */
-import { Settings, AlertTriangle } from "lucide-react";
+import { Settings, AlertTriangle, RotateCw } from "lucide-react";
 import { formatCountdown } from "../../utils/gameHelpers";
 import type { LeagueMeta } from "../../api/queries";
 
@@ -15,11 +15,18 @@ interface SportsEmptyStateProps {
   leagues: LeagueMeta[];
   /** Optional Configure CTA — only shown when leagues array is empty. */
   onConfigure?: () => void;
+  /**
+   * The read itself has not answered yet, or failed: then `leagues` is empty
+   * because nothing arrived, not because none are set up (UD-7).
+   */
+  status?: "loading" | "failed";
+  onRetry?: () => void;
 }
 
 /**
  * Decision tree (top wins):
- *   1. leagues empty                  → "Pick leagues to follow" + CTA
+ *   0. status loading / failed        → "Loading scores…" / "Couldn't load scores" + retry
+ *   1. leagues empty                 → "Pick leagues to follow" + CTA
  *   2. any polling_healthy=false      → "Live data unavailable: ..." (warning)
  *   3. all leagues is_offseason=true  → "Off-season — X returns in Yd"
  *   4. any league has next_game      → "Next: X • in Y"
@@ -31,7 +38,28 @@ interface SportsEmptyStateProps {
  * looking at the MLS page, and "Next: MLS • Mar 3" repeats the league name
  * already in the header. Named `only` below.
  */
-export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptyStateProps) {
+export default function SportsEmptyState({ leagues, onConfigure, status, onRetry }: SportsEmptyStateProps) {
+  // Branch 0: no answer yet, or a failed one. Never "nothing configured".
+  if (status === "loading") {
+    return <p className="px-4 py-5 text-center text-xs text-fg-4">Loading scores&hellip;</p>;
+  }
+  if (status === "failed") {
+    return (
+      <div className="px-4 py-5 text-center" role="status">
+        <p className="text-xs text-fg-3 font-medium mb-1">Couldn&rsquo;t load scores</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="inline-flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80"
+          >
+            <RotateCw size={11} />
+            Try again
+          </button>
+        )}
+      </div>
+    );
+  }
+
   // Branch 1: no leagues selected
   if (leagues.length === 0) {
     return (

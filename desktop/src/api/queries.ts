@@ -5,9 +5,10 @@
  * Every remote data fetch uses this layer — no manual fetch + useState.
  */
 import { queryOptions } from "@tanstack/react-query";
-import { isAuthenticated, hasRefreshToken } from "../auth";
-import { authFetch, request, rssApi, fetchOverview } from "./client";
+import { isAuthenticated, hasRefreshToken, isSignedOut } from "../auth";
+import { ApiError, authFetch, request, rssApi, fetchOverview } from "./client";
 import { pinnedSubjectsQuery } from "./pinnedSubjects";
+import { getStore } from "../lib/store";
 import { DEMO } from "../config";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game, Trade } from "../types";
@@ -79,8 +80,14 @@ async function fetchDashboard(): Promise<DashboardResponse> {
         widgets: data.widgets,
         preferences: data.preferences,
       } as DashboardResponse;
-    } catch {
-      // Token rejected or expired — fall back to public feed
+    } catch (err) {
+      // Only a session that is really over falls back to the public feed:
+      // a 401 after authFetch's refresh-and-retry left nothing stored. Any
+      // other failure (timeout, 429, 5xx, a refresh lost to the network)
+      // throws, so the query keeps the last good dashboard and reports the
+      // error. Before SCROLLR-448 every failure "succeeded" with a payload
+      // that has no widgets, and every bar said "no sources yet" (RC-1).
+      if (!(err instanceof ApiError && err.status === 401 && isSignedOut())) throw err;
     }
   }
 
@@ -90,13 +97,41 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   return { data: data.data } as DashboardResponse;
 }
 
+/**
+ * The last dashboard this install saw (the main window writes every good
+ * one to the store), so a restart during an outage opens on it rather than
+ * on nothing. Never another session's: a signed-in payload carries
+ * `preferences`, the public feed does not.
+ */
+function savedDashboard(): DashboardResponse | undefined {
+  const saved = getStore<DashboardResponse | null>("scrollr:dashboard", null);
+  if (!saved?.data) return undefined;
+  return !isSignedOut() === Boolean(saved.preferences) ? saved : undefined;
+}
+
 /** Query options for the dashboard — usable in route loaders and components. */
 export function dashboardQueryOptions() {
   return queryOptions({
     queryKey: queryKeys.dashboard,
     queryFn: fetchDashboard,
     staleTime: 10_000,
+    initialData: savedDashboard,
+    // Saved, not fetched: stale at once, and no "updated just now".
+    initialDataUpdatedAt: 0,
   });
+}
+
+/**
+ * The one reading every surface takes of the dashboard query (SCROLLR-406):
+ * `pending` (nothing yet, still trying: say nothing), `failed` (nothing at
+ * all and the last attempt failed: say so, offer a retry), `ready` (data,
+ * possibly kept from before a failed refresh). Only `ready` can be empty.
+ */
+export type DashboardState = "pending" | "failed" | "ready";
+
+export function dashboardState(query: { data?: unknown; isError: boolean }): DashboardState {
+  if (query.data) return "ready";
+  return query.isError ? "failed" : "pending";
 }
 
 // ── Catalog Queries ──────────────────────────────────────────────

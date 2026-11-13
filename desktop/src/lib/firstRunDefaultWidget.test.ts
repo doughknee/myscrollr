@@ -20,6 +20,7 @@ import {
   withStarterClock,
   useFirstRunDefaultWidget,
   DEFAULT_WIDGET_RETRY_MS,
+  STARTER_GRACE_MS,
 } from "./firstRunDefaultWidget";
 import { loadPrefs } from "../preferences";
 import type { DashboardResponse } from "../types";
@@ -204,9 +205,21 @@ describe("useFirstRunDefaultWidget", () => {
     vi.mocked(ownsSharedConnection).mockResolvedValue(false);
     const { result } = mount();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(DEFAULT_WIDGET_RETRY_MS);
+      await vi.advanceTimersByTimeAsync(STARTER_GRACE_MS - 1);
     });
     expect(dataWidgetsApi.applyStarter).not.toHaveBeenCalled();
     expect(result.current).toBe(true); // still awaiting the owner's result
+  });
+
+  it("a window that never hears the owner's result stops waiting after the grace (SCROLLR-448)", async () => {
+    // Only the owner learns that the starter failed; before this, every other
+    // window (a second monitor's bar, the main window's Home) suppressed the
+    // "no sources" step for good.
+    vi.mocked(ownsSharedConnection).mockResolvedValue(false);
+    const { result } = mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STARTER_GRACE_MS);
+    });
+    expect(result.current).toBe(false);
   });
 });

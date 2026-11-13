@@ -106,7 +106,7 @@ function mount(
     component: () => (
       <QueryClientProvider client={queryClient}>
         <ShellContext.Provider value={shell}>
-          <ShellDataContext.Provider value={{ widgets, dashboard: undefined }}>
+          <ShellDataContext.Provider value={{ widgets, dashboard: undefined, dashboardState: "pending", retryDashboard: () => {} }}>
             <BarChassisProvider active>
               <BarChassisSlot />
               <Outlet />

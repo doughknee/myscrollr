@@ -119,7 +119,7 @@ interface Props {
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
   /** Widgets with a page up this lap, for the presence check-in (the Also page does not count). */
   onDisplayedWidgetsChange?: (widgetIds: string[]) => void;
-  /** Drawn instead of the bar when no widget has a page (the empty-state CTAs). */
+  /** Drawn when no widget has a page (the empty-state CTAs): the whole bar, or the page block beside a docked edge. */
   empty?: ReactNode;
   /** The band's hover keypad (`prefs.ticker.pageControls`, SCROLLR-301, SCROLLR-303). Off: nothing appears on hover; the band's width is the same. */
   pageControls?: boolean;
@@ -745,8 +745,11 @@ export default function PagedBar({
     transition: { duration: BAND_S, ease: EASE },
   };
 
-  // A clock or a pin on the edge is something to show: the bar stays.
-  if (empty && widgets.length === 0 && edge.utilities.length + edge.pins.length === 0) return <>{empty}</>;
+  // No page to show: the message is the whole bar, or, docked with a clock or
+  // a pin on the edge, takes the page block beside it (SCROLLR-448: a lone
+  // clock used to hide the only next step). Fill's grid keeps its utilities.
+  const emptyPage = empty && widgets.length === 0 ? empty : null;
+  if (emptyPage && edge.utilities.length + edge.pins.length === 0) return <>{emptyPage}</>;
 
   if (grid) {
     const rows = cur?.gridRows ?? [];
@@ -799,7 +802,9 @@ export default function PagedBar({
       onMouseMove={hover.move}
       onMouseLeave={hover.leave}
     >
-      {cur && (
+      {emptyPage ? (
+        <div data-empty-page="" className="flex min-w-0 flex-1">{emptyPage}</div>
+      ) : cur && (
         <>
           <Band cur={cur} live={live ?? cur.widget} widgets={widgets} turn={turn} held={held} dark={dark} keypad={pageControls} reduced={reduced} onMove={step} wipe={wipe} fade={fade} />
 
