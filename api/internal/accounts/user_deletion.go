@@ -493,7 +493,8 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 			purge_at     = EXCLUDED.purge_at,
 			status       = 'pending',
 			canceled_at  = NULL,
-			purged_at    = NULL
+			purged_at    = NULL,
+			purge_email  = NULL
 	`, userID, now, purgeAt)
 	if err != nil {
 		log.Printf("[GDPR] upsert deletion request for %s: %v", userID, err)
@@ -530,7 +531,7 @@ func HandleCancelAccountDeletion(c *fiber.Ctx) error {
 	now := time.Now().UTC()
 	tag, err := platform.DBPool.Exec(context.Background(), `
 		UPDATE user_deletion_requests
-		   SET status = 'canceled', canceled_at = $2
+		   SET status = 'canceled', canceled_at = $2, purge_email = NULL
 		 WHERE logto_sub = $1 AND status = 'pending'
 	`, userID, now)
 	if err != nil {
@@ -693,6 +694,37 @@ func RunGDPRPurgePass(ctx context.Context) {
 	}
 }
 
+// purgeEmail returns the verified address that ties email-keyed support rows to
+// the account. While Logto still has the account it is read fresh and kept with
+// the pending request (purge_email); once Logto has forgotten the account, a
+// failed earlier pass's kept copy is what is left. "" matches by sub only. The
+// copy is cleared when the purge commits.
+func purgeEmail(ctx context.Context, logtoSub string) (string, error) {
+	email, err := verifiedAccountEmail(logtoSub)
+	if err != nil {
+		return "", err
+	}
+	if email != "" {
+		if _, err := platform.DBPool.Exec(ctx, `
+			UPDATE user_deletion_requests SET purge_email = $2
+			 WHERE logto_sub = $1 AND status = 'pending'`, logtoSub, email); err != nil {
+			return "", fmt.Errorf("keep email for retry: %w", err)
+		}
+		return email, nil
+	}
+	var kept *string
+	err = platform.DBPool.QueryRow(ctx,
+		`SELECT purge_email FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'pending'`, logtoSub,
+	).Scan(&kept)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("read kept email: %w", err)
+	}
+	if kept == nil {
+		return "", nil
+	}
+	return *kept, nil
+}
+
 // purgeUserAccount executes the full cascade for one user, in order:
 // Logto first (revokes sign-in access immediately), then local DB
 // rows, then marks the request as purged. Stripe records for lifetime
@@ -702,9 +734,8 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 
 	// Email-keyed support rows are matched on the address Logto verified, and
 	// Logto is about to forget it: read it first. A failed read aborts before
-	// anything is deleted, so the next pass retries. "" (account already gone
-	// from Logto after an earlier partial pass) matches by sub only.
-	email, err := verifiedAccountEmail(logtoSub)
+	// anything is deleted, so the next pass retries.
+	email, err := purgeEmail(ctx, logtoSub)
 	if err != nil {
 		return fmt.Errorf("read logto email: %w", err)
 	}
@@ -831,7 +862,7 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	// Mark the request as purged.
 	if _, err := tx.Exec(ctx, `
 		UPDATE user_deletion_requests
-		   SET status = 'purged', purged_at = now()
+		   SET status = 'purged', purged_at = now(), purge_email = NULL
 		 WHERE logto_sub = $1
 	`, logtoSub); err != nil {
 		return fmt.Errorf("mark purged: %w", err)

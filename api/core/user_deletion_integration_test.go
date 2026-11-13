@@ -111,6 +111,7 @@ func newLogtoStub(t *testing.T) *logtoStub {
 			fail := s.failDelete
 			if !fail {
 				s.deleted = append(s.deleted, parts[0])
+				delete(s.emails, parts[0]) // Logto forgets the account
 			}
 			s.mu.Unlock()
 			if fail {
@@ -551,5 +552,50 @@ func TestIntegrationPurgeRemovesSupportData(t *testing.T) {
 	}
 	if n := queryCount(t, `SELECT count(*) FROM business_leads`); n != 2 {
 		t.Errorf("decoy leads = %d, want 2", n)
+	}
+}
+
+// SCROLLR-457: the verified email survives a purge that fails after Logto
+// forgot the account, so the retry still removes the email-matched case; it
+// is cleared once the purge commits, and the case is stamped purged_at.
+func TestIntegrationPurgeKeepsEmailAcrossFailedPass(t *testing.T) {
+	setupIntegrationDB(t)
+	stub := newLogtoStub(t)
+	const sub = "purge-email-retry"
+	stub.emails = map[string]string{sub: "Retry@Example.com"}
+	seedPurgeableUser(t, sub, false)
+	testsupport.MustExec(t, `INSERT INTO support_cases (ticket_number,user_email,subject,category,status)
+		VALUES ('T-RETRY','retry@example.com','Secret','bug','open')`)
+	// Make the database transaction fail after the Logto delete.
+	testsupport.MustExec(t, `CREATE OR REPLACE FUNCTION fail_pref_delete() RETURNS trigger AS $$
+		BEGIN RAISE EXCEPTION 'injected purge failure'; END $$ LANGUAGE plpgsql`)
+	testsupport.MustExec(t, `CREATE TRIGGER fail_pref_delete BEFORE DELETE ON user_preferences
+		FOR EACH ROW EXECUTE FUNCTION fail_pref_delete()`)
+	dropTrigger := func() {
+		_, _ = platform.DBPool.Exec(context.Background(), `DROP TRIGGER IF EXISTS fail_pref_delete ON user_preferences`)
+	}
+	t.Cleanup(dropTrigger)
+
+	ctx := context.Background()
+	if err := accounts.PurgeUserAccount(ctx, sub); err == nil {
+		t.Fatal("first pass should fail")
+	}
+	if len(stub.deletedSubs()) != 1 {
+		t.Fatal("first pass should have deleted the Logto user")
+	}
+	if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub=$1 AND purge_email='Retry@Example.com'`, sub); n != 1 {
+		t.Fatal("email was not kept with the pending deletion")
+	}
+
+	dropTrigger()
+	if err := accounts.PurgeUserAccount(ctx, sub); err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number='T-RETRY'
+		AND user_email IS NULL AND subject='' AND purged_at IS NOT NULL`); n != 1 {
+		t.Error("email-matched case survived the retry")
+	}
+	if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub=$1 AND status='purged' AND purge_email IS NULL`, sub); n != 1 {
+		t.Error("email outlived the purge")
 	}
 }
