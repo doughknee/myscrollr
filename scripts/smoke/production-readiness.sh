@@ -19,6 +19,8 @@
 #   PORT_FORWARD_TIMEOUT  seconds to wait for each port-forward (default: 10)
 #   READINESS_TIMEOUT     seconds to wait for /health/ready to return 200
 #                         (default: 120)
+#   FEED_MAX_AGE_SECS     newest finance row in /public/feed may be at most
+#                         this old (default: 21600 = 6 h)
 #
 # EXIT STATUS
 #
@@ -181,9 +183,18 @@ check_service() {
 # unauthenticated and aggregates finance + sports straight out of Postgres,
 # so a non-empty response proves ingest -> Postgres -> Redis -> API is intact.
 #
-# Returns 0 when both sources return rows, 1 otherwise.
+# Rows alone can be weeks old, so it also asserts the newest finance row was
+# written within FEED_MAX_AGE_SECS. Finance is the only source that cannot be
+# quiet: it carries ~80 crypto pairs that trade 24/7, so no market holiday or
+# empty sports night can age it. Sports and RSS are not age-checked for that
+# reason. The default of 6 h is deliberately loose: a normal night is minutes,
+# so only a dead ingester trips it. The anonymous /events route must answer
+# 401 (router and auth middleware alive); a 5xx or 404 means a broken deploy.
+#
+# Returns 0 when all of that holds, 1 otherwise.
 check_data_flow() {
-    local local_port=18080 pf_pid="" body="" n_finance="" n_sports=""
+    local local_port=18080 pf_pid="" body="" n_finance="" n_sports="" n_rss="" age="" events_status=""
+    local max_age="${FEED_MAX_AGE_SECS:-21600}"
 
     kubectl -n "$NAMESPACE" port-forward         "svc/core-api" "$local_port:8080"         >"/tmp/smoke-public-feed.log" 2>&1 </dev/null &
     pf_pid=$!
@@ -206,25 +217,46 @@ check_data_flow() {
     fi
 
     body="$(curl -sS --max-time 30 "http://localhost:$local_port/public/feed" 2>/dev/null || true)"
+    events_status="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "http://localhost:$local_port/events" 2>/dev/null || echo 000)"
     kill "$pf_pid" 2>/dev/null || true
     wait "$pf_pid" 2>/dev/null || true
 
     n_finance="$(printf '%s' "$body" | jq '.data.finance | length' 2>/dev/null || echo "")"
     n_sports="$(printf '%s' "$body" | jq '.data.sports.sports | length' 2>/dev/null || echo "")"
+    n_rss="$(printf '%s' "$body" | jq '.data.rss | length' 2>/dev/null || echo "")"
+    # Whole seconds since the newest finance write; fractional seconds are
+    # stripped because jq's fromdateiso8601 rejects them.
+    age="$(printf '%s' "$body" | jq '(now - ([.data.finance[].last_updated | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] | max)) | floor' 2>/dev/null || echo "")"
 
-    case "${n_finance}${n_sports}" in
+    case "${n_finance}${n_sports}${n_rss}" in
         '' | *[!0-9]*)
             echo "unreadable /public/feed response"
             return 1
             ;;
     esac
 
-    if ((n_finance < 1)) || ((n_sports < 1)); then
-        echo "empty feed (finance=$n_finance, sports=$n_sports)"
+    if ((n_finance < 1)) || ((n_sports < 1)) || ((n_rss < 1)); then
+        echo "empty feed (finance=$n_finance, sports=$n_sports, rss=$n_rss)"
         return 1
     fi
 
-    echo "finance=$n_finance, sports=$n_sports"
+    case "$age" in
+        '' | *[!0-9]*)
+            echo "no readable finance timestamp"
+            return 1
+            ;;
+    esac
+    if ((age > max_age)); then
+        echo "finance ingestion looks dead: newest row is ${age}s old (limit ${max_age}s)"
+        return 1
+    fi
+
+    if [[ "$events_status" != "401" ]]; then
+        echo "anonymous /events answered HTTP $events_status, expected 401"
+        return 1
+    fi
+
+    echo "finance=$n_finance, sports=$n_sports, rss=$n_rss, newest finance ${age}s old, /events 401"
     return 0
 }
 

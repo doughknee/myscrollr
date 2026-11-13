@@ -38,12 +38,27 @@ import { fetchHealth } from "../api/client";
 import { loadPref } from "../preferences";
 import { useTauriListener } from "../hooks/useTauriListener";
 import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
+import type { HealthResponse } from "../api/client";
 import type { DeliveryMode } from "../types";
 
 export const Route = createFileRoute("/status")({
   component: StatusPage,
   errorComponent: RouteError,
 });
+
+/**
+ * Core answers 503 with a full report when degraded, but 500 with a bare
+ * `{error}` when the check itself fails. Only a body with a `services` map
+ * is a report; anything else is "could not read status", not a crash.
+ */
+async function fetchHealthReport(): Promise<HealthResponse> {
+  const body = await fetchHealth();
+  if (!body || typeof body.services !== "object" || body.services === null) {
+    throw new UnreadableHealth();
+  }
+  return body;
+}
+class UnreadableHealth extends Error {}
 
 /** "healthy" is the only good state core reports. */
 const isOk = (s: string | undefined) => s === "healthy";
@@ -71,7 +86,7 @@ function ago(ms: number): string {
 function StatusPage() {
   const health = useQuery({
     queryKey: ["health"],
-    queryFn: fetchHealth,
+    queryFn: fetchHealthReport,
     // Live view — refresh while the page is open. /health is cheap
     // (core probes its own deps) and this only runs on-route.
     refetchInterval: 15_000,
@@ -103,7 +118,16 @@ function StatusPage() {
 
   // Core reports "degraded" when any dependency is down; a failed
   // fetch means we can't reach core at all.
-  const overall = health.isError
+  const unreadable = health.error instanceof UnreadableHealth;
+  const overall = unreadable
+    ? {
+        label: "Could not read Scrollr's status",
+        detail:
+          "Scrollr answered, but not with a status report. This is usually temporary — try again in a moment.",
+        icon: AlertTriangle,
+        cls: "bg-warning/10 border-warning/20 text-warning",
+      }
+    : health.isError
     ? {
         label: "Can't reach Scrollr",
         detail:
@@ -214,6 +238,16 @@ function StatusPage() {
           </div>
         </div>
 
+        {health.isError && (
+          <button
+            onClick={() => health.refetch()}
+            disabled={health.isFetching}
+            className="mt-3 h-8 px-3 rounded-lg bg-accent text-ui-meta font-semibold text-surface hover:bg-accent/90 disabled:opacity-50 cursor-pointer"
+          >
+            Try again
+          </button>
+        )}
+
         {rows.length > 0 && (
           <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {rows.map((row) => {
@@ -249,7 +283,7 @@ function StatusPage() {
                     />
                     {ok
                       ? "Healthy"
-                      : row.state
+                      : typeof row.state === "string" && row.state
                         ? row.state.charAt(0).toUpperCase() + row.state.slice(1)
                         : "Unknown"}
                   </span>

@@ -570,7 +570,7 @@ function LeadForm() {
           </h3>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-base-content/60">
             A confirmation email is on its way to{' '}
-            <span className="font-medium text-base-content/85">
+            <span className="font-medium text-base-content/85 [overflow-wrap:anywhere]">
               {submittedEmail}
             </span>{' '}
             with what to expect next. A real human will follow up.

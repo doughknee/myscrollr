@@ -1,8 +1,6 @@
 package support
 
 import (
-	"encoding/json"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -22,19 +20,10 @@ func TestKnowledgeBase(t *testing.T) {
 		t.Fatalf("knowledge base is %d bytes; the limit is 80 KB", n)
 	}
 
-	// Names the desktop version the repo is at. package.json lives outside
-	// the api module, so skip (visibly) when it is not on disk — the same
-	// carve-out gents_test makes for `make shell svc=core-api`.
-	if raw, err := os.ReadFile("../../../desktop/package.json"); err == nil {
-		var pkg struct{ Version string }
-		if err := json.Unmarshal(raw, &pkg); err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(kb, "Current desktop version: **"+pkg.Version+"**") {
-			t.Errorf("knowledge base does not name desktop version %s; run `make kb`", pkg.Version)
-		}
-	} else {
-		t.Log("desktop/package.json not on disk; skipping the version check")
+	// "Current desktop version" is the newest published Stable release, never a
+	// prerelease (SCROLLR-445): desktop/package.json carries the Beta line.
+	if v := currentDesktopVersion(); v == "" || !platform.ValidVersion(v) || platform.IsPrerelease(v) {
+		t.Errorf("knowledge base current desktop version = %q, want a Stable release", v)
 	}
 
 	// Every catalog widget, utilities included — the old KB denied that

@@ -5,6 +5,10 @@ on:
     branches: [main, release/desktop-1.7]
   push:
     branches: [main, release/desktop-1.7]
+  # Advisories are published while nobody pushes; a failed scheduled run emails the owner.
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -53,6 +57,7 @@ jobs:
   rust-vulnerabilities:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         dir: [desktop/src-tauri, channels/finance/service, channels/sports/service, channels/rss/service]
     steps:
@@ -79,5 +84,11 @@ jobs:
             # SQLx's optional MySQL RSA dependency is not compiled by our PostgreSQL services.
             tree=$(cargo tree --locked --target all --invert rsa)
             test -z "$tree"
-            cargo audit --ignore RUSTSEC-2023-0071
+            # RUSTSEC-2026-0459: libsqlite3-sys is an optional dependency of sqlx's SQLite
+            # backend; these services enable only the Postgres feature, so it is in the
+            # lockfile but never built. No sqlx release accepts libsqlite3-sys >= 0.39.0
+            # (0.8.6 needs ^0.30, 0.9.0 needs < 0.38). Fail if that changes.
+            tree=$(cargo tree --locked --target all --invert libsqlite3-sys)
+            test -z "$tree"
+            cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0459
           fi

@@ -16,15 +16,42 @@ export interface UserPreferences {
   enabled_sites: Array<string>
   disabled_sites: Array<string>
   subscription_tier:
-    | 'free'
-    | 'uplink'
-    | 'uplink_pro'
-    | 'uplink_ultimate'
-    | 'super_user'
+    'free' | 'uplink' | 'uplink_pro' | 'uplink_ultimate' | 'super_user'
   updated_at: string
 }
 
 type RequestOptions = RequestInit
+
+/**
+ * fetch() that turns a transport failure ("Failed to fetch") into a
+ * sentence a visitor can act on. Every request below routes through it.
+ */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch {
+    throw new Error(
+      'Could not reach Scrollr. Check your connection and try again in a moment.',
+    )
+  }
+}
+
+/** Throw the server's own message for a failed response, or a plain one. */
+async function failFrom(response: Response): Promise<never> {
+  if (response.status === 429) {
+    throw new Error(
+      'Too many attempts just now. Wait a few minutes and try again.',
+    )
+  }
+  const body = await response.json().catch(() => null)
+  const sent = typeof body?.error === 'string' ? body.error : ''
+  if (sent && response.status < 500) throw new Error(sent)
+  throw new Error(
+    response.status >= 500
+      ? 'Something went wrong on our side. Try again in a minute.'
+      : 'Request failed',
+  )
+}
 
 async function request<T>(
   path: string,
@@ -36,18 +63,13 @@ async function request<T>(
     ...options.headers,
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await send(`${API_BASE}${path}`, {
     ...fetchOptions,
     headers,
     credentials: 'include',
   })
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Request failed' }))
-    throw new Error(error.error || 'Request failed')
-  }
+  if (!response.ok) await failFrom(response)
 
   return response.json()
 }
@@ -71,18 +93,13 @@ export async function authenticatedFetch<T>(
     ;(headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await send(`${API_BASE}${path}`, {
     ...options,
     headers,
     credentials: 'include',
   })
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Request failed' }))
-    throw new Error(error.error || 'Request failed')
-  }
+  if (!response.ok) await failFrom(response)
 
   return response.json()
 }
@@ -115,9 +132,33 @@ export interface CatalogResponse {
   widgets: Array<CatalogWidget>
 }
 
+const isText = (v: unknown): v is string => typeof v === 'string' && v !== ''
+
+/** A catalog this page cannot render is the same as no catalog. */
+export function parseCatalog(body: unknown): CatalogResponse {
+  const widgets = (body as Partial<CatalogResponse> | null)?.widgets
+  if (
+    !Array.isArray(widgets) ||
+    !widgets.every(
+      (w) =>
+        isText(w.id) &&
+        isText(w.name) &&
+        isText(w.category) &&
+        typeof w.description === 'string' &&
+        typeof w.color === 'string',
+    )
+  ) {
+    throw new Error('Unexpected catalog response')
+  }
+  return body as CatalogResponse
+}
+
 export const catalogApi = {
-  /** Fetch the widget catalog. Cached by the CDN for 5 min. */
-  get: () => request<CatalogResponse>('/catalog'),
+  /**
+   * Fetch the widget catalog. Cached by the CDN for 5 min. A malformed
+   * body rejects, and callers fall back to the bundled snapshot.
+   */
+  get: () => request<unknown>('/catalog').then(parseCatalog),
 }
 
 // ── Tier Limits ──────────────────────────────────────────────────
@@ -126,11 +167,7 @@ export const catalogApi = {
 // Null means "unlimited" for that cap.
 
 export type TierKey =
-  | 'free'
-  | 'uplink'
-  | 'uplink_pro'
-  | 'uplink_ultimate'
-  | 'super_user'
+  'free' | 'uplink' | 'uplink_pro' | 'uplink_ultimate' | 'super_user'
 
 export interface WidgetLimits {
   /** Widget-slot cap — how many widgets a tier runs at once. null = unlimited. */
@@ -147,9 +184,32 @@ export interface TierLimitsResponse {
   tiers: Record<TierKey, WidgetLimits>
 }
 
+const TIER_KEYS: Array<TierKey> = [
+  'free',
+  'uplink',
+  'uplink_pro',
+  'uplink_ultimate',
+]
+
+/** Pages index every tier by key, so a body missing one is unusable. */
+export function parseTierLimits(body: unknown): TierLimitsResponse {
+  const tiers = (body as { tiers?: Partial<Record<TierKey, WidgetLimits>> })
+    .tiers
+  for (const key of TIER_KEYS) {
+    const limit = tiers?.[key]?.max_widgets
+    if (limit !== null && typeof limit !== 'number') {
+      throw new Error('Unexpected tier-limits response')
+    }
+  }
+  return body as TierLimitsResponse
+}
+
 export const tierLimitsApi = {
-  /** Fetch tier limits from the backend. Cached by the CDN for 5 min. */
-  get: () => request<TierLimitsResponse>('/tier-limits'),
+  /**
+   * Fetch tier limits from the backend. Cached by the CDN for 5 min. A
+   * malformed body rejects, and callers keep the bundled fallback.
+   */
+  get: () => request<unknown>('/tier-limits').then(parseTierLimits),
 }
 
 // ── Preferences API ───────────────────────────────────────────────
@@ -467,17 +527,12 @@ export const userApi = {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
-    const response = await fetch(`${API_BASE}/users/me/password/reset`, {
+    const response = await send(`${API_BASE}/users/me/password/reset`, {
       method: 'POST',
       headers,
       credentials: 'include',
     })
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ error: 'Request failed' }))
-      throw new Error(error.error || 'Request failed')
-    }
+    if (!response.ok) await failFrom(response)
   },
 }
 
@@ -596,12 +651,7 @@ export const supportApi = {
 // the server. Drift is a 400 from the validator.
 
 export type BusinessUseCase =
-  | 'sports-bars'
-  | 'brokerages'
-  | 'sportsbooks'
-  | 'crypto'
-  | 'news'
-  | 'other'
+  'sports-bars' | 'brokerages' | 'sportsbooks' | 'crypto' | 'news' | 'other'
 
 export interface BusinessLeadPayload {
   name: string

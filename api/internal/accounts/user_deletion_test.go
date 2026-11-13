@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -13,10 +14,94 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// stubLogtoEmails answers GET /api/users/{sub} with the given verified emails
+// (404 for anyone else), the way the export and purge read an account.
+func stubLogtoEmails(t *testing.T, emails map[string]string) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email, ok := emails[strings.TrimPrefix(r.URL.Path, "/api/users/")]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"primaryEmail": email, "isSuspended": false})
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("LOGTO_ENDPOINT", srv.URL)
+	m2mMu.Lock()
+	m2mToken, m2mTokenExpiry = "test", time.Now().Add(time.Hour)
+	m2mMu.Unlock()
+	t.Cleanup(ResetM2MTokenCache)
+}
+
+// SCROLLR-453: the export carries the account's support cases (by sub or by
+// verified email), the messages the user wrote or was sent, and its business
+// leads; never staff material and never anyone else's rows.
+func TestExportSupportHistoryIsAccountScoped(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	const sub = "export-support-owner"
+	stubLogtoEmails(t, map[string]string{sub: "Export.Owner@example.com"})
+	testsupport.MustExec(t, `TRUNCATE support_messages, support_drafts, support_cases, business_leads CASCADE`)
+	for _, c := range []struct{ ticket, email, sub string }{
+		{"E-SUB", "elsewhere@example.com", sub},
+		{"E-MAIL", "export.owner@EXAMPLE.com", ""},
+		{"E-OTHER", "someone@example.com", ""},
+		{"E-LOOK", "export.owner@example.com.evil.test", ""},
+		{"E-OTHERSUB", "export.owner@example.com", "export-support-other"},
+	} {
+		testsupport.MustExec(t, `INSERT INTO support_cases (ticket_number,user_email,logto_sub,subject,summary) VALUES ($1,$2,NULLIF($3,''),'Subject '||$1,'AI summary')`, c.ticket, c.email, c.sub)
+		testsupport.MustExec(t, `INSERT INTO support_messages (ticket_number,kind,body_text) VALUES
+			($1,'user','user text '||$1),($1,'sent','reply text '||$1),($1,'ai_draft','UNSENT DRAFT'),($1,'note','INTERNAL NOTE')`, c.ticket)
+	}
+	for _, e := range []string{"export.owner@example.com", "export.owner@example.com.evil.test"} {
+		testsupport.MustExec(t, `INSERT INTO business_leads (name,email,company,use_case,message) VALUES ('N',$1,'C','U','lead '||$1)`, e)
+	}
+	resp, err := newDeletionTestApp(sub).Test(httptest.NewRequest("GET", "/users/me/export", nil))
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("export status err=%v", err)
+	}
+	defer resp.Body.Close()
+	var archive struct {
+		Support struct {
+			Cases []struct {
+				Ticket   string `json:"ticket_number"`
+				Messages []struct {
+					From string `json:"from"`
+					Body string `json:"body"`
+				} `json:"messages"`
+			} `json:"cases"`
+			Leads []struct {
+				Email string `json:"email"`
+			} `json:"business_leads"`
+		} `json:"support"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&archive); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int{}
+	for _, c := range archive.Support.Cases {
+		got[c.Ticket] = len(c.Messages)
+		for _, m := range c.Messages {
+			if strings.Contains(m.Body, "UNSENT") || strings.Contains(m.Body, "INTERNAL") {
+				t.Fatalf("staff material exported: %q", m.Body)
+			}
+		}
+	}
+	if len(got) != 2 || got["E-SUB"] != 2 || got["E-MAIL"] != 2 {
+		t.Fatalf("exported cases = %v, want E-SUB and E-MAIL with 2 messages each", got)
+	}
+	if len(archive.Support.Leads) != 1 || archive.Support.Leads[0].Email != "export.owner@example.com" {
+		t.Fatalf("exported leads = %+v", archive.Support.Leads)
+	}
+}
+
 func TestExportCustomFeedsIsAccountScoped(t *testing.T) {
 	if !testsupport.DBAvailable(t) {
 		return
 	}
+	stubLogtoEmails(t, map[string]string{})
 	const owner, other = "export-feeds-owner", "export-feeds-other"
 	t.Cleanup(func() {
 		_, _ = platform.DBPool.Exec(context.Background(), `DELETE FROM user_custom_feeds WHERE logto_sub IN ($1,$2)`, owner, other)

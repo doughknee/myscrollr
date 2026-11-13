@@ -1,4 +1,4 @@
-FROM golang:1.26.10-alpine AS builder
+FROM golang:1.26.11-alpine AS builder
 
 WORKDIR /app
 
@@ -8,8 +8,8 @@ RUN apk add --no-cache git curl
 # Monthly DB-IP Lite country data stays inside the image; visitor IPs never
 # leave the API. Update the release and checksum together. The endpoint fails
 # consent-first once the embedded database is older than 45 days.
-ARG DBIP_COUNTRY_RELEASE=2026-09
-ARG DBIP_COUNTRY_SHA256=cb0578ce59f569f2c933bb40feb820804a334855a60739011b0a89cab1d6e4ed
+ARG DBIP_COUNTRY_RELEASE=2026-11
+ARG DBIP_COUNTRY_SHA256=75fe430010f6d38a8c4331c202bf0df6ce3221a6e6d823b9e5a6d951e4cf9758
 RUN curl -fsSL "https://download.db-ip.com/free/dbip-country-lite-${DBIP_COUNTRY_RELEASE}.mmdb.gz" -o /tmp/dbip-country.mmdb.gz \
     && echo "${DBIP_COUNTRY_SHA256}  /tmp/dbip-country.mmdb.gz" | sha256sum -c - \
     && gzip -dc /tmp/dbip-country.mmdb.gz > /app/dbip-country-lite.mmdb
@@ -38,7 +38,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o support-regen ./cmd/support-regen
 #
 # Source is bind-mounted from the host, so `air` rebuilds the binary in
 # place on save — no image rebuild per edit.
-FROM golang:1.26.10-alpine AS dev
+FROM golang:1.26.11-alpine AS dev
 WORKDIR /app
 # air is PINNED, not @latest: v1.67.2 raised its minimum to Go 1.26 and
 # broke this build with no warning. v1.67.1 is the last release that

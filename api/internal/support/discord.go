@@ -1629,7 +1629,7 @@ func truncateRunes(s string, n int) string {
 // anyone reads the draft.
 func appVersionField(ctx context.Context, ticketNumber string) string {
 	reported := caseAppVersion(ctx, ticketNumber)
-	current := currentDesktopVersion()
+	current := currentVersionFor(reported)
 	switch {
 	case reported == "" && current == "":
 		return "—"
@@ -1657,17 +1657,39 @@ func fixRecordField(ctx context.Context, ticketNumber string) string {
 	return "none on record"
 }
 
-// currentDesktopVersionRe pulls the version line the knowledge base is
-// generated with, so there is exactly one source of truth for "current"
-// and it is the same one the AI is told about.
-var currentDesktopVersionRe = regexp.MustCompile(`(?m)^Current desktop version: \*\*([^*]+)\*\*`)
+// The knowledge base states the newest Stable release as "Current desktop
+// version" and, when a Beta newer than it exists, the Beta on its own line.
+// kbgen writes both from the published GitHub releases (SCROLLR-445). These
+// regexes read them back, so the model is told the same facts the KB states.
+var (
+	currentDesktopVersionRe = regexp.MustCompile(`(?m)^Current desktop version: \*\*([^*]+)\*\*`)
+	currentBetaVersionRe    = regexp.MustCompile(`(?m)^Current Beta version: \*\*([^*]+)\*\*`)
+)
 
-func currentDesktopVersion() string {
-	m := currentDesktopVersionRe.FindStringSubmatch(supportKnowledgeBase())
+func kbVersion(re *regexp.Regexp) string {
+	m := re.FindStringSubmatch(supportKnowledgeBase())
 	if len(m) < 2 {
 		return ""
 	}
 	return strings.TrimSpace(m[1])
+}
+
+// currentDesktopVersion is the newest Stable release.
+func currentDesktopVersion() string { return kbVersion(currentDesktopVersionRe) }
+
+// currentVersionFor is the version a user on appVersion should be measured
+// against: a Stable user, or an unknown one, against the newest Stable; a Beta
+// user against the newest of the current Beta and Stable, because a final
+// release supersedes its betas but an older Stable does not make a Beta stale.
+func currentVersionFor(appVersion string) string {
+	return pickCurrent(appVersion, currentDesktopVersion(), kbVersion(currentBetaVersionRe))
+}
+
+func pickCurrent(appVersion, stable, beta string) string {
+	if platform.IsPrerelease(appVersion) && platform.CompareVersions(beta, stable) > 0 {
+		return beta
+	}
+	return stable
 }
 
 // caseAppVersion reads the app version the desktop reported at ticket time.

@@ -1,7 +1,8 @@
 /**
  * /status — live platform health as a terminal ledger.
  *
- * Polling is unchanged: /health + /events/count + /channels every 30s.
+ * Polls /health + /events/count every 30s. Workers are listed from the
+ * /health report itself.
  * Every service the previous page monitored is still here — the skin
  * moved from cards to ledger rows with pulsing status dots.
  */
@@ -11,9 +12,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimateNumber } from 'motion-plus/react'
 import type { ReactNode } from 'react'
+import type { HealthData, ServiceState } from '@/lib/statusHealth'
 import { seo } from '@/lib/seo'
 import { organization } from '@/lib/structured-data'
 import { API_BASE } from '@/api/client'
+import { classifyState, parseHealth } from '@/lib/statusHealth'
 import { EASE } from '@/lib/animations'
 import {
   DeparturesRow,
@@ -43,60 +46,50 @@ const reveal = {
 
 // --- Types ---
 
-interface HealthData {
-  status: string
-  database: string
-  redis: string
-  services: Record<string, string>
-}
-
-interface ChannelEntry {
-  name: string
-  display_name: string
-  capabilities: Array<string>
-}
-
 interface ViewerData {
   count: number
 }
 
-type ServiceState = 'healthy' | 'unhealthy' | 'down' | 'unknown' | 'loading'
+type StateKind = ServiceState | 'loading'
 
-/** Known channel metadata — mono ledger code, description, port. */
-interface ChannelMeta {
-  code: string
-  description: string
-  port?: number
-}
-
-const CHANNEL_META: Partial<Record<string, ChannelMeta>> = {
+/** Known workers: mono ledger code, name and what each one does. */
+const SERVICE_META: Partial<
+  Record<string, { code: string; name: string; description: string }>
+> = {
   finance: {
-    code: 'CHN—FIN',
+    code: 'SVC—FIN',
+    name: 'Finance',
     description: 'TwelveData WebSocket · real-time market data',
-    port: 3001,
   },
   sports: {
-    code: 'CHN—SPT',
-    description: 'ESPN API · scores polling every 60s',
-    port: 3002,
+    code: 'SVC—SPT',
+    name: 'Sports',
+    description: 'api-sports.io · live scores and schedules',
   },
   rss: {
-    code: 'CHN—RSS',
+    code: 'SVC—RSS',
+    name: 'News',
     description: 'RSS/Atom/JSON · feed aggregation every 5 min',
-    port: 3004,
   },
 }
 
-/** Fallback code for channels the API registers that we have no meta for. */
-function channelCode(name: string): string {
-  return CHANNEL_META[name]?.code ?? `CHN—${name.slice(0, 3).toUpperCase()}`
+const KNOWN_SERVICES = ['finance', 'sports', 'rss']
+
+function serviceMeta(name: string) {
+  return (
+    SERVICE_META[name] ?? {
+      code: `SVC—${name.slice(0, 3).toUpperCase()}`,
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      description: 'Ingestion worker',
+    }
+  )
 }
 
 // --- Helpers ---
 
 const POLL_INTERVAL = 30_000
 
-const STATE_LABEL: Record<ServiceState, string> = {
+const STATE_LABEL: Record<StateKind, string> = {
   healthy: 'OPERATIONAL',
   unhealthy: 'DEGRADED',
   down: 'DOWN',
@@ -106,7 +99,7 @@ const STATE_LABEL: Record<ServiceState, string> = {
 
 /** Emerald up / amber degraded / red down; muted while unknown. */
 const STATE_STYLE: Record<
-  ServiceState,
+  StateKind,
   { dot: string; text: string; pulse: boolean }
 > = {
   healthy: { dot: 'bg-primary', text: 'text-primary', pulse: true },
@@ -135,43 +128,43 @@ function overallLabel(health: HealthData | null): string {
 
 function StatusPage() {
   const [health, setHealth] = useState<HealthData | null>(null)
-  const [channels, setChannels] = useState<Array<ChannelEntry>>([])
   const [viewers, setViewers] = useState<number | null>(null)
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
   const [fetchError, setFetchError] = useState(false)
+  const [checking, setChecking] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchHealth = useCallback(async () => {
-    try {
-      const [healthRes, viewerRes, chnlRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/health`),
-        fetch(`${API_BASE}/events/count`),
-        fetch(`${API_BASE}/channels`),
-      ])
+    setChecking(true)
+    const [healthRes, viewerRes] = await Promise.allSettled([
+      fetch(`${API_BASE}/health`),
+      fetch(`${API_BASE}/events/count`),
+    ])
 
-      if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
-        const data: HealthData = await healthRes.value.json()
-        setHealth(data)
-        setFetchError(false)
-      } else {
-        setFetchError(true)
-      }
-
-      if (viewerRes.status === 'fulfilled' && viewerRes.value.ok) {
-        const data: ViewerData = await viewerRes.value.json()
-        setViewers(data.count)
-      }
-
-      if (chnlRes.status === 'fulfilled' && chnlRes.value.ok) {
-        const data: Array<ChannelEntry> = await chnlRes.value.json()
-        setChannels(data)
-      }
-
-      setLastChecked(new Date())
-    } catch {
-      setFetchError(true)
-      setLastChecked(new Date())
+    // Core answers 503 with the full report when anything is degraded, so
+    // read the body whatever the status. Only "nothing answered" or "not a
+    // report" is unreachable.
+    let report: HealthData | null = null
+    if (healthRes.status === 'fulfilled') {
+      report = parseHealth(await healthRes.value.json().catch(() => null))
     }
+    if (report) {
+      setHealth(report)
+      setFetchError(false)
+    } else {
+      setHealth(null)
+      setFetchError(true)
+    }
+
+    if (viewerRes.status === 'fulfilled' && viewerRes.value.ok) {
+      const data: ViewerData | null = await viewerRes.value
+        .json()
+        .catch(() => null)
+      if (typeof data?.count === 'number') setViewers(data.count)
+    }
+
+    setLastChecked(new Date())
+    setChecking(false)
   }, [])
 
   useEffect(() => {
@@ -183,22 +176,24 @@ function StatusPage() {
   }, [fetchHealth])
 
   // Derive infrastructure states
-  const dbState: ServiceState = !health
-    ? 'loading'
-    : health.database === 'healthy'
-      ? 'healthy'
-      : 'unhealthy'
-  const redisState: ServiceState = !health
-    ? 'loading'
-    : health.redis === 'healthy'
-      ? 'healthy'
-      : 'unhealthy'
+  const infraState = (value: string | undefined): StateKind =>
+    fetchError ? 'unknown' : !health ? 'loading' : classifyState(value).state
+  const dbState = infraState(health?.database)
+  const redisState = infraState(health?.redis)
 
-  // Derive integration service states dynamically
-  const getServiceState = (name: string): ServiceState => {
-    if (!health) return 'loading'
-    return (health.services[name] || 'unknown') as ServiceState
-  }
+  // Workers come from the report itself; before the first answer the known
+  // three show as CHECKING.
+  const serviceNames = health ? Object.keys(health.services) : KNOWN_SERVICES
+
+  const failing = health
+    ? [
+        health.database !== 'healthy' && 'PostgreSQL',
+        health.redis !== 'healthy' && 'Redis',
+        ...Object.entries(health.services)
+          .filter(([, v]) => v !== 'healthy' && v !== 'idle')
+          .map(([n]) => serviceMeta(n).name),
+      ].filter(Boolean)
+    : []
 
   // lastChecked starts null, so this never renders during prerender —
   // no locale hydration mismatch.
@@ -272,63 +267,38 @@ function StatusPage() {
         <TerminalContainer className="pb-10">
           <motion.div {...reveal}>
             <SectionRow
-              tag="SEC 02 ／ CHANNEL SERVICES"
+              tag="SEC 02 ／ WORKERS"
               stat={
-                channels.length > 0
-                  ? `${channels.length} REGISTERED`
+                health && serviceNames.length > 0
+                  ? `${serviceNames.length} REPORTING`
                   : undefined
               }
             />
-            {channels.length > 0 ? (
-              channels.map((ch) => {
-                const meta = CHANNEL_META[ch.name]
-                return (
-                  <LedgerRow
-                    key={ch.name}
-                    code={channelCode(ch.name)}
-                    name={`${ch.display_name} Service`}
-                    port={meta?.port}
-                    detail={
-                      meta?.description ??
-                      (ch.capabilities.join(', ') || 'Channel service')
-                    }
-                    right={<StateCell state={getServiceState(ch.name)} />}
-                  />
-                )
-              })
-            ) : !fetchError ? (
-              ['finance', 'sports', 'rss'].map((name) => {
-                const meta = CHANNEL_META[name]
+            {serviceNames.length > 0 ? (
+              serviceNames.map((name) => {
+                const meta = serviceMeta(name)
+                const { state, label } = classifyState(health?.services[name])
                 return (
                   <LedgerRow
                     key={name}
-                    code={channelCode(name)}
-                    name={`${name.charAt(0).toUpperCase() + name.slice(1)} Service`}
-                    port={meta?.port}
-                    detail={meta?.description ?? 'Channel service'}
-                    right={<StateCell state={getServiceState(name)} />}
+                    code={meta.code}
+                    name={`${meta.name} Service`}
+                    detail={meta.description}
+                    right={
+                      <StateCell
+                        state={
+                          fetchError ? 'unknown' : !health ? 'loading' : state
+                        }
+                        label={health && !fetchError ? label : undefined}
+                      />
+                    }
                   />
                 )
               })
             ) : (
-              // Mirrors LedgerRow's mobile stacking: badge + state share
-              // the top row, the message spans full width beneath.
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[18px] gap-y-1 border-b border-hairline-minor px-2 py-5 sm:grid-cols-[90px_1fr_auto]">
-                <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold text-error/80">
-                  <span
-                    aria-hidden="true"
-                    className="animate-pulse-dot h-[7px] w-[7px] rounded-[2px] bg-error/80"
-                  />
-                  CHN—??
-                </span>
-                <span className="order-last col-span-full text-sm text-base-content/55 sm:order-none sm:col-span-1">
-                  Unable to discover channels. The API is not reachable from
-                  this browser.
-                </span>
-                <span className="font-mono text-xs text-error/80">
-                  UNREACHABLE
-                </span>
-              </div>
+              <p className="border-b border-hairline-minor px-2 py-5 text-sm text-base-content/55">
+                This report did not list any workers.
+              </p>
             )}
           </motion.div>
         </TerminalContainer>
@@ -359,14 +329,28 @@ function StatusPage() {
             <LedgerRow
               code="MET—API"
               name="API status"
-              detail={fetchError ? 'Cannot reach API' : 'Accepting requests'}
+              detail={
+                fetchError
+                  ? 'No usable answer from the API'
+                  : 'Accepting requests'
+              }
               right={
-                <span
-                  className={`font-mono text-[11px] tracking-[0.12em] ${
-                    fetchError ? 'text-error' : 'text-primary'
-                  }`}
-                >
-                  {fetchError ? 'UNREACHABLE' : 'ONLINE'}
+                <span className="flex items-center gap-3">
+                  <span
+                    className={`font-mono text-[11px] tracking-[0.12em] ${
+                      fetchError ? 'text-error' : 'text-primary'
+                    }`}
+                  >
+                    {fetchError ? 'UNREACHABLE' : 'ONLINE'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchHealth}
+                    disabled={checking}
+                    className="cursor-pointer rounded-[4px] border border-hairline px-2.5 py-1 font-mono text-[11px] tracking-[0.12em] text-base-content/70 transition-colors hover:border-primary hover:text-primary disabled:cursor-default disabled:opacity-50"
+                  >
+                    {checking ? 'CHECKING' : 'RETRY'}
+                  </button>
                 </span>
               }
             />
@@ -374,11 +358,15 @@ function StatusPage() {
               code="MET—SYS"
               name="Overall"
               detail={
-                !health
-                  ? 'Waiting on first health check'
-                  : health.status === 'healthy'
-                    ? 'Every check passing'
-                    : 'One or more checks failing'
+                fetchError
+                  ? 'No health report to read'
+                  : !health
+                    ? 'Waiting on first health check'
+                    : health.status === 'healthy'
+                      ? 'Every check passing'
+                      : failing.length > 0
+                        ? `Not healthy: ${failing.join(', ')}`
+                        : 'One or more checks failing'
               }
               right={
                 <span
@@ -390,7 +378,7 @@ function StatusPage() {
                         : 'text-warning'
                   }`}
                 >
-                  {overallLabel(health)}
+                  {fetchError ? 'NO REPORT' : overallLabel(health)}
                 </span>
               }
             />
@@ -481,7 +469,7 @@ function LedgerRow({
 }
 
 /** Pulsing dot + mono state label. */
-function StateCell({ state }: { state: ServiceState }) {
+function StateCell({ state, label }: { state: StateKind; label?: string }) {
   const s = STATE_STYLE[state]
   return (
     <span className="flex items-center gap-2.5">
@@ -492,7 +480,7 @@ function StateCell({ state }: { state: ServiceState }) {
         }`}
       />
       <span className={`font-mono text-[11px] tracking-[0.12em] ${s.text}`}>
-        {STATE_LABEL[state]}
+        {label ?? STATE_LABEL[state]}
       </span>
     </span>
   )

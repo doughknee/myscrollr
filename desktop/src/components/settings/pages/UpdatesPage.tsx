@@ -6,6 +6,7 @@ import { channelLocked, updateBusy } from "../../../lib/updateState";
 import { RowList, SettingsButton, SettingsGroup, SegmentedRow } from "../SettingsControls";
 import ReleaseNotes from "../ReleaseNotes";
 import ConfirmDialog from "../../ConfirmDialog";
+import UpdateErrorNotice from "../../UpdateErrorNotice";
 import PageHeader from "./PageHeader";
 import { Row } from "./Row";
 import { SETTINGS_ROWS } from "../rows";
@@ -63,7 +64,7 @@ export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-ui-body font-medium text-fg">{updateDescription(state)}</p>
-                {state.error && <p role="alert" className="mt-2 break-words text-ui-meta text-error">{state.error}</p>}
+                <UpdateErrorNotice state={state} className="mt-2" />
               </div>
               {!busy && (state.phase === "ready"
                 ? <SettingsButton tone="accent" onClick={() => { void updateController.restart(); }}>Restart now</SettingsButton>

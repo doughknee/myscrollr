@@ -120,7 +120,7 @@ func TestStaleUpcomingGamesAreNotServed(t *testing.T) {
 	// empty state reads to say when a league returns. Unfiltered it is
 	// MIN(start_time) over 'pre' rows, so the stale row would make it name
 	// a date in the PAST.
-	meta := loadLeagueMeta(ctx, []string{league})
+	meta, _ := loadLeagueMeta(ctx, []string{league})
 	for _, m := range meta {
 		if m.NextGame != nil && m.NextGame.Before(time.Now()) {
 			t.Errorf("next_game is in the past (%s) â€” the empty state would say a league returns on a date that has been and gone", m.NextGame)

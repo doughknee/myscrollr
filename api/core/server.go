@@ -48,7 +48,11 @@ func NewServer() *Server {
 		EnableTrustedProxyCheck: true,
 		EnableIPValidation:      true,
 		TrustedProxies:          []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
-		ProxyHeader:             "X-Forwarded-For",
+		// The address ingress-nginx saw, which it writes into X-Real-IP itself.
+		// X-Forwarded-For is whatever the caller sent (SB-3), so it is not used:
+		// this is the same header analytics_policy.go trusts. c.IP() feeds the
+		// rate limiter, the public form caps and the audit source hash.
+		ProxyHeader: "X-Real-IP",
 		ReadTimeout:             30 * time.Second,
 		IdleTimeout:             120 * time.Second,
 	})
@@ -140,6 +144,8 @@ func (s *Server) setupMiddleware() {
 	// Core paths always exempt from rate limiting
 	coreExemptPaths := map[string]bool{
 		"/health":                            true,
+		"/health/live":                       true,
+		"/health/ready":                      true,
 		"/public/analytics-policy":           true,
 		"/events":                            true,
 		"/webhooks/sequin":                   true,
@@ -184,6 +190,8 @@ func (s *Server) setupRoutes() {
 
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)
+	s.App.Get("/health/live", s.healthLive)
+	s.App.Get("/health/ready", s.healthReady)
 	s.App.Get("/public/analytics-policy", s.analyticsPolicy)
 	// gzip per route, never app-wide: /events is SSE (SCROLLR-313).
 	s.App.Get("/public/feed", compress.New(), ingestread.HandlePublicFeed)
@@ -386,6 +394,35 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/users/:username", platform.GetProfileByUsername)
 }
 
+// healthLive is the Kubernetes liveness probe: the process answers, nothing
+// else. It must not depend on Postgres, Redis or an ingester, because a
+// restart fixes none of them (RB-1, SCROLLR-367).
+func (s *Server) healthLive(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"status": "alive"})
+}
+
+// healthReady is the readiness and startup probe: only what core needs to
+// serve, Postgres and Redis, each with a bounded wait. The ingesters are
+// deliberately absent; /health still reports them for people and the status
+// pages.
+func (s *Server) healthReady(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	res := fiber.Map{"status": "ready", "database": "healthy", "redis": "healthy"}
+	if platform.DBPool == nil || platform.DBPool.Ping(ctx) != nil {
+		res["status"], res["database"] = "unready", "unhealthy"
+	}
+	if platform.Rdb == nil || platform.Rdb.Ping(ctx).Err() != nil {
+		res["status"], res["redis"] = "unready", "unhealthy"
+	}
+	status := fiber.StatusOK
+	if res["status"] != "ready" {
+		status = fiber.StatusServiceUnavailable
+	}
+	return c.Status(status).JSON(res)
+}
+
 // healthCheck returns the aggregated health status.
 // Results are cached in Redis for 10s. Singleflight prevents thundering herd.
 //
@@ -512,16 +549,23 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		}
 
 		// 1. User preferences (sync tier from JWT roles)
+		// A database error is an error, never an empty account: the desktop
+		// reads no widgets as "this account has no sources" (RB-5), and the
+		// 30 s cache would pin that answer after the database recovers.
 		prefs, err := accounts.GetOrCreatePreferences(userID, userRoles)
-		if err == nil {
-			res.Preferences = prefs
+		if err != nil {
+			log.Printf("[Dashboard] preferences unreadable: %v", err)
+			return nil, err
 		}
+		res.Preferences = prefs
 
 		// 2. User widgets + enabled types
 		widgets, err := platform.GetUserWidgets(userID)
-		if err == nil {
-			res.Widgets = widgets
+		if err != nil {
+			log.Printf("[Dashboard] widgets unreadable: %v", err)
+			return nil, err
 		}
+		res.Widgets = widgets
 
 		// Key by data SOURCE, not the exact widget type, so split widgets
 		// (sports_nfl, finance_stocks, …) still select their backing service's
@@ -534,12 +578,17 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		}
 
 		// Local widget sources (ADR-0002) contribute in-process.
-		for k, v := range ingestread.LocalDashboard(context.Background(), userID, enabledSources) {
+		// A source that cannot be read is left out of Data rather than sent as
+		// an empty list, and the response is not cached.
+		sections, failed := ingestread.LocalDashboard(context.Background(), userID, enabledSources)
+		for k, v := range sections {
 			res.Data[k] = v
 		}
 
 		cacheData, _ := json.Marshal(res)
-		platform.Rdb.Set(context.Background(), cacheKey, cacheData, platform.DashboardCacheTTL)
+		if len(failed) == 0 {
+			platform.Rdb.Set(context.Background(), cacheKey, cacheData, platform.DashboardCacheTTL)
+		}
 		return cacheData, nil
 	})
 

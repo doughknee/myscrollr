@@ -59,10 +59,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
       - run: npm ci --ignore-scripts
@@ -90,13 +90,13 @@ jobs:
       proceed: ${{ steps.check.outputs.proceed }}
       prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           sparse-checkout: |
             desktop/src-tauri/tauri.conf.json
             desktop/scripts/release-lookup.mjs
             desktop/scripts/release-source.mjs
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
       - id: check
@@ -186,7 +186,7 @@ jobs:
         working-directory: desktop
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -195,14 +195,14 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb xdotool dbus-x11 scrot
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: ${{ matrix.rust_target }}
 
@@ -229,7 +229,7 @@ jobs:
           echo "Real cargo at \$CARGO_HOME/bin/cargo: $("$CARGO_HOME/bin/cargo" --version)"
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           # Do not restore ~/.cargo/bin on macOS: a poisoned cache can replace
           # cargo with rustup-init and break cargo metadata inside tauri-action.
@@ -368,7 +368,7 @@ jobs:
       # consumed 51 min before tauri-action gave up.
       - name: Build Tauri app
         if: matrix.platform != 'windows-latest'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -441,7 +441,7 @@ jobs:
 
       - name: Stage verified Windows artifacts
         if: matrix.platform == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scrollr-windows-release-${{ github.sha }}
           overwrite: true
@@ -463,7 +463,7 @@ jobs:
       # failing the whole release pipeline.
       - name: Register Sentry release
         if: matrix.platform == 'ubuntu-22.04' && env.SENTRY_AUTH_TOKEN != '' && env.SENTRY_ORG != ''
-        uses: getsentry/action-release@v3
+        uses: getsentry/action-release@d55c8c3b7375607e972b710f12926b676d89d7d2 # v3
         continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -567,7 +567,7 @@ jobs:
 
       - name: Retain packaged startup evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: package-smoke-${{ matrix.rust_target }}-${{ github.sha }}
           path: desktop/package-smoke/
@@ -584,7 +584,7 @@ jobs:
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Retain build-bound release evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-proof-${{ steps.proof.outputs.target }}-${{ github.sha }}
           overwrite: true
@@ -606,19 +606,19 @@ jobs:
         working-directory: desktop
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: x86_64-pc-windows-msvc
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           prefix-key: "v1-rust-no-bin"
           workspaces: "desktop/src-tauri -> target"
@@ -685,7 +685,7 @@ jobs:
         run: ./scripts/verify-windows-artifacts.ps1
 
       - name: Upload verified signed artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scrollr-windows-signed-${{ github.sha }}
           if-no-files-found: error
@@ -707,9 +707,9 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: scrollr-windows-release-${{ github.sha }}
           path: desktop/src-tauri/target/release
@@ -797,10 +797,10 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
 
