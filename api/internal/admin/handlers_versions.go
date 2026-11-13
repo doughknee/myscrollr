@@ -183,55 +183,13 @@ func buildVersionsResponse(aggs []usageAgg, days int) VersionsResponse {
 	return res
 }
 
-// compareVersions orders dotted numeric versions numerically, so 1.10.0 sorts
-// above 1.9.0 where a string compare would not. A pre-release suffix
-// ("1.7.0-beta.1") sorts below the same release without one, per semver.
-// Returns -1, 0 or 1.
-//
-// Only identical strings return 0. Two spellings that tie numerically ("1.6"
-// and "1.6.0") fall back to a string compare, because sort.Slice is not
-// stable and a list that reorders itself between reads is worse than an
-// arbitrary but fixed order.
+// compareVersions is platform.CompareVersions with a string tie-break, so
+// two spellings of one version ("1.6" and "1.6.0") still sort in a fixed
+// order: sort.Slice is not stable and a list that reorders itself between
+// reads is worse than an arbitrary but fixed order.
 func compareVersions(a, b string) int {
-	aNum, aPre := splitPrerelease(a)
-	bNum, bPre := splitPrerelease(b)
-	for i := 0; i < len(aNum) || i < len(bNum); i++ {
-		x, y := 0, 0
-		if i < len(aNum) {
-			x = aNum[i]
-		}
-		if i < len(bNum) {
-			y = bNum[i]
-		}
-		if x != y {
-			if x < y {
-				return -1
-			}
-			return 1
-		}
+	if c := platform.CompareVersions(a, b); c != 0 {
+		return c
 	}
-	switch {
-	case aPre == bPre:
-		return strings.Compare(a, b)
-	case aPre == "":
-		return 1
-	case bPre == "":
-		return -1
-	}
-	return strings.Compare(aPre, bPre)
-}
-
-func splitPrerelease(v string) ([]int, string) {
-	pre := ""
-	if i := strings.IndexByte(v, '-'); i >= 0 {
-		pre = v[i+1:]
-		v = v[:i]
-	}
-	parts := strings.Split(v, ".")
-	nums := make([]int, 0, len(parts))
-	for _, p := range parts {
-		n, _ := strconv.Atoi(p)
-		nums = append(nums, n)
-	}
-	return nums, pre
+	return strings.Compare(a, b)
 }

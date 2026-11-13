@@ -61,3 +61,29 @@ func indexOf(ids []string, want string) int {
 	}
 	return -1
 }
+
+// SCROLLR-445: "current version" is the newest published Stable, chosen by
+// version rather than list order, with the Beta named only while it is ahead.
+func TestCurrentDesktopVersions(t *testing.T) {
+	rel := func(tag string, pre bool) release { return release{Tag: tag, Prerelease: pre} }
+	all := []release{
+		rel("server-2026.10.26.4", false),
+		rel("desktop-v1.8.0-beta.2", true),
+		rel("desktop-v1.8.0-beta.10", true),
+		rel("desktop-v1.7.3", false),
+		rel("desktop-v1.7.10", false),
+		rel("desktop-v1.7.9", false),
+	}
+	stable, beta := currentDesktopVersions(all)
+	if stable == nil || stable.version != "1.7.10" {
+		t.Fatalf("stable = %+v, want 1.7.10", stable)
+	}
+	if beta == nil || beta.version != "1.8.0-beta.10" {
+		t.Fatalf("beta = %+v, want 1.8.0-beta.10", beta)
+	}
+	// Once the final release ships, its betas are no longer "current".
+	_, beta = currentDesktopVersions(append(all, rel("desktop-v1.8.0", false)))
+	if beta != nil {
+		t.Errorf("beta = %+v after 1.8.0 shipped, want none", beta)
+	}
+}

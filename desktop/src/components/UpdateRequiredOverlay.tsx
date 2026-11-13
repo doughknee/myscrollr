@@ -1,11 +1,18 @@
 import { RefreshCw, Download } from "lucide-react";
 import { motion } from "motion/react";
+import { open } from "@tauri-apps/plugin-shell";
+import UpdateErrorNotice from "./UpdateErrorNotice";
 import { updateBusy } from "../lib/updateState";
 import { updateController, useUpdateController } from "../lib/updateController";
 import {
   backdropMotion,
   overlaySurfaceMotion,
 } from "../lib/motion";
+
+// The app's filled accent button (same classes as the Home empty-state CTAs).
+const PRIMARY_BUTTON =
+  "flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-ui-meta font-semibold text-surface hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60";
+const DOWNLOAD_URL = "https://myscrollr.com/download";
 
 interface Props {
   appVersion: string;
@@ -51,7 +58,7 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
           <button
             type="button"
             onClick={() => void updateController.restart()}
-            className="btn btn-primary btn-sm w-full"
+            className={PRIMARY_BUTTON}
           >
             <RefreshCw size={14} />
             Restart to finish updating
@@ -61,7 +68,7 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
             type="button"
             onClick={() => void runUpdate()}
             disabled={busy}
-            className="btn btn-primary btn-sm w-full"
+            className={PRIMARY_BUTTON}
           >
             <Download size={14} />
             {busy ? "Updating…" : "Update now"}
@@ -71,8 +78,15 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
         {busy && (
           <p className="mt-3 text-xs text-base-content/40">{state.phase === "checking" ? "Checking the selected update channel…" : "Updating Scrollr…"}</p>
         )}
+        <UpdateErrorNotice state={state} className="mt-3" />
         {state.error && (
-          <p className="mt-3 text-xs text-error/70">{state.error}</p>
+          <button
+            type="button"
+            onClick={() => void open(DOWNLOAD_URL).catch(() => {})}
+            className="mt-3 cursor-pointer text-ui-meta font-medium text-accent hover:underline"
+          >
+            Download the installer instead
+          </button>
         )}
       </motion.div>
     </motion.div>

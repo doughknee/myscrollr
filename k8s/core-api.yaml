@@ -269,13 +269,16 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-          # Core /health now returns 503 when any dependency is
-          # degraded (see PR #108 server.go changes). Add a startupProbe
-          # so a slow Postgres connection doesn't get misread as
-          # liveness failure during deploy.
+          # Probes must not depend on the ingesters (SCROLLR-367): /health also
+          # reports finance, sports and rss and answers 503 when one stalls, so
+          # pointing probes at it took every core pod out of rotation and then
+          # restarted them. Liveness is the process alone; readiness and startup
+          # are Postgres and Redis only (what core itself needs to serve).
+          # The startupProbe keeps a slow Postgres connection during deploy
+          # from being misread as a failure: 30 x 5 s.
           startupProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8080
             initialDelaySeconds: 3
             periodSeconds: 5
@@ -283,7 +286,7 @@ spec:
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 30
@@ -291,7 +294,7 @@ spec:
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10

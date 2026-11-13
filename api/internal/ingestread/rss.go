@@ -386,25 +386,31 @@ func rssHealth(ctx context.Context) (string, bool) {
 
 // rssDashboard returns the "rss" dashboard section for a user: the
 // latest items across the feeds of their news/rss widgets.
-func rssDashboard(ctx context.Context, userSub string) map[string]interface{} {
+func rssDashboard(ctx context.Context, userSub string) (map[string]interface{}, error) {
 	cacheKey := CacheKeyRSSPrefix + userSub
 	var items []RssItem
 	if cacheGetJSON(ctx, cacheKey, &items) {
-		return map[string]interface{}{"rss": items}
+		return map[string]interface{}{"rss": items}, nil
 	}
 
-	feedURLs := getUserRSSFeedURLs(ctx, userSub)
+	feedURLs, err := getUserRSSFeedURLs(ctx, userSub)
+	if err != nil {
+		return nil, err
+	}
 	if len(feedURLs) == 0 {
-		return map[string]interface{}{"rss": []RssItem{}}
+		return map[string]interface{}{"rss": []RssItem{}}, nil
 	}
 
-	items = queryRSSItems(ctx, feedURLs)
+	items, err = queryRSSItems(ctx, feedURLs)
+	if err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = make([]RssItem, 0)
 	}
 
 	cacheSetJSON(ctx, cacheKey, items, RSSItemsCacheTTL)
-	return map[string]interface{}{"rss": items}
+	return map[string]interface{}{"rss": items}, nil
 }
 
 // Polling targets commit with widget writes; lifecycle only invalidates caches.
@@ -430,7 +436,7 @@ func rssLifecycle(event, userSub string, config, oldConfig map[string]interface{
 // channels. Post-widget-split a user has one row per curated feed
 // (widget_type = 'news_bbc', …) plus 'rss_custom' for their own feeds —
 // and a legacy coarse 'rss'/'news' row may still exist. Gather them all.
-func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
+func getUserRSSFeedURLs(ctx context.Context, logtoSub string) ([]string, error) {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT widget_type, config FROM user_widgets
 		WHERE logto_sub = $1
@@ -438,7 +444,7 @@ func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 		       OR widget_type LIKE 'rss\_%')
 	`, logtoSub)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 	seen := make(map[string]bool)
@@ -460,7 +466,7 @@ func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 			}
 		}
 	}
-	return urls
+	return urls, rows.Err()
 }
 
 // widgetFeedURLs is the feed URLs a widget row serves. A row whose config
@@ -474,9 +480,9 @@ func widgetFeedURLs(widgetType string, config map[string]interface{}) []string {
 }
 
 // queryRSSItems fetches the latest RSS items for the given feed URLs.
-func queryRSSItems(ctx context.Context, feedURLs []string) []RssItem {
+func queryRSSItems(ctx context.Context, feedURLs []string) ([]RssItem, error) {
 	if len(feedURLs) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	rows, err := platform.DBPool.Query(ctx, `
@@ -488,7 +494,7 @@ func queryRSSItems(ctx context.Context, feedURLs []string) []RssItem {
 	`, feedURLs, DefaultRSSItemsLimit)
 	if err != nil {
 		log.Printf("[RSS] Items query failed: %v", err)
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -505,7 +511,7 @@ func queryRSSItems(ctx context.Context, feedURLs []string) []RssItem {
 		}
 		items = append(items, item)
 	}
-	return items
+	return items, rows.Err()
 }
 
 // PublicRSSPerFeed caps each curated feed's share of /public/feed's rss

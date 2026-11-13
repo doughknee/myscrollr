@@ -35,6 +35,9 @@ func GetUserWidgets(logtoSub string) ([]Widget, error) {
 		}
 		widgets = append(widgets, ch)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return widgets, nil
 }

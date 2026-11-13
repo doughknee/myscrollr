@@ -123,7 +123,7 @@ func MergePinnedRows(ctx context.Context, userSub string, pins map[string][]stri
 				continue
 			}
 			if source == "sports" && !leaguesLoaded {
-				leagues = getUserSportsLeagues(ctx, userSub)
+				leagues, _ = getUserSportsLeagues(ctx, userSub)
 				leaguesLoaded = true
 			}
 			row := pinnedRow(ctx, source, subject, leagues)
@@ -164,7 +164,7 @@ func pinnedRow(ctx context.Context, source, subject string, leagues []string) in
 	case "sports":
 		return pinnedGame(ctx, leagues, subject)
 	case "finance":
-		trades := queryTradesBySymbols(ctx, []string{subject})
+		trades, _ := queryTradesBySymbols(ctx, []string{subject}) // best-effort; the error is logged inside
 		if len(trades) == 0 {
 			return nil
 		}

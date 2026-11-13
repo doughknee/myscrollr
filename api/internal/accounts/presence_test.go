@@ -421,6 +421,7 @@ func TestPresenceMarksAdminTableMembersInternalAtCheckIn(t *testing.T) {
 func TestExportIncludesPresenceHistory(t *testing.T) {
 	resetPresence(t)
 	const sub = "presence-export"
+	stubLogtoEmails(t, map[string]string{})
 	enrollForPresence(t, sub)
 	t0 := time.Date(2026, 9, 11, 10, 0, 0, 0, time.UTC)
 	checkIn(t, sub, "sessionEsessionE", 1, t0, nil)

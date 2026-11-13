@@ -51,7 +51,7 @@ jobs:
       rss-service: ${{ steps.manual.outputs.rss-service || steps.changes.outputs.rss-service }}
       k8s: ${{ steps.manual.outputs.k8s || steps.changes.outputs.k8s }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # A desktop tag may predate website fixes already deployed from main.
           ref: ${{ github.event_name == 'release' && 'main' || github.sha }}
@@ -120,7 +120,7 @@ jobs:
             esac
           done
 
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: changes
         if: github.event_name == 'push'
         with:
@@ -177,14 +177,14 @@ jobs:
         if: matrix.changed != 'true'
         run: echo "Skipping ${{ matrix.service }} — no changes detected"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         if: matrix.changed == 'true'
         with:
           ref: ${{ needs.detect-changes.outputs.checkout-sha }}
 
       - name: Install doctl
         if: matrix.changed == 'true'
-        uses: digitalocean/action-doctl@v2
+        uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2 (v2.5.2)
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
@@ -336,12 +336,12 @@ jobs:
       group: scrollr-production-deploy
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.detect-changes.outputs.checkout-sha }}
 
       - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+        uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2 (v2.5.2)
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
