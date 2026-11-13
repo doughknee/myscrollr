@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
 
 // The prompts ARE the product here: everything the AI says to a user is
@@ -235,14 +237,12 @@ func TestPickCurrent(t *testing.T) {
 func TestContextStableUserOnNewestStableIsCurrent(t *testing.T) {
 	out := TicketContext{Tier: "free", AppVersion: currentDesktopVersion(), HasDiagnostics: true}.render()
 	if strings.Contains(out, "OUT OF DATE") {
-		t.Errorf("a user on the newest Stable was called out of date:
-%s", out)
+		t.Errorf("a user on the newest Stable was called out of date:\n%s", out)
 	}
 	if beta := kbVersion(currentBetaVersionRe); beta != "" {
 		out = TicketContext{Tier: "free", AppVersion: beta, HasDiagnostics: true}.render()
 		if strings.Contains(out, "OUT OF DATE") {
-			t.Errorf("a user on the current Beta was called out of date:
-%s", out)
+			t.Errorf("a user on the current Beta was called out of date:\n%s", out)
 		}
 	}
 }
@@ -250,8 +250,7 @@ func TestContextStableUserOnNewestStableIsCurrent(t *testing.T) {
 func TestContextUnparseableVersionIsNotOutOfDate(t *testing.T) {
 	out := TicketContext{Tier: "free", AppVersion: "junk", HasDiagnostics: true}.render()
 	if strings.Contains(out, "OUT OF DATE") || !strings.Contains(out, "not a recognisable version") {
-		t.Errorf("unparseable version mishandled:
-%s", out)
+		t.Errorf("unparseable version mishandled:\n%s", out)
 	}
 }
 

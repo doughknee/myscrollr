@@ -142,21 +142,16 @@ func (tc TicketContext) render() string {
 	}
 	switch {
 	case tc.AppVersion == "":
-		fmt.Fprintf(&b, "App version: unknown. Current release is %s.
-", current)
+		fmt.Fprintf(&b, "App version: unknown. Current release is %s.\n", current)
 	case !platform.ValidVersion(tc.AppVersion):
-		fmt.Fprintf(&b, "App version: reported as %q, which is not a recognisable version. Current release is %s.
-", tc.AppVersion, current)
+		fmt.Fprintf(&b, "App version: reported as %q, which is not a recognisable version. Current release is %s.\n", tc.AppVersion, current)
 	case platform.CompareVersions(tc.AppVersion, current) < 0:
-		fmt.Fprintf(&b, "Current %s is %s; this user is on %s. THEY ARE OUT OF DATE.
-", channel, current, tc.AppVersion)
+		fmt.Fprintf(&b, "Current %s is %s; this user is on %s. THEY ARE OUT OF DATE.\n", channel, current, tc.AppVersion)
 		b.WriteString("That is a useful diagnostic and nothing more. Do NOT tell them updating will " +
 			"fix what they reported unless the FIX ON RECORD block below names a version; the release " +
-			"notes do not record which report a change closed.
-")
+			"notes do not record which report a change closed.\n")
 	default:
-		fmt.Fprintf(&b, "Current %s is %s; this user is on %s. They are up to date.
-", channel, current, tc.AppVersion)
+		fmt.Fprintf(&b, "Current %s is %s; this user is on %s. They are up to date.\n", channel, current, tc.AppVersion)
 	}
 
 	if tc.OS != "" {
