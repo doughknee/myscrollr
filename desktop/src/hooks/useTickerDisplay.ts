@@ -31,7 +31,14 @@ export function useTickerDisplay(prefs: AppPreferences) {
       .then(async () => {
         if (!mounted.current) return;
         const p = latest.current;
-        const next = await invoke<TickerDisplay>("ticker_display");
+        // A host with no native display (null) gets the docked bar.
+        const next =
+          (await invoke<TickerDisplay | null>("ticker_display")) ?? {
+            ...DEFAULT_DISPLAY,
+            monitor: "",
+            suspended: false,
+            pageLeader: getCurrentWindow().label === "ticker",
+          };
         if (!mounted.current) return;
         setDisplay(next);
         const win = getCurrentWindow();

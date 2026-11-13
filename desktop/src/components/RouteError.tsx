@@ -2,14 +2,16 @@
  * Shared error boundary component for route-level errors.
  *
  * Displays a user-friendly message and a retry button that resets
- * the TanStack Router error boundary. The raw error message is
+ * the TanStack Router error boundary and re-runs the route loaders. The raw error message is
  * hidden behind a disclosure to avoid leaking stack traces, paths,
  * or internal identifiers to casual viewers (e.g. during screen
  * sharing or screenshots).
  */
+import { useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 
 export default function RouteError({ error, reset }: ErrorComponentProps) {
+  const router = useRouter();
   const rawMessage =
     error instanceof Error && error.message.length > 0
       ? error.message
@@ -26,7 +28,12 @@ export default function RouteError({ error, reset }: ErrorComponentProps) {
         if the problem persists, include the details below in a bug report.
       </p>
       <button
-        onClick={reset}
+        onClick={() => {
+          reset();
+          // reset() only clears the boundary; a failed loader result stays
+          // cached until the route is told to load again.
+          void router.invalidate();
+        }}
         className="mt-2 px-4 py-1.5 rounded-lg text-xs font-medium bg-surface-3/50 hover:bg-surface-3 text-fg-3 hover:text-fg "
       >
         Try again

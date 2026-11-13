@@ -14,8 +14,10 @@
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { PackageOpen } from "lucide-react";
 import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
+import EmptySection from "../components/layout/EmptySection";
 import { widgetManifest, isUtilityWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { dashboardQueryOptions } from "../api/queries";
@@ -49,12 +51,26 @@ function WidgetRoute() {
 
   if (!manifest) {
     return (
-      <PageLayout title="Widget not found" width="narrow">
-        <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto gap-3 py-12">
-          <p className="text-sm text-fg-3">
-            The widget &ldquo;{id}&rdquo; is not installed.
-          </p>
-        </div>
+      <PageLayout
+        title="Widget not found"
+        parentLabel="Catalog"
+        onParentClick={() => navigate({ to: "/catalog" })}
+        width="narrow"
+      >
+        <EmptySection
+          icon={PackageOpen}
+          title="Widget not found"
+          description="This widget isn’t installed. It may have been renamed or removed."
+          action={
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/catalog" })}
+              className="cursor-pointer rounded-lg bg-accent px-4 py-2 text-ui-meta font-semibold text-surface hover:bg-accent/90"
+            >
+              Browse the Catalog
+            </button>
+          }
+        />
       </PageLayout>
     );
   }

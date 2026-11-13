@@ -298,6 +298,22 @@ fn get_desktop_environment() -> Option<String> {
         .ok()
 }
 
+/// SCROLLR-449 (SC-4): the OS account name is in every path under the home
+/// directory and often is the user's real name; report `~` instead.
+fn replace_home(s: &str, home: &str) -> String {
+    if home.is_empty() {
+        return s.to_string();
+    }
+    s.replace(home, "~").replace(&home.replace('\\', "/"), "~")
+}
+
+fn scrub_home(s: &str) -> String {
+    let home = std::env::home_dir()
+        .map(|h| h.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    replace_home(s, &home)
+}
+
 fn read_log_tail(app: &AppHandle, max_lines: usize) -> LogInfo {
     let log_dir = app.path().app_log_dir().ok();
     let log_path = log_dir.map(|d| d.join(format!("{}.log", app.package_info().name)));
@@ -317,8 +333,8 @@ fn read_log_tail(app: &AppHandle, max_lines: usize) -> LogInfo {
     };
 
     LogInfo {
-        log_file_path: path_str,
-        recent_lines: lines,
+        log_file_path: path_str.map(|p| scrub_home(&p)),
+        recent_lines: lines.iter().map(|l| scrub_home(l)).collect(),
     }
 }
 
@@ -460,6 +476,17 @@ mod tests {
 
     fn mon(name: &str, is_primary: bool) -> MonitorInfo {
         MonitorInfo::new(name.into(), (0, 0), (1920, 1080), 1.0, is_primary)
+    }
+
+    #[test]
+    fn home_directory_becomes_tilde_in_either_slash_style() {
+        let home = r"C:\Users\jane";
+        assert_eq!(
+            replace_home(r"C:\Users\jane\AppData\Roaming\com.scrollr.desktop\logs\Scrollr.log", home),
+            r"~\AppData\Roaming\com.scrollr.desktop\logs\Scrollr.log"
+        );
+        assert_eq!(replace_home("open C:/Users/jane/x.png failed", home), "open ~/x.png failed");
+        assert_eq!(replace_home("untouched", ""), "untouched");
     }
 
     #[test]
