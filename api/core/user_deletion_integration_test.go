@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/gofiber/fiber/v2"
 )
 
 // =============================================================================
@@ -701,5 +703,154 @@ func TestIntegrationPurgeHonoursCancelAfterScan(t *testing.T) {
 	}
 	if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'canceled'`, sub); n != 1 {
 		t.Error("canceled request was overwritten")
+	}
+}
+
+// SCROLLR-477 B3-2: a purge whose stored Stripe customer is unknown to Stripe
+// has nothing to cancel and completes; if Stripe still has the customer, the
+// same list answer stops the purge so the next pass retries.
+func TestIntegrationPurgeCompletesWhenStripeCustomerIsGone(t *testing.T) {
+	for _, gone := range []bool{true, false} {
+		t.Run(map[bool]string{true: "customer gone", false: "customer exists"}[gone], func(t *testing.T) {
+			setupIntegrationDB(t)
+			logto := newLogtoStub(t)
+			const sub = "user_purge_stale_customer"
+			seedPurgeableUser(t, sub, false)
+			stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/subscriptions":
+					// Stripe's answer to a list filtered on a customer it does not have.
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","param":"customer","message":"No such customer: 'cus_` + sub + `'"}}`))
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/customers/cus_"+sub && gone:
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","param":"id","message":"No such customer"}}`))
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/customers/cus_"+sub:
+					_, _ = w.Write([]byte(`{"id":"cus_` + sub + `","object":"customer"}`))
+				default:
+					t.Errorf("unexpected Stripe call %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			})
+
+			err := accounts.PurgeUserAccount(context.Background(), sub)
+			if !gone {
+				if err == nil || len(logto.deletedSubs()) != 0 {
+					t.Fatalf("purge err=%v logto deletions=%v; want it stopped before Logto", err, logto.deletedSubs())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'purged'`, sub); n != 1 {
+				t.Error("request not purged")
+			}
+		})
+	}
+}
+
+// SCROLLR-477 B3-3: once the purge has started, a cancel or a new request
+// cannot stop it, even when a pass fails after Logto deleted the account; the
+// next pass completes it.
+func TestIntegrationCancelRefusedOncePurgeStarted(t *testing.T) {
+	setupIntegrationDB(t)
+	logto := newLogtoStub(t)
+	const sub = "user_purge_started"
+	seedPurgeableUser(t, sub, false)
+	testsupport.MustExec(t, `CREATE OR REPLACE FUNCTION fail_pref_delete() RETURNS trigger AS $$
+		BEGIN RAISE EXCEPTION 'injected purge failure'; END $$ LANGUAGE plpgsql`)
+	testsupport.MustExec(t, `CREATE TRIGGER fail_pref_delete BEFORE DELETE ON user_preferences
+		FOR EACH ROW EXECUTE FUNCTION fail_pref_delete()`)
+	dropTrigger := func() {
+		_, _ = platform.DBPool.Exec(context.Background(), `DROP TRIGGER IF EXISTS fail_pref_delete ON user_preferences`)
+	}
+	t.Cleanup(dropTrigger)
+
+	ctx := context.Background()
+	if err := accounts.PurgeUserAccount(ctx, sub); err == nil {
+		t.Fatal("first pass should fail")
+	}
+	if len(logto.deletedSubs()) != 1 {
+		t.Fatal("first pass should have deleted the Logto user")
+	}
+
+	call := func(method, path string, h fiber.Handler, body string) (int, string) {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := asUser(method, path, sub, h).Test(req, -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	if st, body := call(fiber.MethodPost, "/users/me/delete/cancel", accounts.HandleCancelAccountDeletion, ""); st != fiber.StatusConflict {
+		t.Errorf("cancel after the purge started: %d %s, want 409", st, body)
+	}
+	if st, body := call(fiber.MethodPost, "/users/me/delete", accounts.HandleRequestAccountDeletion, `{"confirm":"DELETE MY ACCOUNT"}`); st != fiber.StatusConflict {
+		t.Errorf("re-request after the purge started: %d %s, want 409", st, body)
+	}
+	if st, body := call(fiber.MethodGet, "/users/me/delete/status", accounts.HandleAccountDeletionStatus, ""); st != fiber.StatusOK || !strings.Contains(body, `"purge_started_at"`) || !strings.Contains(body, `"status":"pending"`) {
+		t.Errorf("status: %d %s, want pending with purge_started_at", st, body)
+	}
+
+	dropTrigger()
+	if err := accounts.PurgeUserAccount(ctx, sub); err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'purged'`, sub); n != 1 {
+		t.Error("retry did not complete the purge")
+	}
+}
+
+// SCROLLR-477 B3-7: asking for deletion expires the account's open Checkout
+// Sessions and cancels its unconfirmed lifetime PaymentIntents, and nothing else.
+func TestIntegrationDeletionRequestClosesOpenPurchases(t *testing.T) {
+	setupIntegrationDB(t)
+	const sub = "user_delete_open_checkout"
+	seedStripeCustomer(t, sub, "cus_open_checkout", "free", "canceled", false)
+	var mu sync.Mutex
+	var touched []string
+	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		q := r.URL.Query()
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/checkout/sessions":
+			if q.Get("customer") != "cus_open_checkout" || q.Get("status") != "open" {
+				t.Errorf("listed sessions with %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"object":"list","url":"/v1/checkout/sessions","has_more":false,"data":[{"id":"cs_open","object":"checkout.session","status":"open"}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/payment_intents":
+			if q.Get("customer") != "cus_open_checkout" {
+				t.Errorf("listed payment intents with %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"object":"list","url":"/v1/payment_intents","has_more":false,"data":[
+				{"id":"pi_life","object":"payment_intent","status":"requires_payment_method","metadata":{"plan":"lifetime"}},
+				{"id":"pi_invoice","object":"payment_intent","status":"requires_payment_method","metadata":{}},
+				{"id":"pi_paid","object":"payment_intent","status":"succeeded","metadata":{"plan":"lifetime"}}]}`))
+		case r.Method == http.MethodPost:
+			mu.Lock()
+			touched = append(touched, r.URL.Path)
+			mu.Unlock()
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			t.Errorf("unexpected Stripe call %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	req := httptest.NewRequest(fiber.MethodPost, "/users/me/delete", strings.NewReader(`{"confirm":"DELETE MY ACCOUNT"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := asUser(fiber.MethodPost, "/users/me/delete", sub, accounts.HandleRequestAccountDeletion).Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("request deletion: status=%d", resp.StatusCode)
+	}
+	if got := strings.Join(touched, ","); got != "/v1/checkout/sessions/cs_open/expire,/v1/payment_intents/pi_life/cancel" {
+		t.Errorf("Stripe writes = %s, want the open session expired and the lifetime intent canceled", got)
 	}
 }

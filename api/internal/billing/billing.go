@@ -190,8 +190,7 @@ func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	if err == nil && customerID != "" {
 		// Verify the cached customer still exists in Stripe and isn't deleted
 		c, stripeErr := stripecustomer.Get(customerID, nil)
-		var se *stripe.Error
-		if stripeErr != nil && !(errors.As(stripeErr, &se) && se.Code == stripe.ErrorCodeResourceMissing) {
+		if stripeErr != nil && !accounts.IsStripeResourceMissing(stripeErr) {
 			return "", fmt.Errorf("check stripe customer %s: %w", customerID, stripeErr)
 		}
 		if stripeErr == nil && !c.Deleted {
@@ -234,20 +233,28 @@ func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 }
 
 // RefuseWhileDeletionPending stops every purchase route while the account is
-// scheduled for deletion: the purge would otherwise remove an account that
-// Stripe keeps charging (SCROLLR-465). Mounted after LogtoAuth.
+// scheduled for deletion, and after it has been deleted (an access token can
+// outlive the Logto account): the purge would otherwise remove an account
+// that Stripe keeps charging (SCROLLR-465, SCROLLR-477). Mounted after
+// LogtoAuth.
 func RefuseWhileDeletionPending(c *fiber.Ctx) error {
-	pending, err := accounts.DeletionPending(context.Background(), platform.GetUserID(c))
+	status, err := accounts.DeletionRequestStatus(context.Background(), platform.GetUserID(c))
 	if err != nil {
 		log.Printf("[Billing] Deletion status lookup failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error", Error: "Failed to initialize billing",
 		})
 	}
-	if pending {
+	switch status {
+	case "pending":
 		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Your account is scheduled for deletion. Cancel the deletion on your account page before you subscribe or buy.",
+		})
+	case "purged":
+		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "This account has been deleted.",
 		})
 	}
 	return c.Next()
@@ -915,6 +922,15 @@ func HandleGetSubscription(c *fiber.Ctx) error {
 	// Fetch live subscription data from Stripe for billing details + schedule
 	if sc.StripeSubscriptionID != nil && *sc.StripeSubscriptionID != "" {
 		sub, err := stripesubscription.Get(*sc.StripeSubscriptionID, nil)
+		if err != nil && !accounts.IsStripeResourceMissing(err) {
+			// Stripe unreachable, rate-limited, etc.: it said nothing about the
+			// subscription. Keep the row (resetting it would unlink a live
+			// subscription and let the account buy a second one) and answer
+			// from it, without the live price and schedule details.
+			log.Printf("[Billing] Could not refresh subscription %s for %s; serving the stored record: %v",
+				*sc.StripeSubscriptionID, userID, err)
+			return c.JSON(resp)
+		}
 		if err != nil {
 			// Subscription no longer exists in Stripe (deleted from Dashboard, etc.)
 			// Self-heal: reset the DB record so stale data isn't served.
