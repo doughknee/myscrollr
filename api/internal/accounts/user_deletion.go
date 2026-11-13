@@ -271,8 +271,9 @@ func loadSupportExport(ctx context.Context, logtoSub, email string) (map[string]
 // business leads are deleted. The case row stays as a counter (category,
 // status, app/OS, linked issue, dates) with every identifying field cleared,
 // is dismissed so the bot never drafts to it again, and is stamped purged_at so
-// the osTicket backfill and webhook never copy the ticket back in. Messages go before
-// drafts: support_messages.ai_draft_id references support_drafts.
+// the osTicket backfill and webhook never copy the ticket back in. A ticket known
+// only through a draft gets a bare case row first, so it carries the marker too.
+// Messages go before drafts: support_messages.ai_draft_id references support_drafts.
 func purgeSupportData(ctx context.Context, tx pgx.Tx, logtoSub, email string) error {
 	tickets, err := accountSupportTickets(ctx, tx, logtoSub, email)
 	if err != nil {
@@ -280,6 +281,8 @@ func purgeSupportData(ctx context.Context, tx pgx.Tx, logtoSub, email string) er
 	}
 	if len(tickets) > 0 {
 		for _, q := range []struct{ what, sql string }{
+			{"mark draft-only tickets", `INSERT INTO support_cases (ticket_number)
+				SELECT unnest($1::text[]) ON CONFLICT (ticket_number) DO NOTHING`},
 			{"delete support messages", `DELETE FROM support_messages WHERE ticket_number = ANY($1)`},
 			{"delete support drafts", `DELETE FROM support_drafts WHERE ticket_number = ANY($1)`},
 			{"delete support thread copies", `DELETE FROM support_ticket_threads WHERE ticket_number = ANY($1)`},

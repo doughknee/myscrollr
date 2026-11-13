@@ -540,6 +540,12 @@ func TestIntegrationPurgeRemovesSupportData(t *testing.T) {
 		AND console_status='dismissed' AND category='bug'`); n != 2 {
 		t.Errorf("anonymised cases = %d, want 2", n)
 	}
+	// SCROLLR-465 B2-5: the draft-only ticket is marked too, so the backfill
+	// and the osTicket webhook never copy it back.
+	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number IN `+mine+`
+		AND purged_at IS NOT NULL AND user_email IS NULL AND console_status='dismissed'`); n != 3 {
+		t.Errorf("purge-marked tickets = %d, want 3 (including the draft-only one)", n)
+	}
 	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number IN `+decoys+`
 		AND subject='Secret subject' AND summary='Secret summary' AND console_status='' AND user_email IS NOT NULL`); n != 4 {
 		t.Errorf("decoy cases changed: %d unchanged, want 4", n)
