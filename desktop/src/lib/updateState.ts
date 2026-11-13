@@ -42,6 +42,20 @@ export const DOWNLOAD_TIMEOUT_MS = 180_000;
 export const updateBusy = (s: UpdateSnapshot) => ["initializing", "selecting", "checking", "downloading", "installing", "restarting"].includes(s.phase);
 export const channelLocked = (s: UpdateSnapshot) => updateBusy(s) || s.phase === "ready" || s.phase === "recovery";
 const errorText = (e: unknown) => e instanceof Error ? e.message : String(e);
+/** What to tell the user about `s.error`. Failed operations get a fixed sentence and keep the raw
+ * native text as `detail`; messages the controller already wrote in plain words (a failed restart)
+ * pass through unchanged.
+ */
+export function updateErrorView(s: UpdateSnapshot): { message: string; detail?: string } | null {
+  if (!s.error) return null;
+  if (s.phase !== "error") return { message: s.error };
+  const message = s.errorOperation === "checking"
+    ? "Scrollr could not check for updates. Check your internet connection and try again."
+    : s.errorOperation === "downloading" || s.errorOperation === "installing"
+      ? "The update could not be installed. Check your internet connection and try again."
+      : "Something went wrong with the update. Try again in a moment.";
+  return { message, detail: s.error };
+}
 
 /** Main-window singleton in production. Native requests cancel before releasing the lock;
  * never race an IPC operation against a JavaScript timer and leave it running underneath.

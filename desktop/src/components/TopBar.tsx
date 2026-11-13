@@ -211,12 +211,12 @@ export default function TopBar({
               {page.onTitleClick ? (
                 <button
                   onClick={page.onTitleClick}
-                  className="font-semibold text-fg-2 hover:text-fg truncate "
+                  className="font-semibold text-fg-2 hover:text-fg truncate shrink-0 max-w-full"
                 >
                   {page.title}
                 </button>
               ) : (
-                <span className="font-semibold text-fg truncate">
+                <span className="font-semibold text-fg truncate shrink-0 max-w-full">
                   {page.title}
                 </span>
               )}
