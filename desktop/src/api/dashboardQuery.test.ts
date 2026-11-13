@@ -145,6 +145,22 @@ describe("forgetAccountData (sign-out or sign-in)", () => {
     expect(client.getQueryData(queryKeys.catalogs.rss)).toEqual(["shared"]); // not per account
     unsubscribe();
   });
+
+  // SCROLLR-472: after a sign-in a GitHub chip must not wait for its next poll.
+  it("on a sign-in, refetches the emptied GitHub query that is in use at once", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const github = vi.fn().mockResolvedValueOnce({ owner: "a" }).mockResolvedValue({ owner: "b" });
+    const observer = new QueryObserver(client, { queryKey: ["github-board"], queryFn: github, staleTime: Infinity });
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual({ owner: "a" }));
+    authFetch.mockResolvedValue(good);
+
+    await forgetAccountData(client, { refetch: true });
+
+    expect(github).toHaveBeenCalledTimes(2);
+    expect(observer.getCurrentResult().data).toEqual({ owner: "b" });
+    unsubscribe();
+  });
 });
 
 describe("dashboardState", () => {

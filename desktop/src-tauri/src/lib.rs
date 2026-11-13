@@ -98,15 +98,18 @@ fn before_send(
     let home = std::env::home_dir()
         .map(|h| h.to_string_lossy().into_owned())
         .unwrap_or_default();
+    // D2-8: the panic message and absolute frame paths carry the home path too.
+    let scrub = |s: &mut Option<String>| {
+        if let Some(v) = s.as_mut().filter(|_| !home.is_empty()) {
+            *v = v.replace(&home, "~");
+        }
+    };
     for exc in event.exception.iter_mut() {
+        scrub(&mut exc.value);
         if let Some(st) = exc.stacktrace.as_mut() {
             for frame in st.frames.iter_mut() {
-                if let Some(filename) = frame.filename.as_mut() {
-                    if !home.is_empty() {
-                        let s: String = filename.to_string();
-                        *filename = s.replace(&home, "~");
-                    }
-                }
+                scrub(&mut frame.filename);
+                scrub(&mut frame.abs_path);
             }
         }
     }
@@ -446,8 +449,15 @@ mod autostart_launch_tests {
 mod crash_reports_tests {
     use super::*;
 
+    /// The switch is process-wide; tests that flip it must not interleave.
+    static SWITCH: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    fn hold_switch() -> std::sync::MutexGuard<'static, ()> {
+        SWITCH.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
     #[test]
     fn before_send_drops_every_event_while_off() {
+        let _switch = hold_switch();
         let event = sentry::protocol::Event::default();
         set_crash_reports(false);
         assert!(before_send(event.clone()).is_none());
@@ -457,6 +467,7 @@ mod crash_reports_tests {
 
     #[test]
     fn before_send_drops_the_hostname() {
+        let _switch = hold_switch();
         let mut event = sentry::protocol::Event::default();
         event.server_name = Some("Janes-MacBook-Pro".into());
         let device = sentry::protocol::DeviceContext {
@@ -470,6 +481,38 @@ mod crash_reports_tests {
         match sent.contexts.get("device") {
             Some(sentry::protocol::Context::Device(d)) => assert!(d.name.is_none()),
             _ => panic!("device context missing"),
+        }
+    }
+
+    #[test]
+    fn before_send_scrubs_the_home_path_everywhere() {
+        let _switch = hold_switch();
+        let home = std::env::home_dir().unwrap().to_string_lossy().into_owned();
+        let path = format!("{home}/x.rs");
+        let frame = sentry::protocol::Frame {
+            filename: Some(path.clone()),
+            abs_path: Some(path.clone()),
+            ..Default::default()
+        };
+        let exc = sentry::protocol::Exception {
+            value: Some(format!("failed to open {path}")),
+            stacktrace: Some(sentry::protocol::Stacktrace {
+                frames: vec![frame],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let event = sentry::protocol::Event {
+            exception: vec![exc].into(),
+            ..Default::default()
+        };
+        set_crash_reports(true);
+        let sent = before_send(event).unwrap();
+        let exc = &sent.exception.values[0];
+        let frame = &exc.stacktrace.as_ref().unwrap().frames[0];
+        for s in [&exc.value, &frame.filename, &frame.abs_path] {
+            let s = s.as_deref().unwrap();
+            assert!(!s.contains(&home) && s.contains('~'), "{s}");
         }
     }
 }

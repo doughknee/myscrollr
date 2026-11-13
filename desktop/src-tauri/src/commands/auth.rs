@@ -165,7 +165,10 @@ const AUTH_FAILURE_HTML: &str = r##"<!DOCTYPE html>
 /// in a background thread and emits an `auth-callback` event when the
 /// browser redirects back with the authorization code.
 #[tauri::command]
-pub fn start_auth_server(app: tauri::AppHandle) -> Result<(), String> {
+pub fn start_auth_server(
+    app: tauri::AppHandle,
+    expected_state: Option<String>,
+) -> Result<(), String> {
     use std::net::TcpListener;
 
     // Prevent multiple concurrent auth servers
@@ -194,7 +197,7 @@ pub fn start_auth_server(app: tauri::AppHandle) -> Result<(), String> {
     let running_handle = app.state::<AuthServerRunning>().inner().clone();
     let stop_handle = app.state::<AuthServerStop>().inner().clone();
     std::thread::spawn(move || {
-        run_auth_server(listener, running_handle, stop_handle, move |payload| {
+        run_auth_server(listener, running_handle, stop_handle, expected_state, move |payload| {
             // Notify the JS side that auth completed so it can exchange
             // the code for tokens.
             app.emit("auth-callback", payload).ok();
@@ -250,6 +253,7 @@ fn run_auth_server<F>(
     listener: std::net::TcpListener,
     running_handle: AuthServerRunning,
     stop_requested: AuthServerStop,
+    expected_state: Option<String>,
     emit_callback: F,
 ) where
     F: Fn(serde_json::Value),
@@ -290,7 +294,12 @@ fn run_auth_server<F>(
                 // Only process requests to /callback — ignore favicon, prefetch,
                 // and other spurious requests the browser sends.
                 let first_line = request.lines().next().unwrap_or("");
-                if !first_line.contains("/callback") {
+                // A callback for another attempt, or from another local page
+                // (D2-12), is not ours: keep waiting for the real one.
+                let state = extract_query_param(&request, "state");
+                if !first_line.contains("/callback")
+                    || (expected_state.is_some() && state != expected_state)
+                {
                     let _ =
                         stream.write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
                     stream.flush().ok();
@@ -299,7 +308,6 @@ fn run_auth_server<F>(
 
                 // Extract OAuth params — Logto may return error params instead of code
                 let code = extract_query_param(&request, "code");
-                let state = extract_query_param(&request, "state");
                 let error = extract_query_param(&request, "error");
                 let error_desc = extract_query_param(&request, "error_description");
 
@@ -460,7 +468,7 @@ mod tests {
         let running_for_thread = running_handle.clone();
         let stop_for_thread = stop_requested.clone();
         let thread = thread::spawn(move || {
-            run_auth_server(listener, running_for_thread, stop_for_thread, |_| {});
+            run_auth_server(listener, running_for_thread, stop_for_thread, None, |_| {});
         });
 
         thread::sleep(Duration::from_millis(100));
@@ -488,6 +496,7 @@ mod tests {
                 listener,
                 running_for_thread,
                 stop_for_thread,
+                None,
                 move |payload| {
                     payloads_for_thread
                         .lock()
@@ -512,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn auth_server_ignores_favicon_and_processes_real_callback() {
+    fn auth_server_ignores_favicon_and_other_states_and_processes_real_callback() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind test listener");
         let addr = listener.local_addr().expect("read listener addr");
         let running_handle = AuthServerRunning(Arc::new(Mutex::new(true)));
@@ -527,6 +536,7 @@ mod tests {
                 listener,
                 running_for_thread,
                 stop_for_thread,
+                Some("real-state".to_string()),
                 move |payload| {
                     payloads_for_thread
                         .lock()
@@ -548,6 +558,17 @@ mod tests {
         }
 
         // Small delay to let the server loop back
+        thread::sleep(Duration::from_millis(50));
+
+        // A callback with another state (another local page, D2-12) — ignored
+        {
+            let mut forged = TcpStream::connect(addr).expect("connect for forged callback");
+            forged
+                .write_all(b"GET /callback?error=x&error_description=Visit%20evil&state=forged HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .expect("write forged callback");
+            let mut buf = [0u8; 256];
+            let _ = std::io::Read::read(&mut forged, &mut buf);
+        }
         thread::sleep(Duration::from_millis(50));
 
         // Now send the real callback — should be processed
@@ -576,7 +597,7 @@ mod tests {
         let running_for_thread = running_handle.clone();
         let stop_for_thread = stop_requested.clone();
         let thread = thread::spawn(move || {
-            run_auth_server(listener, running_for_thread, stop_for_thread, |_| {});
+            run_auth_server(listener, running_for_thread, stop_for_thread, None, |_| {});
         });
 
         let _stream = TcpStream::connect(addr).expect("connect to auth listener");

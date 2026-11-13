@@ -1,5 +1,6 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { invoke } from "@tauri-apps/api/core";
 import { API_BASE, REDIRECT_URI } from "../config";
 import { installWebAdapter, WEB_REDIRECT_URI } from "./web";
 
@@ -33,6 +34,15 @@ describe("web mode adapter", () => {
     window.dispatchEvent(new StorageEvent("storage", { key: "tauri-store:scrollr.json:scrollr:y", newValue: "2" }));
     await new Promise((r) => setTimeout(r, 0));
     expect(changes).toEqual([2]);
+  });
+
+  it("opens a plain link in a tab without touching a pending sign-in", async () => {
+    localStorage.setItem("scrollr:web-pending-pkce", "pending");
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await invoke("open_external", { url: "https://example.com/news" });
+    expect(open).toHaveBeenCalledWith(new URL("https://example.com/news"), "_blank", "noopener");
+    expect(localStorage.getItem("scrollr:web-pending-pkce")).toBe("pending");
+    open.mockRestore();
   });
 
   it("proxies API calls and swaps the redirect in the code exchange", async () => {

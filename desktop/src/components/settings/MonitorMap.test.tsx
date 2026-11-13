@@ -76,6 +76,7 @@ describe("MonitorMap", () => {
 describe("MonitorsRows placement failures", () => {
   it("names the display, retries once however often it is clicked, and clears when the bar is placed", async () => {
     const handlers: Record<string, (e: { payload: unknown }) => void> = {};
+    const windows = ["main", "ticker", "ticker-2"];
     vi.resetModules();
     const invoke = vi.fn(async (cmd: string) => (cmd === "list_monitors" ? DESK : null));
     vi.doMock("@tauri-apps/api/core", () => ({ invoke }));
@@ -86,8 +87,11 @@ describe("MonitorsRows placement failures", () => {
         return () => {};
       }),
     }));
+    vi.doMock("@tauri-apps/api/window", () => ({
+      getAllWindows: async () => windows.map((label) => ({ label })),
+    }));
     const { MonitorsRows } = await import("./MonitorMap");
-    const { render: r, screen, act, fireEvent: fe } = await import("@testing-library/react");
+    const { render: r, screen, act, fireEvent: fe, waitFor } = await import("@testing-library/react");
     r(<MonitorsRows chosen={[DESK[0].name, DESK[1].name]} onChange={() => {}} displays={{}} onDisplayChange={() => {}} />);
     await screen.findByText("Display 1 · 3440 × 1440");
     expect(screen.queryByText(/Couldn.t place the bar/)).toBeNull();
@@ -103,7 +107,13 @@ describe("MonitorsRows placement failures", () => {
 
     act(() => handlers["ticker-placement"]({ payload: { label: "ticker-2", monitor: DESK[1].name, failed: false } }));
     expect(screen.queryByText(/Couldn.t place the bar/)).toBeNull();
+
+    // D2-7: a failure from a window that no longer exists (its last report
+    // arrived after it was destroyed) does not linger.
+    act(() => handlers["ticker-placement"]({ payload: { label: "ticker-3", monitor: DESK[2].name, failed: true } }));
+    await waitFor(() => expect(screen.queryByText(/Couldn.t place the bar/)).toBeNull());
     vi.doUnmock("@tauri-apps/api/core");
     vi.doUnmock("@tauri-apps/api/event");
+    vi.doUnmock("@tauri-apps/api/window");
   });
 });

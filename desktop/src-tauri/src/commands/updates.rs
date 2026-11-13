@@ -72,7 +72,7 @@ async fn check(
     if recovering && recovery_target.is_none() {
         return Err("In-app recovery has not been verified for this package. Use the recovery instructions.".into());
     }
-    let updater = webview
+    let builder = webview
         .updater_builder()
         .endpoints(vec![channel
             .endpoint()
@@ -89,7 +89,21 @@ async fn check(
             }
             release.version > current
                 && (channel == UpdateChannel::Beta || release.version.pre.is_empty())
+        });
+    // D2-3: on Windows the plugin runs the installer and then calls
+    // `std::process::exit(0)`, so the run-event handler that releases the
+    // docked bar's reserved screen space never runs. This hook replaces the
+    // plugin's default (`cleanup_before_exit`), so it calls that too. Both
+    // calls are synchronous and cannot fail; neither waits on the network.
+    #[cfg(target_os = "windows")]
+    let builder = {
+        let app = webview.app_handle().clone();
+        builder.on_before_exit(move || {
+            crate::commands::appbar_win::unregister_all();
+            app.cleanup_before_exit();
         })
+    };
+    let updater = builder
         .build()
         .map_err(|_| "Could not initialize updates")?;
     // Cancel the native network operation before the controller releases its lock.

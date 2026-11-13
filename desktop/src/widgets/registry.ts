@@ -1,13 +1,15 @@
 /**
  * Desktop-local widget registry.
  *
- * Discovers widget FeedTab components at build time from this
- * directory only. Each widget module exports a named `{id}Widget`
- * conforming to WidgetManifest.
+ * Discovers widget manifests at build time from this directory only. Each
+ * `{id}/manifest.ts` exports a named `{id}Widget` conforming to WidgetManifest.
+ * The manifest is the metadata the ticker window needs (name, colour, icon,
+ * copy); its `FeedTab` is a lazy import of `{id}/FeedTab.tsx`, so the feed
+ * screens load only when a widget's page opens (SCROLLR-408).
  */
 import type { WidgetManifest } from "../types";
 
-const modules = import.meta.glob<Record<string, WidgetManifest>>("./*/FeedTab.tsx", {
+const modules = import.meta.glob<Record<string, WidgetManifest>>("./*/manifest.ts", {
   eager: true,
 });
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { emit } from "@tauri-apps/api/event";
+import { getAllWindows } from "@tauri-apps/api/window";
 import { useTauriListener } from "../hooks/useTauriListener";
 
 /**
@@ -26,11 +27,21 @@ export function reportPlacement(p: Placement) {
 /** Main window: the ticker windows whose last placement failed. */
 export function usePlacementFailures(): Placement[] {
   const [seen, setSeen] = useState<Record<string, Placement>>({});
-  useTauriListener<Placement>(PLACEMENT, (e) => setSeen((s) => ({ ...s, [e.payload.label]: e.payload })));
   // A window that was destroyed can no longer say it recovered.
-  useTauriListener<string[]>("ticker-windows-changed", (e) =>
-    setSeen((s) => Object.fromEntries(Object.entries(s).filter(([label]) => e.payload.includes(label)))),
-  );
+  const keepOnly = (labels: string[]) =>
+    setSeen((s) => Object.fromEntries(Object.entries(s).filter(([label]) => labels.includes(label))));
+  // D2-7: `ticker-windows-changed` is not sent when a sync stops early, and a
+  // window's last report can land after it, so failures are also checked
+  // against the windows that exist now.
+  const pruneToLiveWindows = () =>
+    getAllWindows()
+      .then((ws) => keepOnly(ws.map((w) => w.label)))
+      .catch(() => {});
+  useTauriListener<Placement>(PLACEMENT, (e) => {
+    setSeen((s) => ({ ...s, [e.payload.label]: e.payload }));
+    void pruneToLiveWindows();
+  });
+  useTauriListener<string[]>("ticker-windows-changed", (e) => keepOnly(e.payload));
   // Results sent before this page opened are asked for again.
   useEffect(() => {
     emit(PLACEMENT_ASK).catch(() => {});

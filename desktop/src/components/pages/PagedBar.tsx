@@ -39,7 +39,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import clsx from "clsx";
-import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -166,23 +166,20 @@ function useOsReducedMotion(): boolean {
   return reduced;
 }
 
-/** How long this page has left: the lit pill (or the 25+ track's marker) fills in the ink, and stops while the page is held. */
+/**
+ * How long this page has left: the lit pill (or the 25+ track's marker) fills in the ink, and stops while the page is held.
+ * A CSS animation on `transform` (the `dwell-fill` keyframes in style.css) so the compositor draws it and the main
+ * thread writes no style per frame. A new turn (or a changed dwell) remounts the span, which restarts the fill.
+ */
 function DwellFill({ seq, dwell, held }: { seq: number; dwell: number; held: boolean }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const ctl = useRef<AnimationPlaybackControls | null>(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    const c = animate(ref.current, { scaleX: [0, 1] }, { duration: dwell, ease: "linear" });
-    ctl.current = c;
-    return () => c.stop();
-  }, [seq, dwell]);
-  useEffect(() => {
-    const c = ctl.current;
-    if (!c) return;
-    if (held) c.pause();
-    else if (c.time < dwell) c.play();
-  }, [held, seq, dwell]);
-  return <span ref={ref} aria-hidden className="block h-full w-full origin-left" style={{ background: "var(--accent-ink)", transform: "scaleX(0)" }} />;
+  return (
+    <span
+      key={`${seq}-${dwell}`}
+      aria-hidden
+      className="dwell-fill block h-full w-full origin-left"
+      style={{ background: "var(--accent-ink)", animationDuration: `${dwell}s`, animationPlayState: held ? "paused" : "running" }}
+    />
+  );
 }
 
 /** One 18x22 key on the keypad: a 13px chevron in the ink, a 10% white wash on hover. */

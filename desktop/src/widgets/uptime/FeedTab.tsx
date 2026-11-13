@@ -14,7 +14,7 @@ import { useState, useCallback } from "react";
 import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { HeartPulse, RefreshCw, Unlink } from "lucide-react";
-import type { FeedTabProps, WidgetManifest } from "../../types";
+import type { FeedTabProps } from "../../types";
 import Tooltip from "../../components/Tooltip";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
 import LoadingGlyph from "../../components/LoadingGlyph";
@@ -27,30 +27,9 @@ import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { LS_UPTIME_MONITORS } from "../../constants";
 
-// ── Widget manifest ─────────────────────────────────────────────
-
-export const uptimeWidget: WidgetManifest = {
-  id: "uptime",
-  name: "Uptime",
-  tabLabel: "Uptime",
-  description: "Monitor status from Uptime Kuma",
-  hex: "#10b981",
-  icon: HeartPulse,
-  info: {
-    about:
-      "The Uptime widget connects to your Uptime Kuma status page and " +
-      "shows real-time monitor statuses on your ticker.",
-    usage: [
-      "Paste your Uptime Kuma public status page URL to connect.",
-      "All monitors from your status page appear with their current status.",
-    ],
-  },
-  FeedTab: UptimeFeedTab,
-};
-
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
+export default function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const queryClient = useQueryClient();

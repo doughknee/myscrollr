@@ -8,7 +8,8 @@ const RECHECK_MS = 6 * 60 * 60 * 1000;
 export function useStartupUpdateCheck({ appVersion }: { appVersion: string }) {
   const ran = useRef(false);
   const retryFromToast = useRef(false);
-  const state = useUpdateController();
+  // Not the progress fields: a download chunk must not render the app shell (SCROLLR-429).
+  const state = useUpdateController((s) => ({ phase: s.phase, offerId: s.offerId, version: s.version, error: s.error, errorOperation: s.errorOperation }));
   useEffect(() => {
     if (!appVersion || ran.current) return;
     const timer = setTimeout(() => {

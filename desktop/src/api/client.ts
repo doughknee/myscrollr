@@ -6,8 +6,8 @@
  *   - `request<T>()` — unauthenticated (public endpoints)
  *   - `authFetch<T>()` — automatically attaches Bearer token via getValidToken()
  */
-import { fetch } from "@tauri-apps/plugin-http";
 import { getValidToken, isSignedOut, notifySessionExpired } from "../auth";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 import type { Widget, HealthResponse, UserPreferences } from "../types/api.generated";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -15,9 +15,6 @@ import type { Widget, HealthResponse, UserPreferences } from "../types/api.gener
 import { API_BASE } from "../config";
 
 // ── Request helpers ─────────────────────────────────────────────
-
-/** Default hard timeout for all outbound requests (ms). */
-const DEFAULT_TIMEOUT_MS = 15_000;
 
 /**
  * Error thrown by `request()` / `authFetch()` on non-2xx responses.
@@ -32,36 +29,6 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = "ApiError";
-  }
-}
-
-/**
- * Wrap `fetch` with an AbortController-driven timeout. Prevents hung
- * requests (slow backend, dropped connection, frozen proxy) from
- * stalling the UI indefinitely. Callers may still pass their own
- * `signal`; if both are set, whichever fires first wins.
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  // Honor any caller-provided signal by aborting the controller when it fires.
-  const callerSignal = options.signal ?? undefined;
-  const onCallerAbort = () => controller.abort(callerSignal?.reason);
-  if (callerSignal) {
-    if (callerSignal.aborted) controller.abort(callerSignal.reason);
-    else callerSignal.addEventListener("abort", onCallerAbort, { once: true });
-  }
-
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-    if (callerSignal) callerSignal.removeEventListener("abort", onCallerAbort);
   }
 }
 
@@ -85,12 +52,11 @@ export async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetchWithTimeout(`${API_BASE}${path}`, {
-    ...options,
-    headers: options.headers,
-  });
-
-  return handleResponse<T>(response);
+  return fetchWithTimeout(
+    `${API_BASE}${path}`,
+    { ...options, headers: options.headers },
+    (response) => handleResponse<T>(response),
+  );
 }
 
 // ── Widget catalog ──────────────────────────────────────────────
@@ -136,8 +102,11 @@ export type { HealthResponse };
  * body is a real error here.
  */
 export async function fetchHealth(): Promise<HealthResponse> {
-  const response = await fetchWithTimeout(`${API_BASE}/health`);
-  return (await response.json()) as HealthResponse;
+  return fetchWithTimeout(
+    `${API_BASE}/health`,
+    {},
+    (response) => response.json() as Promise<HealthResponse>,
+  );
 }
 
 /**
@@ -162,10 +131,23 @@ export async function authFetch<T>(
     );
   }
 
-  const response = await fetchWithTimeout(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  // The body is read under the same deadline as the headers (RC-7), so the
+  // outcome is settled inside it and the 401 check reads the ApiError.
+  const send = (init: RequestInit) =>
+    fetchWithTimeout(`${API_BASE}${path}`, init, (response) =>
+      handleResponse<T>(response).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      ),
+    );
+  const unwrap = (r: { value: T } | { error: unknown }): T => {
+    if ("error" in r) throw r.error;
+    return r.value;
+  };
+  const is401 = (r: { value: T } | { error: unknown }) =>
+    "error" in r && r.error instanceof ApiError && r.error.status === 401;
+
+  const response = await send({ ...options, headers });
 
   // 401: force a token refresh and retry the request once.
   //
@@ -181,15 +163,15 @@ export async function authFetch<T>(
   //
   // Now: retry on ANY token we manage to obtain, and if we end up with
   // no stored auth at all, say so once so the sign-in banner appears.
-  if (response.status === 401) {
+  if (is401(response)) {
     const newToken = token ? await getValidToken(true) : null;
     if (newToken) {
-      const retryResponse = await fetchWithTimeout(`${API_BASE}${path}`, {
+      const retryResponse = await send({
         ...options,
         headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
       });
-      if (retryResponse.status === 401 && isSignedOut()) notifySessionExpired();
-      return handleResponse<T>(retryResponse);
+      if (is401(retryResponse) && isSignedOut()) notifySessionExpired();
+      return unwrap(retryResponse);
     }
     // No token. `isSignedOut()` separates "the refresh was refused and
     // clearAuth() ran" from "the refresh call failed on the network" —
@@ -198,7 +180,7 @@ export async function authFetch<T>(
     if (isSignedOut()) notifySessionExpired();
   }
 
-  return handleResponse<T>(response);
+  return unwrap(response);
 }
 
 export interface ProductAnalyticsConsent {
@@ -515,6 +497,7 @@ export async function requestPasswordReset(): Promise<void> {
   const response = await fetchWithTimeout(
     `${API_BASE}/users/me/password/reset`,
     { method: "POST", headers },
+    async (r) => r,
   );
   if (!response.ok) {
     throw new ApiError(
@@ -535,10 +518,13 @@ export async function exportUserData(): Promise<Blob> {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetchWithTimeout(`${API_BASE}/users/me/export`, {
-    method: "GET",
-    headers,
-  });
+  // ponytail: the ZIP body is read outside the deadline, as before: an
+  // export can take longer than 15 s to download. Bound it if one hangs.
+  const response = await fetchWithTimeout(
+    `${API_BASE}/users/me/export`,
+    { method: "GET", headers },
+    async (r) => r,
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, `export failed: ${response.status}`);

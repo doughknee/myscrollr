@@ -2,10 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import { FRESH_INSTALL_KEY, getStore, initStore, readStoreShared, removeStorePersisted, setStorePersisted } from "./store";
 import { UpdateController } from "./updateState";
-import type { UpdateChannel } from "./updateState";
+import type { UpdateChannel, UpdateSnapshot } from "./updateState";
 
 export const UPDATE_CHANNEL_KEY = "scrollr:update-channel";
 type Metadata = ConstructorParameters<typeof Update>[0];
@@ -40,6 +40,28 @@ export const updateController = new UpdateController({
   },
   restart: relaunch,
 });
-export function useUpdateController() {
-  return useSyncExternalStore(updateController.subscribe, updateController.getSnapshot, updateController.getSnapshot);
+const sameValue = (a: unknown, b: unknown) =>
+  Object.is(a, b) ||
+  (typeof a === "object" && typeof b === "object" && a !== null && b !== null &&
+    Object.keys(a).length === Object.keys(b).length &&
+    Object.entries(a).every(([k, v]) => Object.is(v, (b as Record<string, unknown>)[k])));
+
+/**
+ * The controller's snapshot, or what `select` makes of it. Every download chunk
+ * is a new snapshot (SCROLLR-429), so a caller that does not show progress passes
+ * a selector over the fields it reads and re-renders only when one of them
+ * changes; the app shell uses this, so a download no longer renders it per chunk.
+ */
+export function useUpdateController<T = UpdateSnapshot>(select: (s: UpdateSnapshot) => T = (s) => s as unknown as T): T {
+  const last = useRef<{ snap: UpdateSnapshot; value: T } | null>(null);
+  const read = () => {
+    const snap = updateController.getSnapshot();
+    const prev = last.current;
+    if (prev?.snap === snap) return prev.value;
+    const next = select(snap);
+    const value = prev && sameValue(prev.value, next) ? prev.value : next;
+    last.current = { snap, value };
+    return value;
+  };
+  return useSyncExternalStore(updateController.subscribe, read, read);
 }

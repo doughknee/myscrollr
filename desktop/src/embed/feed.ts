@@ -37,6 +37,27 @@ const CATALOG = snapshot.widgets as CatalogEntry[];
  */
 export const STARTER = ["finance_stocks", "news_npr"];
 
+/** The app's own request bound (api/client.ts DEFAULT_TIMEOUT_MS). */
+export const FEED_TIMEOUT_MS = 15_000;
+
+/**
+ * The feed's JSON body, or null when it fails, answers non-2xx or takes
+ * longer than `timeoutMs` end to end (RC-15): the bar waits on the first
+ * answer, and null sends it to the sample fixture.
+ */
+export async function readFeed(fetchFn: typeof fetch, url: string, timeoutMs = FEED_TIMEOUT_MS): ReturnType<Response["json"]> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetchFn(url, { signal: ctl.signal });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** `nfl` or `sports_nfl` → the catalog id. Unknown names are dropped. */
 export function resolveWidget(name: string): string | null {
   const ids = [name, `sports_${name}`, `news_${name}`, `finance_${name}`];

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnitsPrefs, WidgetPrefs } from "../preferences";
 import { fetchSysmonData } from "./useSysmonData";
 import type { SystemInfo } from "./useSysmonData";
@@ -72,6 +73,23 @@ const EMPTY: WidgetTickerData = {
 
 // ── Time formatting helpers ─────────────────────────────────────
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * One formatter per locale, zone and option set. Constructing one costs far
+ * more than formatting with it, and the clock rebuilds every chip each second
+ * (four formatters per zone). A bad zone throws before it is stored.
+ */
+export function formatterFor(locale: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(opts)}`;
+  let f = formatters.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, opts);
+    formatters.set(key, f);
+  }
+  return f;
+}
+
 function formatTime(
   date: Date,
   tz: string | undefined,
@@ -83,7 +101,7 @@ function formatTime(
     hour12: format === "12h",
     ...(tz ? { timeZone: tz } : {}),
   };
-  return new Intl.DateTimeFormat("en-US", opts).format(date);
+  return formatterFor("en-US", opts).format(date);
 }
 
 /**
@@ -96,7 +114,7 @@ function formatTime(
  * again. The offset is the one that is unambiguous; the name goes.
  */
 function formatDetail(date: Date, tz: string | undefined): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return formatterFor("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -187,7 +205,7 @@ function formatEndTime(ts: number): string {
 function isNightIn(now: Date, tz: string | undefined): boolean {
   try {
     const hour = Number(
-      new Intl.DateTimeFormat("en-US", {
+      formatterFor("en-US", {
         hour: "numeric",
         hour12: false,
         timeZone: tz,
@@ -205,7 +223,7 @@ function isNightIn(now: Date, tz: string | undefined): boolean {
 /** "UTC-4" for the detail row. Empty when the zone can't be resolved. */
 function utcOffsetLabel(now: Date, tz: string | undefined): string {
   try {
-    const parts = new Intl.DateTimeFormat("en-US", {
+    const parts = formatterFor("en-US", {
       timeZone: tz,
       timeZoneName: "shortOffset",
     }).formatToParts(now);
@@ -213,6 +231,61 @@ function utcOffsetLabel(now: Date, tz: string | undefined): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * Merge freshly built chips into the data, keeping the same object when
+ * nothing on them changed. The clock rebuilds every second, but its chips
+ * read hours and minutes: handing React a new object each second re-rendered
+ * the whole bar and rebuilt every Continuous chip, 59 times a minute for
+ * nothing (SCROLLR-463, PF-8).
+ */
+export function mergeChips(prev: WidgetTickerData, patch: Partial<WidgetTickerData>): WidgetTickerData {
+  for (const k of Object.keys(patch) as (keyof WidgetTickerData)[]) {
+    if (JSON.stringify(prev[k]) !== JSON.stringify(patch[k])) return { ...prev, ...patch };
+  }
+  return prev;
+}
+
+// ── Visibility ──────────────────────────────────────────────────
+
+/** How often a window with utilities on asks the OS whether it is still on screen. */
+const VISIBLE_CHECK_MS = 2_000;
+
+/**
+ * Is this window on screen? The bar is hidden by the user (Show ticker off),
+ * by a suspended display and by hide-on-fullscreen, and all three end in the
+ * native window being hidden, so one question covers them (`useProductActivity`
+ * asks it too). While it is no, nothing here needs to tick. A failed or
+ * missing answer counts as visible: showing too much beats freezing a bar.
+ */
+function useWindowVisible(active: boolean): boolean {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (!active) return;
+    let stopped = false;
+    const check = () => {
+      try {
+        void getCurrentWindow()
+          .isVisible()
+          .then((v) => {
+            if (!stopped) setVisible(v !== false);
+          })
+          .catch(() => {});
+      } catch {
+        /* no native window (tests, a plain browser) */
+      }
+    };
+    check();
+    const id = setInterval(check, VISIBLE_CHECK_MS);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [active]);
+  return visible;
 }
 
 // ── Hook ────────────────────────────────────────────────────────
@@ -229,6 +302,8 @@ export function useWidgetTickerData(
     () => new Set(widgetPrefs.widgetsOnTicker),
     [widgetPrefs.widgetsOnTicker],
   );
+  // Hidden or suspended: stop every timer below; showing again rebuilds once.
+  const visible = useWindowVisible(enabledWidgets.size > 0);
   // The GitHub config (SCROLLR-312), stable across renders that did not change it.
   const githubJson = JSON.stringify(widgetPrefs.github ?? null);
   const githubCfg = useMemo(() => migrateGitHub(JSON.parse(githubJson)), [githubJson]);
@@ -499,6 +574,9 @@ export function useWidgetTickerData(
       setData(EMPTY);
       return;
     }
+    if (!visible) return;
+
+    const patch = (p: Partial<WidgetTickerData>) => setData((prev) => mergeChips(prev, p));
 
     // Build initial data
     const refresh = () => {
@@ -515,14 +593,14 @@ export function useWidgetTickerData(
     // Clock: update every second
     const clockInterval = hasClock
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, clock: buildClockChips() }));
+          patch({ clock: buildClockChips() });
         }, 1000)
       : null;
 
     // Timer: update every second while enabled for live elapsed time
     const timerInterval = hasTimer
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, timer: buildTimerChips() }));
+          patch({ timer: buildTimerChips() });
         }, 1000)
       : null;
 
@@ -530,35 +608,35 @@ export function useWidgetTickerData(
     // (weatherQueryOptions in __root.tsx writes to LS_WEATHER_CITIES on every fetch)
     const unsubWeatherCities = hasWeather
       ? onStoreChange<SavedCity[]>(LS_WEATHER_CITIES, () => {
-          setData((prev) => ({ ...prev, weather: buildWeatherChips() }));
+          patch({ weather: buildWeatherChips() });
         })
       : null;
 
     // Timer: listen for store changes
     const unsubTimerState = hasTimer
       ? onStoreChange<TimerState | null>(LS_TIMER_STATE, () => {
-          setData((prev) => ({ ...prev, timer: buildTimerChips() }));
+          patch({ timer: buildTimerChips() });
         })
       : null;
 
     // Clock: listen for store changes (timezones)
     const unsubClockTimezones = hasClock
       ? onStoreChange<string[]>(LS_CLOCK_TIMEZONES, () => {
-          setData((prev) => ({ ...prev, clock: buildClockChips() }));
+          patch({ clock: buildClockChips() });
         })
       : null;
 
     // Uptime: listen for store changes (monitor data written by FeedTab)
     const unsubUptimeMonitors = hasUptime
       ? onStoreChange(LS_UPTIME_MONITORS, () => {
-          setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
+          patch({ uptime: buildUptimeChips() });
         })
       : null;
 
     // GitHub: listen for store changes (repo data written by FeedTab)
     const unsubGithubRepos = hasGithub
       ? onStoreChange(LS_GITHUB_BOARD, () => {
-          setData((prev) => ({ ...prev, ...buildGithub() }));
+          patch(buildGithub());
         })
       : null;
 
@@ -569,7 +647,7 @@ export function useWidgetTickerData(
       ? setInterval(async () => {
           try {
             sysInfoRef.current = await fetchSysmonData();
-            setData((prev) => ({ ...prev, sysmon: buildSysmonChips() }));
+            patch({ sysmon: buildSysmonChips() });
           } catch {
             /* ignore IPC failures */
           }
@@ -581,7 +659,7 @@ export function useWidgetTickerData(
     const uptimeMs = 60_000;
     const uptimeInterval = hasUptime
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
+          patch({ uptime: buildUptimeChips() });
         }, uptimeMs)
       : null;
 
@@ -590,7 +668,7 @@ export function useWidgetTickerData(
     const githubMs = 60_000;
     const githubInterval = hasGithub
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, ...buildGithub() }));
+          patch(buildGithub());
         }, githubMs)
       : null;
 
@@ -623,6 +701,7 @@ export function useWidgetTickerData(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     JSON.stringify(widgetPrefs.widgetsOnTicker),
+    visible,
     buildClockChips,
     buildTimerChips,
     buildWeatherChips,

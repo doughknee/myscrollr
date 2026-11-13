@@ -1105,6 +1105,23 @@
   }
 }
 
+/* The band's page-dwell fill (PagedBar DwellFill): scaleX 0 to 1, linear, over the
+   page's dwell. Compositor-only, so no main-thread style write per frame. The
+   duration and play-state are inline; held pauses it. Not stilled under reduced
+   motion: it is a progress readout, not a movement. */
+@keyframes dwell-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.dwell-fill {
+  animation: dwell-fill 6s linear both;
+}
+
 /* Alerting status cap — a monitor that's down, a CI run in progress.
    Opacity only, so the cap never changes size and the rail never
    reflows around it. Attribute-gated like every other chip animation:

@@ -69,4 +69,29 @@ describe("useAuthState", () => {
     expect(() => auth.__fire()).not.toThrow();
     expect(result.current.sessionExpired).toBe(false);
   });
+
+  // SCROLLR-472 (D2-11): Cancel used to only hide the overlay.
+  it("Cancel aborts the sign-in in flight, without a failure toast", async () => {
+    const { login } = await import("../auth");
+    const { toast } = await import("sonner");
+    let signal: AbortSignal | undefined;
+    vi.mocked(login).mockImplementation(
+      (_onUrl?: unknown, s?: AbortSignal) =>
+        new Promise((resolve) => {
+          signal = s;
+          s?.addEventListener("abort", () => resolve(null));
+        }),
+    );
+    const { result } = renderHook(() => useAuthState());
+    let done!: Promise<void>;
+    act(() => {
+      done = result.current.handleLogin();
+    });
+    expect(result.current.loggingIn).toBe(true);
+    act(() => result.current.setLoggingIn(false)); // the overlay's Cancel
+    await act(() => done);
+    expect(signal?.aborted).toBe(true);
+    expect(result.current.loggingIn).toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
 });
