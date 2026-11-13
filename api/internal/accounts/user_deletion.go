@@ -268,7 +268,8 @@ func loadSupportExport(ctx context.Context, logtoSub, email string) (map[string]
 // person. Messages, drafts, the Discord thread copy, mail threading ids and
 // business leads are deleted. The case row stays as a counter (category,
 // status, app/OS, linked issue, dates) with every identifying field cleared,
-// and is dismissed so the bot never drafts to it again. Messages go before
+// is dismissed so the bot never drafts to it again, and is stamped purged_at so
+// the osTicket backfill and webhook never copy the ticket back in. Messages go before
 // drafts: support_messages.ai_draft_id references support_drafts.
 func purgeSupportData(ctx context.Context, tx pgx.Tx, logtoSub, email string) error {
 	tickets, err := accountSupportTickets(ctx, tx, logtoSub, email)
@@ -284,7 +285,7 @@ func purgeSupportData(ctx context.Context, tx pgx.Tx, logtoSub, email string) er
 			{"anonymise support cases", `UPDATE support_cases
 				   SET user_email = NULL, user_name = NULL, logto_sub = NULL, subject = '', summary = NULL,
 				       discord_thread_id = NULL, contact_source = NULL, contact_observed_at = NULL,
-				       account_source = NULL, console_status = 'dismissed'
+				       account_source = NULL, console_status = 'dismissed', purged_at = now()
 				 WHERE ticket_number = ANY($1)`},
 		} {
 			if _, err := tx.Exec(ctx, q.sql, tickets); err != nil {
