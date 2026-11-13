@@ -154,12 +154,15 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 async function exchangeCode(
   code: string,
   codeVerifier: string,
+  signal?: AbortSignal,
 ): Promise<TokenResponse> {
-  // The whole exchange is under the client's usual deadline (RC-7).
+  // The whole exchange is under the client's usual deadline (RC-7), and
+  // Cancel ends it at once (D3-8).
   return fetchWithTimeout(
     `${API_RESOURCE}/extension/token`,
     {
       method: "POST",
+      signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         code,
@@ -352,6 +355,13 @@ function looksFresh(auth: AuthState): boolean {
 }
 
 /**
+ * A token the server refused is not refreshed again if it was obtained less
+ * than this long ago (D3-6): while core refuses freshly issued tokens, every
+ * 401 would otherwise spend a Logto rotation, from every desktop at once.
+ */
+const FORCED_REFRESH_FLOOR_MS = 60_000;
+
+/**
  * Exported as `rearmRefresh` for the election: a window that just BECAME the
  * owner still holds the spent, non-null timer of its non-owner days, so
  * nothing else would re-arm it.
@@ -426,13 +436,13 @@ export async function login(
   const throwIfCancelled = () => {
     if (signal?.aborted) throw cancelled();
   };
+  const state = generateRandomHex(16);
 
   try {
     assertAuthConfig();
 
     const codeVerifier = generateRandomHex(64);
     const codeChallenge = await generateCodeChallenge(codeVerifier);
-    const state = generateRandomHex(16);
     throwIfCancelled();
 
     // Start the callback server (returns immediately, listens in background).
@@ -549,7 +559,7 @@ export async function login(
     }
 
     // Exchange code for tokens
-    const tokenRes = await exchangeCode(payload.code, codeVerifier);
+    const tokenRes = await exchangeCode(payload.code, codeVerifier, signal);
     throwIfCancelled(); // Cancel while the code was being exchanged
 
     const authState: AuthState = {
@@ -570,8 +580,10 @@ export async function login(
       cleanupPendingAuth();
     }
 
+    // Only this attempt's server: a cancelled attempt can end after the
+    // user has started the next one (D3-8).
     if (authServerStarted) {
-      await invoke("stop_auth_server").catch((stopErr) => {
+      await invoke("stop_auth_server", { expectedState: state }).catch((stopErr) => {
         console.warn("[Scrollr] Failed to stop auth server:", stopErr);
       });
     }
@@ -585,10 +597,26 @@ export async function login(
 /**
  * Get a valid access token, refreshing silently if near expiry.
  * Returns null if not authenticated or refresh fails.
+ *
+ * `refused`, with `forceRefresh`, is the token the server just answered 401
+ * to (D3-6). If another token is stored by now, someone already refreshed:
+ * it is used as is unless it is near expiry. If the refused one is stored
+ * and under a minute old, it is returned without spending a refresh.
  */
-export async function getValidToken(forceRefresh = false): Promise<string | null> {
+export async function getValidToken(
+  forceRefresh = false,
+  refused?: string,
+): Promise<string | null> {
   const auth = loadAuth();
   if (!auth) return null;
+
+  if (forceRefresh && refused !== undefined) {
+    if (auth.accessToken !== refused) forceRefresh = false;
+    else if (auth.refreshedAt !== undefined) {
+      const age = Date.now() - auth.refreshedAt;
+      if (age >= 0 && age < FORCED_REFRESH_FLOOR_MS) return auth.accessToken;
+    }
+  }
 
   // Token still valid (with buffer), or just obtained — skip if forced
   if (!forceRefresh && looksFresh(auth)) {
@@ -641,6 +669,13 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
     // Signed out while the answer was on its way: writing it back would
     // sign the user in again (D2-6).
     if (gen !== signOutGen) return null;
+    // Another window signed out, or someone signed in, while the answer was
+    // on its way, and this window has not heard yet (D3-9): keep what the
+    // shared store holds unless it still has the token that was sent.
+    const now = await readStoreShared<AuthState>(STORAGE_KEY);
+    if (now?.refreshToken !== refreshToken) {
+      return now?.refreshToken ? now.accessToken : null;
+    }
 
     const authState: AuthState = {
       accessToken: tokenRes.access_token,
@@ -681,11 +716,14 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
 }
 
 /**
- * Check if the user has valid stored auth tokens.
+ * Check if the user has valid stored auth tokens. A token obtained moments
+ * ago counts whatever its expiry says by the local clock: with a clock
+ * running fast every new token looks expired, and the bar tore itself down
+ * at each refresh (D3-10).
  */
 export function isAuthenticated(): boolean {
   const auth = loadAuth();
-  return auth !== null && auth.expiresAt > Date.now();
+  return auth !== null && (auth.expiresAt > Date.now() || justRefreshed(auth));
 }
 
 /**

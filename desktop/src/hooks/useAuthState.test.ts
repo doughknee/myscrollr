@@ -20,6 +20,16 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 const authed = vi.fn(() => true);
+const authStoreListeners = new Set<(v: unknown) => void>();
+const forgetAccountData = vi.fn(async () => {});
+
+vi.mock("../lib/store", () => ({
+  onStoreChange: (key: string, l: (v: unknown) => void) => {
+    if (key === "scrollr:auth") authStoreListeners.add(l);
+    return () => authStoreListeners.delete(l);
+  },
+}));
+vi.mock("../api/queries", () => ({ forgetAccountData: () => forgetAccountData() }));
 
 vi.mock("../auth", async () => {
   const listeners = new Set<() => void>();
@@ -44,7 +54,10 @@ vi.mock("../auth", async () => {
 const { useAuthState } = await import("./useAuthState");
 const auth = (await import("../auth")) as unknown as { __fire: () => void };
 
-beforeEach(() => authed.mockReturnValue(true));
+beforeEach(() => {
+  authed.mockReturnValue(true);
+  forgetAccountData.mockClear();
+});
 
 describe("useAuthState", () => {
   it("raises the session-expired banner when a 401 outlives the refresh", () => {
@@ -68,6 +81,31 @@ describe("useAuthState", () => {
     // on an unmounted tree and the assertion below would read stale state.
     expect(() => auth.__fire()).not.toThrow();
     expect(result.current.sessionExpired).toBe(false);
+  });
+
+  // D3-5: the refused refresh, and its sign-out, usually run in a ticker.
+  it("follows a sign-out made in another window: banner, signed out, account data forgotten", () => {
+    const { result } = renderHook(() => useAuthState());
+    act(() => {
+      for (const l of [...authStoreListeners]) l(undefined);
+    });
+    expect(result.current.authenticated).toBe(false);
+    expect(result.current.tier).toBe("free");
+    expect(result.current.sessionExpired).toBe(true);
+    expect(forgetAccountData).toHaveBeenCalledTimes(1);
+  });
+
+  it("a sign-out from this window does not raise the expired banner", async () => {
+    const { logout } = await import("../auth");
+    vi.mocked(logout).mockImplementationOnce(async () => {
+      // As if the store's change event reached this window anyway.
+      for (const l of [...authStoreListeners]) l(undefined);
+    });
+    const { result } = renderHook(() => useAuthState());
+    await act(() => result.current.handleLogout());
+    expect(result.current.authenticated).toBe(false);
+    expect(result.current.sessionExpired).toBe(false);
+    expect(forgetAccountData).toHaveBeenCalledTimes(1);
   });
 
   // SCROLLR-472 (D2-11): Cancel used to only hide the overlay.

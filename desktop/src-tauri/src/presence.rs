@@ -275,14 +275,14 @@ pub fn resumed(app: &AppHandle) {
 }
 
 /// What the store says about auth and consent, read fresh each tick.
-struct StoreView {
-    access_token: Option<String>,
+pub(crate) struct StoreView {
+    pub(crate) access_token: Option<String>,
     expires_at_ms: i64,
     consent_enabled: bool,
     show_ticker: bool,
 }
 
-fn read_store(app: &AppHandle) -> StoreView {
+pub(crate) fn read_store(app: &AppHandle) -> StoreView {
     use tauri_plugin_store::StoreExt;
     let store = app.store("scrollr.json").ok();
     let auth = store.as_ref().and_then(|s| s.get("scrollr:auth"));

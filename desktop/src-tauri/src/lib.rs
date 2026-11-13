@@ -242,6 +242,7 @@ pub fn run() {
         .manage(state::SseHandle(Mutex::new(None)))
         .manage(state::AuthServerRunning(Arc::new(Mutex::new(false))))
         .manage(state::AuthServerStop(Arc::new(AtomicBool::new(false))))
+        .manage(state::AuthServerAttempt(Mutex::new(None)))
         .manage(state::SysInfoState(Arc::new(state::SysInfoInner {
             sys: Mutex::new(sysinfo::System::new()),
             components: Mutex::new(sysinfo::Components::new_with_refreshed_list()),

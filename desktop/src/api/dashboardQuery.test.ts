@@ -35,7 +35,8 @@ vi.mock("../lib/store", () => ({
 vi.mock("./pinnedSubjects", () => ({ pinnedSubjectsQuery: () => "" }));
 
 const { ApiError } = await import("./client");
-const { dashboardQueryOptions, dashboardState, dashboardToSave, forgetAccountData, queryKeys } = await import("./queries");
+const { catchUpAfterReconnect, dashboardQueryOptions, dashboardState, dashboardToSave, forgetAccountData, queryKeys } =
+  await import("./queries");
 
 const prefs = { default_widgets_applied: true };
 const good = { data: { rss: [{ title: "a" }] }, widgets: [{ widget_type: "news_npr", enabled: true }], preferences: prefs };
@@ -135,9 +136,11 @@ describe("forgetAccountData (sign-out or sign-in)", () => {
     auth.hasRefreshToken.mockReturnValue(false);
     auth.currentUserSub.mockReturnValue(null);
     request.mockRejectedValue(new ApiError(503, "down"));
+    store.set("scrollr:widget:github:board", [{ title: "A's private PR" }]);
     await forgetAccountData(client);
 
     expect(store.has("scrollr:dashboard")).toBe(false);
+    expect(store.has("scrollr:widget:github:board")).toBe(false); // D3-4
     expect(observer.getCurrentResult().data).toBeUndefined();
     expect(client.getQueryData(queryKeys.dashboard)).toBeUndefined();
     expect(client.getQueryData(queryKeys.userOverview)).toBeUndefined();
@@ -160,6 +163,45 @@ describe("forgetAccountData (sign-out or sign-in)", () => {
     expect(github).toHaveBeenCalledTimes(2);
     expect(observer.getCurrentResult().data).toEqual({ owner: "b" });
     unsubscribe();
+  });
+
+  // D3-3: the main window may already have saved the next account's copy.
+  it("in a ticker window, empties only its own cache: no store delete, no refetch", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    authFetch.mockResolvedValue(good);
+    const observer = new QueryObserver(client, { ...dashboardQueryOptions(), staleTime: 0 });
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual(good));
+    store.set("scrollr:dashboard", { ...good, userSub: "user-b" });
+    store.set("scrollr:widget:github:board", [{ title: "B's PR" }]);
+    authFetch.mockClear();
+
+    await forgetAccountData(client, { ticker: true });
+
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    expect(store.get("scrollr:dashboard")).toEqual({ ...good, userSub: "user-b" });
+    expect(store.has("scrollr:widget:github:board")).toBe(true);
+    expect(authFetch).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+});
+
+describe("catchUpAfterReconnect (D3-7)", () => {
+  it("skips the refetch when the dashboard was fetched under a minute ago", async () => {
+    vi.useFakeTimers();
+    try {
+      authFetch.mockResolvedValue(good);
+      await fetchOnce();
+      const refetch = vi.fn();
+      vi.advanceTimersByTime(30_000);
+      catchUpAfterReconnect(refetch);
+      expect(refetch).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(31_000);
+      catchUpAfterReconnect(refetch);
+      expect(refetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

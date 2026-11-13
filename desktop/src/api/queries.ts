@@ -10,6 +10,7 @@ import { ApiError, authFetch, request, rssApi, fetchOverview } from "./client";
 import { pinnedSubjectsQuery } from "./pinnedSubjects";
 import { getStore, removeStore } from "../lib/store";
 import { DEMO } from "../config";
+import { LS_GITHUB_BOARD } from "../constants";
 import type { QueryClient } from "@tanstack/react-query";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game, Trade } from "../types";
@@ -125,16 +126,26 @@ function savedDashboard(): DashboardResponse | undefined {
 
 /**
  * On sign-in and sign-out, forget everything fetched for the account that
- * was signed in (SCROLLR-470): the saved dashboard and every per-account
- * query (dashboard, profile, GitHub). Preferences live in the store and
- * are not touched. `refetch` (a sign-in, in the window that polls them)
- * also fetches the emptied queries that are on screen now.
+ * was signed in (SCROLLR-470): the saved dashboard, the saved GitHub board
+ * the bar's chips read, and every per-account query (dashboard, profile,
+ * GitHub). Preferences live in the store and are not touched. `refetch` (a
+ * sign-in, in the window that polls them) also fetches the emptied queries
+ * that are on screen now.
+ *
+ * `ticker` (a ticker window): only this window's queries are emptied. The
+ * store copies belong to the main window, which deletes them and saves and
+ * broadcasts the next account's; a ticker deleting them too could remove
+ * that new copy, and a ticker refetching is one more /dashboard per
+ * monitor (D3-3).
  */
 export async function forgetAccountData(
   queryClient: QueryClient,
-  { refetch = false }: { refetch?: boolean } = {},
+  { refetch = false, ticker = false }: { refetch?: boolean; ticker?: boolean } = {},
 ): Promise<void> {
-  removeStore(SAVED_DASHBOARD_KEY);
+  if (!ticker) {
+    removeStore(SAVED_DASHBOARD_KEY);
+    removeStore(LS_GITHUB_BOARD);
+  }
   const filters = {
     predicate: ({ queryKey: [key] }: { queryKey: readonly unknown[] }) =>
       key === queryKeys.dashboard[0] ||
@@ -162,15 +173,32 @@ export async function forgetAccountData(
   // their page (a fetch now would 401 and raise the "session expired"
   // banner after a plain sign-out). Signed in, every one in use refetches,
   // or a GitHub chip sits on its loading state until its next poll.
+  if (ticker) return;
   await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
   if (refetch) await queryClient.refetchQueries({ ...filters, type: "active" }, { cancelRefetch: false });
+}
+
+/** When this window last fetched the dashboard (0: never). */
+let dashboardFetchedAt = 0;
+
+/**
+ * After the stream comes back, refetch the dashboard to catch up on missed
+ * events, unless it was fetched under a minute ago (D3-7): a stream that
+ * keeps going idle would otherwise refetch every ~46 s on top of the poll.
+ */
+export function catchUpAfterReconnect(refetch: () => void): void {
+  if (Date.now() - dashboardFetchedAt >= 60_000) refetch();
 }
 
 /** Query options for the dashboard — usable in route loaders and components. */
 export function dashboardQueryOptions() {
   return queryOptions({
     queryKey: queryKeys.dashboard,
-    queryFn: fetchDashboard,
+    queryFn: async () => {
+      const dashboard = await fetchDashboard();
+      dashboardFetchedAt = Date.now();
+      return dashboard;
+    },
     staleTime: 10_000,
     initialData: savedDashboard,
     // Saved, not fetched: stale at once, and no "updated just now".

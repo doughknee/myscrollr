@@ -1,4 +1,4 @@
-use crate::state::{AuthServerRunning, AuthServerStop};
+use crate::state::{AuthServerAttempt, AuthServerRunning, AuthServerStop};
 use std::sync::atomic::Ordering;
 use tauri::{Emitter, Manager};
 
@@ -194,6 +194,10 @@ pub fn start_auth_server(
         format!("Failed to bind: {e}")
     })?;
 
+    if let Ok(mut attempt) = app.state::<AuthServerAttempt>().0.lock() {
+        *attempt = expected_state.clone();
+    }
+
     let running_handle = app.state::<AuthServerRunning>().inner().clone();
     let stop_handle = app.state::<AuthServerStop>().inner().clone();
     std::thread::spawn(move || {
@@ -219,10 +223,27 @@ pub fn start_auth_server(
     Ok(())
 }
 
+/// Whether a stop asked for by the attempt with state `requested` applies to
+/// the server started for `running` (D3-8). No state: stop whatever runs.
+fn stop_applies(running: Option<&str>, requested: Option<&str>) -> bool {
+    requested.is_none() || running == requested
+}
+
 /// Request shutdown of the temporary OAuth callback server and wait briefly
-/// for the background thread to release the port.
+/// for the background thread to release the port. With `expected_state`,
+/// only the server started for that attempt is stopped.
 #[tauri::command]
-pub fn stop_auth_server(app: tauri::AppHandle) -> Result<(), String> {
+pub fn stop_auth_server(
+    app: tauri::AppHandle,
+    expected_state: Option<String>,
+) -> Result<(), String> {
+    {
+        let attempt_state = app.state::<AuthServerAttempt>();
+        let attempt = attempt_state.0.lock().map_err(|e| format!("lock: {e}"))?;
+        if !stop_applies(attempt.as_deref(), expected_state.as_deref()) {
+            return Ok(()); // another attempt's server: leave it running
+        }
+    }
     let running = app.state::<AuthServerRunning>().inner().clone();
     let stop_requested = app.state::<AuthServerStop>();
 
@@ -457,6 +478,14 @@ mod tests {
         // No query string at all, and a malformed request line.
         assert_eq!(extract_query_param(&line(""), "code"), None);
         assert_eq!(extract_query_param("GET\r\n\r\n", "code"), None);
+    }
+
+    #[test]
+    fn a_stop_from_an_earlier_attempt_spares_the_next_attempts_server() {
+        assert!(!stop_applies(Some("second"), Some("first")));
+        assert!(stop_applies(Some("first"), Some("first")));
+        // No state: the "already running" retry stops whatever is running.
+        assert!(stop_applies(Some("second"), None));
     }
 
     #[test]

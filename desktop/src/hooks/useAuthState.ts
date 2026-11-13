@@ -18,6 +18,7 @@ import {
   onSessionExpired,
 } from "../auth";
 import { forgetAccountData } from "../api/queries";
+import { onStoreChange } from "../lib/store";
 import type { SubscriptionTier } from "../auth";
 import type { DashboardResponse } from "../types";
 
@@ -92,6 +93,22 @@ export function useAuthState(): UseAuthStateReturn {
     [],
   );
 
+  // A refresh the server refused usually runs in a ticker window (it owns
+  // the proactive timer), so the sign-out it causes reaches this window only
+  // as a store change (D3-5). This window's own sign-out does not fire it.
+  useEffect(
+    () =>
+      onStoreChange("scrollr:auth", (value) => {
+        if (value || !authenticatedRef.current) return;
+        authenticatedRef.current = false;
+        setAuthenticated(false);
+        setTier("free");
+        setSessionExpired(true);
+        void forgetAccountData(queryClient);
+      }),
+    [queryClient],
+  );
+
   const handleLogin = useCallback(async () => {
     if (!isAuthConfigured()) {
       toast.error("Desktop auth is not configured for this build");
@@ -129,6 +146,7 @@ export function useAuthState(): UseAuthStateReturn {
   }, [queryClient, setLoggingIn]);
 
   const handleLogout = useCallback(async () => {
+    authenticatedRef.current = false; // not "expired": the store listener stays quiet
     await invoke("stop_sse").catch(() => {});
     // Await it: clearAuth persists the removal, and an unawaited
     // rejection here would leave scrollr:auth on disk after a "sign out".

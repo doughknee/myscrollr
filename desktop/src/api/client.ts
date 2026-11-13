@@ -164,7 +164,8 @@ export async function authFetch<T>(
   // Now: retry on ANY token we manage to obtain, and if we end up with
   // no stored auth at all, say so once so the sign-in banner appears.
   if (is401(response)) {
-    const newToken = token ? await getValidToken(true) : null;
+    // Passing the refused token spends a refresh only if nobody has (D3-6).
+    const newToken = token ? await getValidToken(true, token) : null;
     if (newToken) {
       const retryResponse = await send({
         ...options,

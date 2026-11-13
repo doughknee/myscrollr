@@ -360,3 +360,52 @@ describe("SCROLLR-472 (D2-6): sign-out during a refresh", () => {
     expect(h.disk.get("scrollr:auth")).toBeUndefined();
   });
 });
+
+describe("SCROLLR-480: the refresh rules that interact", () => {
+  const stored = () => h.disk.get("scrollr:auth") as { accessToken: string; refreshToken: string };
+
+  it("D3-6: a 401 for a token obtained under a minute ago does not spend a refresh", async () => {
+    const [ticker] = await restartApp(["ticker"]);
+    expect(await token(ticker, true)).not.toBeNull();
+    const refused = stored().accessToken;
+    const calls = h.logto.calls;
+
+    const p = ticker.auth.getValidToken(true, refused);
+    await tick(LOGTO_LATENCY_MS + IPC_EVENT_MS);
+    expect(await p).toBe(refused);
+    expect(h.logto.calls).toBe(calls);
+
+    // Someone already refreshed past the refused token: use theirs.
+    const q = ticker.auth.getValidToken(true, "an-older-token");
+    await tick(LOGTO_LATENCY_MS + IPC_EVENT_MS);
+    expect(await q).toBe(refused);
+    expect(h.logto.calls).toBe(calls);
+
+    // A minute on, the refusal is believed.
+    await tick(60_000);
+    const r = ticker.auth.getValidToken(true, refused);
+    await tick(LOGTO_LATENCY_MS + IPC_EVENT_MS);
+    expect(await r).not.toBe(refused);
+    expect(h.logto.calls).toBe(calls + 1);
+  });
+
+  it("D3-9: a late refresh answer does not replace a session that changed under it", async () => {
+    const [ticker] = await restartApp(["ticker"]);
+    const p = ticker.auth.getValidToken(true); // refresh in flight
+    await tick(LOGTO_LATENCY_MS / 4);
+    // Someone else signs in (another window); its change event has not
+    // reached this one yet.
+    const other = { accessToken: "b-access", refreshToken: "b-refresh", expiresAt: Date.now() + HOUR, userSub: "u2" };
+    h.disk.set("scrollr:auth", other);
+    await tick(LOGTO_LATENCY_MS);
+    expect(await p).toBe("b-access");
+    expect(h.disk.get("scrollr:auth")).toEqual(other);
+  });
+
+  it("D3-10: with a clock far ahead, a token just obtained still counts as signed in", async () => {
+    const [ticker] = await restartApp(["ticker"]);
+    h.logto.skewMs = -2 * HOUR;
+    expect(await token(ticker, true)).not.toBeNull();
+    expect(ticker.auth.isAuthenticated()).toBe(true);
+  });
+});
