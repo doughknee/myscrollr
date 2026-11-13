@@ -12,6 +12,7 @@
  * not widget.$id.tsx) so it doesn't become widget.$id.info.tsx's
  * layout parent and demand an Outlet.
  */
+import { Suspense } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { PackageOpen } from "lucide-react";
@@ -110,7 +111,9 @@ function WidgetFeed({
   // widget vanish in v1.1.11.
   if (isUtilityWidget(id)) {
     return (
-      <manifest.FeedTab mode="comfort" feedContext={{ __dashboardLoaded: true }} />
+      <Suspense fallback={<WidgetPending />}>
+        <manifest.FeedTab mode="comfort" feedContext={{ __dashboardLoaded: true }} />
+      </Suspense>
     );
   }
 
@@ -132,7 +135,9 @@ function WidgetFeed({
   };
 
   return (
-    <manifest.FeedTab mode="comfort" widgetId={id} feedContext={feedContext} />
+    <Suspense fallback={<WidgetPending />}>
+      <manifest.FeedTab mode="comfort" widgetId={id} feedContext={feedContext} />
+    </Suspense>
   );
 }
 

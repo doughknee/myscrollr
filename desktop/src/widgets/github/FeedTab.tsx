@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { clsx } from "clsx";
 import { Github, Lock, MoreHorizontal, Plus, X } from "lucide-react";
-import type { FeedTabProps, WidgetManifest } from "../../types";
+import type { FeedTabProps } from "../../types";
 import OverflowMenu from "../../components/OverflowMenu";
 import LoadingGlyph from "../../components/LoadingGlyph";
 import RepoCell from "../../components/pages/cells/RepoCell";
@@ -25,33 +25,9 @@ import { githubApi } from "../../api/client";
 import type { GitHubBoardRepo, GitHubRepoRow, GitHubWorkflowRow } from "../../api/client";
 import { relativeTime } from "../../utils/format";
 import { githubBoardQuery, loadBoard, parseRepoUrl, pillsFor, repoChip, repoName, sameRepo, worstOf, MAX_REPOS } from "./types";
+import { HEX } from "./manifest";
 import { newRepo } from "./config";
 import type { GitHubIssueMode, GitHubPRMode, GitHubTrackedRepo, GitHubWidgetConfig } from "./config";
-
-// ── Widget manifest ─────────────────────────────────────────────
-
-const HEX = "#f97316";
-
-export const githubWidget: WidgetManifest = {
-  id: "github",
-  name: "GitHub",
-  tabLabel: "GitHub",
-  description: "CI and pull requests that need you, from your GitHub",
-  hex: HEX,
-  icon: Github,
-  info: {
-    about:
-      "The GitHub widget puts each repo you track on the bar as one cell, " +
-      "showing what you chose for it: workflows, pull requests, issues.",
-    usage: [
-      "Connect GitHub, then add repos with + Add a repo; the two you pushed to last start on the bar.",
-      "Pick a repo to choose its workflows, its pull requests (off, the ones that need you, all open) and its issues.",
-      "GitHub gets its own page on the bar: a cell per repo, and spare columns fill with what needs you next, then what just shipped.",
-      "Quiet hours and the flash are in the ⋯ menu.",
-    ],
-  },
-  FeedTab: GitHubFeedTab,
-};
 
 /** The app's install page: choose which repos it may see, and approve new permissions. */
 const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
@@ -73,7 +49,7 @@ const isDark = () => !document.documentElement.getAttribute("data-theme")?.endsW
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function GitHubFeedTab(_props: FeedTabProps) {
+export default function GitHubFeedTab(_props: FeedTabProps) {
   const shell = useShell();
   const cfg = shell.prefs.widgets.github;
 

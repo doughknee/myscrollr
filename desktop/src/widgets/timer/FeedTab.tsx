@@ -1,5 +1,4 @@
 import { useCallback, useState } from "react";
-import { TimerReset } from "lucide-react";
 import { Timer, loadTimerState, switchedTimerState } from "./Timer";
 import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
@@ -14,27 +13,7 @@ import { useShell } from "../../shell-context";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
 import type { TimerPomodoroConfig } from "../../preferences";
 import type { TimerMode } from "./types";
-import type { FeedTabProps, WidgetManifest } from "../../types";
-
-export const timerWidget: WidgetManifest = {
-  id: "timer",
-  name: "Timer",
-  tabLabel: "Timer",
-  description: "Pomodoro, countdown, and stopwatch tools",
-  hex: "#f59e0b",
-  icon: TimerReset,
-  info: {
-    about:
-      "The Timer widget provides Pomodoro sessions, countdown timers, and a stopwatch as a focused desktop control surface.",
-    usage: [
-      "Choose Pomodoro, Countdown, or Stopwatch from the mode selector.",
-      "Use Space to start or pause and R to reset while the timer feed is focused.",
-      "A running timer automatically appears on the ticker.",
-      "Adjust Pomodoro session lengths and long-break cadence from the top bar.",
-    ],
-  },
-  FeedTab: TimerFeedTab,
-};
+import type { FeedTabProps } from "../../types";
 
 const minuteOptions = (from: number, to: number, step: number): SelectOption<string>[] =>
   Array.from({ length: (to - from) / step + 1 }, (_, i) => {
@@ -56,7 +35,7 @@ const MODE_OPTIONS: SegmentedOption<TimerMode>[] = [
   { value: "stopwatch", label: "Stopwatch" },
 ];
 
-function TimerFeedTab(props: FeedTabProps) {
+export default function TimerFeedTab(props: FeedTabProps) {
   // Timer state lives here so the bar's mode tabs and the Timer body
   // drive one machine (the bar renders only in comfort mode; compact
   // keeps its in-body tabs).
