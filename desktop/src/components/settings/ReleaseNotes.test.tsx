@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReleaseNotes from "./ReleaseNotes";
 import { fetchReleases } from "../../lib/releases";
 import type { ReleaseEntry } from "../../lib/releases";
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn() }));
+vi.mock("../../lib/openExternal", () => ({ openExternal: vi.fn() }));
 vi.mock("../../lib/releases", async original => ({ ...await original<typeof import("../../lib/releases")>(), fetchReleases: vi.fn() }));
 const release = (version: string, prerelease: boolean, date = "2026-11-03"): ReleaseEntry => ({ version, prerelease, tag: `desktop-v${version}`, date, body: "Release notes", name: `Release ${version}`, headline: "New features", url: "https://github.com/doughknee/myscrollr/releases" });
 afterEach(cleanup);

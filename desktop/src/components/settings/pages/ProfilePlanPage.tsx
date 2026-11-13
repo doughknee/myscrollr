@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../../../lib/openExternal";
 import { toast } from "sonner";
 import { TIER_LABELS, getUserIdentity } from "../../../auth";
 import {
@@ -155,7 +155,7 @@ export default function ProfilePlanPage({
         "/users/me/subscription/portal",
         { method: "POST" },
       );
-      await open(url);
+      await openExternal(url);
     } catch (err) {
       setPortalError(
         err instanceof Error ? err.message : "Failed to open billing portal",
@@ -212,7 +212,7 @@ export default function ProfilePlanPage({
 
   const handleBillingAction =
     status === "canceled"
-      ? () => open("https://myscrollr.com/uplink")
+      ? () => openExternal("https://myscrollr.com/uplink")
       : handleOpenPortal;
 
   // ── Signed out ────────────────────────────────────────────────
@@ -414,7 +414,7 @@ export default function ProfilePlanPage({
                 description="More pages on your bar — run more widgets at once."
                 action="Upgrade"
                 tone="accent"
-                onClick={() => open("https://myscrollr.com/uplink")}
+                onClick={() => openExternal("https://myscrollr.com/uplink")}
               />
             )}
         </RowList>

@@ -13,7 +13,7 @@ vi.mock("../../../lib/updateController", async () => {
   };
 });
 vi.mock("../ReleaseNotes", () => ({ default: () => <div>Release history</div> }));
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn(async () => {}) }));
+vi.mock("../../../lib/openExternal", () => ({ openExternal: vi.fn(async () => {}) }));
 
 describe("Updates settings", () => {
   let candidate: UpdateCandidate;

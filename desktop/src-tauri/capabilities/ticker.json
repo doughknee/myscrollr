@@ -20,7 +20,6 @@
     "core:event:allow-emit",
     "core:event:allow-listen",
     "core:menu:default",
-    "shell:allow-open",
     "store:default",
     "log:default",
     {

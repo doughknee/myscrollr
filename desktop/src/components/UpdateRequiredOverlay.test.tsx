@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../lib/openExternal";
 import { UpdateController } from "../lib/updateState";
 import { UpdateRequiredOverlay } from "./UpdateRequiredOverlay";
 
@@ -12,7 +12,7 @@ vi.mock("../lib/updateController", async () => {
     useUpdateController: () => useSyncExternalStore(shared.controller!.subscribe, shared.controller!.getSnapshot),
   };
 });
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn(async () => {}) }));
+vi.mock("../lib/openExternal", () => ({ openExternal: vi.fn(async () => {}) }));
 
 const RAW = "error sending request for url (https://github.com/x/latest.json): dns error";
 
@@ -42,6 +42,6 @@ describe("UpdateRequiredOverlay", () => {
     // raw native text is inside the closed disclosure, not the sentence
     expect(screen.getByText(RAW).closest("details")).not.toHaveAttribute("open");
     fireEvent.click(screen.getByRole("button", { name: "Download the installer instead" }));
-    expect(open).toHaveBeenCalledWith("https://myscrollr.com/download");
+    expect(openExternal).toHaveBeenCalledWith("https://myscrollr.com/download");
   });
 });

@@ -1,6 +1,6 @@
 import { RefreshCw, Download } from "lucide-react";
 import { motion } from "motion/react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../lib/openExternal";
 import UpdateErrorNotice from "./UpdateErrorNotice";
 import { updateBusy } from "../lib/updateState";
 import { updateController, useUpdateController } from "../lib/updateController";
@@ -76,13 +76,13 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
         )}
 
         {busy && (
-          <p className="mt-3 text-xs text-base-content/40">{state.phase === "checking" ? "Checking the selected update channel…" : "Updating Scrollr…"}</p>
+          <p className="mt-3 text-xs text-fg-3">{state.phase === "checking" ? "Checking the selected update channel…" : "Updating Scrollr…"}</p>
         )}
         <UpdateErrorNotice state={state} className="mt-3" />
         {state.error && (
           <button
             type="button"
-            onClick={() => void open(DOWNLOAD_URL).catch(() => {})}
+            onClick={() => void openExternal(DOWNLOAD_URL).catch(() => {})}
             className="mt-3 cursor-pointer text-ui-meta font-medium text-accent hover:underline"
           >
             Download the installer instead

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Settings, ExternalLink } from "lucide-react";
 import clsx from "clsx";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../../lib/openExternal";
 import { toast } from "sonner";
 import { isAuthenticated } from "../../auth";
 import { authFetch } from "../../api/client";
@@ -20,7 +20,7 @@ export default function BillingHelpSection() {
         "/users/me/subscription/portal",
         { method: "POST" },
       );
-      await open(res.url);
+      await openExternal(res.url);
     } catch (err) {
       toast.error("Failed to open subscription portal", {
         description: (err as Error).message,
@@ -31,7 +31,7 @@ export default function BillingHelpSection() {
   }
 
   async function handleViewPlans() {
-    await open("https://myscrollr.com/uplink");
+    await openExternal("https://myscrollr.com/uplink");
   }
 
   function toggleFaq(index: number) {
