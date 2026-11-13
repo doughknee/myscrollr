@@ -72,45 +72,78 @@ func HandleStripeWebhook(c *fiber.Ctx) error {
 		}
 	}
 
+	var handlerErr error
 	switch event.Type {
-	case "checkout.session.completed":
-		HandleCheckoutCompleted(event)
+	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
+		// Both carry the session; payment_status decides whether it grants.
+		handlerErr = HandleCheckoutCompleted(event)
+	case "checkout.session.async_payment_failed":
+		// The delayed payment failed. checkout.session.completed granted
+		// nothing for it (payment_status was "unpaid"), so there is nothing
+		// to take back.
+		log.Printf("[Stripe Webhook] Checkout async payment failed (event %s); no access granted", event.ID)
 	case "customer.subscription.updated":
-		HandleSubscriptionUpdated(event)
+		handlerErr = HandleSubscriptionUpdated(event)
 	case "customer.subscription.deleted":
-		HandleSubscriptionDeleted(event)
+		handlerErr = HandleSubscriptionDeleted(event)
 	case "invoice.paid":
-		HandleInvoicePaid(event)
+		handlerErr = HandleInvoicePaid(event)
 	case "invoice.payment_failed":
-		HandleInvoicePaymentFailed(event)
+		handlerErr = HandleInvoicePaymentFailed(event)
 	case "customer.subscription.trial_will_end":
 		handleTrialWillEnd(event)
 	case "payment_intent.succeeded":
-		handlePaymentIntentSucceeded(event)
+		handlerErr = handlePaymentIntentSucceeded(event)
 	default:
 		log.Printf("[Stripe Webhook] Unhandled event type: %s", event.Type)
 	}
 
-	// Event slot was already claimed atomically above via INSERT ... ON CONFLICT
-	// RETURNING. No second write needed.
+	// A failed handler releases its claim and answers 5xx, so Stripe
+	// retries the event and the retry is not skipped as a duplicate. Every
+	// handler is safe to run again.
+	// ponytail: a duplicate delivery racing a failing first one gets a 200
+	// and Stripe stops retrying; Stripe only redelivers after a failure, so
+	// the two rarely overlap.
+	if handlerErr != nil {
+		log.Printf("[Stripe Webhook] Handling event %s (type: %s) failed, asking Stripe to retry: %v", event.ID, event.Type, handlerErr)
+		sentry.CaptureMessage(fmt.Sprintf("stripe webhook: %s handler failed, event released for retry", event.Type))
+		if platform.DBPool != nil {
+			if _, err := platform.DBPool.Exec(context.Background(),
+				`DELETE FROM stripe_webhook_events WHERE event_id = $1`, event.ID,
+			); err != nil {
+				log.Printf("[Stripe Webhook] Failed to release event %s for retry: %v", event.ID, err)
+			}
+		}
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 
 	return c.SendStatus(fiber.StatusOK)
 }
 
-// handleCheckoutCompleted processes successful checkout sessions.
-// This is the primary entry point for new subscriptions and lifetime purchases.
-func HandleCheckoutCompleted(event stripe.Event) {
+// HandleCheckoutCompleted processes checkout.session.completed and
+// checkout.session.async_payment_succeeded. This is the primary entry point
+// for new subscriptions and lifetime purchases made through Checkout. It
+// grants only once the session's payment_status says the money arrived.
+func HandleCheckoutCompleted(event stripe.Event) error {
 	var session stripe.CheckoutSession
 	if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
-		log.Printf("[Stripe Webhook] Failed to parse checkout.session.completed: %v", err)
-		return
+		log.Printf("[Stripe Webhook] Failed to parse %s: %v", event.Type, err)
+		return nil
 	}
 
 	logtoSub := session.Metadata["logto_sub"]
 	plan := session.Metadata["plan"]
 	if logtoSub == "" || plan == "" {
-		log.Printf("[Stripe Webhook] checkout.session.completed missing metadata (logto_sub=%s, plan=%s)", logtoSub, plan)
-		return
+		log.Printf("[Stripe Webhook] %s missing metadata (logto_sub=%s, plan=%s)", event.Type, logtoSub, plan)
+		return nil
+	}
+
+	if !checkoutPaid(string(session.PaymentStatus)) {
+		// A delayed payment method (bank debit) has not settled.
+		// checkout.session.async_payment_succeeded grants when it does.
+		log.Printf("[Stripe Webhook] %s for user=%s plan=%s not paid yet (payment_status=%q); no access granted",
+			event.Type, logtoSub, plan, session.PaymentStatus)
+		return nil
 	}
 
 	customerID := ""
@@ -133,23 +166,26 @@ func HandleCheckoutCompleted(event stripe.Event) {
 			logtoSub, customerID, plan,
 		)
 		if err != nil {
-			log.Printf("[Stripe Webhook] Failed to upsert lifetime for %s: %v", logtoSub, err)
-			return
+			return fmt.Errorf("upsert lifetime: %w", err)
 		}
 	} else {
 		// Subscription — fetch the full subscription to get actual status.
 		// Webhook payloads don't expand the subscription object, so
 		// session.Subscription.Status is always empty. We must call the
 		// Stripe API to get the real status (e.g. "trialing" vs "active").
+		// If Stripe can't be reached, retry the event rather than guess.
 		subID := ""
 		if session.Subscription != nil {
 			subID = session.Subscription.ID
 			fullSub, err := stripesubscription.Get(subID, nil)
-			if err == nil {
-				subStatus = string(fullSub.Status)
-			} else {
-				log.Printf("[Stripe Webhook] Failed to fetch subscription %s, defaulting to active: %v", subID, err)
+			if err != nil {
+				return fmt.Errorf("fetch subscription %s: %w", subID, err)
 			}
+			subStatus = string(fullSub.Status)
+		}
+		if !subscriptionGrantsAccess(subStatus) {
+			log.Printf("[Stripe Webhook] Checkout subscription %s for user=%s is %s; no access granted", subID, logtoSub, subStatus)
+			return nil
 		}
 
 		_, err := platform.DBPool.Exec(context.Background(),
@@ -161,8 +197,7 @@ func HandleCheckoutCompleted(event stripe.Event) {
 			logtoSub, customerID, subID, plan, subStatus,
 		)
 		if err != nil {
-			log.Printf("[Stripe Webhook] Failed to upsert subscription for %s: %v", logtoSub, err)
-			return
+			return fmt.Errorf("upsert subscription: %w", err)
 		}
 	}
 
@@ -171,27 +206,42 @@ func HandleCheckoutCompleted(event stripe.Event) {
 	// When the trial ends, subscription.updated fires and assigns the correct role.
 	tier := decideCheckoutTier(subStatus, plan)
 	if err := assignTierRole(logtoSub, tier); err != nil {
-		log.Printf("[Stripe Webhook] Failed to assign %s role to %s: %v", tier, logtoSub, err)
+		return fmt.Errorf("assign %s role: %w", tier, err)
 	}
 
 	// Subscription state changed — overview's tier + subscription
 	// blocks are now stale.
 	platform.InvalidateOverviewCache(context.Background(), logtoSub)
+	return nil
 }
 
-// handleSubscriptionUpdated handles subscription changes (renewals, plan changes, cancellations).
-func HandleSubscriptionUpdated(event stripe.Event) {
+// HandleSubscriptionUpdated handles subscription changes (renewals, plan changes, cancellations).
+func HandleSubscriptionUpdated(event stripe.Event) error {
 	var sub stripe.Subscription
 	if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
 		log.Printf("[Stripe Webhook] Failed to parse subscription.updated: %v", err)
-		return
+		return nil
 	}
 
 	// Look up user by Stripe customer ID
-	logtoSub := lookupLogtoSub(sub.Customer.ID)
+	logtoSub, err := lookupLogtoSub(sub.Customer.ID)
+	if err != nil {
+		return err
+	}
 	if logtoSub == "" {
 		log.Printf("[Stripe Webhook] No user found for customer %s", sub.Customer.ID)
-		return
+		return nil
+	}
+
+	storedSubID, isLifetime, err := lookupStoredSubscription(logtoSub)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if isStaleSubscription(storedSubID, sub.ID) {
+		// An older or second subscription changed; the customer's current
+		// one is stored. Don't let it overwrite the row or the roles.
+		log.Printf("[Stripe Webhook] Ignoring subscription.updated for %s: user=%s's stored subscription is %s", sub.ID, logtoSub, *storedSubID)
+		return nil
 	}
 
 	status := string(sub.Status)
@@ -211,9 +261,9 @@ func HandleSubscriptionUpdated(event stripe.Event) {
 	log.Printf("[Stripe Webhook] Subscription updated: user=%s status=%s plan=%s cancel_at_period_end=%v",
 		logtoSub, status, plan, sub.CancelAtPeriodEnd)
 
-	action := decideSubscriptionUpdate(status, sub.CancelAtPeriodEnd, plan)
+	action := decideSubscriptionUpdate(status, sub.CancelAtPeriodEnd, plan, isLifetime)
 
-	_, err := platform.DBPool.Exec(context.Background(),
+	_, err = platform.DBPool.Exec(context.Background(),
 		`UPDATE stripe_customers SET
 		   plan = $2, status = $3, current_period_end = $4,
 		   stripe_subscription_id = $5, updated_at = now()
@@ -221,75 +271,77 @@ func HandleSubscriptionUpdated(event stripe.Event) {
 		logtoSub, plan, action.DBStatus, periodEnd, sub.ID,
 	)
 	if err != nil {
-		log.Printf("[Stripe Webhook] Failed to update subscription for %s: %v", logtoSub, err)
+		return fmt.Errorf("update subscription: %w", err)
 	}
 
 	// Active subscriptions remove stale roles first to handle plan
 	// up/downgrades cleanly, then assign only the current one. Trials
 	// always get Ultimate access (matching checkout.session.completed);
 	// when the trial ends, this handler fires again with status="active"
-	// and assigns the plan-appropriate role.
+	// and assigns the plan-appropriate role. A subscription Stripe gave up
+	// on (incomplete_expired, unpaid, canceled) clears every paid role.
 	if action.ClearPaidRoles {
-		if err := accounts.RemoveUplinkRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to remove uplink role from %s: %v", logtoSub, err)
-		}
-		if err := accounts.RemoveProRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to remove uplink_pro role from %s: %v", logtoSub, err)
-		}
-		if err := accounts.RemoveUltimateRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to remove uplink_ultimate role from %s: %v", logtoSub, err)
+		if err := removePaidRoles(logtoSub); err != nil {
+			return err
 		}
 	}
 	if action.AssignTier != "" {
 		if err := assignTierRole(logtoSub, action.AssignTier); err != nil {
-			log.Printf("[Stripe Webhook] Failed to assign %s role to %s: %v", action.AssignTier, logtoSub, err)
+			return fmt.Errorf("assign %s role: %w", action.AssignTier, err)
 		}
 	}
 
 	// Disable widgets over the new tier's slot cap. This is a no-op for
 	// upgrades (more slots = nothing over cap) and the safety net for
-	// downgrades. Called after role assignment so a failed Logto call
-	// doesn't block the prune.
-	if action.AssignTier != "" {
+	// downgrades and lost access.
+	switch {
+	case action.AssignTier != "":
 		widgets.PruneWidgetsForTier(context.Background(), logtoSub, action.AssignTier)
+	case action.ClearPaidRoles:
+		widgets.PruneWidgetsForTier(context.Background(), logtoSub, "free")
 	}
 
 	// Tier and subscription fields in the overview response just changed.
 	platform.InvalidateOverviewCache(context.Background(), logtoSub)
+	return nil
 }
 
-// handleSubscriptionDeleted fires when a subscription is fully cancelled (period ended).
-func HandleSubscriptionDeleted(event stripe.Event) {
+// HandleSubscriptionDeleted fires when a subscription is fully cancelled (period ended).
+func HandleSubscriptionDeleted(event stripe.Event) error {
 	var sub stripe.Subscription
 	if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
 		log.Printf("[Stripe Webhook] Failed to parse subscription.deleted: %v", err)
-		return
+		return nil
 	}
 
-	logtoSub := lookupLogtoSub(sub.Customer.ID)
+	logtoSub, err := lookupLogtoSub(sub.Customer.ID)
+	if err != nil {
+		return err
+	}
 	if logtoSub == "" {
 		log.Printf("[Stripe Webhook] No user found for customer %s", sub.Customer.ID)
-		return
+		return nil
+	}
+
+	// Check if user has lifetime (don't remove role if so). A lookup
+	// failure retries the event rather than risk stripping a lifetime
+	// purchase; no row (pgx.ErrNoRows) means no lifetime flag.
+	storedSubID, isLifetime, lifetimeErr := lookupStoredSubscription(logtoSub)
+	if lifetimeErr != nil && !errors.Is(lifetimeErr, pgx.ErrNoRows) {
+		return lifetimeErr
+	}
+
+	if isStaleSubscription(storedSubID, sub.ID) {
+		// A stale or second subscription ended; the customer still has the
+		// stored one. Downgrading them would take access they pay for.
+		log.Printf("[Stripe Webhook] Ignoring subscription.deleted for %s: user=%s's stored subscription is %s", sub.ID, logtoSub, *storedSubID)
+		return nil
 	}
 
 	log.Printf("[Stripe Webhook] Subscription deleted: user=%s", logtoSub)
 
-	// Check if user has lifetime (don't remove role if so)
-	var isLifetime bool
-	lifetimeErr := platform.DBPool.QueryRow(context.Background(),
-		`SELECT lifetime FROM stripe_customers WHERE logto_sub = $1`, logtoSub,
-	).Scan(&isLifetime)
-	if lifetimeErr != nil && !errors.Is(lifetimeErr, pgx.ErrNoRows) {
-		// Can't tell if this is a lifetime customer — keep their roles
-		// (decideStripPaidRoles fails safe) rather than risk stripping a
-		// lifetime purchase. Surface the failure: it leaves role state
-		// unreconciled with Stripe.
-		log.Printf("[Stripe Webhook] Lifetime lookup failed for %s (keeping paid roles): %v", logtoSub, lifetimeErr)
-		sentry.CaptureException(fmt.Errorf("stripe webhook: lifetime lookup failed during subscription.deleted: %w", lifetimeErr))
-	}
-
 	// Reset to free plan in DB
-	_, err := platform.DBPool.Exec(context.Background(),
+	_, err = platform.DBPool.Exec(context.Background(),
 		`UPDATE stripe_customers SET
 		   plan = 'free', status = 'canceled', stripe_subscription_id = NULL,
 		   current_period_end = NULL, updated_at = now()
@@ -297,20 +349,13 @@ func HandleSubscriptionDeleted(event stripe.Event) {
 		logtoSub,
 	)
 	if err != nil {
-		log.Printf("[Stripe Webhook] Failed to reset subscription for %s: %v", logtoSub, err)
+		return fmt.Errorf("reset subscription: %w", err)
 	}
 
-	// Remove all paid roles (only if not lifetime; on lookup failure, fail
-	// safe and keep them)
+	// Remove all paid roles (only if not lifetime)
 	if decideStripPaidRoles(isLifetime, lifetimeErr) {
-		if err := accounts.RemoveUplinkRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to remove uplink role from %s: %v", logtoSub, err)
-		}
-		if err := accounts.RemoveProRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to remove uplink_pro role from %s: %v", logtoSub, err)
-		}
-		if err := accounts.RemoveUltimateRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to remove uplink_ultimate role from %s: %v", logtoSub, err)
+		if err := removePaidRoles(logtoSub); err != nil {
+			return err
 		}
 		// Full cancellation drops the user to the free tier — disable any
 		// widgets over the free slot cap (newest first, never deleted).
@@ -319,48 +364,63 @@ func HandleSubscriptionDeleted(event stripe.Event) {
 
 	// Subscription went away (or downgraded to free) — overview is stale.
 	platform.InvalidateOverviewCache(context.Background(), logtoSub)
+	return nil
 }
 
-// handleInvoicePaid confirms successful payment for a subscription renewal.
-func HandleInvoicePaid(event stripe.Event) {
+// HandleInvoicePaid confirms successful payment for a subscription renewal.
+func HandleInvoicePaid(event stripe.Event) error {
 	var invoice struct {
 		Customer     string `json:"customer"`
 		Subscription string `json:"subscription"`
 	}
 	if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
 		log.Printf("[Stripe Webhook] Failed to parse invoice.paid: %v", err)
-		return
+		return nil
 	}
 
-	logtoSub := lookupLogtoSub(invoice.Customer)
-	if logtoSub == "" {
-		return
+	logtoSub, err := lookupLogtoSub(invoice.Customer)
+	if err != nil || logtoSub == "" {
+		return err
 	}
 
 	log.Printf("[Stripe Webhook] Invoice paid for user=%s", logtoSub)
 
 	// Look up current plan to assign the correct role on renewal
 	var currentPlan string
-	_ = platform.DBPool.QueryRow(context.Background(),
+	if err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT plan FROM stripe_customers WHERE logto_sub = $1`, logtoSub,
-	).Scan(&currentPlan)
+	).Scan(&currentPlan); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("read plan: %w", err)
+	}
+	if currentPlan == "free" {
+		// No subscription on record (never stored, or already ended):
+		// a paid invoice alone is not a plan to grant.
+		log.Printf("[Stripe Webhook] Invoice paid for user=%s on the free plan; no role assigned", logtoSub)
+		return nil
+	}
 
 	// Ensure correct role is still assigned on successful renewal.
 	// Also reset past_due status back to active on successful payment.
-	_, _ = platform.DBPool.Exec(context.Background(),
+	if _, err := platform.DBPool.Exec(context.Background(),
 		`UPDATE stripe_customers SET status = 'active', updated_at = now()
 		 WHERE logto_sub = $1 AND status = 'past_due'`,
 		logtoSub,
-	)
+	); err != nil {
+		return fmt.Errorf("clear past_due: %w", err)
+	}
 
 	tier := tierForPlan(currentPlan)
 	if err := assignTierRole(logtoSub, tier); err != nil {
-		log.Printf("[Stripe Webhook] Failed to re-assign %s role to %s: %v", tier, logtoSub, err)
+		return fmt.Errorf("re-assign %s role: %w", tier, err)
 	}
+	return nil
 }
 
-// handleInvoicePaymentFailed handles failed subscription payments.
-func HandleInvoicePaymentFailed(event stripe.Event) {
+// HandleInvoicePaymentFailed handles failed subscription payments.
+func HandleInvoicePaymentFailed(event stripe.Event) error {
 	var invoice struct {
 		Customer     string `json:"customer"`
 		Subscription string `json:"subscription"`
@@ -368,22 +428,27 @@ func HandleInvoicePaymentFailed(event stripe.Event) {
 	}
 	if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
 		log.Printf("[Stripe Webhook] Failed to parse invoice.payment_failed: %v", err)
-		return
+		return nil
 	}
 
-	logtoSub := lookupLogtoSub(invoice.Customer)
-	if logtoSub == "" {
-		return
+	logtoSub, err := lookupLogtoSub(invoice.Customer)
+	if err != nil || logtoSub == "" {
+		return err
 	}
 
 	log.Printf("[Stripe Webhook] Payment failed for user=%s (attempt %d)", logtoSub, invoice.AttemptCount)
 
-	// Mark as past_due in our DB
-	_, _ = platform.DBPool.Exec(context.Background(),
+	// Mark as past_due in our DB. A free-plan row is left alone: the failed
+	// first invoice of a subscription /checkout/subscribe turned away must
+	// not overwrite the 'canceled' status that ends trial eligibility.
+	if _, err := platform.DBPool.Exec(context.Background(),
 		`UPDATE stripe_customers SET status = 'past_due', updated_at = now()
-		 WHERE logto_sub = $1 AND lifetime = false`,
+		 WHERE logto_sub = $1 AND lifetime = false AND plan <> 'free'`,
 		logtoSub,
-	)
+	); err != nil {
+		return fmt.Errorf("mark past_due: %w", err)
+	}
+	return nil
 }
 
 // handleTrialWillEnd is fired ~3 days before a trial expires.
@@ -395,7 +460,7 @@ func handleTrialWillEnd(event stripe.Event) {
 		return
 	}
 
-	logtoSub := lookupLogtoSub(sub.Customer.ID)
+	logtoSub, _ := lookupLogtoSub(sub.Customer.ID)
 	if logtoSub == "" {
 		return
 	}
@@ -406,11 +471,11 @@ func handleTrialWillEnd(event stripe.Event) {
 }
 
 // handlePaymentIntentSucceeded handles successful one-time payments (lifetime purchases).
-func handlePaymentIntentSucceeded(event stripe.Event) {
+func handlePaymentIntentSucceeded(event stripe.Event) error {
 	var pi stripe.PaymentIntent
 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 		log.Printf("[Stripe Webhook] Failed to parse payment_intent.succeeded: %v", err)
-		return
+		return nil
 	}
 
 	plan := pi.Metadata["plan"]
@@ -419,7 +484,7 @@ func handlePaymentIntentSucceeded(event stripe.Event) {
 	// Only handle lifetime payments (other PaymentIntents are not ours)
 	if plan != "lifetime" || logtoSub == "" {
 		log.Printf("[Stripe Webhook] Ignoring payment_intent.succeeded: plan=%s logto_sub=%s", plan, logtoSub)
-		return
+		return nil
 	}
 
 	customerID := ""
@@ -438,23 +503,57 @@ func handlePaymentIntentSucceeded(event stripe.Event) {
 		logtoSub, customerID,
 	)
 	if err != nil {
-		log.Printf("[Stripe Webhook] Failed to upsert lifetime for %s: %v", logtoSub, err)
-		return
+		return fmt.Errorf("upsert lifetime: %w", err)
 	}
 
 	if err := accounts.AssignUltimateRole(logtoSub); err != nil {
-		log.Printf("[Stripe Webhook] Failed to assign ultimate role to %s: %v", logtoSub, err)
+		return fmt.Errorf("assign ultimate role: %w", err)
 	}
+	return nil
 }
 
-// lookupLogtoSub finds the Logto user ID for a Stripe customer ID.
-func lookupLogtoSub(stripeCustomerID string) string {
+// lookupLogtoSub finds the Logto user ID for a Stripe customer ID. An unknown
+// customer is "" with no error; a database failure is an error so the event
+// is retried.
+func lookupLogtoSub(stripeCustomerID string) (string, error) {
 	var logtoSub string
 	err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT logto_sub FROM stripe_customers WHERE stripe_customer_id = $1`, stripeCustomerID,
 	).Scan(&logtoSub)
-	if err != nil {
-		return ""
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
 	}
-	return logtoSub
+	if err != nil {
+		return "", fmt.Errorf("look up customer %s: %w", stripeCustomerID, err)
+	}
+	return logtoSub, nil
+}
+
+// lookupStoredSubscription reads the subscription id and lifetime flag
+// stored for a user. pgx.ErrNoRows is returned as is.
+func lookupStoredSubscription(logtoSub string) (*string, bool, error) {
+	var subID *string
+	var isLifetime bool
+	err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT stripe_subscription_id, lifetime FROM stripe_customers WHERE logto_sub = $1`, logtoSub,
+	).Scan(&subID, &isLifetime)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		err = fmt.Errorf("read stored subscription: %w", err)
+	}
+	return subID, isLifetime, err
+}
+
+// removePaidRoles removes every paid Logto role. Each removal is idempotent
+// (Logto answers 404 for a role the user does not hold).
+func removePaidRoles(logtoSub string) error {
+	if err := accounts.RemoveUplinkRole(logtoSub); err != nil {
+		return fmt.Errorf("remove uplink role: %w", err)
+	}
+	if err := accounts.RemoveProRole(logtoSub); err != nil {
+		return fmt.Errorf("remove uplink_pro role: %w", err)
+	}
+	if err := accounts.RemoveUltimateRole(logtoSub); err != nil {
+		return fmt.Errorf("remove uplink_ultimate role: %w", err)
+	}
+	return nil
 }
