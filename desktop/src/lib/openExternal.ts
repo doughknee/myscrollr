@@ -18,6 +18,9 @@ export function openExternal(url: string): Promise<void> {
  * clicks and calls `shell.open`, which the app does not allow (SCROLLR-470).
  */
 export function openLinkOnClick(event: MouseEvent<HTMLAnchorElement>): void {
+  // Also wired to `onAuxClick`, which fires for the middle and right buttons:
+  // only the middle one opens the link (D3-15).
+  if (event.type === "auxclick" && event.button !== 1) return;
   event.preventDefault();
   void openExternal(event.currentTarget.href).catch(() => {});
 }

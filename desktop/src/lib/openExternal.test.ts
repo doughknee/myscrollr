@@ -27,6 +27,18 @@ describe("openExternal", () => {
     expect(invoke).toHaveBeenCalledWith("open_external", { url: "https://example.com/a" });
   });
 
+  it("opens a middle-click through the command, and ignores the right button", () => {
+    const href = "https://example.com/m";
+    const right = { type: "auxclick", button: 2, preventDefault: vi.fn(), currentTarget: { href } };
+    openLinkOnClick(right as never);
+    expect(right.preventDefault).not.toHaveBeenCalled();
+    invoke.mockClear();
+    const middle = { type: "auxclick", button: 1, preventDefault: vi.fn(), currentTarget: { href } };
+    openLinkOnClick(middle as never);
+    expect(middle.preventDefault).toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith("open_external", { url: href });
+  });
+
   // SCROLLR-470: the shell plugin's injected script turns every click on a
   // target="_blank" link into `shell.open`, which the app does not allow, so
   // the link opens nothing. Outside links use `openLinkOnClick` instead.

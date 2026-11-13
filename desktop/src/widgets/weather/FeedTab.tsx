@@ -7,7 +7,7 @@
  */
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetch as httpFetch } from "@tauri-apps/plugin-http";
+import { fetchWithTimeout } from "../../api/fetchWithTimeout";
 import Tooltip from "../../components/Tooltip";
 import { LocateFixed } from "lucide-react";
 import { WeatherCard } from "./WeatherCard";
@@ -57,16 +57,21 @@ export default function WeatherFeedTab(props: FeedTabProps) {
     try {
       // https, keyless, and through plugin-http: the webview's own fetch is
       // held to the page's CORS rules and ip-api's free tier has no https.
-      const res = await httpFetch("https://ipwho.is/?fields=success,city,latitude,longitude,country,region");
-      if (!res.ok) throw new Error("Request failed");
-      const data = (await res.json()) as {
-        success: boolean;
-        city?: string;
-        latitude?: number;
-        longitude?: number;
-        country?: string;
-        region?: string;
-      };
+      const data = await fetchWithTimeout(
+        "https://ipwho.is/?fields=success,city,latitude,longitude,country,region",
+        {},
+        async (res) => {
+          if (!res.ok) throw new Error("Request failed");
+          return (await res.json()) as {
+            success: boolean;
+            city?: string;
+            latitude?: number;
+            longitude?: number;
+            country?: string;
+            region?: string;
+          };
+        },
+      );
       if (!data.success || data.latitude == null || data.longitude == null) {
         throw new Error("Location not found");
       }

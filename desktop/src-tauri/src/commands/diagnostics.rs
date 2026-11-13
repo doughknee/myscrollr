@@ -347,12 +347,12 @@ pub async fn collect_diagnostics(app: AppHandle) -> Result<DiagnosticReport, Str
 
     // Refresh system info
     {
-        let mut sys = inner.sys.lock().map_err(|e| format!("sysinfo lock: {e}"))?;
+        let mut sys = inner.sys.lock().unwrap_or_else(|p| p.into_inner());
         sys.refresh_cpu_all();
         sys.refresh_memory();
     }
 
-    let sys = inner.sys.lock().map_err(|e| format!("sysinfo lock: {e}"))?;
+    let sys = inner.sys.lock().unwrap_or_else(|p| p.into_inner());
 
     // CPU info
     let cpu_usage = if sys.cpus().is_empty() {
@@ -369,7 +369,7 @@ pub async fn collect_diagnostics(app: AppHandle) -> Result<DiagnosticReport, Str
     };
 
     // GPU info (from cached static info)
-    let static_info = inner.static_info.lock().map_err(|e| format!("static lock: {e}"))?;
+    let static_info = inner.static_info.lock().unwrap_or_else(|p| p.into_inner());
     let gpu = GpuInfo {
         model: static_info.as_ref().and_then(|s| s.gpu_name.clone()),
         vram_total_bytes: static_info.as_ref().and_then(|s| s.gpu_vram_total),

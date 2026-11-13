@@ -6,12 +6,12 @@
  * file attachments, and frequency. Feature requests collect priority.
  * All categories pre-fill user identity from the auth JWT when available.
  */
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useId } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Bug, Lightbulb, MessageSquare, CreditCard, UserCog, Radio, Paperclip, X } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
-import { authFetch, ApiError } from "../../api/client";
+import { authFetch, request, ApiError } from "../../api/client";
 import { SelectMenu } from "../widget-bar/SelectMenu";
 import { getUserIdentity, isAuthenticated } from "../../auth";
 import { getCatalogItems } from "../../marketplace";
@@ -106,7 +106,29 @@ const SUCCESS_MESSAGES: Record<Category, string> = {
 };
 
 const MAX_FILES = 5;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+// Attachments travel as base64 inside the JSON body, which the server caps at
+// 4 MiB. Base64 adds a third, so the raw files get 2.5 MiB: 3.3 MiB encoded,
+// which leaves room for the text and the diagnostics (D3-2).
+const MAX_TOTAL_BYTES = 2.5 * 1024 * 1024;
+
+const formatMB = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+// The public route (signed out) takes bug, feedback, billing and feature only.
+// Account and widget questions go in as feedback; the message says which they
+// were, so the person reading it still knows.
+const PUBLIC_CATEGORY: Record<Category, string> = {
+  bug: "bug",
+  feature: "feature",
+  feedback: "feedback",
+  billing: "billing",
+  account: "feedback",
+  widget: "feedback",
+};
+const PUBLIC_MESSAGE_MIN = 10;
+const PUBLIC_MESSAGE_MAX = 5000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const TOO_LARGE_MESSAGE = `This wasn’t sent because it was too large. Remove an attachment, or use a smaller one (the limit is ${formatMB(MAX_TOTAL_BYTES)} in total). Your text is still here.`;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -184,6 +206,10 @@ export default function ContactForm({ onBack }: ContactFormProps) {
 
   // Auth state
   const authenticated = isAuthenticated();
+  const uid = useId();
+  const id = (name: string) => `${uid}-${name}`;
+  const [fileError, setFileError] = useState<string | null>(null);
+  const totalBytes = files.reduce((n, f) => n + f.size, 0);
 
   // ── Collect diagnostics on mount ────────────────────────────────
   useEffect(() => {
@@ -228,31 +254,66 @@ export default function ContactForm({ onBack }: ContactFormProps) {
 
       const totalAfter = files.length + selected.length;
       if (totalAfter > MAX_FILES) {
-        toast.error(`Maximum ${MAX_FILES} files allowed`);
+        setFileError(`Maximum ${MAX_FILES} files allowed`);
         return;
       }
 
-      const oversized = selected.filter((f) => f.size > MAX_FILE_SIZE);
-      if (oversized.length) {
-        toast.error(
-          `${oversized.map((f) => f.name).join(", ")} exceeds 10MB limit`,
+      const newTotal = totalBytes + selected.reduce((n, f) => n + f.size, 0);
+      if (newTotal > MAX_TOTAL_BYTES) {
+        setFileError(
+          `${selected.map((f) => f.name).join(", ")} would bring the attachments to ${formatMB(newTotal)}. The limit is ${formatMB(MAX_TOTAL_BYTES)} in total.`,
         );
         return;
       }
 
+      setFileError(null);
       setFiles((prev) => [...prev, ...selected]);
     },
-    [files.length],
+    [files.length, totalBytes],
   );
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFileError(null);
   }, []);
+
+  // The signed-out message: the route has one text field, so the form's
+  // pieces go into it, labelled.
+  function buildPublicMessage(): string {
+    const parts: string[] = [];
+    if (category === "account") parts.push("Account & Login question");
+    if (category === "widget") parts.push(`Widget: ${widgetSelection || "not chosen"}`);
+    parts.push(description.trim());
+    if (category === "bug") {
+      parts.push(`What went wrong:\n${whatWentWrong.trim()}`);
+      if (expectedBehavior.trim()) parts.push(`Expected:\n${expectedBehavior.trim()}`);
+      if (frequency) parts.push(`Happens: ${FREQUENCY_OPTIONS.find((o) => o.value === frequency)?.label}`);
+    }
+    if (category === "feature") {
+      if (featureWhy.trim()) parts.push(`Why it matters:\n${featureWhy.trim()}`);
+      if (priority) parts.push(`Importance: ${PRIORITY_OPTIONS.find((o) => o.value === priority)?.label}`);
+    }
+    return parts.join("\n\n").trim();
+  }
 
   // ── canSubmit logic ─────────────────────────────────────────────
 
+  // Signed out, the public route needs a real email and a message of 10 to
+  // 5000 characters once the form has put its pieces together.
+  const publicMessage = buildPublicMessage();
+  const publicProblem = authenticated
+    ? null
+    : !EMAIL_PATTERN.test(email.trim())
+      ? "Enter the email address we should reply to."
+      : publicMessage.length < PUBLIC_MESSAGE_MIN && description.trim().length > 0
+        ? `Write at least ${PUBLIC_MESSAGE_MIN} characters so we can help.`
+        : publicMessage.length > PUBLIC_MESSAGE_MAX
+          ? `That is too long to send without signing in (${PUBLIC_MESSAGE_MAX} characters at most).`
+          : null;
+
   const canSubmit = (() => {
     if (submitting || cooldown > 0) return false;
+    if (publicProblem) return false;
     switch (category) {
       case "bug":
         return description.trim().length > 0 && whatWentWrong.trim().length > 0;
@@ -327,11 +388,29 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         };
       }
 
-      await authFetch("/support/ticket", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (authenticated) {
+        await authFetch("/support/ticket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Signed out there is no session to refresh and none to lose, so this
+        // goes through the plain `request`: no token, no session banner.
+        const label = CATEGORY_OPTIONS.find((o) => o.value === category)?.label ?? "Message";
+        const firstLine = description.trim().split("\n")[0];
+        await request("/support/ticket/public", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim(),
+            category: PUBLIC_CATEGORY[category],
+            subject: `${label}: ${firstLine}`.slice(0, 200),
+            message: publicMessage,
+            name: name.trim() || undefined,
+          }),
+        });
+      }
 
       toast.success(SUCCESS_MESSAGES[category]);
       startCooldown(60);
@@ -352,6 +431,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
       // all (the 15 s deadline, a dropped connection) or a 5xx: it may have
       // been created, and sending again could make a second ticket (RC-14).
       // Either way the text stays in the form.
+      if (err instanceof ApiError && err.status === 413) {
+        setSendError(TOO_LARGE_MESSAGE);
+        toast.error("Couldn’t send your message");
+        return;
+      }
       const unknown = !(err instanceof ApiError) || err.status >= 500;
       const message = unknown
         ? "We couldn’t confirm this was sent, and it may have arrived. Check your email for a confirmation before sending it again. Your text is still here."
@@ -399,7 +483,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
       onSubmit={handleSubmit}
       className="rounded-xl border border-edge/35 bg-base-150/35 p-5 max-w-2xl mx-auto"
     >
-      <p className="text-ui-meta mb-5">{CATEGORY_SUBTITLES[category]}</p>
+      <p className="text-ui-meta mb-5">
+        {category === "bug" && !authenticated
+          ? "Describe the issue"
+          : CATEGORY_SUBTITLES[category]}
+      </p>
 
       <div className="space-y-5">
         {/* Category picker */}
@@ -428,9 +516,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         {/* Email (only if not authenticated) */}
         {!authenticated && (
           <div>
-            <label className={labelClass}>Email address</label>
+            <label htmlFor={id("email")} className={labelClass}>Email address</label>
             <input
+              id={id("email")}
               type="email"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
@@ -443,10 +533,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         {category === "bug" && (
           <>
             <div>
-              <label className={labelClass}>
+              <label htmlFor={id("desc")} className={labelClass}>
                 What were you trying to do?
               </label>
               <textarea
+                id={id("desc")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
@@ -457,8 +548,9 @@ export default function ContactForm({ onBack }: ContactFormProps) {
             </div>
 
             <div>
-              <label className={labelClass}>What went wrong?</label>
+              <label htmlFor={id("wrong")} className={labelClass}>What went wrong?</label>
               <textarea
+                id={id("wrong")}
                 value={whatWentWrong}
                 onChange={(e) => setWhatWentWrong(e.target.value)}
                 rows={4}
@@ -469,10 +561,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor={id("expected")} className={labelClass}>
                 What did you expect to happen instead?
               </label>
               <textarea
+                id={id("expected")}
                 value={expectedBehavior}
                 onChange={(e) => setExpectedBehavior(e.target.value)}
                 rows={3}
@@ -483,14 +576,15 @@ export default function ContactForm({ onBack }: ContactFormProps) {
 
             {/* Frequency */}
             <div>
-              <label className={labelClass}>
+              <span id={id("freq")} className={labelClass}>
                 Does this happen every time?
-              </label>
-              <div className="flex gap-2">
+              </span>
+              <div role="group" aria-labelledby={id("freq")} className="flex gap-2">
                 {FREQUENCY_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
+                    aria-pressed={frequency === opt.value}
                     onClick={() => setFrequency(opt.value)}
                     className={clsx(
                       "px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer",
@@ -505,84 +599,98 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               </div>
             </div>
 
-            {/* Attachments */}
-            <div>
-              <label className={labelClass}>Attachments</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,.log,.txt,.json"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={files.length >= MAX_FILES}
-                className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer",
-                  files.length >= MAX_FILES
-                    ? "bg-surface-2 text-fg-4 cursor-not-allowed"
-                    : "bg-surface-2 text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-                )}
-              >
-                <Paperclip size={13} />
-                Attach files
-              </button>
-              <p className="text-[11px] text-fg-4 mt-1">
-                Max {MAX_FILES} files, 10MB each. Images, logs, text, JSON.
-              </p>
-
-              {/* File chips */}
-              {files.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {files.map((file, i) => (
-                    <span
-                      key={`${file.name}-${i}`}
-                      className="inline-flex items-center gap-1 bg-surface-2 border border-edge/30 rounded-md px-2 py-0.5 text-[11px] text-fg-2"
-                    >
-                      {file.name}
-                      <button
-                        type="button"
-                        onClick={() => removeFile(i)}
-                        className="text-fg-4 hover:text-fg-2 cursor-pointer"
-                        aria-label={`Remove ${file.name}`}
-                      >
-                        <X size={11} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Diagnostic Info */}
-            <details className="group">
-              <summary className="text-xs font-medium text-fg-3 cursor-pointer hover:text-fg-2 select-none">
-                {diagnosticsLoading
-                  ? "Collecting system diagnostics..."
-                  : diagnostics
-                    ? "System diagnostics will be included"
-                    : "System diagnostics could not be collected"}
-              </summary>
-              <div className="mt-2">
-                {diagnosticsLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-fg-4 py-3">
-                    <LoadingGlyph size={13} />
-                    Collecting diagnostics...
-                  </div>
-                ) : diagnostics ? (
-                  <pre className="text-[11px] font-mono bg-surface-2 rounded p-3 max-h-60 overflow-y-auto text-fg-3 whitespace-pre-wrap break-all">
-                    {JSON.stringify(diagnostics, null, 2)}
-                  </pre>
-                ) : (
-                  <p className="text-xs text-fg-4 py-2">
-                    Your report will be sent without them.
+            {authenticated ? (
+              <>
+              {/* Attachments */}
+              <div>
+                <span className={labelClass}>Attachments</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.log,.txt,.json"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={files.length >= MAX_FILES}
+                  className={clsx(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer",
+                    files.length >= MAX_FILES
+                      ? "bg-surface-2 text-fg-4 cursor-not-allowed"
+                      : "bg-surface-2 text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
+                  )}
+                >
+                  <Paperclip size={13} />
+                  Attach files
+                </button>
+                <p className="text-[11px] text-fg-4 mt-1">
+                  Up to {MAX_FILES} files, {formatMB(MAX_TOTAL_BYTES)} in total. Images, logs, text, JSON.
+                  {files.length > 0 && ` Attached: ${formatMB(totalBytes)} of ${formatMB(MAX_TOTAL_BYTES)}.`}
+                </p>
+                {fileError && (
+                  <p role="alert" className="text-[11px] text-error mt-1">
+                    {fileError}
                   </p>
                 )}
+
+                {/* File chips */}
+                {files.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {files.map((file, i) => (
+                      <span
+                        key={`${file.name}-${i}`}
+                        className="inline-flex items-center gap-1 bg-surface-2 border border-edge/30 rounded-md px-2 py-0.5 text-[11px] text-fg-2"
+                      >
+                        {file.name}
+                        <button
+                          type="button"
+                          onClick={() => removeFile(i)}
+                          className="text-fg-4 hover:text-fg-2 cursor-pointer"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-            </details>
+
+              {/* Diagnostic Info */}
+              <details className="group">
+                <summary className="text-xs font-medium text-fg-3 cursor-pointer hover:text-fg-2 select-none">
+                  {diagnosticsLoading
+                    ? "Collecting system diagnostics..."
+                    : diagnostics
+                      ? "System diagnostics will be included"
+                      : "System diagnostics could not be collected"}
+                </summary>
+                <div className="mt-2">
+                  {diagnosticsLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-fg-4 py-3">
+                      <LoadingGlyph size={13} />
+                      Collecting diagnostics...
+                    </div>
+                  ) : diagnostics ? (
+                    <pre className="text-[11px] font-mono bg-surface-2 rounded p-3 max-h-60 overflow-y-auto text-fg-3 whitespace-pre-wrap break-all">
+                      {JSON.stringify(diagnostics, null, 2)}
+                    </pre>
+                  ) : (
+                    <p className="text-xs text-fg-4 py-2">
+                      Your report will be sent without them.
+                    </p>
+                  )}
+                </div>
+              </details>
+              </>
+            ) : (
+              <p className="text-[11px] text-fg-4">
+                Attachments and system diagnostics are only sent when you are signed in.
+              </p>
+            )}
           </>
         )}
 
@@ -590,10 +698,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         {category === "feature" && (
           <>
             <div>
-              <label className={labelClass}>
+              <label htmlFor={id("desc")} className={labelClass}>
                 What feature would you like?
               </label>
               <textarea
+                id={id("desc")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
@@ -604,10 +713,11 @@ export default function ContactForm({ onBack }: ContactFormProps) {
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor={id("why")} className={labelClass}>
                 Why is this important to you?
               </label>
               <textarea
+                id={id("why")}
                 value={featureWhy}
                 onChange={(e) => setFeatureWhy(e.target.value)}
                 rows={3}
@@ -618,12 +728,13 @@ export default function ContactForm({ onBack }: ContactFormProps) {
 
             {/* Priority */}
             <div>
-              <label className={labelClass}>How important is this to you?</label>
-              <div className="flex gap-2">
+              <span id={id("priority")} className={labelClass}>How important is this to you?</span>
+              <div role="group" aria-labelledby={id("priority")} className="flex gap-2">
                 {PRIORITY_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
+                    aria-pressed={priority === opt.value}
                     onClick={() => setPriority(opt.value)}
                     className={clsx(
                       "px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer",
@@ -643,8 +754,9 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         {/* ── Feedback / Billing / Account fields ───────────────── */}
         {simpleField && (
           <div>
-            <label className={labelClass}>{simpleField.label}</label>
+            <label htmlFor={id("desc")} className={labelClass}>{simpleField.label}</label>
             <textarea
+              id={id("desc")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
@@ -662,7 +774,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         {category === "widget" && (
           <>
             <div>
-              <label className={labelClass}>Which widget?</label>
+              <span className={labelClass}>Which widget?</span>
               <SelectMenu
                 value={widgetSelection}
                 options={widgetOptions}
@@ -672,8 +784,9 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               />
             </div>
             <div>
-              <label className={labelClass}>Describe your issue</label>
+              <label htmlFor={id("desc")} className={labelClass}>Describe your issue</label>
               <textarea
+                id={id("desc")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
@@ -683,6 +796,10 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               />
             </div>
           </>
+        )}
+
+        {publicProblem && description.trim() && (
+          <p className="text-ui-meta text-fg-3">{publicProblem}</p>
         )}
 
         {sendError && (
