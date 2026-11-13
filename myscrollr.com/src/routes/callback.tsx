@@ -1,6 +1,6 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useHandleSignInCallback } from '@logto/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { seo } from '@/lib/seo'
 
@@ -23,7 +23,12 @@ function Callback() {
   const { signIn } = useScrollrAuth()
   const [stalled, setStalled] = useState(false)
 
+  // The hook's success callback and the authenticated effect below can both
+  // fire on one sign-in; the second would find returnTo already gone.
+  const went = useRef(false)
   const goOn = () => {
+    if (went.current) return
+    went.current = true
     const returnTo = sessionStorage.getItem('scrollr:returnTo')
     sessionStorage.removeItem('scrollr:returnTo')
     navigate({ to: returnTo || '/account' })
