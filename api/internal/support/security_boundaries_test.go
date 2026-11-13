@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
 	"github.com/gofiber/fiber/v2"
 )
@@ -168,5 +169,59 @@ func TestDraftPromptExcludesOtherCustomers(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "my current ticket") {
 		t.Fatal("current ticket missing")
+	}
+}
+
+// SCROLLR-387: a signed interaction is accepted once, only while fresh, and
+// fails closed without Redis. PING keeps working.
+func TestDiscordInteractionReplayProtection(t *testing.T) {
+	pub, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DISCORD_PUBLIC_KEY", hex.EncodeToString(pub))
+	t.Setenv("DISCORD_GUILD_ID", "our-guild")
+	t.Setenv("DISCORD_APPLICATION_ID", "our-app")
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+	app := fiber.New()
+	app.Post("/discord", HandleDiscordInteractions)
+
+	send := func(ix discordInteraction, at time.Time) (int, string) {
+		body, _ := json.Marshal(ix)
+		stamp := strconv.FormatInt(at.Unix(), 10)
+		req := httptest.NewRequest("POST", "/discord", strings.NewReader(string(body)))
+		req.Header.Set("X-Signature-Timestamp", stamp)
+		req.Header.Set("X-Signature-Ed25519", hex.EncodeToString(ed25519.Sign(private, append([]byte(stamp), body...))))
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		out, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(out)
+	}
+	staff := func(id string) discordInteraction {
+		return discordInteraction{ID: id, Type: discordInteractionApplicationCommand, GuildID: "our-guild", ApplicationID: "our-app",
+			Member: &discordMember{User: &discordUser{ID: "staff"}, Permissions: "8"}}
+	}
+
+	if code, _ := send(discordInteraction{Type: discordInteractionPing}, time.Now()); code != 200 {
+		t.Fatalf("PING: want 200, got %d", code)
+	}
+	if code, _ := send(staff("ix-1"), time.Now()); code == 401 || code == 503 {
+		t.Fatalf("first delivery refused: %d", code)
+	}
+	if code, _ := send(staff("ix-1"), time.Now()); code != 401 {
+		t.Fatalf("replayed interaction id: want 401, got %d", code)
+	}
+	if code, _ := send(staff("ix-2"), time.Now().Add(-10*time.Minute)); code != 401 {
+		t.Fatalf("stale timestamp: want 401, got %d", code)
+	}
+	live := platform.Rdb
+	platform.Rdb = nil
+	defer func() { platform.Rdb = live }()
+	if code, _ := send(staff("ix-3"), time.Now()); code != 503 {
+		t.Fatalf("no Redis: want 503, got %d", code)
 	}
 }

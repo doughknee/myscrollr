@@ -141,6 +141,12 @@ func HandleDiscordInteractions(c *fiber.Ctx) error {
 		log.Printf("[DiscordInteraction] signature verify failed: %v", err)
 		return c.Status(fiber.StatusUnauthorized).SendString("invalid signature")
 	}
+	// A valid signature proves Discord signed it once, not that it is new:
+	// without a window a captured request could be replayed forever.
+	if !discordTimestampFresh(timestamp, time.Now()) {
+		log.Printf("[DiscordInteraction] stale or malformed signature timestamp %q", timestamp)
+		return c.Status(fiber.StatusUnauthorized).SendString("stale timestamp")
+	}
 
 	var interaction discordInteraction
 	if err := json.Unmarshal(body, &interaction); err != nil {
@@ -150,6 +156,11 @@ func HandleDiscordInteractions(c *fiber.Ctx) error {
 
 	if interaction.Type != discordInteractionPing && !discordStaffAuthorized(&interaction) {
 		return discordEphemeralResponse(c, "Scrollr support actions require an administrator in the configured server.")
+	}
+	if interaction.Type != discordInteractionPing {
+		if status, msg := claimDiscordInteraction(interaction.ID); status != 0 {
+			return c.Status(status).SendString(msg)
+		}
 	}
 	switch interaction.Type {
 	case discordInteractionPing:
@@ -164,6 +175,50 @@ func HandleDiscordInteractions(c *fiber.Ctx) error {
 		log.Printf("[DiscordInteraction] unknown type %d", interaction.Type)
 		return c.Status(fiber.StatusBadRequest).SendString("unknown interaction type")
 	}
+}
+
+// Replay protection for signed interactions.
+const (
+	discordTimestampWindow = 5 * time.Minute
+	discordInteractionTTL  = 15 * time.Minute // comfortably longer than the window
+)
+
+// discordTimestampFresh reports whether the X-Signature-Timestamp (unix
+// seconds) is within the window of now, in either direction.
+func discordTimestampFresh(timestamp string, now time.Time) bool {
+	sec, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return false
+	}
+	age := now.Sub(time.Unix(sec, 0))
+	return age > -discordTimestampWindow && age < discordTimestampWindow
+}
+
+// claimDiscordInteraction records the interaction id in Redis so the same
+// signed request cannot act twice inside the window. It returns a non-zero
+// HTTP status when the request must not proceed. Redis being unavailable
+// fails closed: these interactions send replies and change tickets, and
+// refusing one costs the partner a click, while running one twice does not.
+func claimDiscordInteraction(id string) (int, string) {
+	if id == "" {
+		return fiber.StatusBadRequest, "missing interaction id"
+	}
+	if platform.Rdb == nil {
+		log.Printf("[DiscordInteraction] Redis unavailable, refusing interaction %s", id)
+		return fiber.StatusServiceUnavailable, "replay protection unavailable, try again"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ok, err := platform.Rdb.SetNX(ctx, "support:discord:interaction:"+id, "1", discordInteractionTTL).Result()
+	if err != nil {
+		log.Printf("[DiscordInteraction] Redis error, refusing interaction %s: %v", id, err)
+		return fiber.StatusServiceUnavailable, "replay protection unavailable, try again"
+	}
+	if !ok {
+		log.Printf("[DiscordInteraction] replayed interaction %s rejected", id)
+		return fiber.StatusUnauthorized, "replayed interaction"
+	}
+	return 0, ""
 }
 
 func discordStaffAuthorized(ix *discordInteraction) bool {
