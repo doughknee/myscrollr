@@ -1,4 +1,6 @@
-use std::{collections::HashMap, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant}};
+use std::{collections::HashMap, sync::{Arc, LazyLock, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant}};
+
+use anyhow::Context;
 
 use reqwest::Client;
 use tokio::{net::TcpStream, sync::{Mutex, RwLock}, time};
@@ -20,6 +22,30 @@ use crate::{get_quote, types::{FinanceHealth, PriceEvent, TradeData, WebSocketSt
 const UPDATE_BATCH_SIZE: usize = 10;
 const UPDATE_BATCH_TIMEOUT: u64 = 1000;
 const UPDATE_BATCH_SIZE_DELAY: u64 = 500;
+
+/// Symbols whose previous close could not be fetched: symbol -> (failures, next
+/// allowed attempt). Without it every tick of such a symbol spends a TwelveData
+/// credit. The delay doubles from one minute up to 30 minutes; a success clears it.
+#[derive(Default)]
+struct QuoteBackoff(HashMap<String, (u32, Instant)>);
+
+impl QuoteBackoff {
+    fn blocked(&self, symbol: &str, now: Instant) -> bool {
+        self.0.get(symbol).is_some_and(|(_, next)| now < *next)
+    }
+
+    fn record_failure(&mut self, symbol: &str, now: Instant) {
+        let failures = self.0.get(symbol).map_or(0, |(n, _)| *n).saturating_add(1);
+        let delay = Duration::from_secs(60u64 << (failures - 1).min(5)).min(Duration::from_secs(30 * 60));
+        self.0.insert(symbol.to_string(), (failures, now + delay));
+    }
+
+    fn record_success(&mut self, symbol: &str) {
+        self.0.remove(symbol);
+    }
+}
+
+static QUOTE_BACKOFF: LazyLock<std::sync::Mutex<QuoteBackoff>> = LazyLock::new(Default::default);
 
 const LOG_THROTTLE_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -426,14 +452,16 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
     let (symbol, price, day_volume) = (trade.symbol, trade.price, trade.day_volume);
 
     let existing_record = trades_map.get(&symbol).cloned();
+    if existing_record.is_none() {
+        // A failed insert is an error for this trade (counted in batch errors
+        // and health); the stream and the other symbols carry on.
+        insert_symbol(Arc::clone(&pool), symbol.clone())
+            .await
+            .with_context(|| format!("insert symbol {symbol}"))?;
+    }
+    let mut write_error: Option<anyhow::Error> = None;
     let mut current_record = existing_record.unwrap_or_else(|| {
         info!("Inserting new symbol {}", symbol);
-
-        let pool_clone = Arc::clone(&pool);
-        let symbol_clone = symbol.clone();
-        tokio::spawn(async move {
-            let _ = insert_symbol(pool_clone, symbol_clone).await;
-        });
 
         DatabaseTradeData {
             symbol: symbol.clone(),
@@ -447,7 +475,10 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
         }
     });
 
-    if current_record.previous_close <= 0.0 {
+    let quote_blocked = current_record.previous_close <= 0.0
+        && QUOTE_BACKOFF.lock().is_ok_and(|b| b.blocked(&symbol, Instant::now()));
+
+    if current_record.previous_close <= 0.0 && !quote_blocked {
         info!("Fetching quote for {}", symbol);
 
         let mut determined_previous_close: Option<f64> = None;
@@ -475,13 +506,25 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
         // close right now, skip this trade — the daily refresh task in
         // lib.rs::update_all_previous_closes will fill it in on its next run.
 
+        if let Ok(mut b) = QUOTE_BACKOFF.lock() {
+            match determined_previous_close {
+                Some(_) => b.record_success(&symbol),
+                None => b.record_failure(&symbol, Instant::now()),
+            }
+        }
+
         if let Some(pc) = determined_previous_close {
             current_record.previous_close = pc;
-            let _ = update_previous_close(Arc::clone(&pool), symbol.clone(), pc).await;
+            if let Err(e) = update_previous_close(Arc::clone(&pool), symbol.clone(), pc).await {
+                write_error = Some(e.context(format!("update previous close for {symbol}")));
+            }
         }
     }
 
     if current_record.previous_close <= 0.0 {
+        if quote_blocked {
+            return Ok(());
+        }
         warn!("Skipping {}, unable to determine previous close", symbol);
         return Ok(());
     }
@@ -515,5 +558,32 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
         day_volume,
     ).await?;
 
-    Ok(())
+    match write_error {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quote_backoff_grows_caps_and_resets() {
+        let t0 = Instant::now();
+        let mut b = QuoteBackoff::default();
+        assert!(!b.blocked("DAI/USD", t0));
+        b.record_failure("DAI/USD", t0);
+        assert!(b.blocked("DAI/USD", t0 + Duration::from_secs(59)));
+        assert!(!b.blocked("DAI/USD", t0 + Duration::from_secs(61)));
+        b.record_failure("DAI/USD", t0);
+        assert!(b.blocked("DAI/USD", t0 + Duration::from_secs(119)));
+        for _ in 0..40 {
+            b.record_failure("DAI/USD", t0);
+        }
+        assert!(!b.blocked("DAI/USD", t0 + Duration::from_secs(30 * 60 + 1)));
+        assert!(!b.blocked("TON/USD", t0), "other symbols are unaffected");
+        b.record_success("DAI/USD");
+        assert!(!b.blocked("DAI/USD", t0));
+    }
 }

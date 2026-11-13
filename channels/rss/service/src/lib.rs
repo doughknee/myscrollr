@@ -1,4 +1,5 @@
 use std::{sync::Arc, fs};
+use anyhow::Context;
 use bytes::BytesMut;
 use reqwest::Client;
 use tokio::sync::Mutex;
@@ -44,6 +45,7 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
     }
 
     let mut feeds = get_tracked_feeds(pool.clone()).await;
+    feeds.retain(|f| !in_backoff(f.consecutive_failures, cycle));
 
     // On cycle 0 (startup) and every 288 cycles (~24 hours) afterwards, retry
     // quarantined feeds to see if they've recovered. Retrying at cycle 0 is
@@ -142,6 +144,23 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
     );
 }
 
+/// Longest gap between attempts on a failing feed: 12 cycles of 5 minutes = 1 hour.
+const MAX_BACKOFF_CYCLES: u64 = 12;
+
+/// A feed with `failures` consecutive failures is polled only on cycles that are
+/// a multiple of min(2^failures, 12), so a success (which resets the counter)
+/// puts it back on every cycle. Cycle 0 always polls everything. The cap
+/// divides 288, so quarantined feeds still get their daily retry.
+fn in_backoff(failures: i32, cycle: u64) -> bool {
+    if failures <= 0 {
+        return false;
+    }
+    let gap = 1u64
+        .checked_shl(failures as u32)
+        .map_or(MAX_BACKOFF_CYCLES, |g| g.min(MAX_BACKOFF_CYCLES));
+    !cycle.is_multiple_of(gap)
+}
+
 async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> anyhow::Result<usize> {
     // Stream the body into a bounded buffer so a hostile or misbehaving feed
     // can't OOM the pod. `.error_for_status()?` also surfaces 4xx/5xx as
@@ -235,10 +254,11 @@ async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> a
     }
 
     let count = articles.len();
-    if let Err(e) = batch_upsert_rss_items(pool, articles).await {
-        warn!("Failed to batch upsert RSS items from {}: {}", feed.name, e);
-        return Ok(0);
-    }
+    // A failed write is a failed poll: the caller logs it with the feed name,
+    // counts it against the feed and records it in health.
+    batch_upsert_rss_items(pool, articles)
+        .await
+        .context("failed to store feed items")?;
 
     Ok(count)
 }
@@ -265,6 +285,17 @@ fn strip_html_tags(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_in_backoff_grows_caps_and_resets() {
+        assert!(!in_backoff(0, 7)); // healthy feed: every cycle
+        assert!(!in_backoff(3, 0)); // startup polls everything
+        assert!(in_backoff(1, 1) && !in_backoff(1, 2));
+        assert!(in_backoff(3, 4) && !in_backoff(3, 8));
+        // capped at 12 cycles (1 hour), including absurd counts
+        assert!(in_backoff(200, 11) && !in_backoff(200, 12) && !in_backoff(200, 288));
+        assert!(!in_backoff(i32::MAX, 24));
+    }
 
     #[test]
     fn test_strip_html_tags_simple() {
