@@ -19,8 +19,8 @@ vi.mock("./types", async (orig) => ({
   saveCities: (c: unknown[]) => void h.saved.push(...c),
 }));
 
-const { weatherWidget } = await import("./FeedTab");
-const Feed = weatherWidget.FeedTab as (p: { mode: string }) => import("react").ReactElement;
+// The screen is the module default; its manifest lazy-loads it (SCROLLR-408).
+const Feed = (await import("./FeedTab")).default as (p: { mode: string }) => import("react").ReactElement;
 
 beforeEach(() => {
   vi.stubGlobal("IntersectionObserver", class { observe() {} disconnect() {} unobserve() {} });
