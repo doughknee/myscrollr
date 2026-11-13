@@ -38,3 +38,24 @@ it("keeps an automatic startup feed failure quiet", async () => {
   expect(shared.toast.error).not.toHaveBeenCalled();
   expect(shared.controller.getSnapshot().phase).toBe("error");
 });
+
+it("asks the feed again every few hours, but never over an offer the user may have dismissed (RC-10)", async () => {
+  const candidate = { version: "1.8.0", download: vi.fn(async () => {}), install: vi.fn(async () => {}), close: vi.fn(async () => {}) };
+  const check = vi.fn(async (): Promise<{ feedVersion: string; update: typeof candidate | null }> => ({ feedVersion: "1.7.2", update: null }));
+  shared.controller = new UpdateController({ load: async () => ({ version: "1.7.2", channel: "stable", fresh: false }), saveChannel: async () => {}, check, restart: async () => {} });
+  await shared.controller.initialize();
+  render(<Host />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+  expect(check).toHaveBeenCalledTimes(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000); });
+  expect(check).toHaveBeenCalledTimes(2);
+
+  check.mockResolvedValue({ feedVersion: "1.8.0", update: candidate });
+  await act(async () => { await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000); });
+  expect(check).toHaveBeenCalledTimes(3);
+  expect(shared.toast.info).toHaveBeenCalledTimes(1);
+  // The user dismissed it (the phase stays "available"): the next round leaves it alone.
+  await act(async () => { await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000); });
+  expect(check).toHaveBeenCalledTimes(3);
+  expect(shared.toast.info).toHaveBeenCalledTimes(1);
+});

@@ -7,6 +7,7 @@
  */
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetch as httpFetch } from "@tauri-apps/plugin-http";
 import Tooltip from "../../components/Tooltip";
 import { CloudSun, LocateFixed } from "lucide-react";
 import { WeatherCard } from "./WeatherCard";
@@ -75,25 +76,27 @@ function WeatherFeedTab(props: FeedTabProps) {
   const detectLocation = useCallback(async () => {
     setDetecting(true);
     try {
-      const res = await fetch("http://ip-api.com/json/?fields=status,city,lat,lon,country,regionName");
+      // https, keyless, and through plugin-http: the webview's own fetch is
+      // held to the page's CORS rules and ip-api's free tier has no https.
+      const res = await httpFetch("https://ipwho.is/?fields=success,city,latitude,longitude,country,region");
       if (!res.ok) throw new Error("Request failed");
       const data = (await res.json()) as {
-        status: string;
+        success: boolean;
         city?: string;
-        lat?: number;
-        lon?: number;
+        latitude?: number;
+        longitude?: number;
         country?: string;
-        regionName?: string;
+        region?: string;
       };
-      if (data.status !== "success" || data.lat == null || data.lon == null) {
+      if (!data.success || data.latitude == null || data.longitude == null) {
         throw new Error("Location not found");
       }
       addCity({
         name: data.city || "My Location",
-        lat: data.lat,
-        lon: data.lon,
+        lat: data.latitude,
+        lon: data.longitude,
         country: data.country ?? "",
-        admin1: data.regionName,
+        admin1: data.region,
       });
     } catch {
       toast.error("Couldn't detect your location — try searching for a city instead");

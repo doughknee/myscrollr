@@ -16,11 +16,14 @@
  */
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toggleDataWidgetVisibility } from "../api/client";
+import { emit } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { ApiError, toggleDataWidgetVisibility } from "../api/client";
 import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
 import type { AppPreferences } from "../preferences";
+import { useTauriListener } from "./useTauriListener";
 import {
   isOnTicker,
   withDataMembership,
@@ -28,16 +31,43 @@ import {
   type TickerRow,
 } from "../utils/tickerMembership";
 
+/** Ticker window -> main window: a toggle the server refused. */
+export const TOGGLE_FAILED_EVENT = "widget-toggle-failed";
+
+interface ToggleFailedPayload {
+  widgetId: string;
+  on: boolean;
+  status?: number;
+  message?: string;
+}
+
 export function useToggleOnTicker(opts: {
   /** Current prefs, read at call time. */
   getPrefs: () => AppPreferences;
   /** Persist a new prefs object (state + store). */
   persistPrefs: (next: AppPreferences) => void;
-  /** Called when the server refuses. Optional: the ticker window has no toaster. */
+  /**
+   * Called when the server refuses. Only the main window passes it (it owns
+   * the toaster). A window without it forwards the failure to the main
+   * window, which calls this on its behalf, so the user always hears.
+   */
   onError?: (widgetId: string, turningOn: boolean, err: unknown) => void;
 }) {
   const { getPrefs, persistPrefs, onError } = opts;
   const queryClient = useQueryClient();
+
+  // Main window only (it is the one that passes onError). Exactly one window
+  // forwards, the one the user clicked in, so there is one toast however many
+  // ticker windows exist. The ticker window has no toaster and the main window
+  // is usually hidden, so bring it forward to show the message.
+  useTauriListener<ToggleFailedPayload>(TOGGLE_FAILED_EVENT, (e) => {
+    const { widgetId, on, status, message } = e.payload;
+    onError?.(
+      widgetId,
+      on,
+      status === undefined ? new Error(message) : new ApiError(status, message ?? ""),
+    );
+  });
 
   return useCallback(
     async (widgetId: string) => {
@@ -51,7 +81,10 @@ export function useToggleOnTicker(opts: {
         return;
       }
 
-      const previous = dashboard;
+      // An in-flight dashboard refetch would land after the optimistic write
+      // and snap the chip back before the server has answered.
+      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
+      const previous = queryClient.getQueryData<DashboardResponse>(queryKeys.dashboard);
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) =>
         old ? { ...old, widgets: withDataMembership(old.widgets ?? [], widgetId, on) } : old,
       );
@@ -60,7 +93,17 @@ export function useToggleOnTicker(opts: {
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
       } catch (err) {
         if (previous) queryClient.setQueryData(queryKeys.dashboard, previous);
-        onError?.(widgetId, on, err);
+        if (onError) {
+          onError(widgetId, on, err);
+        } else {
+          void emit(TOGGLE_FAILED_EVENT, {
+            widgetId,
+            on,
+            status: err instanceof ApiError ? err.status : undefined,
+            message: err instanceof Error ? err.message : undefined,
+          } satisfies ToggleFailedPayload).catch(() => {});
+          void invoke("show_app_window").catch(() => {});
+        }
       }
     },
     [queryClient, getPrefs, persistPrefs, onError],

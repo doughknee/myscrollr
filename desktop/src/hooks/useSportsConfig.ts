@@ -68,6 +68,10 @@ export function useSportsConfig(widgetType: string = "sports") {
   }, [raw]);
 
   const mutation = useMutation({
+    // One widget's writes run in click order (a later whole-config write must
+    // never land first and be overwritten by an earlier one).
+    scope: { id: `widget-config:${widgetType}` },
+    mutationKey: ["widget-config", widgetType],
     mutationFn: (next: SportsConfig) =>
       dataWidgetsApi.update(widgetType, {
         config: next as unknown as Record<string, unknown>,
@@ -95,11 +99,18 @@ export function useSportsConfig(widgetType: string = "sports") {
     },
     onError: (_err, _next, ctx) => {
       const prev = (ctx as { previous?: DashboardResponse } | undefined)?.previous;
-      if (prev) queryClient.setQueryData(queryKeys.dashboard, prev);
+      // The snapshot predates any write queued behind this one, so restore it
+      // only when nothing else is in flight; the last write's refetch settles
+      // the rest.
+      if (prev && queryClient.isMutating({ mutationKey: ["widget-config", widgetType] }) <= 1) {
+        queryClient.setQueryData(queryKeys.dashboard, prev);
+      }
       toast.error("Failed to save \u2014 try again");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      if (queryClient.isMutating({ mutationKey: ["widget-config", widgetType] }) <= 1) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      }
     },
   });
 

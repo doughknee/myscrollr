@@ -13,7 +13,7 @@ import { fetch } from "@tauri-apps/plugin-http";
 import { LS_GITHUB_BOARD } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { isSignedOut } from "../../auth";
-import { githubApi } from "../../api/client";
+import { ApiError, githubApi } from "../../api/client";
 import type { GitHubBoardItem, GitHubBoardRepo, GitHubBoardRun, GitHubPRRow, GitHubRepoRow, GitHubRunRow } from "../../api/client";
 import { newRepo } from "./config";
 import type { GitHubTrackedRepo } from "./config";
@@ -118,7 +118,14 @@ export async function fetchBoard(tracked: GitHubTrackedRepo[]): Promise<GitHubBo
   if (isSignedOut()) return noFill(await Promise.all(tracked.map((t) => fetchDirect(t.repo))));
   const board = await githubApi
     .board(tracked.map(({ repo, workflows, prs, issues }) => ({ repo, workflows, prs, issues })))
-    .catch(() => null);
+    // Only "this core has no board" (404/409) falls back to the runs list. A
+    // timeout, 429 or 5xx is a failed fetch, not an empty board: let it throw
+    // so the query keeps the last board and the page can say so, instead of
+    // saving the public-runs downgrade over a connected user's PRs and issues.
+    .catch((err) => {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 409)) return null;
+      throw err;
+    });
   if (board?.connected) {
     return {
       repos: tracked.map((t) => board.repos.find((r) => sameRepo(r.repo, t.repo)) ?? { repo: t.repo, available: false, workflows: [] }),

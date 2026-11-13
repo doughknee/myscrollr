@@ -77,4 +77,20 @@ describe("server minimum and Stable recovery", () => {
     await shared.controller!.check();
     expect(shared.controller!.getSnapshot().phase).toBe("error");
   });
+
+  it("reads the minimum again every few hours, so an app left open learns the floor moved (RC-10)", async () => {
+    vi.useFakeTimers();
+    try {
+      respond("1.7.4");
+      const { result } = renderHook(() => useUpdateGate("1.7.5"));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.updateRequired).toBe(false);
+      respond("1.8.0");
+      await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60 * 60 * 1000); });
+      expect(fetchMinimum).toHaveBeenCalledTimes(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(60 * 60 * 1000); });
+      expect(fetchMinimum).toHaveBeenCalledTimes(2);
+      expect(result.current.updateRequired).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
 });

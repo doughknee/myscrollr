@@ -646,7 +646,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
       rel="noopener noreferrer"
       className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "block")}
     >
-      <span className="text-sm font-medium text-fg leading-snug line-clamp-2">
+      <span className="text-sm font-medium text-fg leading-snug line-clamp-2 [overflow-wrap:anywhere]">
         {item.title}
       </span>
       {item.description && (

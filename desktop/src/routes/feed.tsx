@@ -327,6 +327,18 @@ function HomePage() {
           </div>
         )}
 
+        {/* ── Still loading (UD-4): placeholders, not an empty account ── */}
+        {dashboardState === "pending" && (
+          <div
+            role="status"
+            aria-label="Loading your widgets"
+            className="mb-4 grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3.5"
+          >
+            <div className="h-44 rounded-xl bg-surface-2" />
+            <div className="h-44 rounded-xl bg-surface-2/60" />
+          </div>
+        )}
+
         {/* ── Needs setup ──────────────────────────────────── */}
         {needsSetup.length > 0 && (
           <div className="mb-4 rounded-xl border border-warn/25 bg-warn/[0.06] px-3.5 py-2.5 text-ui-meta text-fg-2">

@@ -9,7 +9,12 @@ const runs = vi.fn();
 const directFetch = vi.fn();
 
 vi.mock("../../auth", () => ({ isSignedOut: () => signedOut() }));
-vi.mock("../../api/client", () => ({ githubApi: { board: (r: unknown) => board(r), runs: (r: string[]) => runs(r) } }));
+class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
+vi.mock("../../api/client", () => ({ ApiError, githubApi: { board: (r: unknown) => board(r), runs: (r: string[]) => runs(r) } }));
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: (...a: unknown[]) => directFetch(...a) }));
 
 const { autoPick, fetchBoard, fitPills, needFor, nextFlash, parseRepoUrl, pillWidth, pillsFor, repoChip, thingsFor, worstOf } = await import("./types");
@@ -146,8 +151,16 @@ describe("fetchBoard", () => {
     expect(got[0].workflows).toEqual([{ name: "CI", state: "failing", at: "2026-10-02T11:00:00Z", url: "u" }]);
     expect(got[1]).toMatchObject({ repo: "o/b", available: false, workflows: [] });
     expect(queue).toEqual([]);
-    board.mockRejectedValue(new Error("404"));
+    board.mockRejectedValue(new ApiError(404, "not found"));
     expect((await fetchBoard(tracked)).repos[0].workflows[0].state).toBe("failing");
+  });
+
+  it("a failed board fetch is an error, not an empty board (RC-11)", async () => {
+    for (const err of [new ApiError(503, "unavailable"), new ApiError(429, "slow down"), new Error("timeout")]) {
+      board.mockRejectedValue(err);
+      await expect(fetchBoard(tracked)).rejects.toBe(err);
+    }
+    expect(runs).not.toHaveBeenCalled();
   });
 
   it("signed out: GitHub directly, one call a repo", async () => {

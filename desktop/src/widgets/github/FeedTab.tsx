@@ -116,7 +116,7 @@ function GitHubFeedTab(_props: FeedTabProps) {
   // An empty list fills itself with your active repos from the shell
   // (__root.tsx, SCROLLR-312's zero setup), whether or not this page is open.
 
-  const { data: board } = useQuery({
+  const { data: board, isError: boardFailed } = useQuery({
     ...githubBoardQuery(cfg.repos, shell.authenticated),
     enabled: connected && cfg.repos.length > 0,
   });
@@ -150,6 +150,7 @@ function GitHubFeedTab(_props: FeedTabProps) {
       cfg={cfg}
       login={status.login ?? ""}
       board={boardRows}
+      boardFailed={boardFailed}
       yours={yours?.repos}
       write={write}
     />
@@ -162,12 +163,15 @@ function TwoPanes({
   cfg,
   login,
   board,
+  boardFailed,
   yours,
   write,
 }: {
   cfg: GitHubWidgetConfig;
   login: string;
   board: GitHubBoardRepo[];
+  /** The last refresh failed; `board` is the last one that worked. */
+  boardFailed: boolean;
   yours: GitHubRepoRow[] | undefined;
   write: (patch: Partial<GitHubWidgetConfig>) => void;
 }) {
@@ -242,6 +246,11 @@ function TwoPanes({
         {quietOpen && <QuietHours cfg={cfg} write={write} />}
 
         <span className="px-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-3">On your bar</span>
+        {boardFailed && (
+          <p role="status" className="px-1.5 text-[11px] text-error">
+            Couldn't refresh your repos. Showing the last result; it will try again in a minute.
+          </p>
+        )}
         <div className="flex flex-col gap-0.5" role="list" aria-label="On your bar">
           {cfg.repos.map((t) => {
             const row = rowOf(t.repo);
