@@ -164,12 +164,12 @@ func TestIntegrationSubscriptionUpdatedUnpaidRemovesAccess(t *testing.T) {
 	testsupport.MustExec(t, `UPDATE stripe_customers SET stripe_subscription_id = 'sub_unpaid' WHERE logto_sub = $1`, sub)
 
 	// An update about some other subscription changes nothing.
-	_ = billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	_ = deliverSubscriptionUpdate(t, `{
 		"id": "sub_other", "object": "subscription", "status": "canceled",
 		"cancel_at_period_end": false, "customer": "cus_unpaid_upd",
 		"items": {"object": "list", "data": [{"id": "si_1", "object": "subscription_item",
 			"current_period_end": 1781136000, "price": {"id": "price_monthly_t", "object": "price"}}]}
-	}`))
+	}`)
 	if row := readStripeCustomer(t, sub); row.Status != "past_due" || row.Plan != "pro_monthly" {
 		t.Errorf("row after another subscription's update = %+v, want untouched", row)
 	}
@@ -178,12 +178,12 @@ func TestIntegrationSubscriptionUpdatedUnpaidRemovesAccess(t *testing.T) {
 	}
 
 	// The stored subscription going unpaid ends paid access.
-	_ = billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	_ = deliverSubscriptionUpdate(t, `{
 		"id": "sub_unpaid", "object": "subscription", "status": "unpaid",
 		"cancel_at_period_end": false, "customer": "cus_unpaid_upd",
 		"items": {"object": "list", "data": [{"id": "si_1", "object": "subscription_item",
 			"current_period_end": 1781136000, "price": {"id": "price_pro_monthly_t", "object": "price"}}]}
-	}`))
+	}`)
 	if row := readStripeCustomer(t, sub); row.Status != "unpaid" {
 		t.Errorf("status = %q, want unpaid", row.Status)
 	}
@@ -378,5 +378,43 @@ func TestIntegrationPurchaseRefusedWhileDeletionPending(t *testing.T) {
 		if tc.wantStatus == fiber.StatusConflict && !strings.Contains(string(body), `"error":"Your account is scheduled for deletion. Cancel the deletion`) {
 			t.Errorf("body = %s, want the cancel-the-deletion message", body)
 		}
+	}
+}
+
+// SCROLLR-465 B2-2: an active update retried after the subscription was
+// deleted must not re-grant access; the handler asks Stripe what is true now.
+func TestIntegrationLateActiveUpdateAfterDeletionGrantsNothing(t *testing.T) {
+	setupIntegrationDB(t)
+	logto := newLogtoStub(t)
+	setStripePriceEnv(t)
+	const sub = "user_late_update"
+	// What subscription.deleted leaves behind.
+	seedStripeCustomer(t, sub, "cus_late_update", "free", "canceled", false)
+	const event = `{"id": "sub_late", "object": "subscription", "status": "active",
+		"cancel_at_period_end": false, "customer": "cus_late_update",
+		"items": {"object": "list", "data": [{"id": "si_1", "object": "subscription_item",
+			"current_period_end": 1781136000, "price": {"id": "price_ultimate_monthly_t", "object": "price"}}]}}`
+
+	serveSubscription(t, `{"id": "sub_late", "object": "subscription", "status": "canceled", "customer": "cus_late_update"}`)
+	if err := billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", event)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got := logto.assignedRoles(); len(got) != 0 {
+		t.Errorf("assigned roles = %v, want none for a subscription Stripe says has ended", got)
+	}
+	if row := readStripeCustomer(t, sub); row.Plan != "free" || row.Status != "canceled" || row.SubscriptionID != nil {
+		t.Errorf("row = %+v, want untouched free/canceled", row)
+	}
+
+	// Stripe unreachable: the event fails so Stripe retries it, and nothing changes.
+	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","message":"down"}}`))
+	})
+	if err := billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", event)); err == nil {
+		t.Error("handler succeeded although Stripe could not be asked")
+	}
+	if got := logto.assignedRoles(); len(got) != 0 {
+		t.Errorf("assigned roles = %v, want none", got)
 	}
 }
