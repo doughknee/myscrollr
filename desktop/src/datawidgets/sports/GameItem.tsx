@@ -11,6 +11,7 @@ import { Star } from "lucide-react";
 import { isLive, isFinal, getWinner, gameStatusLabel, displayTeamCode, sameGame } from "../../utils/gameHelpers";
 import { FEED_CARD, FEED_CARD_INTERACTIVE, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
+import { openLinkOnClick } from "../../lib/openExternal";
 import type { Game, FeedMode } from "../../types";
 
 interface GameItemProps {
@@ -38,7 +39,7 @@ function CardWrapper({
     return (
       <a
         href={link}
-        target="_blank"
+        onClick={openLinkOnClick}
         rel="noopener noreferrer"
         className={className}
       >
