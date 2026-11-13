@@ -296,13 +296,13 @@ func handleGetSports(c *fiber.Ctx) error {
 		return c.JSON(resp)
 	}
 
-	leagues := getUserSportsLeagues(ctx, userSub)
+	leagues, _ := getUserSportsLeagues(ctx, userSub)
 	if len(leagues) == 0 {
 		// Even with no leagues, return the shape — empty arrays both sides.
 		return c.JSON(SportsResponse{Sports: []Game{}, Meta: SportsMeta{Leagues: []LeagueMeta{}}})
 	}
 
-	favoriteTeams := getUserFavoriteTeams(ctx, userSub)
+	favoriteTeams, _ := getUserFavoriteTeams(ctx, userSub)
 	// /sports (full channel page) returns every game for every selected
 	// league. The page already has league + status filter chips for the
 	// user to narrow down — we surface all the data and let them control it.
@@ -314,7 +314,7 @@ func handleGetSports(c *fiber.Ctx) error {
 			Error:  "Internal server error",
 		})
 	}
-	meta := loadLeagueMeta(ctx, leagues)
+	meta, _ := loadLeagueMeta(ctx, leagues)
 
 	resp = SportsResponse{Sports: games, Meta: SportsMeta{Leagues: meta}}
 	cacheSetJSON(ctx, cacheKey, resp, SportsCacheTTL)
@@ -351,7 +351,7 @@ func PublicSports(ctx context.Context) (resp SportsResponse, cacheHit bool, err 
 	if err != nil {
 		return SportsResponse{}, false, err
 	}
-	meta := loadLeagueMeta(ctx, leagues)
+	meta, _ := loadLeagueMeta(ctx, leagues)
 	resp = SportsResponse{Sports: games, Meta: SportsMeta{Leagues: meta}}
 	cacheSetJSON(ctx, CacheKeySports, resp, SportsCacheTTL)
 	return resp, false, nil
@@ -413,9 +413,9 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 // loadLeagueMeta builds the per-league meta array attached to dashboard +
 // public sports responses. Returns an empty slice (never nil) so callers
 // can JSON-encode cleanly.
-func loadLeagueMeta(ctx context.Context, names []string) []LeagueMeta {
+func loadLeagueMeta(ctx context.Context, names []string) ([]LeagueMeta, error) {
 	if len(names) == 0 {
-		return []LeagueMeta{}
+		return []LeagueMeta{}, nil
 	}
 
 	currentMonth := int32(time.Now().Month())
@@ -426,7 +426,7 @@ func loadLeagueMeta(ctx context.Context, names []string) []LeagueMeta {
 		WHERE name = ANY($1)`, names)
 	if err != nil {
 		log.Printf("[Sports] loadLeagueMeta tracked_leagues query failed: %v", err)
-		return []LeagueMeta{}
+		return []LeagueMeta{}, err
 	}
 	defer rows.Close()
 
@@ -443,6 +443,9 @@ func loadLeagueMeta(ctx context.Context, names []string) []LeagueMeta {
 			continue
 		}
 		leagueRows = append(leagueRows, r)
+	}
+	if err := rows.Err(); err != nil {
+		return []LeagueMeta{}, err
 	}
 
 	// Pull next_game alongside in a single batched query. Log on failure;
@@ -584,7 +587,7 @@ func sportsHealth(ctx context.Context) (string, bool) {
 // sportsDashboard returns the "sports" + "sports_meta" dashboard sections
 // for a user. Home dashboard uses fair-share so every selected league is
 // visible within the 60-row payload, regardless of relative volume.
-func sportsDashboard(ctx context.Context, userSub string) map[string]interface{} {
+func sportsDashboard(ctx context.Context, userSub string) (map[string]interface{}, error) {
 	empty := map[string]interface{}{
 		"sports":      []Game{},
 		"sports_meta": SportsMeta{Leagues: []LeagueMeta{}},
@@ -596,23 +599,32 @@ func sportsDashboard(ctx context.Context, userSub string) map[string]interface{}
 		return map[string]interface{}{
 			"sports":      resp.Sports,
 			"sports_meta": resp.Meta,
-		}
+		}, nil
 	}
 
-	leagues := getUserSportsLeagues(ctx, userSub)
+	leagues, err := getUserSportsLeagues(ctx, userSub)
+	if err != nil {
+		return nil, err
+	}
 	if len(leagues) == 0 {
-		return empty
+		return empty, nil
 	}
 
-	favoriteTeams := getUserFavoriteTeams(ctx, userSub)
+	favoriteTeams, err := getUserFavoriteTeams(ctx, userSub)
+	if err != nil {
+		return nil, err
+	}
 	// Each league's share splits between soonest-upcoming and newest-finals
 	// (v1.1.4, fairShareSideSplit) so the day-window always has both sides.
 	games, err := queryGamesByLeagues(ctx, leagues, DashboardSportsLimit, favoriteTeams, true)
 	if err != nil {
 		log.Printf("[Sports] Dashboard query failed: %v", err)
-		return empty
+		return nil, err
 	}
-	meta := loadLeagueMeta(ctx, leagues)
+	meta, err := loadLeagueMeta(ctx, leagues)
+	if err != nil {
+		return nil, err
+	}
 
 	resp = SportsResponse{Sports: games, Meta: SportsMeta{Leagues: meta}}
 	cacheSetJSON(ctx, cacheKey, resp, SportsCacheTTL)
@@ -622,7 +634,7 @@ func sportsDashboard(ctx context.Context, userSub string) map[string]interface{}
 	return map[string]interface{}{
 		"sports":      resp.Sports,
 		"sports_meta": resp.Meta,
-	}
+	}, nil
 }
 
 // invalidateSportsUserCache drops the per-user games cache after a sports
@@ -868,14 +880,14 @@ func AttachStandings(ctx context.Context, record map[string]interface{}) {
 // per league (widget_type = 'sports_nfl', …) rather than a single
 // 'sports' row, so we gather every sports_* channel (plus any legacy
 // coarse 'sports' row) and union their leagues.
-func getUserSportsLeagues(ctx context.Context, logtoSub string) []string {
+func getUserSportsLeagues(ctx context.Context, logtoSub string) ([]string, error) {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
 		  AND widget_type LIKE 'sports\_%'
 	`, logtoSub)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 	seen := make(map[string]bool)
@@ -896,19 +908,19 @@ func getUserSportsLeagues(ctx context.Context, logtoSub string) []string {
 			}
 		}
 	}
-	return leagues
+	return leagues, rows.Err()
 }
 
 // getUserFavoriteTeams merges favorite teams across a user's sports widget
 // channels (keyed by league, so per-widget entries don't collide).
-func getUserFavoriteTeams(ctx context.Context, logtoSub string) map[string]FavoriteTeam {
+func getUserFavoriteTeams(ctx context.Context, logtoSub string) (map[string]FavoriteTeam, error) {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
 		  AND widget_type LIKE 'sports\_%'
 	`, logtoSub)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 	merged := make(map[string]FavoriteTeam)
@@ -921,10 +933,13 @@ func getUserFavoriteTeams(ctx context.Context, logtoSub string) map[string]Favor
 			merged[k] = v
 		}
 	}
-	if len(merged) == 0 {
-		return nil
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
-	return merged
+	if len(merged) == 0 {
+		return nil, nil
+	}
+	return merged, nil
 }
 
 // handleGetStandings returns league standings filtered by league query param.

@@ -22,7 +22,9 @@ import (
 type localSource struct {
 	// dashboard contributes this source's section(s) to /dashboard for
 	// one user. Returned keys merge into DashboardResponse.Data.
-	dashboard func(ctx context.Context, userSub string) map[string]interface{}
+	// An error means the source could not be read: LocalDashboard then omits
+	// its keys instead of serving an empty section as if it were the truth.
+	dashboard func(ctx context.Context, userSub string) (map[string]interface{}, error)
 
 	// health reports the source's ingestion status for /health. The
 	// string lands in HealthResponse.Services[name]; healthy=false marks
@@ -83,18 +85,26 @@ func LocalHealth(ctx context.Context) map[string]struct {
 }
 
 // LocalDashboard merges each enabled local source's /dashboard section for
-// one user. `enabled` is keyed by source name.
-func LocalDashboard(ctx context.Context, userSub string, enabled map[string]bool) map[string]interface{} {
-	out := map[string]interface{}{}
+// one user. `enabled` is keyed by source name. A source that cannot be read
+// contributes nothing and is named in `failed`, so the caller can send what it
+// has without caching it (RB-5).
+func LocalDashboard(ctx context.Context, userSub string, enabled map[string]bool) (out map[string]interface{}, failed []string) {
+	out = map[string]interface{}{}
 	for name, src := range LocalSources {
 		if src.dashboard == nil || !enabled[name] {
 			continue
 		}
-		for k, v := range src.dashboard(ctx, userSub) {
+		section, err := src.dashboard(ctx, userSub)
+		if err != nil {
+			log.Printf("[Dashboard] source %s unreadable for a user: %v", name, err)
+			failed = append(failed, name)
+			continue
+		}
+		for k, v := range section {
 			out[k] = v
 		}
 	}
-	return out
+	return out, failed
 }
 
 // DispatchLifecycle delivers a widget lifecycle event to a local source,

@@ -216,25 +216,31 @@ func financeHealth(ctx context.Context) (string, bool) {
 
 // financeDashboard returns the "finance" dashboard section for a user:
 // the latest trades for the symbols across their finance widgets.
-func financeDashboard(ctx context.Context, userSub string) map[string]interface{} {
+func financeDashboard(ctx context.Context, userSub string) (map[string]interface{}, error) {
 	cacheKey := CacheKeyFinancePrefix + userSub
 	var trades []Trade
 	if cacheGetJSON(ctx, cacheKey, &trades) {
-		return map[string]interface{}{"finance": trades}
+		return map[string]interface{}{"finance": trades}, nil
 	}
 
-	symbols := getUserFinanceSymbols(ctx, userSub)
+	symbols, err := getUserFinanceSymbols(ctx, userSub)
+	if err != nil {
+		return nil, err
+	}
 	if len(symbols) == 0 {
-		return map[string]interface{}{"finance": []Trade{}}
+		return map[string]interface{}{"finance": []Trade{}}, nil
 	}
 
-	trades = queryTradesBySymbols(ctx, symbols)
+	trades, err = queryTradesBySymbols(ctx, symbols)
+	if err != nil {
+		return nil, err
+	}
 	if trades == nil {
 		trades = make([]Trade, 0)
 	}
 
 	cacheSetJSON(ctx, cacheKey, trades, FinanceCacheTTL)
-	return map[string]interface{}{"finance": trades}
+	return map[string]interface{}{"finance": trades}, nil
 }
 
 // invalidateFinanceUserCache drops the per-user trades cache after a
@@ -267,14 +273,17 @@ func queryTrades(ctx context.Context) ([]Trade, error) {
 		}
 		trades = append(trades, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("finance query failed: %w", err)
+	}
 
 	return trades, nil
 }
 
 // queryTradesBySymbols fetches trades for a specific set of symbols.
-func queryTradesBySymbols(ctx context.Context, symbols []string) []Trade {
+func queryTradesBySymbols(ctx context.Context, symbols []string) ([]Trade, error) {
 	if len(symbols) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	rows, err := platform.DBPool.Query(ctx, `
@@ -287,7 +296,7 @@ func queryTradesBySymbols(ctx context.Context, symbols []string) []Trade {
 	`, symbols)
 	if err != nil {
 		log.Printf("[Finance] Trades by symbols query failed: %v", err)
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -300,20 +309,23 @@ func queryTradesBySymbols(ctx context.Context, symbols []string) []Trade {
 		}
 		trades = append(trades, t)
 	}
-	return trades
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return trades, nil
 }
 
 // getUserFinanceSymbols unions the symbol lists across a user's finance
 // widget channels (finance_stocks, finance_crypto, …; plus any legacy
 // coarse 'finance' row).
-func getUserFinanceSymbols(ctx context.Context, logtoSub string) []string {
+func getUserFinanceSymbols(ctx context.Context, logtoSub string) ([]string, error) {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
 		  AND widget_type LIKE 'finance\_%'
 	`, logtoSub)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 	seen := make(map[string]bool)
@@ -334,5 +346,5 @@ func getUserFinanceSymbols(ctx context.Context, logtoSub string) []string {
 			}
 		}
 	}
-	return symbols
+	return symbols, rows.Err()
 }
