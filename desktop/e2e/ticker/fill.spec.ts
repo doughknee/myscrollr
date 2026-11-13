@@ -277,7 +277,7 @@ test("grid ignores header-only pins and refreshes a visible quote in place", asy
   await expect(page.locator("[data-page]")).toHaveAttribute("data-visit", visit!);
   await cell.click();
   await expect.poll(() => page.evaluate(() =>
-    (window as unknown as { __shimCalls: string[] }).__shimCalls.some(call => call.startsWith("plugin:shell|open")),
+    (window as unknown as { __shimCalls: string[] }).__shimCalls.some(call => call.startsWith("open_external")),
   )).toBe(true);
 });
 
