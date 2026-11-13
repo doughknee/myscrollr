@@ -13,7 +13,7 @@ import type { ShellState } from "../../shell-context";
 import { loadPrefs } from "../../preferences";
 import type { AppPreferences } from "../../preferences";
 import type { GitHubTrackedRepo } from "./config";
-import { githubWidget } from "./FeedTab";
+import FeedTab from "./FeedTab";
 import { useGitHubAutoPick } from "./useAutoPick";
 
 const api = vi.hoisted(() => ({
@@ -89,7 +89,6 @@ function mount(repos: GitHubTrackedRepo[] = [{ repo: "octo/app", prs: "mine", is
         setPrefs(p);
       },
     } as unknown as ShellState;
-    const FeedTab = githubWidget.FeedTab;
     return (
       <ShellContext.Provider value={shell}>
         <FeedTab mode="comfort" feedContext={{}} />

@@ -14,10 +14,12 @@
  */
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTauriListener } from "./useTauriListener";
 import { queryKeys } from "../api/queries";
 import { CDC_TABLES, SSE_REFETCH_DELAY_MS } from "../cdc";
 import type { CDCTableConfig } from "../cdc";
+import { isTickerLabel } from "../lib/windowRole";
 import type { DashboardResponse } from "../types";
 
 // ── SSE Payload Types ────────────────────────────────────────────
@@ -180,7 +182,11 @@ export function useDashboardCDC(): void {
       // A full dashboard re-fetch after a short delay ensures the
       // optimistic cache stays consistent with the server. Trailing-edge
       // debounced so a burst of CDC events produces one refetch, not
-      // one-per-event.
+      // one-per-event. Only the main window runs it: it is the single
+      // poller and broadcasts the result through the store, so a ticker
+      // window refetching too turned a burst into N+1 identical requests
+      // (SCROLLR-463). Every window still applies the merge above.
+      if (isTickerLabel(getCurrentWindow().label)) return;
       if (pendingSafetyRef.current) clearTimeout(pendingSafetyRef.current);
       pendingSafetyRef.current = setTimeout(() => {
         pendingSafetyRef.current = null;

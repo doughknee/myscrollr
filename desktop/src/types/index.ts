@@ -388,6 +388,7 @@ export interface GitHubChipData {
   flashTone?: "up" | "down";
 }
 
+// Values must stay JSON-comparable (no functions, Dates or class instances): `mergeChips` compares them as JSON.
 export interface WidgetTickerData {
   clock: ClockChipData[];
   timer: ClockChipData[];

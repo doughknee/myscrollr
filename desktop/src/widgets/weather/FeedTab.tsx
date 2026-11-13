@@ -8,44 +8,23 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Tooltip from "../../components/Tooltip";
-import { CloudSun, LocateFixed } from "lucide-react";
+import { LocateFixed } from "lucide-react";
 import { WeatherCard } from "./WeatherCard";
 import { CitySearch } from "./CitySearch";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import { SearchBox } from "../../components/widget-bar/SearchBox";
 import { useShell } from "../../shell-context";
 import { weatherQueryOptions, queryKeys } from "../../api/queries";
-import type { FeedTabProps, WidgetManifest } from "../../types";
+import type { FeedTabProps } from "../../types";
 import type { TempUnit, WeatherLocation } from "./types";
 import { loadCities, saveCities } from "./types";
 import { toast } from "sonner";
 
 // ── Widget manifest ─────────────────────────────────────────────
 
-export const weatherWidget: WidgetManifest = {
-  id: "weather",
-  name: "Weather",
-  tabLabel: "Weather",
-  description: "Current conditions for your locations",
-  hex: "#0ea5e9",
-  icon: CloudSun,
-  info: {
-    about:
-      "The Weather widget shows current weather conditions for one or more " +
-      "locations on your ticker. Weather data updates automatically.",
-    usage: [
-      "Search for a city in the feed view to add it to your weather locations.",
-      "Each location appears on the ticker with temperature, conditions, and an icon.",
-      "Add multiple cities to track weather across different locations.",
-      "Switch between °F and °C under Settings → Appearance → Units & formats.",
-    ],
-  },
-  FeedTab: WeatherFeedTab,
-};
-
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function WeatherFeedTab(props: FeedTabProps) {
+export default function WeatherFeedTab(props: FeedTabProps) {
   // °F/°C is an app-wide setting (Appearance → Units & formats).
   const unit = useShell().prefs.appearance.units.temperature;
   // City-add state lives here because the bar writes it and the body

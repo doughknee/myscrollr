@@ -1,6 +1,6 @@
 import { Activity } from "lucide-react";
 import { clsx } from "clsx";
-import type { FeedTabProps, WidgetManifest } from "../../types";
+import type { FeedTabProps } from "../../types";
 import { WidgetBar } from "../../components/widget-bar/Bar";
 import { MenuPopover, MenuRow } from "../../components/widget-bar/Menu";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
@@ -42,7 +42,7 @@ const STAT_ROWS: { key: StatKey; label: string }[] = [
   { key: "gpuPower", label: "GPU power draw" },
 ];
 
-function SysmonFeedTab(props: FeedTabProps) {
+export default function SysmonFeedTab(props: FeedTabProps) {
   return (
     <div className="flex min-h-full flex-col">
       {props.mode === "comfort" && <SysmonBar />}
@@ -419,23 +419,3 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
 
 // ── Manifest ────────────────────────────────────────────────────
 
-export const sysmonWidget: WidgetManifest = {
-  id: "sysmon",
-  name: "System Monitor",
-  tabLabel: "System",
-  description: "Live CPU, memory, and GPU stats",
-  hex: "#06b6d4",
-  icon: Activity,
-  info: {
-    about:
-      "The System Monitor widget shows live stats for your computer on the ticker, including CPU usage, memory, and GPU.",
-    usage: [
-      "CPU, memory, and GPU usage appear on the ticker.",
-      "Turn individual stats on or off from the Stats menu in the top bar.",
-      "The feed view shows detailed real-time stats including temperatures and a full breakdown.",
-      "Pin it to a ticker row from Home to keep it in a fixed spot.",
-    ],
-  },
-  desktopOnly: true,
-  FeedTab: SysmonFeedTab,
-};
