@@ -122,16 +122,42 @@ pub fn build_client() -> reqwest::Result<Client> {
     client_builder().build()
 }
 
+/// A feed URL that is safe to log: scheme, host, port and path only. Custom
+/// feed URLs can carry tokens in the query string or userinfo, so those and the
+/// fragment are dropped. Use this at every log site that prints a feed URL.
+pub fn redact_feed_url(raw: &str) -> String {
+    match Url::parse(raw) {
+        Ok(url) => {
+            let port = url.port().map(|p| format!(":{p}")).unwrap_or_default();
+            format!("{}://{}{}{}", url.scheme(), url.host_str().unwrap_or(""), port, url.path())
+        }
+        Err(_) => String::from("<unparseable feed url>"),
+    }
+}
+
 pub async fn get(client: &Client, raw_url: &str) -> anyhow::Result<Response> {
     let url = Url::parse(raw_url)?;
     validate_url(&url)?;
-    Ok(client.get(url).send().await?.error_for_status()?)
+    // reqwest errors embed the full request URL; strip it so the error text
+    // (logged, and stored as the feed's last error) cannot leak a token.
+    let response = client.get(url).send().await.map_err(reqwest::Error::without_url)?;
+    Ok(response.error_for_status().map_err(reqwest::Error::without_url)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn redact_feed_url_drops_userinfo_query_and_fragment() {
+        assert_eq!(
+            redact_feed_url("https://user:pw@example.com:8443/feeds/a.xml?token=SECRET&x=1#frag"),
+            "https://example.com:8443/feeds/a.xml"
+        );
+        assert_eq!(redact_feed_url("http://example.com"), "http://example.com/");
+        assert_eq!(redact_feed_url("not a url?token=SECRET"), "<unparseable feed url>");
+    }
 
     #[test]
     fn rejects_non_public_and_obfuscated_destinations() {

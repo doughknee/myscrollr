@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration, fs};
+use std::{sync::Arc, time::{Duration, Instant}, fs};
 
 use chrono::{Timelike, Utc};
 use futures_util::future::join_all;
@@ -99,10 +99,12 @@ pub async fn start_finance_services(
         }
     });
 
+    let mut attempt = 0u32;
     loop {
+        let connected_at = Instant::now();
         match connect(state.subscriptions.clone(), state.api_key.clone(), state.client.clone(), pool.clone(), health_state.clone()).await {
             Ok(()) => {
-                error!("WebSocket disconnected, attempting reconnect in 5 minutes...");
+                error!("WebSocket disconnected");
             }
             Err(e) => {
                 // Surface connect() failures in the health payload so the
@@ -115,10 +117,57 @@ pub async fn start_finance_services(
                     h.error_count += 1;
                     h.last_error = Some(format!("{e:#}"));
                 }
-                error!("WebSocket connect failed: {e:#}, retrying in 5 minutes...");
+                error!("WebSocket connect failed: {e:#}");
             }
         }
-        sleep(Duration::from_secs(300)).await;
+        // A connection that stayed up for a while was healthy: start over at
+        // the short delay. Quick drops and failed connects keep backing off.
+        if connected_at.elapsed() >= RECONNECT_STABLE_AFTER {
+            attempt = 0;
+        }
+        let delay = reconnect_delay(attempt, jitter_fraction());
+        attempt = attempt.saturating_add(1);
+        error!("Reconnecting to TwelveData in {}s (attempt {})", delay.as_secs(), attempt);
+        sleep(delay).await;
+    }
+}
+
+/// First reconnect delay; doubles per consecutive failure up to the cap.
+const RECONNECT_BASE: Duration = Duration::from_secs(5);
+/// The old flat delay, now only the ceiling.
+const RECONNECT_CAP: Duration = Duration::from_secs(300);
+/// A connection that lasted this long resets the backoff.
+const RECONNECT_STABLE_AFTER: Duration = Duration::from_secs(60);
+
+/// Delay before reconnect number `attempt` (0-based): exponential from
+/// [`RECONNECT_BASE`], capped at [`RECONNECT_CAP`], then scaled by a jitter in
+/// 50%..100% so replicas do not reconnect in lockstep. `jitter` is 0.0..=1.0.
+pub(crate) fn reconnect_delay(attempt: u32, jitter: f64) -> Duration {
+    let exp = RECONNECT_BASE.saturating_mul(1u32 << attempt.min(10));
+    exp.min(RECONNECT_CAP).mul_f64(0.5 + 0.5 * jitter.clamp(0.0, 1.0))
+}
+
+/// Cheap jitter source: no RNG dependency, only needs to differ between pods.
+fn jitter_fraction() -> f64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.subsec_nanos());
+    f64::from(nanos % 1_000_000) / 1_000_000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reconnect_delay_grows_then_caps_at_five_minutes() {
+        let secs = |a| reconnect_delay(a, 1.0).as_secs();
+        assert_eq!([secs(0), secs(1), secs(2), secs(3)], [5, 10, 20, 40]);
+        assert_eq!(secs(6), 300);
+        assert_eq!(secs(500), 300);
+        // Jitter only shortens: 50%..100% of the step, never above the cap.
+        assert_eq!(reconnect_delay(0, 0.0), Duration::from_millis(2500));
+        assert!(reconnect_delay(30, 1.0) <= RECONNECT_CAP);
     }
 }
 

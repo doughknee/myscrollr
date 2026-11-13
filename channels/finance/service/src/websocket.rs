@@ -7,7 +7,7 @@ use tokio_tungstenite::{
     tungstenite::protocol::{Message, WebSocketConfig},
 };
 use futures_util::{SinkExt, StreamExt, stream::{self, SplitSink, SplitStream}};
-use crate::{database::{PgPool, DatabaseTradeData, Utc, get_trades, insert_symbol, update_previous_close, update_trade, widen_day_range}, log::{error, info, warn}};
+use crate::{database::{PgPool, DatabaseTradeData, Utc, get_trades, insert_symbol, update_previous_close, update_trade}, log::{error, info, warn}};
 
 /// Maximum WebSocket message / frame size we will accept from TwelveData.
 /// The real feed sends ~200 byte price events; anything larger is either a
@@ -25,6 +25,11 @@ const LOG_THROTTLE_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Interval between heartbeat messages sent to TwelveData (30 seconds).
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Reconnect when nothing at all (price, heartbeat ack, ping) has been read
+/// for this long. The heartbeat above elicits traffic every 30 s, so silence
+/// this long means a half-open or hung connection, not a quiet market.
+const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub(crate) async fn connect(subscriptions: Vec<String>, api_key: String, client: Arc<Client>, pool: Arc<PgPool>, health_state: Arc<Mutex<FinanceHealth>>) -> Result<(), anyhow::Error> {
     let state = Arc::new(RwLock::new(WebSocketState::new()));
@@ -67,9 +72,13 @@ pub(crate) async fn connect(subscriptions: Vec<String>, api_key: String, client:
     ws_send(Arc::clone(&writer), subscriptions).await?;
 
     // Spawn heartbeat task
-    tokio::spawn(ws_heartbeat(Arc::clone(&writer)));
+    let heartbeat = tokio::spawn(ws_heartbeat(Arc::clone(&writer)));
 
     ws_read(reader, Arc::clone(&state), client, api_key, pool, health_state.clone()).await;
+
+    // The heartbeat holds the write half; without this a dead connection
+    // stays open behind a reconnect for as long as writes keep buffering.
+    heartbeat.abort();
 
     Ok(())
 }
@@ -121,6 +130,7 @@ async fn ws_read(
 ) {
     info!("Now listening for TwelveData price events...");
 
+    let mut last_read = time::Instant::now();
     loop {
         // Poll the batch timer without holding the state lock across the
         // await. We snapshot the deadline under a short read lock, then
@@ -166,7 +176,15 @@ async fn ws_read(
                 }
             }
 
+            _ = time::sleep_until(last_read + READ_IDLE_TIMEOUT) => {
+                let error_msg = format!("Nothing received from TwelveData for {}s; reconnecting", READ_IDLE_TIMEOUT.as_secs());
+                error!("{}", error_msg);
+                state.write().await.last_error_message = Some(error_msg);
+                break;
+            }
+
             Some(msg) = reader.next() => {
+                last_read = time::Instant::now();
                 match msg {
                     Ok(msg) => {
                         if msg.is_text() {
@@ -485,7 +503,9 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
 
     let direction = if price_change >= 0.0 { "up" } else { "down" };
 
-    let _ = update_trade(
+    // One statement: price fields plus the session range (see update_trade).
+    // A failed write is an error for the batch, not silently dropped.
+    update_trade(
         Arc::clone(&pool),
         symbol.clone(),
         current_price,
@@ -493,13 +513,7 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
         percentage_change,
         direction,
         day_volume,
-    ).await;
-
-    // Keep the session range honest. The quote that seeds day_low/day_high
-    // is fetched once a day, so without this the stored range is yesterday's
-    // for the whole of the next session and the rail's marker clamps to one
-    // end and never moves.
-    let _ = widen_day_range(Arc::clone(&pool), symbol.clone(), current_price).await;
+    ).await?;
 
     Ok(())
 }
