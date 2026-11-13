@@ -1,4 +1,31 @@
 use crate::state::{GpuDynamic, StaticSystemInfo, SysInfoInner, SysInfoState};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+/// The last reading, shared by every window. Each ticker window polls every
+/// 2 s, and a reading spawns `nvidia-smi` or queries WMI, so N windows cost N
+/// probes per poll (SCROLLR-463). A reading younger than this is handed out
+/// again; one window's poll is never served stale (2 s > this).
+const SHARE_FOR: Duration = Duration::from_millis(1500);
+static LAST_READING: Mutex<Option<(Instant, serde_json::Value)>> = Mutex::new(None);
+
+/// Return the slot's reading if it is younger than `ttl`, else take a new one.
+/// The slot stays locked while reading, so concurrent callers wait and share it.
+fn shared_reading(
+    slot: &Mutex<Option<(Instant, serde_json::Value)>>,
+    ttl: Duration,
+    read: impl FnOnce() -> Result<serde_json::Value, String>,
+) -> Result<serde_json::Value, String> {
+    let mut last = slot.lock().map_err(|e| format!("lock: {e}"))?;
+    if let Some((at, value)) = last.as_ref() {
+        if at.elapsed() < ttl {
+            return Ok(value.clone());
+        }
+    }
+    let value = read()?;
+    *last = Some((Instant::now(), value.clone()));
+    Ok(value)
+}
 
 /// Build a `std::process::Command` for `name` that won't pop a
 /// console window on Windows. No-op on every other platform.
@@ -247,7 +274,9 @@ pub async fn get_system_info(
     state: tauri::State<'_, SysInfoState>,
 ) -> Result<serde_json::Value, String> {
     let inner = state.0.clone();
-    tokio::task::spawn_blocking(move || get_system_info_blocking(&inner))
+    tokio::task::spawn_blocking(move || {
+        shared_reading(&LAST_READING, SHARE_FOR, || get_system_info_blocking(&inner))
+    })
         .await
         .map_err(|e| format!("spawn_blocking: {e}"))?
 }
@@ -395,4 +424,32 @@ fn get_system_info_blocking(inner: &SysInfoInner) -> Result<serde_json::Value, S
         "components": comp_info,
         "network": net_info,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn windows_polling_together_share_one_reading() {
+        let slot = Mutex::new(None);
+        let mut probes = 0;
+        for _ in 0..3 {
+            let v = shared_reading(&slot, Duration::from_secs(60), || {
+                probes += 1;
+                Ok(serde_json::json!({ "n": probes }))
+            })
+            .unwrap();
+            assert_eq!(v["n"], 1);
+        }
+        assert_eq!(probes, 1);
+    }
+
+    #[test]
+    fn an_old_reading_is_replaced() {
+        let slot = Mutex::new(None);
+        let read = |n| shared_reading(&slot, Duration::ZERO, || Ok(serde_json::json!({ "n": n }))).unwrap();
+        assert_eq!(read(1)["n"], 1);
+        assert_eq!(read(2)["n"], 2);
+    }
 }

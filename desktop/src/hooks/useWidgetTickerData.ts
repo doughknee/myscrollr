@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnitsPrefs, WidgetPrefs } from "../preferences";
 import { fetchSysmonData } from "./useSysmonData";
 import type { SystemInfo } from "./useSysmonData";
@@ -215,6 +216,47 @@ function utcOffsetLabel(now: Date, tz: string | undefined): string {
   }
 }
 
+// ── Visibility ──────────────────────────────────────────────────
+
+/** How often a window with utilities on asks the OS whether it is still on screen. */
+const VISIBLE_CHECK_MS = 2_000;
+
+/**
+ * Is this window on screen? The bar is hidden by the user (Show ticker off),
+ * by a suspended display and by hide-on-fullscreen, and all three end in the
+ * native window being hidden, so one question covers them (`useProductActivity`
+ * asks it too). While it is no, nothing here needs to tick. A failed or
+ * missing answer counts as visible: showing too much beats freezing a bar.
+ */
+function useWindowVisible(active: boolean): boolean {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (!active) return;
+    let stopped = false;
+    const check = () => {
+      try {
+        void getCurrentWindow()
+          .isVisible()
+          .then((v) => {
+            if (!stopped) setVisible(v !== false);
+          })
+          .catch(() => {});
+      } catch {
+        /* no native window (tests, a plain browser) */
+      }
+    };
+    check();
+    const id = setInterval(check, VISIBLE_CHECK_MS);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [active]);
+  return visible;
+}
+
 // ── Hook ────────────────────────────────────────────────────────
 
 export function useWidgetTickerData(
@@ -229,6 +271,8 @@ export function useWidgetTickerData(
     () => new Set(widgetPrefs.widgetsOnTicker),
     [widgetPrefs.widgetsOnTicker],
   );
+  // Hidden or suspended: stop every timer below; showing again rebuilds once.
+  const visible = useWindowVisible(enabledWidgets.size > 0);
   // The GitHub config (SCROLLR-312), stable across renders that did not change it.
   const githubJson = JSON.stringify(widgetPrefs.github ?? null);
   const githubCfg = useMemo(() => migrateGitHub(JSON.parse(githubJson)), [githubJson]);
@@ -499,6 +543,7 @@ export function useWidgetTickerData(
       setData(EMPTY);
       return;
     }
+    if (!visible) return;
 
     // Build initial data
     const refresh = () => {
@@ -623,6 +668,7 @@ export function useWidgetTickerData(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     JSON.stringify(widgetPrefs.widgetsOnTicker),
+    visible,
     buildClockChips,
     buildTimerChips,
     buildWeatherChips,
