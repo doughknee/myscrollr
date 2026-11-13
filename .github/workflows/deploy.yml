@@ -129,17 +129,34 @@ jobs:
       # those changes were skipped with no signal (SCROLLR-462). Diff from the
       # last push deploy that succeeded instead. Every push deploy covers
       # everything since the one before it, so that revision is fully deployed.
-      # No answer falls back to the pushed range, as before.
+      # An empty list (no push deploy has ever succeeded) falls back to the
+      # pushed range. A lookup that errors does not: guessing would skip the
+      # undeployed changes and make this run the next base, so the job fails
+      # and a re-run tries again.
       - name: Find the last revision that deployed
         id: deployed
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sha="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
-          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then sha=""; fi
+          ok=""
+          for attempt in 1 2 3; do
+            if sha="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty')"; then
+              ok=1
+              break
+            fi
+            sleep $((attempt * 10))
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::Could not look up the last successful deploy, so what is undeployed is unknown. Re-run this job."
+            exit 1
+          fi
+          if [ -n "$sha" ] && ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::Unexpected answer for the last successful deploy: $sha"
+            exit 1
+          fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Diffing from: ${sha:-the pushed range (no successful push deploy found)}"
+          echo "Diffing from: ${sha:-the pushed range (no push deploy has succeeded yet)}"
 
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: changes
@@ -357,7 +374,31 @@ jobs:
     concurrency:
       group: scrollr-production-deploy
       cancel-in-progress: false
+    # actions: read is for the revision-order check; checkout is the only
+    # other use of the token in this job.
+    permissions:
+      contents: read
+      actions: read
     steps:
+      # Two merges close together can reach this job out of order when the
+      # older run's builds are slower. Deploying the older images then quietly
+      # undoes the newer release. Stop before touching the cluster if a newer
+      # commit has already deployed. A lookup that fails does not block.
+      - name: Refuse to deploy an older revision over a newer one
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THIS: ${{ needs.detect-changes.outputs.checkout-sha }}
+        run: |
+          last="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          if [ -z "$last" ] || [ "$last" = "$THIS" ]; then exit 0; fi
+          order="$(gh api "repos/$GITHUB_REPOSITORY/compare/$THIS...$last" --jq .status || true)"
+          echo "Last successful deploy: $last ($order relative to this run)"
+          if [ "$order" = "ahead" ]; then
+            echo "::error::A newer revision ($last) is already deployed. Not deploying $THIS over it; nothing was changed."
+            exit 1
+          fi
+
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.detect-changes.outputs.checkout-sha }}
