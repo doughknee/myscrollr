@@ -69,3 +69,20 @@ describe("Updates settings", () => {
     expect(screen.queryByText(/You have the latest/)).toBeNull();
   });
 });
+
+describe("Updates settings errors", () => {
+  afterEach(cleanup);
+  it("a failed check shows a plain sentence with the native text behind Technical details", async () => {
+    const raw = "error sending request for url (https://github.com/x/latest.json): dns error";
+    shared.controller = new UpdateController({
+      load: async () => ({ version: "1.7.2", channel: "stable", fresh: false }),
+      saveChannel: async () => {},
+      check: async () => { throw new Error(raw); },
+      restart: async () => {},
+    });
+    await act(async () => { render(<UpdatesPage />); });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Check now" })));
+    expect(screen.getByRole("alert")).toHaveTextContent("Scrollr could not check for updates.");
+    expect(screen.getByText(raw).closest("details")).not.toHaveAttribute("open");
+  });
+});
