@@ -107,6 +107,7 @@ func TestDisposition_EscalationTriggers(t *testing.T) {
 		name    string
 		breakIt func(*dispositionSignals)
 	}{
+		{"anonymous address that has not replied", func(s *dispositionSignals) { s.UnverifiedContact = true }},
 		{"money by category", func(s *dispositionSignals) { s.Category = "billing" }},
 		{"money by content", func(s *dispositionSignals) { s.UserText = "I want a refund for last month" }},
 		{"account by category", func(s *dispositionSignals) { s.Category = "account" }},
