@@ -64,6 +64,7 @@ export interface OverviewGDPR {
   deletion_status: string;
   requested_at: string | null;
   purge_at: string | null;
+  purge_started_at: string | null;
 }
 
 export interface OverviewIdentity {

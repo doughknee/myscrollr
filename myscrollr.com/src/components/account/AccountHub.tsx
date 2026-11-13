@@ -208,6 +208,7 @@ export function AccountHub() {
             getToken={getToken}
             deletionStatus={overview.gdpr.deletion_status}
             purgeAt={overview.gdpr.purge_at}
+            purgeStartedAt={overview.gdpr.purge_started_at}
             onDeletionChange={fetchOverview}
           />
         </>

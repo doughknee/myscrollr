@@ -10,6 +10,7 @@ import (
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/githubapp"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -30,6 +31,8 @@ func IsStripeResourceMissing(err error) bool {
 
 // errPurgeUnderway answers a cancel or a new request once the purge has begun
 // its irreversible steps.
+const errAccountDeleted = "This account has been deleted."
+
 const errPurgeUnderway = "Your account is already being deleted, so this can no longer be stopped."
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -517,8 +520,9 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 			purged_at        = NULL,
 			purge_email      = NULL,
 			purge_started_at = NULL
-		WHERE user_deletion_requests.status <> 'pending'
-		   OR user_deletion_requests.purge_started_at IS NULL
+		WHERE user_deletion_requests.status = 'canceled'
+		   OR (user_deletion_requests.status = 'pending'
+		       AND user_deletion_requests.purge_started_at IS NULL)
 	`, userID, now, purgeAt)
 	if err != nil {
 		log.Printf("[GDPR] upsert deletion request for %s: %v", userID, err)
@@ -528,7 +532,14 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 		})
 	}
 	if tag.RowsAffected() == 0 {
-		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: errPurgeUnderway})
+		// Either a purge that has started, or an account already purged: a
+		// purged request is never re-opened (a still-valid access token must
+		// not be able to cancel it and unlock purchases).
+		msg := errPurgeUnderway
+		if st, _ := DeletionRequestStatus(ctx, userID); st == "purged" {
+			msg = errAccountDeleted
+		}
+		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: msg})
 	}
 
 	log.Printf("[GDPR] Account deletion scheduled: user=%s purge_at=%s", userID, purgeAt.Format(time.RFC3339))
@@ -739,6 +750,7 @@ func RunGDPRPurgePass(ctx context.Context) {
 	for _, sub := range subs {
 		if err := PurgeUserAccount(ctx, sub); err != nil {
 			log.Printf("[GDPR Purge] %s failed: %v (will retry on next pass)", sub, err)
+			reportStuckPurge(ctx, sub, err)
 			continue
 		}
 	}
@@ -757,6 +769,32 @@ func RunGDPRPurgePass(ctx context.Context) {
 			pending.Close()
 		}
 	}
+}
+
+// reportStuckPurge sends one Sentry event per failed pass for a purge that has
+// already started: from then on cancel is refused and the row is retried every
+// pass, so a persistent failure would otherwise leave only a log line. No sub
+// or message text, only the hashed account id and the root error's type.
+func reportStuckPurge(ctx context.Context, sub string, purgeErr error) {
+	var started bool
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT purge_started_at IS NOT NULL FROM user_deletion_requests WHERE logto_sub = $1`, sub,
+	).Scan(&started); err != nil || !started {
+		return
+	}
+	root := purgeErr
+	for e := errors.Unwrap(root); e != nil; e = errors.Unwrap(root) {
+		root = e
+	}
+	sentry.WithScope(func(scope *sentry.Scope) {
+		scope.SetLevel(sentry.LevelError)
+		scope.SetTag("feature", "gdpr-purge")
+		scope.SetTag("error_class", fmt.Sprintf("%T", root))
+		if id := platform.HashUserSub(sub); id != "" {
+			scope.SetUser(sentry.User{ID: id})
+		}
+		sentry.CaptureMessage("GDPR purge failed after it started")
+	})
 }
 
 // purgeEmail returns the verified address that ties email-keyed support rows to
@@ -928,6 +966,8 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		log.Printf("[GDPR Purge] %s no longer pending (canceled); skipped", logtoSub)
 		return nil
 	}
+	// The account page must now stop offering Cancel.
+	platform.InvalidateOverviewCache(ctx, logtoSub)
 
 	// The cascade's transaction locks the request row across the
 	// irreversible steps, so a second replica purging the same account
