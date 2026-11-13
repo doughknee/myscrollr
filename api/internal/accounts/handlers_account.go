@@ -277,7 +277,7 @@ func HandleRequestPasswordReset(c *fiber.Ctx) error {
 
 	recordPasswordResetSent(userID)
 
-	log.Printf("[PasswordReset] sent reset email to %s for user %s", email, userID)
+	log.Printf("[PasswordReset] sent reset email for user %s", userID)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 

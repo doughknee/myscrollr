@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -34,8 +35,7 @@ func HandleSequinWebhook(c *fiber.Ctx) error {
 			Error:  "Webhook authentication not configured",
 		})
 	}
-	auth := c.Get("Authorization")
-	if auth != "Bearer "+secret {
+	if subtle.ConstantTimeCompare([]byte(c.Get("Authorization")), []byte("Bearer "+secret)) != 1 {
 		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Invalid webhook secret",

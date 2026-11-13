@@ -400,10 +400,13 @@ func (s *Server) healthLive(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "alive"})
 }
 
-// healthReady is the readiness and startup probe: only what core needs to
-// serve, Postgres and Redis, each with a bounded wait. The ingesters are
-// deliberately absent; /health still reports them for people and the status
-// pages.
+// healthReady is the readiness and startup probe: Postgres is the gate, with a
+// bounded wait. Redis is reported in the body but never fails readiness:
+// every Redis user in core (dashboard and health caches, rate limiter,
+// access-decision cache) degrades without it, while a 503 here pulls every
+// replica out of rotation at once and turns a Redis blip into a full outage
+// (B2-6). The ingesters are deliberately absent; /health still reports them
+// and Redis for people and the status pages.
 func (s *Server) healthReady(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -413,7 +416,7 @@ func (s *Server) healthReady(c *fiber.Ctx) error {
 		res["status"], res["database"] = "unready", "unhealthy"
 	}
 	if platform.Rdb == nil || platform.Rdb.Ping(ctx).Err() != nil {
-		res["status"], res["redis"] = "unready", "unhealthy"
+		res["redis"] = "unhealthy"
 	}
 	status := fiber.StatusOK
 	if res["status"] != "ready" {

@@ -31,6 +31,16 @@ const (
 	DBMaxConnIdleTime = 30 * time.Minute
 	DBMaxRetries      = 5
 	DBRetryDelay      = 2 * time.Second
+
+	// DBStatementTimeout is Postgres's statement_timeout on every DBPool
+	// connection (RB-8): a stuck query gives its pool connection back instead
+	// of holding one of the 20 for ever. The longest legitimate statements
+	// (an account purge or export, the daily prune DELETEs, admin report
+	// aggregates, the support backfill's per-ticket upserts) run in well under
+	// a second at today's table sizes, so 60 s is generous headroom and still
+	// frees a stuck connection within a minute. Migrations are not bound by
+	// it: golang-migrate opens its own connection from the raw URL.
+	DBStatementTimeout = 60 * time.Second
 )
 
 // =============================================================================

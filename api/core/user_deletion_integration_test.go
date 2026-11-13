@@ -680,3 +680,26 @@ func TestIntegrationPurgeCancelsGracePeriodSubscription(t *testing.T) {
 		})
 	}
 }
+
+// A cancel that lands between the purge pass's scan and the purge itself is
+// honoured: nothing is deleted at Logto or locally (SCROLLR-467).
+func TestIntegrationPurgeHonoursCancelAfterScan(t *testing.T) {
+	setupIntegrationDB(t)
+	stub := newLogtoStub(t)
+	const sub = "user_purge_canceled_late"
+	seedPurgeableUser(t, sub, false)
+	testsupport.MustExec(t, `UPDATE user_deletion_requests SET status = 'canceled', canceled_at = now() WHERE logto_sub = $1`, sub)
+
+	if err := accounts.PurgeUserAccount(context.Background(), sub); err != nil {
+		t.Fatalf("purge of a canceled request: %v", err)
+	}
+	if len(stub.deletedSubs()) != 0 {
+		t.Error("Logto user deleted although the deletion was canceled")
+	}
+	if n := queryCount(t, `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`, sub); n != 1 {
+		t.Error("local data deleted although the deletion was canceled")
+	}
+	if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'canceled'`, sub); n != 1 {
+		t.Error("canceled request was overwritten")
+	}
+}

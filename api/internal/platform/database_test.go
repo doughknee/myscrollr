@@ -1,6 +1,12 @@
 package platform
 
-import "testing"
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 // isLoopbackDB decides whether the migration connection may skip TLS. Getting
 // it wrong in the permissive direction silently sends the whole DDL chain, and
@@ -37,5 +43,30 @@ func TestIsLoopbackDB(t *testing.T) {
 		if got := isLoopbackDB(c.url); got != c.want {
 			t.Errorf("%s: isLoopbackDB = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+// RB-8: every DBPool connection carries a statement_timeout, so a stuck query
+// cannot hold a pool connection for ever.
+func TestPoolConnectionsHaveStatementTimeout(t *testing.T) {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+	cfg, err := poolConfig(dbURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var got string
+	if err := pool.QueryRow(context.Background(), "SHOW statement_timeout").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != "1min" {
+		t.Fatalf("statement_timeout = %q, want 1min", got)
 	}
 }

@@ -3,6 +3,7 @@ package support
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -48,32 +49,61 @@ func StartSupportDigest(ctx context.Context) {
 	}
 
 	go func() {
+		retry := false
 		for {
 			wait := time.Until(nextDigestTime(time.Now().In(loc), loc))
+			if retry {
+				wait = digestRetryDelay
+			}
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(wait):
 			}
-
-			// Day-keyed lock: whichever replica wakes first posts, the
-			// rest find the key taken. 23h TTL so it always clears before
-			// the next morning.
-			if platform.Rdb != nil {
-				key := "support:digest:" + time.Now().In(loc).Format("2006-01-02")
-				locked, err := platform.Rdb.SetNX(ctx, key, "1", 23*time.Hour).Result()
-				if err != nil || !locked {
-					continue
-				}
-			}
-			runCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-			if err := postSupportDigest(runCtx, loc); err != nil {
-				log.Printf("[Digest] post: %v", err)
-			}
-			cancel()
+			// Retry a failed morning until noon, then give the day up.
+			retry = digestOnce(ctx, loc, postSupportDigest) &&
+				time.Now().In(loc).Hour() < digestHour+3
 		}
 	}()
 	log.Printf("[Digest] daily queue digest started (%02d:00 %s)", digestHour, digestTimezone)
+}
+
+// digestRetryDelay is the wait before retrying a digest that failed.
+const digestRetryDelay = 15 * time.Minute
+
+// errDigestPartlyPosted marks a failure after part of the digest reached
+// Discord: a retry would post that part twice.
+var errDigestPartlyPosted = errors.New("digest partly posted")
+
+// digestOnce takes the day's lock and posts, reporting whether a retry is
+// worthwhile. Day-keyed lock: whichever replica wakes first posts, the rest
+// find the key taken; 23h TTL so it always clears before the next morning.
+// A successful post keeps the lock, so no replica posts the day twice. A
+// failure that posted nothing releases it, so the retry is not locked out.
+func digestOnce(ctx context.Context, loc *time.Location, post func(context.Context, *time.Location) error) (retry bool) {
+	key := "support:digest:" + time.Now().In(loc).Format("2006-01-02")
+	if platform.Rdb != nil {
+		locked, err := platform.Rdb.SetNX(ctx, key, "1", 23*time.Hour).Result()
+		if err != nil || !locked {
+			return false
+		}
+	}
+	runCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	err := post(runCtx, loc)
+	if err == nil {
+		return false
+	}
+	log.Printf("[Digest] post: %v", err)
+	if errors.Is(err, errDigestPartlyPosted) {
+		return false
+	}
+	if platform.Rdb != nil {
+		if delErr := platform.Rdb.Del(context.Background(), key).Err(); delErr != nil {
+			log.Printf("[Digest] release lock: %v", delErr)
+		}
+	}
+	return true
 }
 
 // nextDigestTime is the next digestHour in loc strictly after now.
@@ -266,8 +296,11 @@ func postSupportDigest(ctx context.Context, loc *time.Location) error {
 		return err
 	}
 	content := renderDigest(stats, time.Now().In(loc))
-	for _, chunk := range splitForDiscord(content, discordMessageLimit) {
+	for i, chunk := range splitForDiscord(content, discordMessageLimit) {
 		if _, err := discordPostMessage(ctx, threadID, chunk, nil); err != nil {
+			if i > 0 {
+				return fmt.Errorf("post digest: %w: %w", errDigestPartlyPosted, err)
+			}
 			return fmt.Errorf("post digest: %w", err)
 		}
 	}

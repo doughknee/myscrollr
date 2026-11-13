@@ -273,7 +273,8 @@ spec:
           # reports finance, sports and rss and answers 503 when one stalls, so
           # pointing probes at it took every core pod out of rotation and then
           # restarted them. Liveness is the process alone; readiness and startup
-          # are Postgres and Redis only (what core itself needs to serve).
+          # are Postgres only (Redis is reported in the body but core runs
+          # without it, so it never fails readiness; B2-6).
           # The startupProbe keeps a slow Postgres connection during deploy
           # from being misread as a failure: 30 x 5 s.
           startupProbe:
