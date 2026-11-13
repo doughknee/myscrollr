@@ -61,6 +61,7 @@ func TestDecideSubscriptionUpdate(t *testing.T) {
 		status            string
 		cancelAtPeriodEnd bool
 		plan              string
+		lifetime          bool
 		want              subscriptionUpdateAction
 	}{
 		{
@@ -109,30 +110,133 @@ func TestDecideSubscriptionUpdate(t *testing.T) {
 			want: subscriptionUpdateAction{DBStatus: "past_due"},
 		},
 		{
-			name:   "canceled keeps roles untouched",
-			status: "canceled", plan: "monthly",
-			want: subscriptionUpdateAction{DBStatus: "canceled"},
-		},
-		{
+			// The first payment may still settle (3-D Secure); Stripe moves
+			// it to incomplete_expired if it doesn't.
 			name:   "incomplete keeps roles untouched",
 			status: "incomplete", plan: "pro_monthly",
 			want: subscriptionUpdateAction{DBStatus: "incomplete"},
 		},
+		// Stripe stopped collecting: no paid access (SCROLLR-443).
 		{
-			name:   "unpaid keeps roles untouched",
+			name:   "canceled clears paid roles",
+			status: "canceled", plan: "monthly",
+			want: subscriptionUpdateAction{DBStatus: "canceled", ClearPaidRoles: true},
+		},
+		{
+			name:   "unpaid clears paid roles",
 			status: "unpaid", plan: "ultimate_annual",
+			want: subscriptionUpdateAction{DBStatus: "unpaid", ClearPaidRoles: true},
+		},
+		{
+			name:   "incomplete_expired clears paid roles",
+			status: "incomplete_expired", plan: "ultimate_monthly",
+			want: subscriptionUpdateAction{DBStatus: "incomplete_expired", ClearPaidRoles: true},
+		},
+		{
+			name:   "canceled clears paid roles even with cancel_at_period_end still set",
+			status: "canceled", cancelAtPeriodEnd: true, plan: "pro_monthly",
+			want: subscriptionUpdateAction{DBStatus: "canceled", ClearPaidRoles: true},
+		},
+		// Lifetime is permanent Ultimate: subscription events never touch roles.
+		{
+			name:   "lifetime unpaid keeps roles",
+			status: "unpaid", plan: "ultimate_monthly", lifetime: true,
 			want: subscriptionUpdateAction{DBStatus: "unpaid"},
+		},
+		{
+			name:   "lifetime canceled keeps roles",
+			status: "canceled", plan: "pro_monthly", lifetime: true,
+			want: subscriptionUpdateAction{DBStatus: "canceled"},
+		},
+		{
+			name:   "lifetime active never swaps ultimate for the plan tier",
+			status: "active", plan: "pro_monthly", lifetime: true,
+			want: subscriptionUpdateAction{DBStatus: "active"},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := decideSubscriptionUpdate(tc.status, tc.cancelAtPeriodEnd, tc.plan)
+			got := decideSubscriptionUpdate(tc.status, tc.cancelAtPeriodEnd, tc.plan, tc.lifetime)
 			if got != tc.want {
-				t.Errorf("decideSubscriptionUpdate(%q, %v, %q) = %+v, want %+v",
-					tc.status, tc.cancelAtPeriodEnd, tc.plan, got, tc.want)
+				t.Errorf("decideSubscriptionUpdate(%q, %v, %q, %v) = %+v, want %+v",
+					tc.status, tc.cancelAtPeriodEnd, tc.plan, tc.lifetime, got, tc.want)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Decision logic — what may grant access (SCROLLR-443)
+// =============================================================================
+
+func TestSubscriptionGrantsAccess(t *testing.T) {
+	for status, want := range map[string]bool{
+		"active": true, "trialing": true,
+		"incomplete": false, "incomplete_expired": false, "past_due": false,
+		"unpaid": false, "canceled": false, "": false,
+	} {
+		if got := subscriptionGrantsAccess(status); got != want {
+			t.Errorf("subscriptionGrantsAccess(%q) = %v, want %v", status, got, want)
+		}
+	}
+}
+
+func TestCheckoutPaid(t *testing.T) {
+	for status, want := range map[string]bool{
+		"paid": true, "no_payment_required": true, "unpaid": false, "": false,
+	} {
+		if got := checkoutPaid(status); got != want {
+			t.Errorf("checkoutPaid(%q) = %v, want %v", status, got, want)
+		}
+	}
+}
+
+func TestIsStaleSubscription(t *testing.T) {
+	str := func(s string) *string { return &s }
+	tests := []struct {
+		name   string
+		stored *string
+		event  string
+		want   bool
+	}{
+		{"same subscription", str("sub_a"), "sub_a", false},
+		{"other subscription", str("sub_b"), "sub_a", true},
+		{"nothing stored", nil, "sub_a", false},
+		{"empty stored", str(""), "sub_a", false},
+	}
+	for _, tc := range tests {
+		if got := isStaleSubscription(tc.stored, tc.event); got != tc.want {
+			t.Errorf("%s: isStaleSubscription = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestHadSubscription(t *testing.T) {
+	str := func(s string) *string { return &s }
+	tests := []struct {
+		name   string
+		plan   string
+		status string
+		subID  *string
+		want   bool
+	}{
+		// The row getOrCreateStripeCustomer writes before any subscription.
+		{"never subscribed", "free", "active", nil, false},
+		{"current subscription", "monthly", "active", str("sub_1"), true},
+		{"trialing", "ultimate_monthly", "trialing", str("sub_1"), true},
+		{"lifetime", "lifetime", "active", nil, true},
+		// Reset by subscription.deleted or the trial cancel: still a prior
+		// subscriber, so no second trial.
+		{"canceled and reset to free", "free", "canceled", nil, true},
+		// Reset by the HandleGetSubscription self-heal.
+		{"self-healed to none", "free", "none", nil, true},
+		{"free with a subscription id", "free", "active", str("sub_1"), true},
+	}
+	for _, tc := range tests {
+		if got := hadSubscription(tc.plan, tc.status, tc.subID); got != tc.want {
+			t.Errorf("%s: hadSubscription(%q, %q) = %v, want %v", tc.name, tc.plan, tc.status, got, tc.want)
+		}
 	}
 }
 
