@@ -107,21 +107,7 @@ func (s *Server) setupMiddleware() {
 	s.App.Use("/admin", AdminTiming)
 
 	// Security Headers
-	s.App.Use(func(c *fiber.Ctx) error {
-		c.Set("X-XSS-Protection", "1; mode=block")
-		c.Set("X-Content-Type-Options", "nosniff")
-		c.Set("X-Download-Options", "noopen")
-		c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", platform.HSTSMaxAge))
-		c.Set("X-DNS-Prefetch-Control", "off")
-		if c.Path() == "/yahoo/callback" {
-			// Yahoo OAuth callback returns HTML with inline <script> (postMessage + window.close)
-			// and inline style attributes. Allow those while keeping everything else locked down.
-			c.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'self' https://relentnet.com")
-		} else {
-			c.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self' https://relentnet.com")
-		}
-		return c.Next()
-	})
+	s.App.Use(securityHeaders)
 
 	// CORS
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
@@ -177,6 +163,18 @@ func (s *Server) setupMiddleware() {
 			return coreExemptPaths[c.Path()]
 		},
 	}))
+}
+
+// securityHeaders sets the headers every response carries. Pages that need a
+// looser policy (ops/release) set their own after this runs.
+func securityHeaders(c *fiber.Ctx) error {
+	c.Set("X-XSS-Protection", "1; mode=block")
+	c.Set("X-Content-Type-Options", "nosniff")
+	c.Set("X-Download-Options", "noopen")
+	c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", platform.HSTSMaxAge))
+	c.Set("X-DNS-Prefetch-Control", "off")
+	c.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self' https://relentnet.com")
+	return c.Next()
 }
 
 // setupRoutes mounts core public and protected routes.

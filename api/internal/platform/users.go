@@ -43,17 +43,15 @@ func TierFromRoles(roles []string) string {
 	return tier
 }
 
-// GetProfileByUsername returns basic profile info (Logto-sourced username).
+// GetProfileByUsername answers GET /users/:username. There is no public profile
+// data behind it (usernames live in Logto, and nothing here reads them), and no
+// client calls it: it used to echo whatever name it was given with a 200, which
+// made every string look like a real account (SCROLLR-459 / UW-7). It now says
+// 404 for every name, so it can neither mislead nor become an oracle for which
+// usernames exist.
 func GetProfileByUsername(c *fiber.Ctx) error {
-	username := c.Params("username")
-	if username == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Username is required",
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"username": username,
+	return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+		Status: "not_found",
+		Error:  "Profile not found",
 	})
 }
