@@ -26,7 +26,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "What platforms are supported?",
     answer:
-      "Scrollr runs natively on macOS (Apple Silicon and Intel), Windows (x64), and Linux (x64). Each platform gets a dedicated build optimized for that OS.",
+      "Scrollr runs natively on macOS (Apple Silicon), Windows (x64), and Linux (x64). Each platform gets a dedicated build optimized for that OS.",
   },
   {
     question: "Do I need an account?",
@@ -56,7 +56,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Can I use Scrollr on multiple monitors?",
     answer:
-      "Yes. The ticker spans the full width of whichever monitor the Scrollr window is currently on. To move it to a different monitor, drag the main window onto that monitor — the ticker follows. There's no monitor selector inside Customize; the ticker uses your OS's active-monitor placement.",
+      "Yes. Open Customize > Ticker > Monitors and choose which screens show the ticker. Each chosen screen gets its own bar spanning that screen's full width, showing the same content.",
   },
   {
     question: "How does live data work vs. polling?",

@@ -100,14 +100,6 @@ export function ingestHealth(row: IngestRow): IngestHealth {
 }
 
 /**
- * Downloads are not installs, and the label has to carry that everywhere the
- * number appears — a reader who sees the count without the caveat will file
- * it away as an install count.
- */
-export const DOWNLOADS_CAVEAT =
-  'Downloads, not installs. One person upgrading through five releases is five downloads, and nothing reports back whether the app was kept or opened.'
-
-/**
  * A Trend ready to render: the figure, the signed change, and which way it
  * went. `value: null` carries the same promise as `measuredValue` — with Logto
  * unreachable neither the count nor the delta may appear as a number.

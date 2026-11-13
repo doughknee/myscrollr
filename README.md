@@ -38,7 +38,7 @@ exists to feed it.
 |---|---|---|
 | [`desktop/`](./desktop/) | Desktop app (the primary product) | Tauri v2 + React 19 + Vite 7 |
 | [`myscrollr.com/`](./myscrollr.com/) | Marketing, auth, billing — *not* where widgets are configured | React 19 + Vite 7 + TanStack Start (static prerender) |
-| [`api/`](./api/) | Core API: widget catalog, reads, SSE, billing, accounts, support | Go 1.25 + Fiber v2 + Postgres + Redis |
+| [`api/`](./api/) | Core API: widget catalog, reads, SSE, billing, accounts, support | Go 1.26 + Fiber v2 + Postgres + Redis |
 | [`channels/finance/`](./channels/finance/) | Market-data ingester (TwelveData) | Rust |
 | [`channels/sports/`](./channels/sports/) | Scores + schedules ingester (api-sports.io) | Rust |
 | [`channels/rss/`](./channels/rss/) | RSS/Atom ingester | Rust |
@@ -76,8 +76,9 @@ exists to feed it.
 - **The widget catalog is server-authoritative.** `GET /catalog` is the
   single definition of what widgets exist. The desktop fetches it and
   renders generically, so adding a widget that reuses an existing renderer
-  is a server-only change — no client release. The marketing site does not
-  fetch it; its widget counts are hardcoded and updated by hand.
+  is a server-only change — no client release. The marketing site fetches it
+  too (`useCatalog()`) and keeps a snapshot as the offline and prerender
+  fallback.
 - **No proxied channel service remains.** Finance, sports and rss were
   folded into core by
   [ADR-0002](./docs/adr/0002-consolidate-widget-read-apis.md); fantasy was

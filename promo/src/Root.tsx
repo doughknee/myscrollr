@@ -1,8 +1,6 @@
 /**
  * The film (promo/src/film): one 18.5s shot of the real bar, built from
- * the app's own page cells. The older chip-overlay comps in promo-chips/
- * imported FantasyStatChip, which left with the fantasy widget
- * (SCROLLR-239); they are kept for reference but not registered.
+ * the app's own page cells.
  */
 import { Composition } from "remotion";
 import "./styles.css";

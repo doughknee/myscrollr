@@ -51,9 +51,6 @@ made it wrong. That is how this list stays true.
 
 | Doc | What it's for |
 |---|---|
-| [`channels/fantasy/YAHOO_API.md`](../channels/fantasy/YAHOO_API.md) | The one remaining separate service — Yahoo OAuth routes and why it stays separate. |
-| [`channels/predictions/CONTRACT.md`](../channels/predictions/CONTRACT.md) | The predictions/Kalshi service's data contract with core. |
-| [`channels/predictions/LOCAL_DEV.md`](../channels/predictions/LOCAL_DEV.md) | Running the Kalshi demo locally, including the no-auth bridge behind `VITE_DEMO=1`. |
 | [`desktop/src-tauri/CSP_NOTES.md`](../desktop/src-tauri/CSP_NOTES.md) | Why the desktop CSP is shaped the way it is. |
 | [`desktop/src-tauri/dmg/README.md`](../desktop/src-tauri/dmg/README.md) | Regenerating the macOS DMG background art. |
 | [`desktop/screenshots/README.md`](../desktop/screenshots/README.md) | The desktop screenshot set and how it's captured. |
