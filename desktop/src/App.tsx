@@ -13,7 +13,7 @@ import { isPrimaryTicker } from "./lib/windowRole";
 import { STARTER_EDGE_WIDGET, useFirstRunDefaultWidget, withStarterClock } from "./lib/firstRunDefaultWidget";
 import { emit } from "@tauri-apps/api/event";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
-import { dashboardQueryOptions, dashboardState, queryKeys } from "./api/queries";
+import { dashboardQueryOptions, dashboardState, forgetAccountData, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
 import PagedBar from "./components/pages/PagedBar";
@@ -28,6 +28,7 @@ import {
   getValidToken,
   isAuthenticated as checkAuth,
   getTier,
+  currentUserSub,
 } from "./auth";
 import {
   dataWidgetsApi,
@@ -276,6 +277,7 @@ export default function App() {
   authenticatedRef.current = authenticated;
   const tierRef = useRef<SubscriptionTier>(tier);
   tierRef.current = tier;
+  const accountRef = useRef(currentUserSub());
   // ── Initial auth + tier resolve ───────────────────────────────
   // Real-time is universal: the server dropped the Ultimate-only gate
   // on /events with the widget-slot redesign (8e9f0f9, 2026-06-30) —
@@ -312,6 +314,14 @@ export default function App() {
       const wasAuth = authenticatedRef.current;
       const isAuth = checkAuth();
       setAuthenticated(isAuth);
+
+      // Signed out, or another account: nothing of the previous one may
+      // stay on this bar (SCROLLR-470). A token refresh keeps the account.
+      const account = currentUserSub();
+      if (account !== accountRef.current) {
+        accountRef.current = account;
+        void forgetAccountData(queryClient);
+      }
 
       if (!isAuth && wasAuth) {
         // Just logged out — tear down SSE, reset to free tier
