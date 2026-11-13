@@ -3,6 +3,7 @@ package support
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/jackc/pgx/v5"
 )
 
 // =============================================================================
@@ -196,8 +198,27 @@ func logged(err error) int {
 	return 0
 }
 
+// casePurged reports whether the account purge anonymised this ticket's case.
+// purged_at is set only by that purge; staff dismissing a case leave it NULL.
+// osTicket still holds the ticket, so every importer must check this before
+// copying its text back (SCROLLR-457).
+func casePurged(ctx context.Context, number string) (bool, error) {
+	var purged bool
+	err := platform.DBPool.QueryRow(ctx,
+		`SELECT purged_at IS NOT NULL FROM support_cases WHERE ticket_number = $1`, number).Scan(&purged)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return purged, err
+}
+
 // syncTicket is pass 2 for one ticket.
 func syncTicket(ctx context.Context, number string, st *BackfillStats) error {
+	if purged, err := casePurged(ctx, number); err != nil {
+		return fmt.Errorf("check purge: %w", err)
+	} else if purged {
+		return nil
+	}
 	status, body, err := osTicketRequest(ctx, "GET", "/api/tickets/"+url.PathEscape(number)+".json", nil)
 	if err != nil {
 		return fmt.Errorf("detail (status %d): %w", status, err)

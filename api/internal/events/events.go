@@ -495,14 +495,6 @@ func RouteToRecordOwner(record map[string]interface{}, field string, payload []b
 	}
 }
 
-// PublishToTopic publishes a CDC payload to a topic channel.
-// This is the Phase 3 replacement for SendToUsers.
-func PublishToTopic(topic string, payload []byte) {
-	if err := platform.PublishRaw(topic, payload); err != nil {
-		log.Printf("[EventHub] Failed to publish to topic %s: %v", topic, err)
-	}
-}
-
 // TopicForRSSFeed returns the topic channel for an RSS feed URL.
 // Uses FNV-1a hash because RSS URLs can contain characters that break
 // Redis channel patterns (:, *, ?).
@@ -512,16 +504,43 @@ func TopicForRSSFeed(feedURL string) string {
 	return fmt.Sprintf("%s%08x", platform.TopicPrefixRSS, h.Sum32())
 }
 
+// Seams for the subscribe retry (tests shorten the delays).
+var (
+	loadUserWidgets        = platform.GetUserWidgets
+	subscribeRetryBase     = time.Second
+	subscribeRetryMax      = 30 * time.Second
+	subscribeRetryAttempts = 8
+)
+
 // subscribeUserToTopics reads the user's widget subscriptions from the DB
 // and registers them in the Hub's topic registry.
+//
+// A failed load is retried with backoff for as long as the user stays
+// connected to this replica: without the retry a client that connects during
+// a database blip is subscribed to nothing until its token expires (RB-7).
 func subscribeUserToTopics(userID string) {
 	// Core user-specific topics (user_preferences, user_widgets) are handled
 	// by direct dispatch in listenToTopics -- no registry entry needed.
 
-	widgets, err := platform.GetUserWidgets(userID)
-	if err != nil {
-		log.Printf("[EventHub] Failed to load widgets for %s: %v", userID, err)
-		return
+	var widgets []platform.Widget
+	delay := subscribeRetryBase
+	for attempt := 1; ; attempt++ {
+		var err error
+		widgets, err = loadUserWidgets(userID)
+		if err == nil {
+			break
+		}
+		log.Printf("[EventHub] Failed to load widgets for %s (attempt %d): %v", userID, attempt, err)
+		if attempt == subscribeRetryAttempts {
+			return
+		}
+		time.Sleep(delay)
+		delay = min(delay*2, subscribeRetryMax)
+		// Gone while we waited: subscribing now would leak a registry entry
+		// nobody unsubscribes.
+		if _, ok := globalHub.clients.Load(userID); !ok {
+			return
+		}
 	}
 
 	for _, ch := range widgets {

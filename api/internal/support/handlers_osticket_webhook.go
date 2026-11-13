@@ -110,6 +110,25 @@ func HandleOSTicketThreadMessage(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ignored", "reason": "no user email"})
 	}
 
+	// 2b. A ticket whose case the account purge anonymised stays gone: do not
+	//     copy the user's message back in or draft a reply to it (SCROLLR-457).
+	if platform.DBPool != nil {
+		purgeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		purged, err := casePurged(purgeCtx, ev.TicketNumber)
+		cancel()
+		if err != nil {
+			log.Printf("[OSTicketWebhook] purge check for ticket %s: %v", ev.TicketNumber, err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{
+				Status: "error",
+				Error:  "try again",
+			})
+		}
+		if purged {
+			log.Printf("[OSTicketWebhook] ticket %s was purged with its account; ignoring", ev.TicketNumber)
+			return c.JSON(fiber.Map{"status": "ignored", "reason": "purged"})
+		}
+	}
+
 	// 3. Dedupe via thread_entry_id. Same entry firing twice (osTicket
 	//    quirks, plugin retries) won't generate duplicate drafts.
 	if hasDraftForThreadEntry(c.Context(), ev.ThreadEntryID) {

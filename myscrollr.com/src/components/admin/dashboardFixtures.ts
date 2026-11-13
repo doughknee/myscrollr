@@ -284,7 +284,6 @@ export const desktop: DesktopUsage = {
         note: 'No cohort is old enough.',
       },
     },
-    features: [{ category: 'sports', accounts: 12, share: 0.7 }],
     population_note: 'Opted-in signed-in accounts only.',
     recent_presence: 0,
     recent_presence_note: 'Accounts seen in the last 15 minutes.',

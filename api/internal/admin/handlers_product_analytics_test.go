@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,9 +91,6 @@ func TestProductAnalyticsAggregateUsesMatureExactDayCohorts(t *testing.T) {
 	if got.Activation.FirstObserved != 3 {
 		t.Fatalf("first observed in 7d = %d, want 3", got.Activation.FirstObserved)
 	}
-	if len(got.Features) != 6 || got.Features[0].Category != "sports" || got.Features[0].Accounts != 1 || got.Features[0].Share != 0.2 {
-		t.Fatalf("features = %+v", got.Features)
-	}
 }
 
 func TestProductAnalyticsAggregateMarksImmatureDenominatorUnavailable(t *testing.T) {
@@ -121,5 +119,17 @@ func TestProductAnalyticsAggregateValidatesWindow(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+// CN-10: nothing reads a per-category `features` field, so the response must
+// not carry (or compute) one.
+func TestProductAnalyticsResponseHasNoFeaturesField(t *testing.T) {
+	raw, err := json.Marshal(ProductAnalyticsResponse{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), `"features"`) {
+		t.Fatalf("response still carries features: %s", raw)
 	}
 }
