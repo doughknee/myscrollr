@@ -44,6 +44,15 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
     }
 
     let mut feeds = get_tracked_feeds(pool.clone()).await;
+    let (prev_ok, prev_failed) = {
+        let h = health_state.lock().await;
+        (h.feeds_polled, h.cycle_failures)
+    };
+    if mostly_failed(prev_ok, prev_failed) {
+        info!("Last cycle failed for {} of {} feeds; assuming our own outage and polling every feed this cycle", prev_failed, prev_ok + prev_failed);
+    } else {
+        feeds.retain(|f| !in_backoff(f.consecutive_failures, cycle));
+    }
 
     // On cycle 0 (startup) and every 288 cycles (~24 hours) afterwards, retry
     // quarantined feeds to see if they've recovered. Retrying at cycle 0 is
@@ -142,6 +151,31 @@ pub async fn start_rss_service(pool: Arc<PgPool>, health_state: Arc<Mutex<RssHea
     );
 }
 
+/// True when most of the previous cycle failed (more than half, from at least
+/// 5 feeds): that points at our own network, not at the feeds, so backoff is
+/// skipped for one cycle and everything recovers as fast as it did before.
+fn mostly_failed(ok: u64, failed: u64) -> bool {
+    let total = ok + failed;
+    total >= 5 && failed * 2 > total
+}
+
+/// Longest gap between attempts on a failing feed: 12 cycles of 5 minutes = 1 hour.
+const MAX_BACKOFF_CYCLES: u64 = 12;
+
+/// A feed with `failures` consecutive failures is polled only on cycles that are
+/// a multiple of min(2^failures, 12), so a success (which resets the counter)
+/// puts it back on every cycle. Cycle 0 always polls everything. The cap
+/// divides 288, so quarantined feeds still get their daily retry.
+fn in_backoff(failures: i32, cycle: u64) -> bool {
+    if failures <= 0 {
+        return false;
+    }
+    let gap = 1u64
+        .checked_shl(failures as u32)
+        .map_or(MAX_BACKOFF_CYCLES, |g| g.min(MAX_BACKOFF_CYCLES));
+    !cycle.is_multiple_of(gap)
+}
+
 async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> anyhow::Result<usize> {
     // Stream the body into a bounded buffer so a hostile or misbehaving feed
     // can't OOM the pod. `.error_for_status()?` also surfaces 4xx/5xx as
@@ -235,10 +269,11 @@ async fn poll_feed(client: &Client, pool: &Arc<PgPool>, feed: &TrackedFeed) -> a
     }
 
     let count = articles.len();
-    if let Err(e) = batch_upsert_rss_items(pool, articles).await {
-        warn!("Failed to batch upsert RSS items from {}: {}", feed.name, e);
-        return Ok(0);
-    }
+    // A failed write is a failed poll: the caller logs it with the feed name,
+    // counts it against the feed and records it in health.
+    batch_upsert_rss_items(pool, articles)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to store feed items: {e}"))?;
 
     Ok(count)
 }
@@ -265,6 +300,26 @@ fn strip_html_tags(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mostly_failed_detects_own_outage() {
+        assert!(!mostly_failed(0, 0)); // nothing polled yet
+        assert!(!mostly_failed(96, 1)); // healthy cycle, one bad feed
+        assert!(!mostly_failed(1, 1)); // too few to judge
+        assert!(!mostly_failed(5, 5)); // exactly half
+        assert!(mostly_failed(0, 97)); // everything failing
+    }
+
+    #[test]
+    fn test_in_backoff_grows_caps_and_resets() {
+        assert!(!in_backoff(0, 7)); // healthy feed: every cycle
+        assert!(!in_backoff(3, 0)); // startup polls everything
+        assert!(in_backoff(1, 1) && !in_backoff(1, 2));
+        assert!(in_backoff(3, 4) && !in_backoff(3, 8));
+        // capped at 12 cycles (1 hour), including absurd counts
+        assert!(in_backoff(200, 11) && !in_backoff(200, 12) && !in_backoff(200, 288));
+        assert!(!in_backoff(i32::MAX, 24));
+    }
 
     #[test]
     fn test_strip_html_tags_simple() {

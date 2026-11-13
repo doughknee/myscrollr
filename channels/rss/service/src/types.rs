@@ -9,6 +9,9 @@ pub struct RssHealth {
     pub items_ingested: u64,
     pub error_count: u64,
     pub last_error: Option<String>,
+    /// Feeds that failed in the current cycle (`error_count` is cumulative).
+    #[serde(skip)]
+    pub cycle_failures: u64,
 }
 
 impl Default for RssHealth {
@@ -30,6 +33,7 @@ impl RssHealth {
             items_ingested: 0,
             error_count: 0,
             last_error: None,
+            cycle_failures: 0,
         }
     }
 
@@ -42,6 +46,7 @@ impl RssHealth {
 
     pub fn record_error(&mut self, error: String) {
         self.error_count += 1;
+        self.cycle_failures += 1;
         self.last_error = Some(error);
         self.status = String::from("degraded");
     }
@@ -50,6 +55,7 @@ impl RssHealth {
     pub fn reset_cycle(&mut self) {
         self.feeds_polled = 0;
         self.items_ingested = 0;
+        self.cycle_failures = 0;
     }
 
     pub fn get_health(&self) -> Self {
