@@ -135,7 +135,7 @@ describe("mapRelease", () => {
     body: "## Highlights\n\n- World Cup mode",
     published_at: "2026-06-12T15:30:00Z",
     html_url:
-      "https://github.com/brandon-relentnet/myscrollr/releases/tag/desktop-v1.0.20",
+      "https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.0.20",
     prerelease: false,
     draft: false,
   };
@@ -148,7 +148,7 @@ describe("mapRelease", () => {
       headline: "FIFA World Cup 2026",
       date: "2026-06-12T15:30:00Z",
       body: "## Highlights\n\n- World Cup mode",
-      url: "https://github.com/brandon-relentnet/myscrollr/releases/tag/desktop-v1.0.20",
+      url: "https://github.com/doughknee/myscrollr/releases/tag/desktop-v1.0.20",
       prerelease: false,
     });
   });

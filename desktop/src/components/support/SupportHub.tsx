@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import clsx from "clsx";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../../lib/openExternal";
 import { searchSupportContent } from "./support-content";
 import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
@@ -233,7 +233,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
             {/* Discord — opens externally rather than routing, so it
                 sits outside CATEGORIES/SectionId like What's New. */}
             <button
-              onClick={() => void open("https://discord.gg/4sM494F9qH")}
+              onClick={() => void openExternal("https://discord.gg/4sM494F9qH").catch(() => {})}
               className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm cursor-pointer"
             >
               <Users size={18} className="text-accent mb-2.5" />

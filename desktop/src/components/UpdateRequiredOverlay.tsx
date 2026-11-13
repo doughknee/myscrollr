@@ -1,6 +1,6 @@
 import { RefreshCw, Download } from "lucide-react";
 import { motion } from "motion/react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../lib/openExternal";
 import UpdateErrorNotice from "./UpdateErrorNotice";
 import { updateBusy } from "../lib/updateState";
 import { updateController, useUpdateController } from "../lib/updateController";
@@ -36,19 +36,19 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
     >
       <motion.div
         variants={backdropMotion}
-        className="absolute inset-0 bg-base-100/95 backdrop-blur-sm"
+        className="absolute inset-0 bg-surface/95 backdrop-blur-sm"
       />
       <motion.div
         variants={overlaySurfaceMotion}
-        className="relative max-w-md w-full mx-6 rounded-2xl border border-base-300/40 bg-base-200/80 p-8 text-center shadow-xl"
+        className="relative max-w-md w-full mx-6 rounded-2xl border border-edge bg-surface-2 p-8 text-center shadow-xl"
       >
-        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent">
           <Download size={22} />
         </div>
-        <h2 className="mb-2 text-lg font-bold text-base-content">
+        <h2 className="mb-2 text-lg font-bold text-fg">
           Update required
         </h2>
-        <p className="mb-6 text-sm leading-relaxed text-base-content/55">
+        <p className="mb-6 text-sm leading-relaxed text-fg-3">
           This version of Scrollr ({appVersion}) is older than the minimum
           the service now supports ({minVersion}). Update to keep your
           widgets streaming — your data and settings carry over.
@@ -76,13 +76,13 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
         )}
 
         {busy && (
-          <p className="mt-3 text-xs text-base-content/40">{state.phase === "checking" ? "Checking the selected update channel…" : "Updating Scrollr…"}</p>
+          <p className="mt-3 text-xs text-fg-3">{state.phase === "checking" ? "Checking the selected update channel…" : "Updating Scrollr…"}</p>
         )}
         <UpdateErrorNotice state={state} className="mt-3" />
         {state.error && (
           <button
             type="button"
-            onClick={() => void open(DOWNLOAD_URL).catch(() => {})}
+            onClick={() => void openExternal(DOWNLOAD_URL).catch(() => {})}
             className="mt-3 cursor-pointer text-ui-meta font-medium text-accent hover:underline"
           >
             Download the installer instead

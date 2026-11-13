@@ -5,7 +5,7 @@ edition = "2024"
 description = "Scrollr finance channel ingestion service — streams real-time market data via TwelveData WebSocket."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/brandon-relentnet/myscrollr"
+repository = "https://github.com/doughknee/myscrollr"
 homepage = "https://myscrollr.com"
 publish = false
 

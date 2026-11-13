@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { setCrashReports } from "./sentry";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "./lib/openExternal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTauriListener } from "./hooks/useTauriListener";
 import { useDashboardCDC } from "./hooks/useDashboardCDC";
@@ -399,7 +399,7 @@ export default function App() {
         // back to opening the desktop app so the user always gets SOME
         // observable response to the click — earlier behavior silently
         // logged to console where the user couldn't see it.
-        open(url)
+        openExternal(url)
           .catch((err) => {
             console.error("[Scrollr] Failed to open external URL:", err);
             // Fallback: bring the main app window forward.

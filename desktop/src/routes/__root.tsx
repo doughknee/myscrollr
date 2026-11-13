@@ -12,7 +12,7 @@ import {
   useLocation,
   useNavigate,
 } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { applyPinToggle } from "../hooks/usePinSubject";
@@ -52,12 +52,11 @@ import { getAllDataWidgets } from "../datawidgets/registry";
 import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
 import { API_BASE, DEMO } from "../config";
 import { getAllWidgets } from "../widgets/registry";
-import { githubBoardQuery } from "../widgets/github/types";
 import { useGitHubAutoPick } from "../widgets/github/useAutoPick";
 import { canonicalOrder } from "../marketplace";
 
 // Data
-import { dashboardQueryOptions, dashboardState } from "../api/queries";
+import { dashboardState } from "../api/queries";
 
 // Preferences
 import {
@@ -92,7 +91,6 @@ import { useTauriListener } from "../hooks/useTauriListener";
 import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
 import { useStartupUpdateCheck } from "../hooks/useStartupUpdateCheck";
-import { weatherQueryOptions } from "../api/queries";
 import {
   fetchSubscription,
   getPostHogAnalyticsConsent,
@@ -104,7 +102,7 @@ import { queryKeys } from "../api/queries";
 import { getValidToken } from "../auth";
 
 // CDC
-import { POLL_INTERVALS } from "../cdc";
+import { useShellDashboard, useShellWidgetPolling } from "../hooks/useShellPolling";
 
 // Shell context
 import { ShellContext, ShellDataContext } from "../shell-context";
@@ -262,10 +260,7 @@ function RootLayout() {
   const auth = useAuthState();
 
   // ── Dashboard data (TanStack Query) ─────────────────────────
-  const dashboardQuery = useQuery({
-    ...dashboardQueryOptions(),
-    refetchInterval: POLL_INTERVALS[auth.tier],
-  });
+  const dashboardQuery = useShellDashboard(auth.tier);
   const dashboard = dashboardQuery.data;
   const dashState = dashboardState(dashboardQuery);
   // Data on screen, last refresh failed: the data stays (SCROLLR-448), and
@@ -411,8 +406,12 @@ function RootLayout() {
   // The ticker window normally owns the SSE connection; this hook makes the
   // main window take it over when there is no ticker window at all, and
   // gives every window the live status either way (hooks/useSharedSSE.ts).
+  // After a reconnect it refetches the dashboard: this window owns the poll
+  // every ticker window reads, and events missed while the stream was down
+  // are not replayed (RC-4).
   const { deliveryMode } = useSharedSSE({
     tickerShown: prefs.ticker.showTicker,
+    onReconnect: retryDashboard,
   });
   const [billingBannerDismissed, setBillingBannerDismissed] = useState(false);
 
@@ -478,22 +477,10 @@ function RootLayout() {
 
   const queryClient = useQueryClient();
 
-  // Shell-level weather polling — keeps data fresh regardless of which page is visible.
-  // Permanent observer so refetchInterval runs even when WeatherFeedTab is unmounted.
-  // The queryFn writes to the Tauri store on success (cross-window sync for ticker).
-  useQuery({
-    ...weatherQueryOptions(),
-    enabled: enabledWidgets.includes("weather"),
-  });
-
-  // Shell-level GitHub polling (SCROLLR-308, SCROLLR-312): the bar has to
-  // move within a minute of a review request whichever page is open. Same
-  // key as the GitHub FeedTab's observer, so the two never double-fetch;
-  // saveBoard writes only on a change.
-  useQuery({
-    ...githubBoardQuery(prefs.widgets.github.repos, auth.authenticated),
-    enabled: enabledWidgets.includes("github") && prefs.widgets.github.repos.length > 0,
-  });
+  // Shell-level weather, GitHub and Uptime polling (SCROLLR-308, SCROLLR-312,
+  // RC-2): the bar has to move whichever page is open. Same keys as the
+  // widget pages' observers, so the two never double-fetch.
+  useShellWidgetPolling(prefs, auth.authenticated);
 
   // Zero setup (SCROLLR-312): nothing tracked, your active repos go on the bar.
   useGitHubAutoPick(prefs, enabledWidgets.includes("github"), auth.authenticated, persistPrefs);

@@ -21,6 +21,7 @@ import {
   removeStorePersisted,
 } from "./lib/store";
 import { ownsSharedConnection } from "./lib/windowRole";
+import { openExternal } from "./lib/openExternal";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -463,7 +464,7 @@ export async function login(
     // environment — inside an AppImage, `xdg-open` run with the
     // AppRun-injected env silently fails to launch a browser
     // (SCROLLR-8). Windows/macOS still delegate to plugin-shell there.
-    await invoke("open_external", { url: authUrl });
+    await openExternal(authUrl);
 
     // Wait for the callback event from Rust.
     const payload = await payloadPromise;

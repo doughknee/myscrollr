@@ -21,7 +21,7 @@ import (
 // So the field is named downloads, the tile is labelled downloads, and
 // OverviewResponse.Installs separately says installs are not measurable.
 const (
-	releasesURL       = "https://api.github.com/repos/brandon-relentnet/myscrollr/releases?per_page=30"
+	releasesURL       = "https://api.github.com/repos/doughknee/myscrollr/releases?per_page=30"
 	downloadsCacheKey = "scrollr:admin:downloads"
 	downloadsCacheTTL = 15 * time.Minute
 	downloadsTimeout  = 8 * time.Second

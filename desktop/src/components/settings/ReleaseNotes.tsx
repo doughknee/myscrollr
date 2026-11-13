@@ -1,6 +1,6 @@
 /** Published history is independent of enrollment and approved update offers. */
 import { useCallback, useEffect, useMemo, useState, useId } from "react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../../lib/openExternal";
 import clsx from "clsx";
 import { ChevronDown, ExternalLink, PackageOpen } from "lucide-react";
 
@@ -164,7 +164,7 @@ function ReleaseRow({
     const anchor = (e.target as HTMLElement).closest("a");
     if (anchor?.href) {
       e.preventDefault();
-      open(anchor.href).catch(() => {});
+      openExternal(anchor.href).catch(() => {});
     }
   }, []);
 
@@ -232,7 +232,7 @@ function ReleaseRow({
               )}
               <div className="mt-4 flex justify-end border-t border-edge/25 pt-3">
                 <button
-                  onClick={() => open(entry.url).catch(() => {})}
+                  onClick={() => openExternal(entry.url).catch(() => {})}
                   className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-medium text-fg-3 hover:bg-base-250/50 hover:text-fg-2 cursor-pointer"
                 >
                   <ExternalLink size={12} />
@@ -285,7 +285,7 @@ function EmptyState() {
         version history is always available on GitHub.
       </p>
       <button
-        onClick={() => open(RELEASES_PAGE_URL).catch(() => {})}
+        onClick={() => openExternal(RELEASES_PAGE_URL).catch(() => {})}
         className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent hover:bg-accent/20 cursor-pointer"
       >
         <ExternalLink size={14} />

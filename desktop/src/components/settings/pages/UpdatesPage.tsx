@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { prerelease, valid } from "semver";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../../../lib/openExternal";
 import { updateController, useUpdateController } from "../../../lib/updateController";
 import { channelLocked, updateBusy } from "../../../lib/updateState";
 import { RowList, SettingsButton, SettingsGroup, SegmentedRow } from "../SettingsControls";
@@ -85,11 +85,11 @@ export default function UpdatesPage({ appVersion }: { appVersion?: string }) {
             {state.phase === "waiting" && state.recoveryVersion && <div ref={recoveryControl}><SettingsButton tone="accent" onClick={() => { void updateController.prepareRecovery(); }}>Return to Stable {state.recoveryVersion}…</SettingsButton></div>}
             {betaBuild && state.channel === "stable" && !busy && state.phase !== "ready" && <div className="space-y-2">
               {state.phase === "waiting" && !state.recoveryVersion && <p className="text-ui-meta text-fg-3">In-app recovery is not verified for this version or installer. Recovery instructions cover the supported options.</p>}
-              <SettingsButton onClick={() => { void open("https://github.com/doughknee/myscrollr/blob/main/docs/beta-recovery.md").catch(() => {}); }}>Beta recovery instructions</SettingsButton>
+              <SettingsButton onClick={() => { void openExternal("https://github.com/doughknee/myscrollr/blob/main/docs/beta-recovery.md").catch(() => {}); }}>Beta recovery instructions</SettingsButton>
             </div>}
             {(state.phase === "available" || state.phase === "error") && <SettingsButton onClick={() => {
               const url = state.version ? `https://github.com/doughknee/myscrollr/releases/tag/desktop-v${encodeURIComponent(state.version)}` : "https://github.com/doughknee/myscrollr/releases";
-              void open(url).catch(() => {});
+              void openExternal(url).catch(() => {});
             }}>View releases and installers</SettingsButton>}
           </div>
         </Row>

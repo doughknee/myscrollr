@@ -21,7 +21,7 @@
 import { useCallback, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../lib/openExternal";
 
 import {
   CATEGORY_LABELS,
@@ -184,7 +184,7 @@ function CatalogPage() {
     [go, search.kind, search.q, search.sort],
   );
 
-  const onUpgrade = useCallback(() => void open(UPGRADE_URL), []);
+  const onUpgrade = useCallback(() => void openExternal(UPGRADE_URL).catch(() => {}), []);
   const onRequestWidget = useCallback(
     () => void navigate({ to: "/support" }),
     [navigate],

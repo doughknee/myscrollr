@@ -30,7 +30,7 @@ import type { DataWidgetRow } from "../../api/client";
 import { queryKeys } from "../../api/queries";
 import type { TrackedSymbol } from "../../api/queries";
 
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn() }));
+vi.mock("../../lib/openExternal", () => ({ openExternal: vi.fn() }));
 vi.mock("@tauri-apps/plugin-http", () => ({
   fetch: vi.fn(() => Promise.reject(new Error("no tauri in tests"))),
 }));
