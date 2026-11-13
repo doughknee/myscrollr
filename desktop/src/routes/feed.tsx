@@ -647,7 +647,7 @@ function MarketsCard({
             onClick={() => openWidget(id)}
             className="flex w-full cursor-pointer items-center gap-3 border-t border-fg/7 px-3.5 py-2 first:border-t-0 hover:bg-surface-hover/40"
           >
-            <span className="w-12 shrink-0 text-left font-mono text-ui-meta font-semibold text-fg">
+            <span className="min-w-[9ch] shrink-0 text-left font-mono text-ui-meta font-semibold text-fg">
               {t.symbol}
             </span>
             {/* The design shows a company-name column, but Trade
