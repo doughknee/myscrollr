@@ -24,8 +24,11 @@
  *                 poll fallback is carrying updates (not an error)
  *     stale     — last successful update was 60s–5min ago
  *                 (data is shown but visibly aging)
- *     offline   — last successful update was >5min ago OR no data yet
- *                 (assume something is broken; user should see it)
+ *     offline   — last successful update was >5min ago, or a refresh
+ *                 failed while only a saved copy is on screen
+ *     connecting — nothing fetched yet and the first load is still going
+ *     failed    — nothing to show and the last load failed
+ *                 (both read the shared `dashboardState`, SCROLLR-464)
  *
  * Inputs are cheap to derive — the hook is safe to call anywhere.
  *
@@ -39,10 +42,16 @@
  */
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { dashboardQueryOptions } from "../api/queries";
+import { dashboardQueryOptions, dashboardState } from "../api/queries";
 import type { DeliveryMode } from "../types";
 
-export type DeliveryHealthState = "live" | "polling" | "stale" | "offline";
+export type DeliveryHealthState =
+  | "live"
+  | "polling"
+  | "stale"
+  | "offline"
+  | "connecting"
+  | "failed";
 
 /** Data older than this is "stale" (yellow). */
 const STALE_THRESHOLD_MS = 60_000;
@@ -81,7 +90,7 @@ export function useDeliveryHealth({
   // anything — the shell already manages this query's lifecycle.
   const dashboardQuery = useQuery({
     ...dashboardQueryOptions(),
-    notifyOnChangeProps: ["dataUpdatedAt"],
+    notifyOnChangeProps: ["dataUpdatedAt", "data", "isError"],
   });
 
   return useMemo(() => {
@@ -91,7 +100,15 @@ export function useDeliveryHealth({
 
     // Choose the state. Order matters: offline beats stale beats fresh.
     let state: DeliveryHealthState;
-    if (ageMs === null || ageMs > OFFLINE_THRESHOLD_MS) {
+    const dash = dashboardState(dashboardQuery);
+    if (ageMs === null && dash === "pending") {
+      state = "connecting";
+    } else if (ageMs === null && dash === "failed") {
+      state = "failed";
+    } else if (ageMs === null && !dashboardQuery.isError) {
+      // A saved copy on screen, first refresh still in flight.
+      state = "connecting";
+    } else if (ageMs === null || ageMs > OFFLINE_THRESHOLD_MS) {
       state = "offline";
     } else if (ageMs > STALE_THRESHOLD_MS) {
       state = "stale";
@@ -105,7 +122,7 @@ export function useDeliveryHealth({
     const description = descriptionFor(state, ageMs);
 
     return { state, ageMs, label, description };
-  }, [deliveryMode, dashboardQuery.dataUpdatedAt, now]);
+  }, [deliveryMode, dashboardQuery.dataUpdatedAt, dashboardQuery.data, dashboardQuery.isError, now]);
 }
 
 function labelFor(state: DeliveryHealthState, ageMs: number | null): string {
@@ -118,6 +135,10 @@ function labelFor(state: DeliveryHealthState, ageMs: number | null): string {
       return ageMs ? `${formatAge(ageMs)} ago` : "Stale";
     case "offline":
       return "Offline";
+    case "connecting":
+      return "Connecting";
+    case "failed":
+      return "Can't load";
   }
 }
 
@@ -136,6 +157,10 @@ function descriptionFor(
     }
     case "offline":
       return "No connection to Scrollr. Check your network — data shown is from the last successful fetch.";
+    case "connecting":
+      return "Loading your dashboard.";
+    case "failed":
+      return "Scrollr couldn't load your dashboard. It will keep trying.";
   }
 }
 

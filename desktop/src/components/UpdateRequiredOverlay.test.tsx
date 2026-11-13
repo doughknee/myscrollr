@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../lib/openExternal";
 import { UpdateController } from "../lib/updateState";
 import { UpdateRequiredOverlay } from "./UpdateRequiredOverlay";
 
@@ -12,7 +13,7 @@ vi.mock("../lib/updateController", async () => {
     useUpdateController: () => useSyncExternalStore(shared.controller!.subscribe, shared.controller!.getSnapshot),
   };
 });
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn(async () => {}) }));
+vi.mock("../lib/openExternal", () => ({ openExternal: vi.fn(async () => {}) }));
 
 const RAW = "error sending request for url (https://github.com/x/latest.json): dns error";
 
@@ -42,6 +43,16 @@ describe("UpdateRequiredOverlay", () => {
     // raw native text is inside the closed disclosure, not the sentence
     expect(screen.getByText(RAW).closest("details")).not.toHaveAttribute("open");
     fireEvent.click(screen.getByRole("button", { name: "Download the installer instead" }));
-    expect(open).toHaveBeenCalledWith("https://myscrollr.com/download");
+    expect(openExternal).toHaveBeenCalledWith("https://myscrollr.com/download");
+  });
+
+  it("uses the app's own colour tokens, not the legacy base-* / primary aliases", () => {
+    const here = (f: string) => new URL(f, import.meta.url);
+    const css = readFileSync(here("../style.css"), "utf8");
+    const defined = new Set([...css.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]));
+    const src = readFileSync(here("./UpdateRequiredOverlay.tsx"), "utf8");
+    const used = [...src.matchAll(/\b(?:bg|text|border)-((?:surface|edge|fg|accent|error|base|primary)[a-z0-9-]*)(?:\/\d+)?/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(5);
+    expect(used.filter((name) => !defined.has(name) || /^(base|primary)/.test(name))).toEqual([]);
   });
 });

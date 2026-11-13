@@ -240,3 +240,25 @@ export function loadMonitors(): KumaMonitor[] {
 export function saveMonitors(monitors: KumaMonitor[]): void {
   setStore(LS_UPTIME_MONITORS, monitors);
 }
+
+/** Seconds between status-page fetches. Not a user setting (REL-206). */
+export const UPTIME_POLL_INTERVAL = 60;
+
+/**
+ * The status-page poll, shared by the shell (so the bar's chips move whichever
+ * page is open) and the Uptime page. One key, so the two never double-fetch;
+ * the query function writes the store, which is what the ticker reads.
+ */
+export function uptimeQuery(url: string) {
+  return {
+    queryKey: ["uptime-kuma", url],
+    queryFn: async () => {
+      const monitors = await fetchKumaStatus(url);
+      saveMonitors(monitors);
+      return monitors;
+    },
+    refetchInterval: UPTIME_POLL_INTERVAL * 1000,
+    staleTime: (UPTIME_POLL_INTERVAL * 1000) / 2,
+    retry: 2,
+  };
+}

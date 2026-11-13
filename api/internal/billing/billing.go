@@ -3,6 +3,7 @@ package billing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -176,8 +177,10 @@ func hadPriorSubscription(userID string) (bool, error) {
 }
 
 // getOrCreateStripeCustomer looks up or creates a Stripe customer for the user.
-// If a cached customer ID is stale (e.g. Stripe mode switch, deleted customer),
-// it deletes the stale record and creates a fresh customer.
+// Only a customer Stripe reports deleted or missing (e.g. after a Stripe mode
+// switch) is replaced: its record is deleted and a fresh customer created. Any
+// other Stripe error fails the request and leaves the record alone, so a
+// timeout cannot cost the account its trial history or its subscription link.
 func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	// Check DB first
 	var customerID string
@@ -187,6 +190,10 @@ func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	if err == nil && customerID != "" {
 		// Verify the cached customer still exists in Stripe and isn't deleted
 		c, stripeErr := stripecustomer.Get(customerID, nil)
+		var se *stripe.Error
+		if stripeErr != nil && !(errors.As(stripeErr, &se) && se.Code == stripe.ErrorCodeResourceMissing) {
+			return "", fmt.Errorf("check stripe customer %s: %w", customerID, stripeErr)
+		}
 		if stripeErr == nil && !c.Deleted {
 			// Backfill email if the Stripe customer was created without one
 			if c.Email == "" && email != "" {
@@ -224,6 +231,26 @@ func getOrCreateStripeCustomer(logtoSub, email string) (string, error) {
 	}
 
 	return c.ID, nil
+}
+
+// RefuseWhileDeletionPending stops every purchase route while the account is
+// scheduled for deletion: the purge would otherwise remove an account that
+// Stripe keeps charging (SCROLLR-465). Mounted after LogtoAuth.
+func RefuseWhileDeletionPending(c *fiber.Ctx) error {
+	pending, err := accounts.DeletionPending(context.Background(), platform.GetUserID(c))
+	if err != nil {
+		log.Printf("[Billing] Deletion status lookup failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to initialize billing",
+		})
+	}
+	if pending {
+		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "Your account is scheduled for deletion. Cancel the deletion on your account page before you subscribe or buy.",
+		})
+	}
+	return c.Next()
 }
 
 // getFrontendURL determines the frontend origin for Stripe return URLs.
@@ -551,11 +578,31 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Re-check for active subscription (guards against concurrent tab race condition)
+	// One subscribe at a time per account: the check below, the Stripe calls
+	// and the upsert run under a transaction-scoped lock, so a second tab with
+	// its own SetupIntent waits, then sees the first tab's subscription and
+	// gets the conflict answer instead of creating a second one.
+	ctx := context.Background()
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
+		log.Printf("[Billing] Subscribe lock for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to create subscription",
+		})
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('subscribe:' || $1, 0))`, userID); err != nil {
+		log.Printf("[Billing] Subscribe lock for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error", Error: "Failed to create subscription",
+		})
+	}
+
+	// Re-check for active subscription, under the lock.
 	var existingPlan string
 	var existingStatus string
 	var existingLifetime bool
-	err := platform.DBPool.QueryRow(context.Background(),
+	err = tx.QueryRow(ctx,
 		`SELECT plan, status, lifetime FROM stripe_customers WHERE logto_sub = $1`, userID,
 	).Scan(&existingPlan, &existingStatus, &existingLifetime)
 
@@ -650,10 +697,11 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 	if !hadPriorSub {
 		subParams.TrialPeriodDays = stripe.Int64(7)
 	}
-	// One subscription per confirmed SetupIntent: a double submit, a second
-	// tab or a client retry gets the first subscription back from Stripe
-	// instead of creating (and billing) another.
-	subParams.SetIdempotencyKey("subscribe-" + req.SetupIntentID)
+	// One subscription per confirmed SetupIntent and price: a double submit
+	// or a client retry gets the first subscription back from Stripe instead
+	// of creating (and billing) another. The price is in the key so a retry
+	// with another price is a new request, not an idempotency error.
+	subParams.SetIdempotencyKey("subscribe-" + req.SetupIntentID + "-" + req.PriceID)
 
 	sub, err := stripesubscription.New(subParams)
 	if err != nil {
@@ -679,8 +727,8 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Upsert DB record
-	_, err = platform.DBPool.Exec(context.Background(),
+	// Upsert DB record, then release the lock.
+	_, err = tx.Exec(ctx,
 		`INSERT INTO stripe_customers (logto_sub, stripe_customer_id, stripe_subscription_id, plan, status)
 		 VALUES ($1, $2, $3, $4, $5)
 		 ON CONFLICT (logto_sub) DO UPDATE SET
@@ -688,6 +736,9 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		   plan = $4, status = $5, updated_at = now()`,
 		userID, customerID, sub.ID, plan, subStatus,
 	)
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
 	if err != nil {
 		log.Printf("[Billing] Failed to upsert subscription record for %s: %v", userID, err)
 	}

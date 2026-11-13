@@ -36,12 +36,16 @@ interface ProfileData {
 
 function ProfilePage() {
   const { username } = Route.useParams()
-  const { isAuthenticated, signIn, getIdTokenClaims } = useScrollrAuth()
+  const { isAuthenticated, isLoading, signIn, getIdTokenClaims } =
+    useScrollrAuth()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Logto reports signed-out until it has read the session; deciding now
+    // would show the owner "not found".
+    if (isLoading) return
     async function loadProfile() {
       setLoading(true)
       setError(null)
@@ -99,7 +103,7 @@ function ProfilePage() {
     }
 
     loadProfile()
-  }, [username, isAuthenticated, getIdTokenClaims])
+  }, [username, isAuthenticated, isLoading, getIdTokenClaims])
 
   // ── Loading state ──
   if (loading) {

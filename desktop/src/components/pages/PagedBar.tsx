@@ -744,7 +744,8 @@ export default function PagedBar({
 
   // No page to show: the message is the whole bar, or, docked with a clock or
   // a pin on the edge, takes the page block beside it (SCROLLR-448: a lone
-  // clock used to hide the only next step). Fill's grid keeps its utilities.
+  // clock used to hide the only next step). Fill's grid keeps its utilities
+  // in the header and puts the message in its body.
   const emptyPage = empty && widgets.length === 0 ? empty : null;
   if (emptyPage && edge.utilities.length + edge.pins.length === 0) return <>{emptyPage}</>;
 
@@ -784,6 +785,8 @@ export default function PagedBar({
               })}
             </motion.div>}
           </AnimatePresence>
+          {/* Nothing to page (failed, sourceless, all off): the shared message fills the body, so utilities never sit over a silent canvas (SCROLLR-464). */}
+          {!cur && emptyPage && <div data-display-empty="" className="absolute inset-0 [&>[data-empty]]:!h-full [&_[data-label=empty]]:hidden">{emptyPage}</div>}
         </div>
       </div>
     );

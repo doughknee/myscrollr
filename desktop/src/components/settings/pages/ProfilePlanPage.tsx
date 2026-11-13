@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../../../lib/openExternal";
 import { toast } from "sonner";
 import { TIER_LABELS, getUserIdentity } from "../../../auth";
 import {
@@ -104,7 +104,11 @@ export default function ProfilePlanPage({
 
   const jwtIdentity = authenticated ? getUserIdentity() : null;
 
-  const { data: overview } = useQuery({
+  const {
+    data: overview,
+    isError: overviewFailed,
+    refetch: refetchOverview,
+  } = useQuery({
     ...userOverviewQueryOptions(),
     enabled: authenticated,
   });
@@ -155,7 +159,7 @@ export default function ProfilePlanPage({
         "/users/me/subscription/portal",
         { method: "POST" },
       );
-      await open(url);
+      await openExternal(url);
     } catch (err) {
       setPortalError(
         err instanceof Error ? err.message : "Failed to open billing portal",
@@ -212,7 +216,7 @@ export default function ProfilePlanPage({
 
   const handleBillingAction =
     status === "canceled"
-      ? () => open("https://myscrollr.com/uplink")
+      ? () => openExternal("https://myscrollr.com/uplink")
       : handleOpenPortal;
 
   // ── Signed out ────────────────────────────────────────────────
@@ -279,23 +283,43 @@ export default function ProfilePlanPage({
       {/* ── Profile ────────────────────────────────────────── */}
       <SettingsGroup label="Profile">
         <RowList>
-          <Row id="displayName">
-            <ProfileField
-              label={R.displayName.label}
-              value={overview?.identity.name ?? ""}
-              placeholder="Add a display name"
-              onSave={(next) => handleProfileSave({ name: next }, "Display name")}
-            />
-          </Row>
-          <Row id="email">
-            <ProfileField
-              label={R.email.label}
-              type="email"
-              value={overview?.identity.email ?? ""}
-              placeholder="you@example.com"
-              onSave={async (next) => setPendingEmail(next)}
-            />
-          </Row>
+          {/* The editable fields hold the server's copy. Until it has loaded
+              they would read as an empty profile (and a save would write over
+              one the user cannot see), so they wait (UD-10). */}
+          {overview ? (
+            <>
+              <Row id="displayName">
+                <ProfileField
+                  label={R.displayName.label}
+                  value={overview.identity.name ?? ""}
+                  placeholder="Add a display name"
+                  onSave={(next) => handleProfileSave({ name: next }, "Display name")}
+                />
+              </Row>
+              <Row id="email">
+                <ProfileField
+                  label={R.email.label}
+                  type="email"
+                  value={overview.identity.email ?? ""}
+                  placeholder="you@example.com"
+                  onSave={async (next) => setPendingEmail(next)}
+                />
+              </Row>
+            </>
+          ) : overviewFailed ? (
+            <Row id="displayName">
+              <ActionRow
+                label="Couldn’t load your profile"
+                description="Your name and email can’t be edited until it loads."
+                action="Try again"
+                onClick={() => void refetchOverview()}
+              />
+            </Row>
+          ) : (
+            <Row id="displayName">
+              <DisplayRow label="Profile" value="Loading…" />
+            </Row>
+          )}
           <Row id="password">
             <ActionRow
               label={R.password.label}
@@ -414,7 +438,7 @@ export default function ProfilePlanPage({
                 description="More pages on your bar — run more widgets at once."
                 action="Upgrade"
                 tone="accent"
-                onClick={() => open("https://myscrollr.com/uplink")}
+                onClick={() => openExternal("https://myscrollr.com/uplink")}
               />
             )}
         </RowList>

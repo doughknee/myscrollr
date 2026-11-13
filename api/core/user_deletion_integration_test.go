@@ -540,6 +540,12 @@ func TestIntegrationPurgeRemovesSupportData(t *testing.T) {
 		AND console_status='dismissed' AND category='bug'`); n != 2 {
 		t.Errorf("anonymised cases = %d, want 2", n)
 	}
+	// SCROLLR-465 B2-5: the draft-only ticket is marked too, so the backfill
+	// and the osTicket webhook never copy it back.
+	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number IN `+mine+`
+		AND purged_at IS NOT NULL AND user_email IS NULL AND console_status='dismissed'`); n != 3 {
+		t.Errorf("purge-marked tickets = %d, want 3 (including the draft-only one)", n)
+	}
 	if n := queryCount(t, `SELECT count(*) FROM support_cases WHERE ticket_number IN `+decoys+`
 		AND subject='Secret subject' AND summary='Secret summary' AND console_status='' AND user_email IS NOT NULL`); n != 4 {
 		t.Errorf("decoy cases changed: %d unchanged, want 4", n)
@@ -597,5 +603,80 @@ func TestIntegrationPurgeKeepsEmailAcrossFailedPass(t *testing.T) {
 	}
 	if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub=$1 AND status='purged' AND purge_email IS NULL`, sub); n != 1 {
 		t.Error("email outlived the purge")
+	}
+}
+
+// SCROLLR-465: an account that subscribed during its grace period has every
+// live subscription canceled at Stripe before its billing row goes, and a
+// Stripe failure stops the purge so the next pass retries.
+func TestIntegrationPurgeCancelsGracePeriodSubscription(t *testing.T) {
+	for _, stripeDown := range []bool{false, true} {
+		t.Run(map[bool]string{false: "stripe up", true: "stripe down"}[stripeDown], func(t *testing.T) {
+			setupIntegrationDB(t)
+			logto := newLogtoStub(t)
+			const sub = "user_purge_grace_sub"
+			seedPurgeableUser(t, sub, false)
+			testsupport.MustExec(t, `UPDATE stripe_customers SET status = 'active', stripe_subscription_id = 'sub_grace' WHERE logto_sub = $1`, sub)
+
+			var mu sync.Mutex
+			var canceled []string
+			stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch {
+				case stripeDown:
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","message":"down"}}`))
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/subscriptions":
+					if r.URL.Query().Get("customer") != "cus_"+sub || r.URL.Query().Get("status") != "all" {
+						t.Errorf("listed subscriptions with %s, want customer=cus_%s status=all", r.URL.RawQuery, sub)
+					}
+					_, _ = w.Write([]byte(`{"object":"list","url":"/v1/subscriptions","has_more":false,"data":[
+						{"id":"sub_grace","object":"subscription","status":"active"},
+						{"id":"sub_second","object":"subscription","status":"past_due"},
+						{"id":"sub_old","object":"subscription","status":"canceled"}]}`))
+				case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v1/subscriptions/"):
+					if n := queryCount(t, `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`, sub); n != 1 {
+						t.Errorf("billing row gone before the subscription was canceled")
+					}
+					if len(logto.deletedSubs()) != 0 {
+						t.Errorf("Logto user deleted before the subscription was canceled")
+					}
+					id := strings.TrimPrefix(r.URL.Path, "/v1/subscriptions/")
+					mu.Lock()
+					canceled = append(canceled, id)
+					mu.Unlock()
+					_, _ = w.Write([]byte(`{"id":"` + id + `","object":"subscription","status":"canceled"}`))
+				default:
+					t.Errorf("unexpected Stripe call %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			})
+
+			err := accounts.PurgeUserAccount(context.Background(), sub)
+			if stripeDown {
+				if err == nil {
+					t.Fatal("purge succeeded although Stripe could not be reached")
+				}
+				if len(logto.deletedSubs()) != 0 {
+					t.Error("Logto user deleted although the subscription could not be canceled")
+				}
+				if n := queryCount(t, `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`, sub); n != 1 {
+					t.Error("billing row removed although the subscription could not be canceled")
+				}
+				if n := queryCount(t, `SELECT count(*) FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'pending'`, sub); n != 1 {
+					t.Error("deletion request no longer pending, so the next pass would not retry")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if strings.Join(canceled, ",") != "sub_grace,sub_second" {
+				t.Errorf("canceled at Stripe = %v, want [sub_grace sub_second]", canceled)
+			}
+			if n := queryCount(t, `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`, sub); n != 0 {
+				t.Error("billing row survives the purge")
+			}
+		})
 	}
 }

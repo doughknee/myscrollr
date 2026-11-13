@@ -41,6 +41,10 @@ jobs:
   # ── Detect which services changed ──────────────────────────────
   detect-changes:
     runs-on: ubuntu-latest
+    # actions: read lets the job look up the last deploy that succeeded.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       checkout-sha: ${{ steps.revision.outputs.sha }}
       image-tag: ${{ steps.revision.outputs.image-tag }}
@@ -120,10 +124,28 @@ jobs:
             esac
           done
 
+      # A deploy that fails or is superseded in the queue leaves its changes
+      # undeployed, and the next push used to diff only its own commits, so
+      # those changes were skipped with no signal (SCROLLR-462). Diff from the
+      # last push deploy that succeeded instead. Every push deploy covers
+      # everything since the one before it, so that revision is fully deployed.
+      # No answer falls back to the pushed range, as before.
+      - name: Find the last revision that deployed
+        id: deployed
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then sha=""; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Diffing from: ${sha:-the pushed range (no successful push deploy found)}"
+
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: changes
         if: github.event_name == 'push'
         with:
+          base: ${{ steps.deployed.outputs.sha }}
           filters: |
             core-api:
               - 'api/**'

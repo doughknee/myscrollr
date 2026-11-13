@@ -332,16 +332,26 @@ function StatusPage() {
               detail={
                 fetchError
                   ? 'No usable answer from the API'
-                  : 'Accepting requests'
+                  : health && health.status !== 'healthy'
+                    ? 'Answering, but reporting a problem'
+                    : 'Accepting requests'
               }
               right={
                 <span className="flex items-center gap-3">
                   <span
                     className={`font-mono text-[11px] tracking-[0.12em] ${
-                      fetchError ? 'text-error' : 'text-primary'
+                      fetchError
+                        ? 'text-error'
+                        : health && health.status !== 'healthy'
+                          ? 'text-warning'
+                          : 'text-primary'
                     }`}
                   >
-                    {fetchError ? 'UNREACHABLE' : 'ONLINE'}
+                    {fetchError
+                      ? 'UNREACHABLE'
+                      : health && health.status !== 'healthy'
+                        ? 'DEGRADED'
+                        : 'ONLINE'}
                   </span>
                   <button
                     type="button"

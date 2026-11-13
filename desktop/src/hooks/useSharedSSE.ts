@@ -10,6 +10,11 @@
  * is correct everywhere, and CDC events keep flowing to non-owners
  * untouched (`useDashboardCDC`).
  *
+ * The owner keeps the stream alive: when it cannot start (the token refresh
+ * failed once, the start call failed) or Rust gave it up (401, repeated
+ * oversized frames) it retries with backoff for as long as the user is
+ * still signed in, and stops once nothing usable is stored (RC-4).
+ *
  * Ownership is re-evaluated whenever the set of ticker windows can have
  * moved — a monitor plugged or unplugged, a sync that created or destroyed
  * a ticker, the bar shown or hidden — not only at mount.
@@ -18,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTauriListener } from "./useTauriListener";
 import { ownsSharedConnection } from "../lib/windowRole";
-import { getValidToken, rearmRefresh } from "../auth";
+import { getValidToken, isSignedOut, rearmRefresh } from "../auth";
 import { loadPref } from "../preferences";
 import { API_BASE, DEMO } from "../config";
 import type { DeliveryMode } from "../types";
@@ -32,12 +37,50 @@ export interface SharedSSE {
   stopSSE: () => Promise<void>;
 }
 
-export function useSharedSSE({ tickerShown }: { tickerShown: boolean }): SharedSSE {
+/** Retry delays for a stream that will not start: 2 s, 4 s ... 60 s. */
+const RETRY_BASE_MS = 2_000;
+const RETRY_MAX_MS = 60_000;
+
+interface Options {
+  tickerShown: boolean;
+  /**
+   * Called in this window after the stream comes back up following a gap, so
+   * the window that polls the dashboard can catch up on what it missed.
+   * Not called for the first connection.
+   */
+  onReconnect?: () => void;
+}
+
+export function useSharedSSE({ tickerShown, onReconnect }: Options): SharedSSE {
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>(() =>
     loadPref<DeliveryMode>("deliveryMode", "polling"),
   );
   const ownsRef = useRef(false);
   const activeRef = useRef(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptRef = useRef(0);
+  const startRef = useRef<() => Promise<void>>(async () => {});
+  const connectedRef = useRef(false);
+  const everConnectedRef = useRef(false);
+  const onReconnectRef = useRef(onReconnect);
+  onReconnectRef.current = onReconnect;
+
+  const clearRetry = useCallback(() => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
+  }, []);
+
+  // Try again later, unless the session is really over or we no longer own
+  // the stream. One timer at a time.
+  const scheduleRetry = useCallback(() => {
+    if (retryTimerRef.current || !ownsRef.current || (!DEMO && isSignedOut())) return;
+    const delay = Math.min(RETRY_BASE_MS * 2 ** attemptRef.current, RETRY_MAX_MS);
+    attemptRef.current += 1;
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      void startRef.current();
+    }, delay);
+  }, []);
 
   const startSSE = useCallback(async () => {
     if (!ownsRef.current || activeRef.current) return;
@@ -50,17 +93,22 @@ export function useSharedSSE({ tickerShown }: { tickerShown: boolean }): SharedS
     // Ownership can move while the silent refresh is in flight.
     if (!token || !ownsRef.current) {
       activeRef.current = false;
+      scheduleRetry(); // a refresh that failed once may work in a moment
       return;
     }
     setDeliveryMode("sse");
     await invoke("start_sse", { token, apiBase: API_BASE }).catch(() => {
       activeRef.current = false;
       setDeliveryMode("polling");
+      scheduleRetry();
     });
-  }, []);
+  }, [scheduleRetry]);
+  startRef.current = startSSE;
 
   const stopSSE = useCallback(async () => {
     if (!ownsRef.current) return;
+    clearRetry();
+    attemptRef.current = 0;
     activeRef.current = false;
     setDeliveryMode("polling");
     await invoke("stop_sse").catch(() => {});
@@ -82,8 +130,13 @@ export function useSharedSSE({ tickerShown }: { tickerShown: boolean }): SharedS
       rearmRefresh();
       await startSSE();
     }
-    else activeRef.current = false;
-  }, [startSSE]);
+    else {
+      clearRetry();
+      activeRef.current = false;
+    }
+  }, [startSSE, clearRetry]);
+
+  useEffect(() => clearRetry, [clearRetry]);
 
   // A monitor came or went; `sync_ticker_windows` finished creating or
   // destroying ticker windows; this ticker was told to re-place itself.
@@ -100,14 +153,25 @@ export function useSharedSSE({ tickerShown }: { tickerShown: boolean }): SharedS
   }, [tickerShown, elect]);
 
   // ── Status from Rust ──────────────────────────────────────────
-  useTauriListener<{ status: string; code?: number; error?: string }>(
+  useTauriListener<{ status: string; code?: number; error?: string; message?: string }>(
     "sse-status",
     async (event) => {
-      const status = event.payload.status;
+      const { status, message } = event.payload;
       setDeliveryMode(status === "connected" ? "sse" : "polling");
-      if (status === "auth-expired") {
-        // The token died under the stream. Rust stopped retrying; the owner
-        // refreshes and reopens, everyone else just showed "polling".
+      if (status === "connected") {
+        attemptRef.current = 0;
+        const wasConnected = connectedRef.current;
+        connectedRef.current = true;
+        // Events missed while the stream was down are gone: catch up once.
+        if (!wasConnected && everConnectedRef.current) onReconnectRef.current?.();
+        everConnectedRef.current = true;
+        return;
+      }
+      connectedRef.current = false; // anything but "connected" is a gap
+      // Rust has given up on the stream: a 401, or repeated oversized frames
+      // (the only "error" it sends with a message). The owner reopens it
+      // with a fresh token, retrying if that cannot be had yet.
+      if (status === "auth-expired" || (status === "error" && message)) {
         activeRef.current = false;
         await startSSE();
       }

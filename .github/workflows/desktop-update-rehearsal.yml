@@ -47,8 +47,8 @@ jobs:
       TAG: ${{ inputs.tag }}
       BUILD_RUN_ID: ${{ inputs.run_id }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
       - run: npm ci --ignore-scripts
@@ -56,7 +56,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y minisign
       - name: Verify source, proofs and final signed bytes without publishing
         run: node desktop/scripts/finalize-release.mjs verify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-transport-input
           path: ${{ runner.temp }}/release-verify-${{ inputs.run_id }}/
@@ -83,7 +83,7 @@ jobs:
           TAG: ${{ inputs.source_tag }}
           BUILD_RUN_ID: legacy
         run: node desktop/scripts/verify-legacy-upgrade-source.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: inputs.source_tag != ''
         with:
           name: verified-install-source
@@ -103,8 +103,8 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
       - run: npm ci --ignore-scripts
@@ -120,13 +120,13 @@ jobs:
           TAG: desktop-v1.8.0-beta.1
           BUILD_RUN_ID: '41622562602'
         run: node desktop/scripts/finalize-release.mjs verify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-transport-input
           path: ${{ runner.temp }}/release-verify-41688396593/
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-install-source
           path: ${{ runner.temp }}/release-verify-41622562602/
@@ -143,8 +143,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
       - name: Install Linux build dependencies
@@ -152,16 +152,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb xdotool dbus-x11
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       - name: Prefer installed Rust over Homebrew stub
         if: runner.os == 'macOS'
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: desktop/src-tauri
           prefix-key: v1-rust-no-bin
           cache-bin: "false"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: verified-transport-input
           path: ${{ runner.temp }}/signed-updater-input
@@ -175,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --locked --test update_transport signed_native_transport -- --ignored --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/update-transport.log"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: inputs.source_tag != ''
         with:
           name: verified-install-source
@@ -199,7 +199,7 @@ jobs:
           node desktop/scripts/rehearse-installed-update.mjs prepare
           cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --test update_transport signed_native_install -- --ignored --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/update-install/native-install.log"
           node desktop/scripts/rehearse-installed-update.mjs finish
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: update-transport-${{ runner.os }}

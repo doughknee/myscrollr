@@ -23,7 +23,7 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternal } from "../lib/openExternal";
 
 import {
   catalogItemById,
@@ -164,13 +164,13 @@ function WidgetInfoPage() {
       : tierLocked
         ? {
             label: `Requires ${TIER_LABELS[item.requiredTier]} — Upgrade`,
-            onClick: () => void open("https://myscrollr.com/uplink"),
+            onClick: () => void openExternal("https://myscrollr.com/uplink"),
             external: true,
           }
         : slotLocked
           ? {
               label: "Upgrade for more pages",
-              onClick: () => void open("https://myscrollr.com/uplink"),
+              onClick: () => void openExternal("https://myscrollr.com/uplink"),
               external: true,
             }
           : {
@@ -420,7 +420,7 @@ function WidgetInfoPage() {
               Every page on your bar is in use. You can always swap — remove a
               widget you're not using to free its page for this one, or{" "}
               <button
-                onClick={() => void open("https://myscrollr.com/uplink")}
+                onClick={() => void openExternal("https://myscrollr.com/uplink").catch(() => {})}
                 className="font-semibold text-accent hover:underline"
               >
                 upgrade for more

@@ -11,7 +11,6 @@
  */
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
 import { clsx } from "clsx";
 import { Github, Lock, MoreHorizontal, Plus, X } from "lucide-react";
 import type { FeedTabProps } from "../../types";
@@ -24,6 +23,7 @@ import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { githubApi } from "../../api/client";
 import type { GitHubBoardRepo, GitHubRepoRow, GitHubWorkflowRow } from "../../api/client";
 import { relativeTime } from "../../utils/format";
+import { openExternal } from "../../lib/openExternal";
 import { githubBoardQuery, loadBoard, parseRepoUrl, pillsFor, repoChip, repoName, sameRepo, worstOf, MAX_REPOS } from "./types";
 import { HEX } from "./manifest";
 import { newRepo } from "./config";
@@ -32,7 +32,7 @@ import type { GitHubIssueMode, GitHubPRMode, GitHubTrackedRepo, GitHubWidgetConf
 /** The app's install page: choose which repos it may see, and approve new permissions. */
 const INSTALL_URL = "https://github.com/apps/scrollr-desktop/installations/new";
 
-const openExternal = (url: string) => void invoke("open_external", { url }).catch(() => {});
+const openLink = (url: string) => void openExternal(url).catch(() => {});
 
 const PR_OPTIONS: Array<[GitHubPRMode, string]> = [
   ["off", "Off"],
@@ -207,7 +207,7 @@ function TwoPanes({
                 { key: "quiet", label: "Quiet hours…", hint: cfg.quietHours.on ? `${cfg.quietHours.from} to ${cfg.quietHours.to}` : "Off", onSelect: () => setQuietOpen((v) => !v) },
                 { key: "flash", label: "Flash on change", hint: cfg.flash ? "On" : "Off", onSelect: () => write({ flash: !cfg.flash }) },
                 { key: "public", label: "Track a public repo…", onSelect: () => setPublicUrl("") },
-                { key: "choose", label: "Choose repos on GitHub ↗", onSelect: () => openExternal(INSTALL_URL) },
+                { key: "choose", label: "Choose repos on GitHub ↗", onSelect: () => openLink(INSTALL_URL) },
                 { key: "d", divider: true },
                 { key: "disconnect", label: "Disconnect", destructive: true, onSelect: () => void disconnect() },
               ]}
@@ -385,7 +385,7 @@ function RepoPane({
           style={accentStyle(accentFor(HEX, dark), inkFor(HEX, dark))}
         >
           {chip ? (
-            <RepoCell chip={chip} dark={dark} onClick={() => openExternal(chip.url)} />
+            <RepoCell chip={chip} dark={dark} onClick={() => openLink(chip.url)} />
           ) : (
             <span className="flex h-full items-center gap-2 px-4 text-[12px] text-fg-3">
               <LoadingGlyph size={10} /> Reading GitHub…
@@ -424,7 +424,7 @@ function RepoPane({
             <Radios name={`issues-${t.repo}`} legend="Issues" options={ISSUE_OPTIONS} value={t.issues} onChange={(issues) => onChange({ issues })} />
           </div>
           {permission ? (
-            <button type="button" onClick={() => openExternal(INSTALL_URL)} className="self-start px-2.5 pt-1.5 text-[12.5px] font-semibold text-widget-github hover:underline">
+            <button type="button" onClick={() => openLink(INSTALL_URL)} className="self-start px-2.5 pt-1.5 text-[12.5px] font-semibold text-widget-github hover:underline">
               Approve on GitHub ↗
             </button>
           ) : (
@@ -561,7 +561,7 @@ function RepoPicker({
         </button>
       )}
       <div className="mt-1 flex flex-wrap gap-x-3 border-t border-edge px-1 pt-1.5 text-[11px]">
-        <button type="button" onClick={() => openExternal(INSTALL_URL)} className="font-semibold text-widget-github hover:underline">
+        <button type="button" onClick={() => openLink(INSTALL_URL)} className="font-semibold text-widget-github hover:underline">
           Choose repos on GitHub
         </button>
         <button type="button" onClick={onPublic} className="text-fg-3 hover:text-fg">
@@ -614,7 +614,7 @@ function GitHubAccount() {
     setActionError(null);
     try {
       const { url } = await githubApi.connect();
-      await invoke("open_external", { url });
+      await openExternal(url);
       setWaitUntil(Date.now() + CONNECT_WINDOW_MS);
     } catch {
       setActionError("Couldn't start the GitHub connection. Try again.");

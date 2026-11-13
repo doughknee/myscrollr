@@ -164,12 +164,12 @@ func TestIntegrationSubscriptionUpdatedUnpaidRemovesAccess(t *testing.T) {
 	testsupport.MustExec(t, `UPDATE stripe_customers SET stripe_subscription_id = 'sub_unpaid' WHERE logto_sub = $1`, sub)
 
 	// An update about some other subscription changes nothing.
-	_ = billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	_ = deliverSubscriptionUpdate(t, `{
 		"id": "sub_other", "object": "subscription", "status": "canceled",
 		"cancel_at_period_end": false, "customer": "cus_unpaid_upd",
 		"items": {"object": "list", "data": [{"id": "si_1", "object": "subscription_item",
 			"current_period_end": 1781136000, "price": {"id": "price_monthly_t", "object": "price"}}]}
-	}`))
+	}`)
 	if row := readStripeCustomer(t, sub); row.Status != "past_due" || row.Plan != "pro_monthly" {
 		t.Errorf("row after another subscription's update = %+v, want untouched", row)
 	}
@@ -178,12 +178,12 @@ func TestIntegrationSubscriptionUpdatedUnpaidRemovesAccess(t *testing.T) {
 	}
 
 	// The stored subscription going unpaid ends paid access.
-	_ = billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	_ = deliverSubscriptionUpdate(t, `{
 		"id": "sub_unpaid", "object": "subscription", "status": "unpaid",
 		"cancel_at_period_end": false, "customer": "cus_unpaid_upd",
 		"items": {"object": "list", "data": [{"id": "si_1", "object": "subscription_item",
 			"current_period_end": 1781136000, "price": {"id": "price_pro_monthly_t", "object": "price"}}]}
-	}`))
+	}`)
 	if row := readStripeCustomer(t, sub); row.Status != "unpaid" {
 		t.Errorf("status = %q, want unpaid", row.Status)
 	}
@@ -245,6 +245,7 @@ type subscribeStripeStub struct {
 	idempotencyKey string
 	trialRequested bool
 	canceled       []string
+	created        int
 }
 
 func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribeStripeStub {
@@ -252,8 +253,8 @@ func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribe
 	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/setup_intents/seti_1":
-			_, _ = w.Write([]byte(`{"id":"seti_1","object":"setup_intent","status":"succeeded",
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/setup_intents/"):
+			_, _ = w.Write([]byte(`{"id":"` + strings.TrimPrefix(r.URL.Path, "/v1/setup_intents/") + `","object":"setup_intent","status":"succeeded",
 				"payment_method":"pm_1","customer":"cus_subscribe","metadata":{"logto_sub":"` + logtoSub + `"}}`))
 		case r.URL.Path == "/v1/payment_methods/pm_1/attach":
 			_, _ = w.Write([]byte(`{"id":"pm_1","object":"payment_method"}`))
@@ -264,7 +265,9 @@ func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribe
 			s.mu.Lock()
 			s.idempotencyKey = r.Header.Get("Idempotency-Key")
 			s.trialRequested = strings.Contains(string(form), "trial_period_days")
+			s.created++
 			s.mu.Unlock()
+			time.Sleep(100 * time.Millisecond) // widen the window a second tab could race through
 			_, _ = w.Write([]byte(`{"id":"sub_new","object":"subscription","status":"` + subStatus + `"}`))
 		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v1/subscriptions/"):
 			s.mu.Lock()
@@ -280,10 +283,14 @@ func newSubscribeStripeStub(t *testing.T, logtoSub, subStatus string) *subscribe
 }
 
 func postSubscribe(t *testing.T, sub string) (int, string) {
+	return postSubscribeWith(t, sub, "seti_1")
+}
+
+func postSubscribeWith(t *testing.T, sub, setupIntentID string) (int, string) {
 	t.Helper()
 	app := asUser(fiber.MethodPost, "/checkout/subscribe", sub, billing.HandleConfirmSubscription)
 	req := httptest.NewRequest(fiber.MethodPost, "/checkout/subscribe",
-		strings.NewReader(`{"setup_intent_id":"seti_1","price_id":"price_ultimate_monthly_t"}`))
+		strings.NewReader(`{"setup_intent_id":"`+setupIntentID+`","price_id":"price_ultimate_monthly_t"}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, -1)
 	if err != nil {
@@ -336,8 +343,8 @@ func TestIntegrationSubscribeActiveGrantsWithIdempotencyKey(t *testing.T) {
 	if status != fiber.StatusOK {
 		t.Fatalf("status = %d (%s), want 200", status, body)
 	}
-	if stripeStub.idempotencyKey != "subscribe-seti_1" {
-		t.Errorf("Idempotency-Key = %q, want subscribe-seti_1", stripeStub.idempotencyKey)
+	if stripeStub.idempotencyKey != "subscribe-seti_1-price_ultimate_monthly_t" {
+		t.Errorf("Idempotency-Key = %q, want subscribe-seti_1-price_ultimate_monthly_t", stripeStub.idempotencyKey)
 	}
 	if len(stripeStub.canceled) != 0 {
 		t.Errorf("canceled at Stripe = %v, want none", stripeStub.canceled)
@@ -348,5 +355,182 @@ func TestIntegrationSubscribeActiveGrantsWithIdempotencyKey(t *testing.T) {
 	row := readStripeCustomer(t, sub)
 	if row.Plan != "ultimate_monthly" || row.Status != "active" || row.SubscriptionID == nil || *row.SubscriptionID != "sub_new" {
 		t.Errorf("row = %+v, want ultimate_monthly active sub_new", row)
+	}
+}
+
+func TestIntegrationPurchaseRefusedWhileDeletionPending(t *testing.T) {
+	setupIntegrationDB(t)
+	const pendingSub, otherSub = "user_buy_pending", "user_buy_free"
+	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
+		VALUES ($1, now(), now() + interval '30 days', 'pending'), ($2, now(), now() + interval '30 days', 'canceled')`,
+		pendingSub, otherSub)
+
+	for _, tc := range []struct {
+		sub        string
+		wantStatus int
+	}{{pendingSub, fiber.StatusConflict}, {otherSub, fiber.StatusOK}} {
+		app := fiber.New()
+		app.Post("/checkout/subscribe", func(c *fiber.Ctx) error {
+			c.Locals("user_id", tc.sub)
+			return c.Next()
+		}, billing.RefuseWhileDeletionPending, func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+		resp, err := app.Test(httptest.NewRequest(fiber.MethodPost, "/checkout/subscribe", nil), -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != tc.wantStatus {
+			t.Errorf("%s: status = %d (%s), want %d", tc.sub, resp.StatusCode, body, tc.wantStatus)
+		}
+		if tc.wantStatus == fiber.StatusConflict && !strings.Contains(string(body), `"error":"Your account is scheduled for deletion. Cancel the deletion`) {
+			t.Errorf("body = %s, want the cancel-the-deletion message", body)
+		}
+	}
+}
+
+// SCROLLR-465 B2-2: an active update retried after the subscription was
+// deleted must not re-grant access; the handler asks Stripe what is true now.
+func TestIntegrationLateActiveUpdateAfterDeletionGrantsNothing(t *testing.T) {
+	setupIntegrationDB(t)
+	logto := newLogtoStub(t)
+	setStripePriceEnv(t)
+	const sub = "user_late_update"
+	// What subscription.deleted leaves behind.
+	seedStripeCustomer(t, sub, "cus_late_update", "free", "canceled", false)
+	const event = `{"id": "sub_late", "object": "subscription", "status": "active",
+		"cancel_at_period_end": false, "customer": "cus_late_update",
+		"items": {"object": "list", "data": [{"id": "si_1", "object": "subscription_item",
+			"current_period_end": 1781136000, "price": {"id": "price_ultimate_monthly_t", "object": "price"}}]}}`
+
+	serveSubscription(t, `{"id": "sub_late", "object": "subscription", "status": "canceled", "customer": "cus_late_update"}`)
+	if err := billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", event)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got := logto.assignedRoles(); len(got) != 0 {
+		t.Errorf("assigned roles = %v, want none for a subscription Stripe says has ended", got)
+	}
+	if row := readStripeCustomer(t, sub); row.Plan != "free" || row.Status != "canceled" || row.SubscriptionID != nil {
+		t.Errorf("row = %+v, want untouched free/canceled", row)
+	}
+
+	// Stripe unreachable: the event fails so Stripe retries it, and nothing changes.
+	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","message":"down"}}`))
+	})
+	if err := billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", event)); err == nil {
+		t.Error("handler succeeded although Stripe could not be asked")
+	}
+	if got := logto.assignedRoles(); len(got) != 0 {
+		t.Errorf("assigned roles = %v, want none", got)
+	}
+
+	// Stripe has no such subscription at all: acknowledged (no retry can
+	// succeed), and nothing changes.
+	stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","message":"No such subscription"}}`))
+	})
+	if err := billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", event)); err != nil {
+		t.Errorf("handler = %v for a subscription Stripe does not have, want nil so Stripe stops retrying", err)
+	}
+	if got := logto.assignedRoles(); len(got) != 0 {
+		t.Errorf("assigned roles = %v, want none", got)
+	}
+	if row := readStripeCustomer(t, sub); row.Plan != "free" || row.Status != "canceled" || row.SubscriptionID != nil {
+		t.Errorf("row = %+v, want untouched free/canceled", row)
+	}
+}
+
+// SCROLLR-465 B2-3: only a customer Stripe says is gone is replaced; any other
+// Stripe error fails the request and keeps the billing row.
+func TestIntegrationStripeCustomerReplacedOnlyWhenMissing(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "stripe error", true: "customer missing"}[missing], func(t *testing.T) {
+			setupIntegrationDB(t)
+			setStripePriceEnv(t)
+			const sub = "user_customer_check"
+			seedStripeCustomer(t, sub, "cus_kept", "free", "canceled", false)
+			stubStripeAPI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/customers/cus_kept" && missing:
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","code":"resource_missing","message":"No such customer"}}`))
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/customers/cus_kept":
+					w.Header().Set("Stripe-Should-Retry", "false")
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`{"error":{"type":"api_error","message":"timeout"}}`))
+				case r.Method == http.MethodPost && r.URL.Path == "/v1/customers":
+					if !missing {
+						t.Error("a new customer was created after a transient error")
+					}
+					_, _ = w.Write([]byte(`{"id":"cus_new","object":"customer"}`))
+				default:
+					// Stop the handler after the customer step.
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":{"type":"invalid_request_error","message":"stop"}}`))
+				}
+			})
+
+			app := asUser(fiber.MethodPost, "/checkout/setup-intent", sub, billing.HandleCreateSetupIntent)
+			req := httptest.NewRequest(fiber.MethodPost, "/checkout/setup-intent", strings.NewReader(`{"price_id":"price_ultimate_monthly_t"}`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != fiber.StatusInternalServerError {
+				t.Errorf("status = %d, want 500", resp.StatusCode)
+			}
+			row := readStripeCustomer(t, sub)
+			if missing {
+				if row.CustomerID != "cus_new" {
+					t.Errorf("customer = %q, want the replacement cus_new", row.CustomerID)
+				}
+				return
+			}
+			if row.CustomerID != "cus_kept" || row.Status != "canceled" {
+				t.Errorf("row = %+v, want cus_kept/canceled untouched", row)
+			}
+		})
+	}
+}
+
+// SCROLLR-465 B2-4: two tabs, each with its own SetupIntent, subscribe at the
+// same time. One subscription is created; the other tab gets the conflict.
+func TestIntegrationConcurrentSubscribesCreateOne(t *testing.T) {
+	setupIntegrationDB(t)
+	newLogtoStub(t)
+	setStripePriceEnv(t)
+	const sub = "user_two_tabs"
+	seedStripeCustomer(t, sub, "cus_subscribe", "free", "canceled", false)
+	stripeStub := newSubscribeStripeStub(t, sub, "active")
+
+	var wg sync.WaitGroup
+	statuses := make([]int, 2)
+	for i, seti := range []string{"seti_tab1", "seti_tab2"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			statuses[i], _ = postSubscribeWith(t, sub, seti)
+		}()
+	}
+	wg.Wait()
+
+	if stripeStub.created != 1 {
+		t.Errorf("subscriptions created at Stripe = %d, want 1", stripeStub.created)
+	}
+	ok, conflict := 0, 0
+	for _, st := range statuses {
+		switch st {
+		case fiber.StatusOK:
+			ok++
+		case fiber.StatusConflict:
+			conflict++
+		}
+	}
+	if ok != 1 || conflict != 1 {
+		t.Errorf("statuses = %v, want one 200 and one 409", statuses)
 	}
 }

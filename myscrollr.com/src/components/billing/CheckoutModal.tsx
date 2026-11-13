@@ -420,7 +420,8 @@ export default function CheckoutModal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  // Fetch intent on mount
+  // Fetch intent on mount, and again when the visitor presses Try again
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false
     setState('loading')
@@ -451,7 +452,7 @@ export default function CheckoutModal({
     return () => {
       cancelled = true
     }
-  }, [plan, isLifetime, getToken])
+  }, [plan, isLifetime, getToken, attempt])
 
   // Build Elements options — appearance re-derives whenever theme changes.
   const appearance = getStripeAppearance(isDark)
@@ -500,12 +501,20 @@ export default function CheckoutModal({
               Checkout Failed
             </h3>
             <p className="text-xs text-base-content/50">{error}</p>
-            <button
-              onClick={onClose}
-              className="mt-2 px-6 py-2 text-xs font-semibold border border-base-content/20 rounded-lg hover:bg-base-content/5 transition-colors"
-            >
-              Close
-            </button>
+            <div className="mt-2 flex gap-3">
+              <button
+                onClick={() => setAttempt((n) => n + 1)}
+                className="px-6 py-2 text-xs font-semibold border border-primary/40 text-primary rounded-lg hover:bg-primary/5 transition-colors"
+              >
+                Try again
+              </button>
+              <button
+                onClick={onClose}
+                className="px-6 py-2 text-xs font-semibold border border-base-content/20 rounded-lg hover:bg-base-content/5 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>
