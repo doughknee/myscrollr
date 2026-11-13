@@ -233,6 +233,20 @@ function utcOffsetLabel(now: Date, tz: string | undefined): string {
   }
 }
 
+/**
+ * Merge freshly built chips into the data, keeping the same object when
+ * nothing on them changed. The clock rebuilds every second, but its chips
+ * read hours and minutes: handing React a new object each second re-rendered
+ * the whole bar and rebuilt every Continuous chip, 59 times a minute for
+ * nothing (SCROLLR-463, PF-8).
+ */
+export function mergeChips(prev: WidgetTickerData, patch: Partial<WidgetTickerData>): WidgetTickerData {
+  for (const k of Object.keys(patch) as (keyof WidgetTickerData)[]) {
+    if (JSON.stringify(prev[k]) !== JSON.stringify(patch[k])) return { ...prev, ...patch };
+  }
+  return prev;
+}
+
 // ── Visibility ──────────────────────────────────────────────────
 
 /** How often a window with utilities on asks the OS whether it is still on screen. */
@@ -562,6 +576,8 @@ export function useWidgetTickerData(
     }
     if (!visible) return;
 
+    const patch = (p: Partial<WidgetTickerData>) => setData((prev) => mergeChips(prev, p));
+
     // Build initial data
     const refresh = () => {
       setData({
@@ -577,14 +593,14 @@ export function useWidgetTickerData(
     // Clock: update every second
     const clockInterval = hasClock
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, clock: buildClockChips() }));
+          patch({ clock: buildClockChips() });
         }, 1000)
       : null;
 
     // Timer: update every second while enabled for live elapsed time
     const timerInterval = hasTimer
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, timer: buildTimerChips() }));
+          patch({ timer: buildTimerChips() });
         }, 1000)
       : null;
 
@@ -592,35 +608,35 @@ export function useWidgetTickerData(
     // (weatherQueryOptions in __root.tsx writes to LS_WEATHER_CITIES on every fetch)
     const unsubWeatherCities = hasWeather
       ? onStoreChange<SavedCity[]>(LS_WEATHER_CITIES, () => {
-          setData((prev) => ({ ...prev, weather: buildWeatherChips() }));
+          patch({ weather: buildWeatherChips() });
         })
       : null;
 
     // Timer: listen for store changes
     const unsubTimerState = hasTimer
       ? onStoreChange<TimerState | null>(LS_TIMER_STATE, () => {
-          setData((prev) => ({ ...prev, timer: buildTimerChips() }));
+          patch({ timer: buildTimerChips() });
         })
       : null;
 
     // Clock: listen for store changes (timezones)
     const unsubClockTimezones = hasClock
       ? onStoreChange<string[]>(LS_CLOCK_TIMEZONES, () => {
-          setData((prev) => ({ ...prev, clock: buildClockChips() }));
+          patch({ clock: buildClockChips() });
         })
       : null;
 
     // Uptime: listen for store changes (monitor data written by FeedTab)
     const unsubUptimeMonitors = hasUptime
       ? onStoreChange(LS_UPTIME_MONITORS, () => {
-          setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
+          patch({ uptime: buildUptimeChips() });
         })
       : null;
 
     // GitHub: listen for store changes (repo data written by FeedTab)
     const unsubGithubRepos = hasGithub
       ? onStoreChange(LS_GITHUB_BOARD, () => {
-          setData((prev) => ({ ...prev, ...buildGithub() }));
+          patch(buildGithub());
         })
       : null;
 
@@ -631,7 +647,7 @@ export function useWidgetTickerData(
       ? setInterval(async () => {
           try {
             sysInfoRef.current = await fetchSysmonData();
-            setData((prev) => ({ ...prev, sysmon: buildSysmonChips() }));
+            patch({ sysmon: buildSysmonChips() });
           } catch {
             /* ignore IPC failures */
           }
@@ -643,7 +659,7 @@ export function useWidgetTickerData(
     const uptimeMs = 60_000;
     const uptimeInterval = hasUptime
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
+          patch({ uptime: buildUptimeChips() });
         }, uptimeMs)
       : null;
 
@@ -652,7 +668,7 @@ export function useWidgetTickerData(
     const githubMs = 60_000;
     const githubInterval = hasGithub
       ? setInterval(() => {
-          setData((prev) => ({ ...prev, ...buildGithub() }));
+          patch(buildGithub());
         }, githubMs)
       : null;
 
