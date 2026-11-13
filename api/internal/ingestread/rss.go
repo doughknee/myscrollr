@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/sync/singleflight"
 )
@@ -669,6 +670,18 @@ func runJanitorOnce(parent context.Context) {
 		log.Print("[RSS Janitor] security event retention step failed")
 	}
 
+	// Safety net: when most of the catalog looks dead at once the cause is
+	// almost certainly ours (ingester down, no network, cannot write), and
+	// removing custom feeds from subscribers cannot be undone. Change nothing.
+	if dead, total, err := countJanitorCandidates(ctx); err != nil {
+		log.Printf("[RSS Janitor] candidate count failed (skipping pass): %v", err)
+		return
+	} else if janitorSystemicFailure(dead, total) {
+		log.Printf("[RSS Janitor] %d of %d feeds look dead; skipping this run because the cause is probably ours, not the feeds", dead, total)
+		sentry.CaptureMessage(fmt.Sprintf("RSS janitor skipped: %d of %d feeds look dead", dead, total))
+		return
+	}
+
 	// Step 1 — disable broken curated feeds (operator action required
 	// for actual removal).
 	disabled, err := disableBrokenCuratedFeeds(ctx)
@@ -691,6 +704,33 @@ func runJanitorOnce(parent context.Context) {
 		// catalog so the next read sees the new state.
 		invalidateAllCatalogCaches(ctx)
 	}
+}
+
+// Systemic-failure guard: skip a pass when more than half of the feeds the
+// janitor considers, and more than janitorMinDeadForSkip of them, qualify at
+// once. A few genuinely dead feeds (<= 5) are always cleaned up, even in a
+// tiny catalog. Production has ~140 feeds, so the skip starts at 71 dead.
+const janitorMinDeadForSkip = 5
+
+func janitorSystemicFailure(dead, total int) bool {
+	return dead > janitorMinDeadForSkip && dead*2 > total
+}
+
+// countJanitorCandidates counts, over the feeds the two steps consider
+// (enabled curated + custom), how many they would act on and how many exist.
+// The predicate must match disableBrokenCuratedFeeds / removeBrokenCustomFeeds.
+func countJanitorCandidates(ctx context.Context) (dead, total int, err error) {
+	const q = `
+		SELECT COUNT(*) FILTER (WHERE
+		           (last_success_at IS NULL AND created_at < NOW() - INTERVAL '` + LastSuccessStaleThreshold + `')
+		        OR last_success_at < NOW() - INTERVAL '` + LastSuccessStaleThreshold + `'
+		        OR consecutive_failures >= $1),
+		       COUNT(*)
+		  FROM tracked_feeds
+		 WHERE is_default = false OR is_enabled = true
+	`
+	err = platform.DBPool.QueryRow(ctx, q, MaxConsecutiveFailuresJanitor).Scan(&dead, &total)
+	return
 }
 
 // disableBrokenCuratedFeeds flips is_enabled = false on curated feeds

@@ -14,8 +14,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v82"
+	checkoutsession "github.com/stripe/stripe-go/v82/checkout/session"
+	stripecustomer "github.com/stripe/stripe-go/v82/customer"
+	stripepaymentintent "github.com/stripe/stripe-go/v82/paymentintent"
 	stripesubscription "github.com/stripe/stripe-go/v82/subscription"
 )
+
+// IsStripeResourceMissing reports whether Stripe answered that the object the
+// request names does not exist (code resource_missing). Only this answer may
+// be treated as "gone"; any other Stripe error says nothing about the object.
+func IsStripeResourceMissing(err error) bool {
+	var se *stripe.Error
+	return errors.As(err, &se) && se.Code == stripe.ErrorCodeResourceMissing
+}
+
+// errPurgeUnderway answers a cancel or a new request once the purge has begun
+// its irreversible steps.
+const errPurgeUnderway = "Your account is already being deleted, so this can no longer be stopped."
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -489,17 +504,21 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 
 	// Idempotent upsert: a second request while pending returns the
 	// existing schedule. Resetting a canceled/purged row restarts the
-	// countdown (the user changed their mind; acceptable).
-	_, err := platform.DBPool.Exec(ctx, `
+	// countdown (the user changed their mind; acceptable). A purge that has
+	// started is never pushed back.
+	tag, err := platform.DBPool.Exec(ctx, `
 		INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
 		VALUES ($1, $2, $3, 'pending')
 		ON CONFLICT (logto_sub) DO UPDATE SET
-			requested_at = EXCLUDED.requested_at,
-			purge_at     = EXCLUDED.purge_at,
-			status       = 'pending',
-			canceled_at  = NULL,
-			purged_at    = NULL,
-			purge_email  = NULL
+			requested_at     = EXCLUDED.requested_at,
+			purge_at         = EXCLUDED.purge_at,
+			status           = 'pending',
+			canceled_at      = NULL,
+			purged_at        = NULL,
+			purge_email      = NULL,
+			purge_started_at = NULL
+		WHERE user_deletion_requests.status <> 'pending'
+		   OR user_deletion_requests.purge_started_at IS NULL
 	`, userID, now, purgeAt)
 	if err != nil {
 		log.Printf("[GDPR] upsert deletion request for %s: %v", userID, err)
@@ -508,8 +527,14 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 			Error:  "Failed to schedule deletion",
 		})
 	}
+	if tag.RowsAffected() == 0 {
+		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: errPurgeUnderway})
+	}
 
 	log.Printf("[GDPR] Account deletion scheduled: user=%s purge_at=%s", userID, purgeAt.Format(time.RFC3339))
+
+	// New purchases are refused from here on; close the ones already open.
+	closeOpenPurchases(ctx, userID)
 
 	// Overview's gdpr block flipped from "none" to "pending".
 	platform.InvalidateOverviewCache(ctx, userID)
@@ -521,14 +546,19 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 	})
 }
 
-// DeletionPending reports whether the account has a deletion request waiting
-// for its purge. Billing refuses new purchases meanwhile.
-func DeletionPending(ctx context.Context, logtoSub string) (bool, error) {
-	var pending bool
+// DeletionRequestStatus returns the account's deletion request status
+// ("pending", "canceled" or "purged"), or "" when it never asked. The row
+// outlives the purge, so "purged" also answers for an account Logto has
+// already forgotten while one of its access tokens is still valid. Billing
+// refuses new purchases while pending or purged.
+func DeletionRequestStatus(ctx context.Context, logtoSub string) (string, error) {
+	var status string
 	err := platform.DBPool.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM user_deletion_requests WHERE logto_sub = $1 AND status = 'pending')`,
-		logtoSub).Scan(&pending)
-	return pending, err
+		`SELECT status FROM user_deletion_requests WHERE logto_sub = $1`, logtoSub).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return status, err
 }
 
 // HandleCancelAccountDeletion cancels a pending purge. Returns 404 if no
@@ -544,10 +574,12 @@ func HandleCancelAccountDeletion(c *fiber.Ctx) error {
 	}
 
 	now := time.Now().UTC()
+	// Once the purge has started (subscriptions canceled, Logto account
+	// deleted) a cancel would only strand the local data, so it is refused.
 	tag, err := platform.DBPool.Exec(context.Background(), `
 		UPDATE user_deletion_requests
 		   SET status = 'canceled', canceled_at = $2, purge_email = NULL
-		 WHERE logto_sub = $1 AND status = 'pending'
+		 WHERE logto_sub = $1 AND status = 'pending' AND purge_started_at IS NULL
 	`, userID, now)
 	if err != nil {
 		log.Printf("[GDPR] cancel deletion for %s: %v", userID, err)
@@ -557,6 +589,20 @@ func HandleCancelAccountDeletion(c *fiber.Ctx) error {
 		})
 	}
 	if tag.RowsAffected() == 0 {
+		var underway bool
+		if err := platform.DBPool.QueryRow(context.Background(), `
+			SELECT EXISTS (SELECT 1 FROM user_deletion_requests
+			  WHERE logto_sub = $1 AND status = 'pending' AND purge_started_at IS NOT NULL)`, userID,
+		).Scan(&underway); err != nil {
+			log.Printf("[GDPR] cancel deletion for %s: %v", userID, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+				Status: "error",
+				Error:  "Failed to cancel deletion",
+			})
+		}
+		if underway {
+			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: errPurgeUnderway})
+		}
 		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "No pending deletion request to cancel",
@@ -605,11 +651,11 @@ func HandleAccountDeletionStatus(c *fiber.Ctx) error {
 func getUserDeletionStatus(ctx context.Context, logtoSub string) (map[string]any, error) {
 	var status string
 	var requestedAt, purgeAt time.Time
-	var canceledAt, purgedAt *time.Time
+	var canceledAt, purgedAt, purgeStartedAt *time.Time
 	err := platform.DBPool.QueryRow(ctx, `
-		SELECT status, requested_at, purge_at, canceled_at, purged_at
+		SELECT status, requested_at, purge_at, canceled_at, purged_at, purge_started_at
 		  FROM user_deletion_requests WHERE logto_sub = $1
-	`, logtoSub).Scan(&status, &requestedAt, &purgeAt, &canceledAt, &purgedAt)
+	`, logtoSub).Scan(&status, &requestedAt, &purgeAt, &canceledAt, &purgedAt, &purgeStartedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -626,6 +672,10 @@ func getUserDeletionStatus(ctx context.Context, logtoSub string) (map[string]any
 	}
 	if purgedAt != nil {
 		out["purged_at"] = purgedAt
+	}
+	if purgeStartedAt != nil {
+		// Present only while it can no longer be canceled (and after).
+		out["purge_started_at"] = purgeStartedAt
 	}
 	return out, nil
 }
@@ -740,26 +790,36 @@ func purgeEmail(ctx context.Context, logtoSub string) (string, error) {
 	return *kept, nil
 }
 
-// cancelLiveSubscriptions cancels every subscription Stripe still lists for
-// the account's customer that has not ended. Stripe is asked, not the stored
-// subscription id, because a second subscription is never stored. Any Stripe
-// error is returned so the purge stops and the next pass retries. A lifetime
-// purchase is a payment, not a subscription, and is not touched.
-func cancelLiveSubscriptions(ctx context.Context, logtoSub string) error {
+// stripeCustomerFor returns the account's Stripe customer id, or "" when it has
+// none or billing is switched off (STRIPE_DISABLED: this deployment cannot have
+// taken a payment).
+func stripeCustomerFor(ctx context.Context, logtoSub string) (string, error) {
 	var customerID string
 	err := platform.DBPool.QueryRow(ctx,
 		`SELECT stripe_customer_id FROM stripe_customers WHERE logto_sub = $1`, logtoSub,
 	).Scan(&customerID)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && customerID == "") {
-		return nil
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
 	}
 	if err != nil {
-		return fmt.Errorf("read stripe customer: %w", err)
+		return "", fmt.Errorf("read stripe customer: %w", err)
 	}
 	if stripe.Key == "" {
-		// Billing is switched off (STRIPE_DISABLED): this deployment cannot
-		// have started a subscription.
-		return nil
+		return "", nil
+	}
+	return customerID, nil
+}
+
+// cancelLiveSubscriptions cancels every subscription Stripe still lists for
+// the account's customer that has not ended. Stripe is asked, not the stored
+// subscription id, because a second subscription is never stored. A customer
+// Stripe does not have (or has deleted) has nothing to cancel; any other
+// Stripe error is returned so the purge stops and the next pass retries. A
+// lifetime purchase is a payment, not a subscription, and is not touched.
+func cancelLiveSubscriptions(ctx context.Context, logtoSub string) error {
+	customerID, err := stripeCustomerFor(ctx, logtoSub)
+	if err != nil || customerID == "" {
+		return err
 	}
 	params := &stripe.SubscriptionListParams{Customer: stripe.String(customerID), Status: stripe.String("all")}
 	params.Context = ctx
@@ -775,7 +835,67 @@ func cancelLiveSubscriptions(ctx context.Context, logtoSub string) error {
 		}
 		log.Printf("[GDPR Purge] Canceled %s subscription %s for %s", sub.Status, sub.ID, logtoSub)
 	}
-	return iter.Err()
+	err = iter.Err()
+	if IsStripeResourceMissing(err) {
+		// Stripe answers an unknown customer filter with resource_missing
+		// (old mode's id, or deleted at Stripe). Confirm on the customer
+		// itself before treating it as "nothing to cancel".
+		c, getErr := stripecustomer.Get(customerID, &stripe.CustomerParams{Params: stripe.Params{Context: ctx}})
+		if IsStripeResourceMissing(getErr) || (getErr == nil && c.Deleted) {
+			log.Printf("[GDPR Purge] Stripe has no customer %s for %s; no subscriptions to cancel", customerID, logtoSub)
+			return nil
+		}
+	}
+	return err
+}
+
+// closeOpenPurchases expires the account's open Checkout Sessions and cancels
+// its unconfirmed lifetime PaymentIntents, so a payment page opened before the
+// deletion request cannot complete during the grace period. Best effort: the
+// deletion stays scheduled if Stripe fails, and the purge still cancels any
+// subscription that gets through.
+func closeOpenPurchases(ctx context.Context, logtoSub string) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	customerID, err := stripeCustomerFor(ctx, logtoSub)
+	if err != nil || customerID == "" {
+		if err != nil {
+			log.Printf("[GDPR] close open purchases for %s: %v", logtoSub, err)
+		}
+		return
+	}
+	sp := &stripe.CheckoutSessionListParams{Customer: stripe.String(customerID), Status: stripe.String("open")}
+	sp.Context = ctx
+	sessions := checkoutsession.List(sp)
+	for sessions.Next() {
+		s := sessions.CheckoutSession()
+		if _, err := checkoutsession.Expire(s.ID, &stripe.CheckoutSessionExpireParams{Params: stripe.Params{Context: ctx}}); err != nil {
+			log.Printf("[GDPR] expire checkout session %s for %s: %v", s.ID, logtoSub, err)
+		}
+	}
+	if err := sessions.Err(); err != nil {
+		log.Printf("[GDPR] list checkout sessions for %s: %v", logtoSub, err)
+	}
+	pp := &stripe.PaymentIntentListParams{Customer: stripe.String(customerID)}
+	pp.Context = ctx
+	intents := stripepaymentintent.List(pp)
+	for intents.Next() {
+		pi := intents.PaymentIntent()
+		// Only our own lifetime intents (HandleCreatePaymentIntent); an
+		// invoice's intent belongs to its subscription.
+		if pi.Metadata["plan"] != "lifetime" {
+			continue
+		}
+		switch pi.Status {
+		case stripe.PaymentIntentStatusRequiresPaymentMethod, stripe.PaymentIntentStatusRequiresConfirmation, stripe.PaymentIntentStatusRequiresAction:
+			if _, err := stripepaymentintent.Cancel(pi.ID, &stripe.PaymentIntentCancelParams{Params: stripe.Params{Context: ctx}}); err != nil {
+				log.Printf("[GDPR] cancel payment intent %s for %s: %v", pi.ID, logtoSub, err)
+			}
+		}
+	}
+	if err := intents.Err(); err != nil {
+		log.Printf("[GDPR] list payment intents for %s: %v", logtoSub, err)
+	}
 }
 
 // purgeUserAccount executes the full cascade for one user, in order:
@@ -793,12 +913,25 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		return fmt.Errorf("read logto email: %w", err)
 	}
 
-	// The cascade's transaction opens here, before anything irreversible,
-	// and locks the request row: this is the last point where a cancel can
-	// still be honoured. A cancel that landed since the scan is seen now and
-	// stops the purge; one that arrives from here on waits on the row lock
-	// and, once the purge commits, finds nothing pending and answers 404
-	// instead of a "canceled" that is no longer true.
+	// The last point where a cancel can still be honoured: the purge is
+	// marked started, committed on its own, before anything irreversible
+	// (Stripe cancel, Logto delete). A cancel that landed since the scan
+	// leaves nothing pending to mark and stops the purge here. From now on
+	// the cancel endpoint refuses, and the row stays pending (so the next
+	// pass retries) until the cascade commits, even if this pass fails
+	// after Logto has forgotten the account (SCROLLR-477 B3-3).
+	if tag, err := platform.DBPool.Exec(ctx, `
+		UPDATE user_deletion_requests SET purge_started_at = COALESCE(purge_started_at, now())
+		 WHERE logto_sub = $1 AND status = 'pending'`, logtoSub); err != nil {
+		return fmt.Errorf("mark purge started: %w", err)
+	} else if tag.RowsAffected() == 0 {
+		log.Printf("[GDPR Purge] %s no longer pending (canceled); skipped", logtoSub)
+		return nil
+	}
+
+	// The cascade's transaction locks the request row across the
+	// irreversible steps, so a second replica purging the same account
+	// waits here (or on the statement above) and then skips.
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -809,7 +942,7 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		SELECT true FROM user_deletion_requests
 		 WHERE logto_sub = $1 AND status = 'pending' FOR UPDATE`, logtoSub,
 	).Scan(&stillPending); errors.Is(err, pgx.ErrNoRows) {
-		log.Printf("[GDPR Purge] %s no longer pending (canceled); skipped", logtoSub)
+		log.Printf("[GDPR Purge] %s no longer pending (purged by another pass); skipped", logtoSub)
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("lock deletion request: %w", err)
