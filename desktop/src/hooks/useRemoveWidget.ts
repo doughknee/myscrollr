@@ -19,7 +19,7 @@ import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { CatalogItem } from "../marketplace";
 import { slotWidgetCount } from "../marketplace";
-import { disableWidget } from "../preferences";
+import { disableWidget, dropPinsForWidget, MAX_PINS } from "../preferences";
 import { ShellContext } from "../shell-context";
 import type { DashboardResponse } from "../types";
 import { useUndoableAction } from "./useUndoableAction";
@@ -36,6 +36,7 @@ export function useRemoveWidget(
   const undoable = useUndoableAction(shell);
   const ctx = useContext(ShellContext);
   const prefs = (shell ?? ctx)?.prefs;
+  const onPrefsChange = (shell ?? ctx)?.onPrefsChange;
 
   return useCallback(
     async (item: CatalogItem) => {
@@ -53,6 +54,14 @@ export function useRemoveWidget(
         try {
           await dataWidgetsApi.delete(item.id);
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+          // Its pins go with it: a pin for a widget that no longer exists can
+          // never render a chip, yet still counts against MAX_PINS.
+          const droppedPins = (prefs?.widgets.pins ?? []).filter(
+            (p) => p.widget === item.id,
+          );
+          if (prefs && onPrefsChange && droppedPins.length > 0) {
+            onPrefsChange(dropPinsForWidget(prefs, item.id));
+          }
           toast.success(`${item.name} removed`, {
             description: "Its page is free for another widget.",
             action: {
@@ -68,6 +77,16 @@ export function useRemoveWidget(
                     queryClient.invalidateQueries({
                       queryKey: queryKeys.dashboard,
                     });
+                    if (prefs && onPrefsChange && droppedPins.length > 0) {
+                      const kept = dropPinsForWidget(prefs, item.id);
+                      onPrefsChange({
+                        ...kept,
+                        widgets: {
+                          ...kept.widgets,
+                          pins: [...kept.widgets.pins, ...droppedPins].slice(0, MAX_PINS),
+                        },
+                      });
+                    }
                     toast.success(`${item.name} restored`);
                   })
                   .catch(() => toast.error(`Couldn't restore ${item.name}`));
@@ -91,6 +110,6 @@ export function useRemoveWidget(
         );
       }
     },
-    [queryClient, undoable, prefs],
+    [queryClient, undoable, prefs, onPrefsChange],
   );
 }

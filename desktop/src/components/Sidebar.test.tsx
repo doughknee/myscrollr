@@ -7,6 +7,11 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TrendingUp } from "lucide-react";
 import Sidebar from "./Sidebar";
+import type { DashboardState } from "../api/queries";
+
+// The widget list's loading state comes from the shared dashboard query.
+const dash = vi.hoisted(() => ({ state: "ready" as DashboardState, retry: vi.fn() }));
+vi.mock("../hooks/useDashboardState", () => ({ useDashboardState: () => dash }));
 import type { SubscriptionTier } from "../auth";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
@@ -300,5 +305,22 @@ describe("Sidebar ticker mark", () => {
     const on = screen.getByRole("button", { name: "MLB" });
     expect(off.dataset.offTicker).toBe("true");
     expect(on.dataset.offTicker).toBeUndefined();
+  });
+});
+
+describe("Sidebar widget list while the dashboard loads (UD-4)", () => {
+  it("shows placeholders while pending, a retry when it failed, nothing when ready", () => {
+    dash.state = "pending";
+    const { container } = renderSidebar({ tier: "free", sourceCount: 0 });
+    expect(screen.getByRole("status", { name: "Loading your widgets" })).toBeInTheDocument();
+    container.remove();
+
+    dash.state = "failed";
+    renderSidebar({ tier: "free", sourceCount: 0 });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(dash.retry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("status", { name: "Loading your widgets" })).toBeNull();
+
+    dash.state = "ready";
   });
 });

@@ -17,6 +17,9 @@ import { API_BASE } from "../config";
 import { requiresUpdate } from "../lib/releases";
 import { updateController } from "../lib/updateController";
 
+/** How often the minimum is read again while the app stays open. */
+const RECHECK_MS = 6 * 60 * 60 * 1000;
+
 interface UpdateGate {
   /** True when the server's minimum is newer than the installed version. */
   updateRequired: boolean;
@@ -30,7 +33,7 @@ export function useUpdateGate(appVersion: string): UpdateGate {
   useEffect(() => {
     if (!appVersion) return;
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       try {
         const res = await fetch(`${API_BASE}/app/min-version`);
         if (!res.ok) return;
@@ -49,9 +52,15 @@ export function useUpdateGate(appVersion: string): UpdateGate {
       } catch {
         // Offline / API blip — fail open.
       }
-    })();
+    };
+    void load();
+    // An app left open for days (or started before the network was up) would
+    // otherwise never learn the floor moved; the next reading is a few hours
+    // away, never minutes.
+    const timer = setInterval(() => void load(), RECHECK_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [appVersion]);
 

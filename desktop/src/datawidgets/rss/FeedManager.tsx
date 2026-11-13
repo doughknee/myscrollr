@@ -28,6 +28,7 @@ import { tooltipMotion } from "../../lib/motion";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import type { TrackedFeed } from "../../api/client";
+import { relativeTime } from "../../utils/format";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -522,7 +523,7 @@ function FeedRow({ feed, saving, onToggle, pinWidget }: FeedRowProps) {
         </span>
         {feed.catalog?.last_success_at && tracked && (
           <span className="text-ui-meta text-fg-3 truncate block">
-            {relativeTime(feed.catalog.last_success_at)}
+            {relativeTime(feed.catalog.last_success_at, Date.now(), { suffix: true }) || "—"}
           </span>
         )}
       </div>
@@ -590,15 +591,4 @@ function healthTooltip(feed: UnifiedFeed): string {
   if (hours < 1) return "Last article: less than 1 hour ago";
   if (hours < 24) return `Last article: ${hours}h ago`;
   return `Last article: ${Math.round(hours / 24)}d ago`;
-}
-
-function relativeTime(iso: string | undefined): string {
-  if (!iso) return "—";
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(ms / 60_000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
 }

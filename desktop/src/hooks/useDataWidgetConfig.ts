@@ -34,6 +34,9 @@ export function useDataWidgetConfig<T>(
   }, [error]);
 
   const updateMutation = useMutation({
+    // One widget's writes run in click order; see useSportsConfig.
+    scope: { id: `widget-config:${widgetType}` },
+    mutationKey: ["widget-config", widgetType],
     // Send the FULL merged config so sibling fields (e.g. finance's
     // asset_class, set on add) survive a partial update. onMutate has already
     // patched the dashboard cache below, so we read the merged config from it.
@@ -76,7 +79,10 @@ export function useDataWidgetConfig<T>(
     onError: (err, _next, ctx) => {
       const prev = (ctx as { previous?: DashboardResponse } | undefined)
         ?.previous;
-      if (prev) queryClient.setQueryData(queryKeys.dashboard, prev);
+      // Only when nothing later is queued: the snapshot predates it.
+      if (prev && queryClient.isMutating({ mutationKey: ["widget-config", widgetType] }) <= 1) {
+        queryClient.setQueryData(queryKeys.dashboard, prev);
+      }
       // Tier-limit 403s come back as "Your Free plan allows..." — show
       // the server's message verbatim instead of our generic toast so
       // users understand why the save was refused and what to change.
@@ -89,7 +95,9 @@ export function useDataWidgetConfig<T>(
       toast.error(display);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      if (queryClient.isMutating({ mutationKey: ["widget-config", widgetType] }) <= 1) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      }
     },
   });
 

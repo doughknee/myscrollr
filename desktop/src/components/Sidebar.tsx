@@ -33,6 +33,7 @@ import {
   ArrowUp,
   ArrowUpRight,
   ChevronDown,
+  CloudOff,
   Home,
   Info,
   LifeBuoy,
@@ -58,6 +59,7 @@ import { isSingleChipWidget } from "../preferences";
 import type { SubscriptionTier } from "../auth";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 import { getMaxWidgets } from "../tierLimits";
+import { useDashboardState } from "../hooks/useDashboardState";
 import { slotWidgetCount } from "../marketplace";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -177,6 +179,38 @@ interface SidebarProps {
   onMoveItem: (id: string, direction: "up" | "down") => void;
   /** Remove the widget (frees its slot). */
   onRemoveItem: (source: SidebarSource) => void;
+}
+
+/**
+ * The widget list before the account's widgets have arrived: placeholder
+ * rows while loading, one line and a retry when the load failed with nothing
+ * to show. Without it a slow or failed load looks like an account that lost
+ * everything (UD-4). Nothing once the dashboard is ready.
+ */
+function WidgetsLoadState({ collapsed }: { collapsed: boolean }) {
+  const { state, retry } = useDashboardState();
+  if (state === "ready") return null;
+  if (state === "pending") {
+    return (
+      <div role="status" aria-label="Loading your widgets" className="flex flex-col gap-1.5 py-1">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={clsx("rounded-lg bg-fg-4/15", collapsed ? "mx-auto size-8" : "mx-2 h-8")} />
+        ))}
+      </div>
+    );
+  }
+  return collapsed ? (
+    <Tooltip content="Couldn't load your widgets. Click to try again." side="right">
+      <button type="button" onClick={retry} aria-label="Couldn't load your widgets. Try again." className="mx-auto flex size-8 items-center justify-center rounded-lg text-fg-3 hover:bg-surface-hover hover:text-fg">
+        <CloudOff size={15} />
+      </button>
+    </Tooltip>
+  ) : (
+    <div role="alert" className="flex flex-col items-start gap-1 px-3 py-2 text-ui-meta text-fg-3">
+      <span className="flex items-center gap-1.5"><CloudOff size={13} /> Couldn't load your widgets</span>
+      <button type="button" onClick={retry} className="font-semibold text-accent hover:underline">Try again</button>
+    </div>
+  );
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -368,6 +402,7 @@ export default function Sidebar({
             </motion.div>
           ))}
         </AnimatePresence>
+        <WidgetsLoadState collapsed={collapsed} />
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}

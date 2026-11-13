@@ -72,10 +72,6 @@ export function useAddWidget(): (
           updated_at: new Date().toISOString(),
         };
 
-        const previous = queryClient.getQueryData<DashboardResponse>(
-          queryKeys.dashboard,
-        );
-
         queryClient.setQueryData<DashboardResponse>(
           queryKeys.dashboard,
           (old) => {
@@ -152,18 +148,29 @@ export function useAddWidget(): (
             });
           })
           .catch((err) => {
-            // Roll back the optimistic insert.
+            // Remove only OUR placeholder (a snapshot would also erase any
+            // other add still in flight), then refetch for the truth.
             queryClient.setQueryData<DashboardResponse>(
               queryKeys.dashboard,
-              previous,
+              (old) =>
+                old && {
+                  ...old,
+                  widgets: (old.widgets ?? []).filter(
+                    (c) => c.id !== optimisticWidget.id,
+                  ),
+                },
             );
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
             const message =
               err instanceof Error ? err.message : "Failed to add widget";
             toast.error(`Couldn't add ${item.name}: ${message}`);
           });
       } else {
-        const nextEnabled = [...prefs.widgets.enabledWidgets, item.id];
-        const nextOnTicker = [...prefs.widgets.widgetsOnTicker, item.id];
+        // A double-click reaches here twice; the id goes in once.
+        const withId = (ids: string[]) =>
+          ids.includes(item.id) ? ids : [...ids, item.id];
+        const nextEnabled = withId(prefs.widgets.enabledWidgets);
+        const nextOnTicker = withId(prefs.widgets.widgetsOnTicker);
         // No auto-pin (REL-239). Every new widget used to be pinned to the
         // right so the user saw SOMETHING happen -- which quietly spent the
         // fixed zone on whatever was added last, and for a multi-item widget
