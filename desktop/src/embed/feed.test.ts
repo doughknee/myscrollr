@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { feedUrl, fromPublicFeed, isUtility, rebase, resolveWidget, sportsTonight, widgetRows } from "./feed";
+import { describe, expect, it, vi } from "vitest";
+import { feedUrl, fromPublicFeed, isUtility, readFeed, rebase, resolveWidget, sportsTonight, widgetRows } from "./feed";
 
 const NOW = Date.parse("2026-10-02T17:00:00Z");
 
@@ -66,5 +66,17 @@ describe("embed feed", () => {
       a: ["2026-10-02T17:01:00.000Z", "AAPL"],
       n: 1,
     });
+  });
+
+  it("gives up on a feed that never answers, so the bar falls back to the sample (RC-15)", async () => {
+    vi.useFakeTimers();
+    const hung = (_url: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+    const result = readFeed(hung as typeof fetch, "https://x/public/feed", 5000);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await result).toBeNull();
+    vi.useRealTimers();
+    const ok = async () => new Response('{"data":{}}', { status: 200 });
+    expect(await readFeed(ok as typeof fetch, "https://x")).toEqual({ data: {} });
   });
 });

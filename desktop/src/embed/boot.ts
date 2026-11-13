@@ -30,6 +30,7 @@ import {
   feedUrl,
   fromPublicFeed,
   isUtility,
+  readFeed,
   rebase,
   resolveWidget,
   sportsTonight,
@@ -84,9 +85,8 @@ let ids: string[] | null = asked;
 
 async function live(): Promise<EmbedDashboard | null> {
   try {
-    const res = await nativeFetch(feedUrl(FEED_URL, ids));
-    if (!res.ok) return null;
-    const body = await res.json();
+    const body = await readFeed(nativeFetch, feedUrl(FEED_URL, ids));
+    if (!body) return null;
     ids ??= [sportsTonight(body?.data?.sports?.sports ?? [], Date.now()), ...STARTER].filter(
       (id): id is string => id !== null,
     );
