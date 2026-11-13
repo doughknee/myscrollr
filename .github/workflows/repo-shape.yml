@@ -22,5 +22,7 @@ jobs:
           bash scripts/ci/check-doc-paths.sh
       - name: Check repo shape against the base
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          # Full depth: a shallow fetch of a base that moved after this run was
+          # triggered cuts its history and leaves no merge base (SCROLLR-456).
+          git fetch --no-tags origin "${{ github.base_ref }}"
           bash scripts/ci/check-repo-shape.sh "origin/${{ github.base_ref }}"
