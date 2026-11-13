@@ -14,9 +14,38 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
+
+// anonymousTicketEmail stands in when an account has no verified address. Mail
+// to it goes nowhere, which is the point: it is never a client-chosen address.
+const anonymousTicketEmail = "anonymous@scrollr.user"
+
+// lookupVerifiedEmail is the account's Logto-verified primary email; a
+// variable so tests can answer without a Logto.
+var lookupVerifiedEmail = accounts.LogtoPrimaryEmail
+
+// accountTicketEmail is the address an authenticated ticket is filed under:
+// the account's verified primary email, never anything the client sent
+// (SCROLLR-459 / SB-9: a client-supplied fallback let a case be linked to the
+// caller's account with someone else's address, which the AI reply and the
+// osTicket thread then went to). When Logto cannot be reached the token's own
+// email claim is used, since it comes from the same account; when Logto says
+// the account has no email, the ticket is still accepted so staff see it, but
+// under the placeholder, so no mail can reach a third party.
+func accountTicketEmail(sub, claimEmail string) string {
+	email, err := lookupVerifiedEmail(sub)
+	if err != nil {
+		log.Printf("[Support] verified email lookup failed for %s (using token claim): %v", platform.HashUserSub(sub), err)
+		email = claimEmail
+	}
+	if email == "" {
+		return anonymousTicketEmail
+	}
+	return email
+}
 
 // SupportEpoch is the support reset of 25 Sep 2026. Every case opened before
 // it was closed that day and is history: the bot does not learn from those
@@ -144,13 +173,8 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	}
 
 	// Determine user identity (email is set by LogtoAuth middleware in c.Locals)
-	email, _ := c.Locals("user_email").(string)
-	if email == "" {
-		email = req.Email
-	}
-	if email == "" {
-		email = "anonymous@scrollr.user"
-	}
+	claimEmail, _ := c.Locals("user_email").(string)
+	email := accountTicketEmail(userID, claimEmail)
 
 	name := req.Name
 	if name == "" {

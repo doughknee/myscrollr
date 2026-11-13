@@ -567,10 +567,12 @@ export const inviteApi = {
       body: JSON.stringify(data),
     }),
 
-  checkUsernameAvailable: (email: string, username: string) =>
-    request<CheckUsernameResponse>(
-      `/invite/username-available?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}`,
-    ),
+  checkUsernameAvailable: (email: string, token: string, username: string) =>
+    request<CheckUsernameResponse>('/invite/username-available', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, username }),
+    }),
 }
 
 // ── Support API ───────────────────────────────────────────────────

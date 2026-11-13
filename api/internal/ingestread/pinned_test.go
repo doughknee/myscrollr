@@ -179,3 +179,45 @@ func TestPinnedGamePrefersLive(t *testing.T) {
 		t.Fatalf("got %v, want the next fixture", game.ExternalGameID)
 	}
 }
+
+// SCROLLR-459 / SB-11: a pinned RSS feed must be one the caller has. Another
+// user's custom feed, known by URL, resolves to nothing.
+func TestMergePinnedRowsRSSIsScopedToTheCallersFeeds(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	ctx := context.Background()
+	const mine, theirs, user = "https://pin-test.example/mine.xml", "https://pin-test.example/theirs.xml", "pin-scope-user"
+	clean := func() {
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM rss_items WHERE feed_url LIKE 'https://pin-test.example/%'`)
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM tracked_feeds WHERE url LIKE 'https://pin-test.example/%'`)
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM user_widgets WHERE logto_sub = $1`, user)
+	}
+	clean()
+	defer clean()
+	for _, u := range []string{mine, theirs} {
+		if _, err := platform.DBPool.Exec(ctx,
+			`INSERT INTO tracked_feeds (url, name) VALUES ($1, 'pin test')`, u); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := platform.DBPool.Exec(ctx,
+			`INSERT INTO rss_items (feed_url, guid, title, published_at) VALUES ($1, 'g', 'headline', now())`, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := platform.DBPool.Exec(ctx,
+		`INSERT INTO user_widgets (logto_sub, widget_type, config) VALUES ($1, 'rss_custom', $2::jsonb)`,
+		user, `{"feeds":[{"url":"`+mine+`"}]}`); err != nil {
+		t.Fatal(err)
+	}
+
+	data := map[string]interface{}{"rss": []interface{}{}}
+	MergePinnedRows(ctx, user, map[string][]string{"rss": {mine, theirs}}, data)
+	rows, _ := data["rss"].([]interface{})
+	if len(rows) != 1 {
+		t.Fatalf("got %d pinned rows, want only the caller's own feed: %#v", len(rows), rows)
+	}
+	if item, ok := rows[0].(RssItem); !ok || item.FeedURL != mine {
+		t.Fatalf("pinned row = %#v, want the caller's feed", rows[0])
+	}
+}

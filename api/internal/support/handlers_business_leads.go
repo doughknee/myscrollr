@@ -224,7 +224,7 @@ func HandleSubmitBusinessLead(c *fiber.Ctx) error {
 		}
 	}
 
-	if err := sendBusinessLeadAutoReply(bg, req, useCaseLabel); err != nil {
+	if err := sendBusinessLeadAutoReply(bg, req.Email); err != nil {
 		log.Printf("[BusinessLeads] Auto-reply failed for lead #%d to %s: %v",
 			leadID, redactEmail(req.Email), err)
 	} else {
@@ -254,7 +254,7 @@ func HandleSubmitBusinessLead(c *fiber.Ctx) error {
 
 // resendEndpoint is the Resend Emails API URL. Pulled into a const so
 // tests (when we add them) can swap it via a test double if needed.
-const resendEndpoint = "https://api.resend.com/emails"
+var resendEndpoint = "https://api.resend.com/emails"
 
 // businessLeadsFrom returns the From address used for both the
 // internal notification and the auto-reply. Resolution order:
@@ -355,27 +355,28 @@ func sendBusinessLeadNotification(
 // sendBusinessLeadAutoReply confirms receipt to the lead. Brand voice
 // matches the rest of the site: short, direct, no salesy fluff. Tells
 // them exactly what happens next so they're not left wondering.
-func sendBusinessLeadAutoReply(
-	ctx context.Context,
-	req BusinessLeadRequest,
-	useCaseLabel string,
-) error {
+//
+// The form is anonymous and the address is unverified, so this mail is a FIXED
+// acknowledgement: nothing the submitter typed (name, company, message) is
+// quoted in the subject or body. Otherwise anyone could have Scrollr deliver
+// text of their choosing, from our domain, to any address (SCROLLR-459 / SB-7).
+func sendBusinessLeadAutoReply(ctx context.Context, to string) error {
 	apiKey := strings.TrimSpace(os.Getenv("RESEND_API_KEY"))
 	if apiKey == "" {
 		return fmt.Errorf("RESEND_API_KEY not configured")
 	}
 
-	subject := fmt.Sprintf("Thanks — we got your note about %s", truncateForSubject(req.Company))
+	subject := "Thanks — we got your note"
 
-	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+	htmlBody := `<!DOCTYPE html>
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0b0d10;color:#e6e6e6;padding:24px;">
   <div style="max-width:560px;margin:0 auto;background:#14181d;border:1px solid #1e252d;border-radius:12px;padding:32px;">
     <p style="margin:0 0 4px;font-size:11px;color:#10b981;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Scrollr for business</p>
-    <h2 style="margin:0 0 20px;font-size:22px;color:#fff;font-weight:700;">Thanks, %s — we got your note.</h2>
+    <h2 style="margin:0 0 20px;font-size:22px;color:#fff;font-weight:700;">Thanks — we got your note.</h2>
 
     <p style="margin:0 0 20px;line-height:1.6;color:#c8c8c8;font-size:15px;">
-      We received your inquiry about deploying Scrollr for <strong style="color:#e6e6e6;">%s</strong> (%s). Here&rsquo;s what happens next:
+      We received your inquiry about deploying Scrollr for business. Here&rsquo;s what happens next:
     </p>
 
     <ol style="margin:0 0 24px;padding-left:20px;line-height:1.7;color:#c8c8c8;font-size:14px;">
@@ -399,15 +400,11 @@ func sendBusinessLeadAutoReply(
     You received this because you submitted the form at myscrollr.com/business
   </p>
 </body>
-</html>`,
-		html.EscapeString(req.Name),
-		html.EscapeString(req.Company),
-		html.EscapeString(useCaseLabel),
-	)
+</html>`
 
 	payload := map[string]any{
 		"from":     businessLeadsFrom(),
-		"to":       []string{req.Email},
+		"to":       []string{to},
 		"reply_to": businessLeadsTo(),
 		"subject":  subject,
 		"html":     htmlBody,

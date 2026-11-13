@@ -162,14 +162,31 @@ func HandleCompleteInvite(c *fiber.Ctx) error {
 	})
 }
 
-// HandleCheckUsernameAvailable checks if a username is available.
-// GET /invite/username-available?email=X&username=Y (no auth — verified via email+role)
-func HandleCheckUsernameAvailable(c *fiber.Ctx) error {
-	email := c.Query("email")
-	username := c.Query("username")
+// CheckUsernameRequest is the body for POST /invite/username-available.
+type CheckUsernameRequest struct {
+	Email    string `json:"email"`
+	Token    string `json:"token"`
+	Username string `json:"username"`
+}
 
-	if email == "" || username == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Error: "email and username are required"})
+// HandleCheckUsernameAvailable checks if a username is available to an invitee.
+// POST /invite/username-available (no auth middleware: the invite's one-time
+// token is the credential, verified exactly as /invite/complete verifies it).
+//
+// SCROLLR-459 / SB-8: it used to take only an email, so a 403 vs 200 told any
+// caller whether an address belonged to a super user. Now every way of not
+// being the invitee (no token, wrong token, wrong email, not a super user)
+// gets the SAME 403, and the token goes in the body, not a URL that ingress
+// access logs would record.
+func HandleCheckUsernameAvailable(c *fiber.Ctx) error {
+	var req CheckUsernameRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Error: "Invalid request body"})
+	}
+	email, username := req.Email, req.Username
+
+	if email == "" || username == "" || req.Token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Error: "email, token and username are required"})
 	}
 
 	if !usernameRegex.MatchString(username) {
@@ -186,6 +203,10 @@ func HandleCheckUsernameAvailable(c *fiber.Ctx) error {
 	}
 
 	cfg := getM2MConfig()
+
+	if err := findActiveOneTimeToken(cfg.Endpoint, m2mToken, email, req.Token); err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(platform.ErrorResponse{Error: "Not authorized"})
+	}
 
 	userID, _, err := findUserByEmail(cfg.Endpoint, m2mToken, email)
 	if err != nil {

@@ -53,12 +53,17 @@ type dispositionSignals struct {
 	NeedsInfo       bool
 	ShouldClose     bool
 	IsReply         bool
-	ResolutionText  string
-	DraftBody       string // what we would say to the user
-	UserText        string // what the user said to us — data, never instructions
-	OutboundLast24h int
-	MaxAutoReplies  int
-	CategoryDemoted bool
+	// UnverifiedContact is a ticket opened through the anonymous public form
+	// whose address has not yet written back (SCROLLR-459 / SB-7). Anyone can
+	// type any address there, so nothing may be sent to it unattended: a human
+	// reads the draft first.
+	UnverifiedContact bool
+	ResolutionText    string
+	DraftBody         string // what we would say to the user
+	UserText          string // what the user said to us — data, never instructions
+	OutboundLast24h   int
+	MaxAutoReplies    int
+	CategoryDemoted   bool
 
 	// REL-259. HasProvenFix is the server's answer to "did a shipped release
 	// close THIS report" — a linked Linear issue, done, with a merged PR that
@@ -80,6 +85,9 @@ type dispositionSignals struct {
 func decideDisposition(s dispositionSignals) (disposition, reason string) {
 	if !s.HasDraft {
 		return dispositionEscalate, "triage produced no reply"
+	}
+	if s.UnverifiedContact {
+		return dispositionEscalate, "the address came from the anonymous form and has not replied yet"
 	}
 	if hit := firstMatch(s.UserText, securityPatterns); hit != "" {
 		return dispositionEscalate, "security-related submission requires staff review"
@@ -533,29 +541,46 @@ func isOurOwnOutbound(ctx context.Context, threadEntryID int64) bool {
 // gatherDispositionSignals collects everything decideDisposition reads for a
 // persisted draft.
 func gatherDispositionSignals(ctx context.Context, draft *SupportDraft) dispositionSignals {
+	isReply := draft.OSTicketThreadEntryID > 0
 	return dispositionSignals{
-		HasDraft:        strings.TrimSpace(draft.DraftBodyHTML) != "",
-		Category:        draft.AICategory,
-		DrafterCategory: draft.DrafterCategory,
-		Priority:        draft.AIPriority,
-		Confidence:      draft.AIConfidence,
-		Sentiment:       draft.Sentiment,
-		GroundedIn:      draft.GroundedIn,
-		Unknowns:        draft.Unknowns,
-		AskUserFor:      draft.AskUserFor,
-		NeedsInfo:       draft.NeedsInfo,
-		ShouldClose:     draft.ShouldClose,
-		IsReply:         draft.OSTicketThreadEntryID > 0,
-		ResolutionText:  draft.UserMessageHTML,
-		DraftBody:       htmlToPlain(draft.DraftBodyHTML),
-		UserText:        draft.OriginalSubject + "\n" + htmlToPlain(draft.UserMessageHTML),
-		OutboundLast24h: outboundRepliesLast24h(ctx, draft.TicketNumber),
-		MaxAutoReplies:  maxAutoReplies(),
-		CategoryDemoted: interventionRate(ctx, draft.AICategory).Demoted,
-		HasProvenFix:    lookupProvenFix(ctx, draft.TicketNumber) != nil,
-		StaleDays:       caseStaleDays(ctx, draft.TicketNumber),
-		StaleAfter:      staleTicketDays(),
+		UnverifiedContact: !isReply && caseContactSource(ctx, draft.TicketNumber) == contactSourcePublic,
+		HasDraft:          strings.TrimSpace(draft.DraftBodyHTML) != "",
+		Category:          draft.AICategory,
+		DrafterCategory:   draft.DrafterCategory,
+		Priority:          draft.AIPriority,
+		Confidence:        draft.AIConfidence,
+		Sentiment:         draft.Sentiment,
+		GroundedIn:        draft.GroundedIn,
+		Unknowns:          draft.Unknowns,
+		AskUserFor:        draft.AskUserFor,
+		NeedsInfo:         draft.NeedsInfo,
+		ShouldClose:       draft.ShouldClose,
+		IsReply:           isReply,
+		ResolutionText:    draft.UserMessageHTML,
+		DraftBody:         htmlToPlain(draft.DraftBodyHTML),
+		UserText:          draft.OriginalSubject + "\n" + htmlToPlain(draft.UserMessageHTML),
+		OutboundLast24h:   outboundRepliesLast24h(ctx, draft.TicketNumber),
+		MaxAutoReplies:    maxAutoReplies(),
+		CategoryDemoted:   interventionRate(ctx, draft.AICategory).Demoted,
+		HasProvenFix:      lookupProvenFix(ctx, draft.TicketNumber) != nil,
+		StaleDays:         caseStaleDays(ctx, draft.TicketNumber),
+		StaleAfter:        staleTicketDays(),
 	}
+}
+
+// caseContactSource is where the case's contact address came from, "" when
+// unknown (no case row, no database). Unknown reads as "not public", which is
+// the pre-existing behaviour.
+func caseContactSource(ctx context.Context, ticketNumber string) string {
+	if platform.DBPool == nil || strings.TrimSpace(ticketNumber) == "" {
+		return ""
+	}
+	var src *string
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT contact_source FROM support_cases WHERE ticket_number = $1`, ticketNumber).Scan(&src); err != nil || src == nil {
+		return ""
+	}
+	return *src
 }
 
 var securityPatterns = []string{"security test", "security report", "vulnerability", "penetration test", "pentest", "ssrf", "xss", "sql injection", "remote code execution", "credential exposure", "bug bounty", "public support endpoint"}

@@ -7,10 +7,45 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 )
+
+// ExtensionTokenMaxPerMinute is the per-address budget for the two token
+// proxy routes (SCROLLR-459 / SB-5). A desktop app spends one refresh per
+// launch plus one per access-token lifetime, shared by all its windows, and
+// retries back off; even a whole office behind one address launching together
+// stays far under 60 a minute. A flood does not, and without a cap it is
+// relayed to Logto from core's own address.
+const ExtensionTokenMaxPerMinute = 60
+
+// ExtensionTokenLimiter rate-limits POST /extension/token[/refresh] per client
+// address, in its own bucket (the global limiter exempts these paths so that
+// ordinary API traffic can never starve a sign-in).
+//
+// The limit answers 503 + Retry-After, NOT 429: the installed desktop treats
+// any 4xx from the refresh route as "the refresh token was rejected" and signs
+// the user out (auth.ts), while a 5xx is a transient failure it retries.
+func ExtensionTokenLimiter(storage fiber.Storage) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        ExtensionTokenMaxPerMinute,
+		Expiration: time.Minute,
+		Storage:    storage,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return "ext-token:" + c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			c.Set("Retry-After", "60")
+			return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{
+				Status: "unavailable",
+				Error:  "Too many sign-in requests from this address; retry shortly",
+			})
+		},
+	})
+}
 
 // getLogtoTokenURL returns the Logto OIDC token endpoint URL.
 func getLogtoTokenURL() string {

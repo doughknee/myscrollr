@@ -107,21 +107,7 @@ func (s *Server) setupMiddleware() {
 	s.App.Use("/admin", AdminTiming)
 
 	// Security Headers
-	s.App.Use(func(c *fiber.Ctx) error {
-		c.Set("X-XSS-Protection", "1; mode=block")
-		c.Set("X-Content-Type-Options", "nosniff")
-		c.Set("X-Download-Options", "noopen")
-		c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", platform.HSTSMaxAge))
-		c.Set("X-DNS-Prefetch-Control", "off")
-		if c.Path() == "/yahoo/callback" {
-			// Yahoo OAuth callback returns HTML with inline <script> (postMessage + window.close)
-			// and inline style attributes. Allow those while keeping everything else locked down.
-			c.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'self' https://relentnet.com")
-		} else {
-			c.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self' https://relentnet.com")
-		}
-		return c.Next()
-	})
+	s.App.Use(securityHeaders)
 
 	// CORS
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
@@ -179,6 +165,18 @@ func (s *Server) setupMiddleware() {
 	}))
 }
 
+// securityHeaders sets the headers every response carries. Pages that need a
+// looser policy (ops/release) set their own after this runs.
+func securityHeaders(c *fiber.Ctx) error {
+	c.Set("X-XSS-Protection", "1; mode=block")
+	c.Set("X-Content-Type-Options", "nosniff")
+	c.Set("X-Download-Options", "noopen")
+	c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", platform.HSTSMaxAge))
+	c.Set("X-DNS-Prefetch-Control", "off")
+	c.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self' https://relentnet.com")
+	return c.Next()
+}
+
 // setupRoutes mounts core public and protected routes.
 func (s *Server) setupRoutes() {
 	// Local widget sources (ADR-0002) — served in-process, registered
@@ -206,9 +204,10 @@ func (s *Server) setupRoutes() {
 
 	// Extension auth proxy
 	s.App.Options("/extension/token", accounts.HandleExtensionAuthPreflight)
-	s.App.Post("/extension/token", accounts.HandleExtensionTokenExchange)
+	extLimit := accounts.ExtensionTokenLimiter(platform.NewRedisLimiterStorage("ratelimit:"))
+	s.App.Post("/extension/token", extLimit, accounts.HandleExtensionTokenExchange)
 	s.App.Options("/extension/token/refresh", accounts.HandleExtensionAuthPreflight)
-	s.App.Post("/extension/token/refresh", accounts.HandleExtensionTokenRefresh)
+	s.App.Post("/extension/token/refresh", extLimit, accounts.HandleExtensionTokenRefresh)
 
 	// The "I did it" page that finishes a stalled desktop release
 	// (SCROLLR-305). No JWT: OPS_RELEASE_KEY in the query gates all three,
@@ -344,7 +343,7 @@ func (s *Server) setupRoutes() {
 
 	// Invite (no auth — user isn't logged in yet, token-verified server-side)
 	s.App.Post("/invite/complete", accounts.HandleCompleteInvite)
-	s.App.Get("/invite/username-available", accounts.HandleCheckUsernameAvailable)
+	s.App.Post("/invite/username-available", accounts.HandleCheckUsernameAvailable)
 
 	// Billing Routes
 	s.App.Post("/checkout/session", platform.LogtoAuth, billing.HandleCreateCheckoutSession)
