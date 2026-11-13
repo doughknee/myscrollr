@@ -78,6 +78,8 @@ type OverviewGDPR struct {
 	DeletionStatus string  `json:"deletion_status"`
 	RequestedAt    *string `json:"requested_at"`
 	PurgeAt        *string `json:"purge_at"`
+	// PurgeStartedAt is set once the purge can no longer be canceled.
+	PurgeStartedAt *string `json:"purge_started_at"`
 }
 
 // OverviewLinks holds outbound URLs the account pane needs to render.
@@ -211,6 +213,10 @@ func getDeletionStatusForOverview(ctx context.Context, userID string) OverviewGD
 	if t, ok := status["purge_at"].(time.Time); ok {
 		s := t.UTC().Format(time.RFC3339)
 		out.PurgeAt = &s
+	}
+	if t, ok := status["purge_started_at"].(*time.Time); ok && t != nil {
+		s := t.UTC().Format(time.RFC3339)
+		out.PurgeStartedAt = &s
 	}
 	return out
 }

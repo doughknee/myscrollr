@@ -26,6 +26,8 @@ interface AccountDangerZoneProps {
   deletionStatus: 'none' | 'pending' | 'canceled' | 'purged'
   /** ISO RFC3339 string. Drives the pending banner's countdown. Null when no pending request. */
   purgeAt: string | null
+  /** Set once the purge has begun: it can no longer be canceled. */
+  purgeStartedAt?: string | null
   /** Called after a deletion request is scheduled or canceled, so the parent can re-fetch overview. */
   onDeletionChange?: () => void | Promise<void>
 }
@@ -34,6 +36,7 @@ export default function AccountDangerZone({
   getToken,
   deletionStatus,
   purgeAt,
+  purgeStartedAt,
   onDeletionChange,
 }: AccountDangerZoneProps) {
   const [exporting, setExporting] = useState(false)
@@ -69,6 +72,8 @@ export default function AccountDangerZone({
       setCancelError(
         err instanceof Error ? err.message : 'Failed to cancel deletion',
       )
+      // A refusal means the purge began meanwhile: reload so the banner says so.
+      await onDeletionChange?.()
     } finally {
       setCanceling(false)
     }
@@ -96,6 +101,7 @@ export default function AccountDangerZone({
         {deletionStatus === 'pending' && purgeAt && (
           <PendingBanner
             purgeAt={purgeAt}
+            inProgress={!!purgeStartedAt}
             canceling={canceling}
             cancelError={cancelError}
             onCancel={handleCancel}
@@ -186,11 +192,13 @@ export default function AccountDangerZone({
 
 function PendingBanner({
   purgeAt,
+  inProgress,
   canceling,
   cancelError,
   onCancel,
 }: {
   purgeAt: string
+  inProgress: boolean
   canceling: boolean
   cancelError: string | null
   onCancel: () => void
@@ -216,31 +224,43 @@ function PendingBanner({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-base-content">
-            Account scheduled for deletion
+            {inProgress
+              ? 'Deletion in progress'
+              : 'Account scheduled for deletion'}
           </h3>
           <p className="mt-1 text-xs text-base-content/70 leading-relaxed">
-            Your account will be permanently deleted on{' '}
-            <span className="font-semibold text-base-content">{formatted}</span>{' '}
-            ({daysLeft} {daysLeft === 1 ? 'day' : 'days'} from now). You can
-            cancel any time before that.
+            {inProgress ? (
+              'We are deleting your account now. This can no longer be stopped.'
+            ) : (
+              <>
+                Your account will be permanently deleted on{' '}
+                <span className="font-semibold text-base-content">
+                  {formatted}
+                </span>{' '}
+                ({daysLeft} {daysLeft === 1 ? 'day' : 'days'} from now). You can
+                cancel any time before that.
+              </>
+            )}
           </p>
           {cancelError && (
             <p className="mt-2 text-xs text-error">{cancelError}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={canceling}
-          className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {canceling ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <X size={14} />
-          )}
-          Cancel deletion
-        </button>
+        {!inProgress && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={canceling}
+            className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {canceling ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <X size={14} />
+            )}
+            Cancel deletion
+          </button>
+        )}
       </div>
     </div>
   )

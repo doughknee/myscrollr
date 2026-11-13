@@ -3,6 +3,8 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -304,5 +307,66 @@ func TestRequestAccountDeletionRejectsBadConfirmation(t *testing.T) {
 				t.Errorf("confirm=%s: status = %d, want %d", tc.body, status, fiber.StatusBadRequest)
 			}
 		})
+	}
+}
+
+// SCROLLR-484 B4-2: a purged request is terminal. A still-valid access token
+// must not re-open it (and so cancel it and unlock purchases); a canceled one
+// can still be re-opened.
+func TestRequestAccountDeletionNeverReopensPurged(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	testsupport.MustExec(t, `TRUNCATE user_deletion_requests`)
+	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status, purged_at)
+		VALUES ('reopen-purged', now() - interval '31 days', now() - interval '1 day', 'purged', now()),
+		       ('reopen-canceled', now() - interval '2 days', now() + interval '28 days', 'canceled', now())`)
+	body := `{"confirm":"DELETE MY ACCOUNT"}`
+	if got := testRequest(t, newDeletionTestApp("reopen-purged"), "POST", "/users/me/delete", body); got != fiber.StatusConflict {
+		t.Errorf("purged request: status = %d, want 409", got)
+	}
+	st, _ := DeletionRequestStatus(context.Background(), "reopen-purged")
+	if st != "purged" {
+		t.Errorf("purged request became %q", st)
+	}
+	if got := testRequest(t, newDeletionTestApp("reopen-canceled"), "POST", "/users/me/delete", body); got != fiber.StatusOK {
+		t.Errorf("canceled request: status = %d, want 200", got)
+	}
+}
+
+type captureTransport struct{ events []*sentry.Event }
+
+func (c *captureTransport) Configure(sentry.ClientOptions)        {}
+func (c *captureTransport) SendEvent(e *sentry.Event)             { c.events = append(c.events, e) }
+func (c *captureTransport) Flush(time.Duration) bool              { return true }
+func (c *captureTransport) FlushWithContext(context.Context) bool { return true }
+func (c *captureTransport) Close()                                {}
+
+// SCROLLR-484 B4-1: a failed pass for a purge that has started reaches Sentry
+// (no sub, no message text); one that has not started stays a log line.
+func TestReportStuckPurgeOnlyAfterStart(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	tr := &captureTransport{}
+	if err := sentry.Init(sentry.ClientOptions{Transport: tr}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { sentry.CurrentHub().BindClient(nil) })
+	testsupport.MustExec(t, `TRUNCATE user_deletion_requests`)
+	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status, purge_started_at)
+		VALUES ('stuck-started', now() - interval '31 days', now() - interval '1 day', 'pending', now()),
+		       ('stuck-fresh', now() - interval '31 days', now() - interval '1 day', 'pending', NULL)`)
+	perr := fmt.Errorf("logto delete stuck-started: %w", errors.New("boom"))
+	reportStuckPurge(context.Background(), "stuck-fresh", perr)
+	if len(tr.events) != 0 {
+		t.Fatalf("not-started purge reported %d events", len(tr.events))
+	}
+	reportStuckPurge(context.Background(), "stuck-started", perr)
+	if len(tr.events) != 1 {
+		t.Fatalf("started purge reported %d events, want 1", len(tr.events))
+	}
+	if m := tr.events[0].Message; strings.Contains(m, "stuck-started") || strings.Contains(m, "boom") {
+		t.Errorf("event message leaks detail: %q", m)
 	}
 }

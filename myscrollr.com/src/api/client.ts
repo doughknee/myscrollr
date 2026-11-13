@@ -488,6 +488,8 @@ export interface UserOverviewGDPR {
   deletion_status: 'none' | 'pending' | 'canceled' | 'purged'
   requested_at: string | null
   purge_at: string | null
+  /** Set once the purge has begun and can no longer be canceled. */
+  purge_started_at?: string | null
 }
 
 export interface UserOverviewLinks {
@@ -704,6 +706,7 @@ export type AccountDeletionStatus =
       status: 'pending'
       requested_at: string
       purge_at: string
+      purge_started_at?: string
       canceled_at?: string
       purged_at?: string
     }
