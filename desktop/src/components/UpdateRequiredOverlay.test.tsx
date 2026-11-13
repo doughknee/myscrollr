@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openExternal } from "../lib/openExternal";
 import { UpdateController } from "../lib/updateState";
@@ -43,5 +44,15 @@ describe("UpdateRequiredOverlay", () => {
     expect(screen.getByText(RAW).closest("details")).not.toHaveAttribute("open");
     fireEvent.click(screen.getByRole("button", { name: "Download the installer instead" }));
     expect(openExternal).toHaveBeenCalledWith("https://myscrollr.com/download");
+  });
+
+  it("uses the app's own colour tokens, not the legacy base-* / primary aliases", () => {
+    const here = (f: string) => new URL(f, import.meta.url);
+    const css = readFileSync(here("../style.css"), "utf8");
+    const defined = new Set([...css.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]));
+    const src = readFileSync(here("./UpdateRequiredOverlay.tsx"), "utf8");
+    const used = [...src.matchAll(/\b(?:bg|text|border)-((?:surface|edge|fg|accent|error|base|primary)[a-z0-9-]*)(?:\/\d+)?/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(5);
+    expect(used.filter((name) => !defined.has(name) || /^(base|primary)/.test(name))).toEqual([]);
   });
 });
