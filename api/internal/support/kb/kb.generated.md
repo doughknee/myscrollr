@@ -6,7 +6,7 @@ This is the authoritative product reference for support replies. Anything stated
 
 Current desktop version: **1.7.3**.
 
-Current Beta version: **1.8.0-beta.2** (opt-in Beta channel, newer than Stable).
+Current Beta version: **1.8.0-beta.4** (opt-in Beta channel, newer than Stable).
 
 <!-- source: github.com/doughknee/myscrollr/releases (newest published desktop release per channel) @ desktop-v1.7.3 -->
 
