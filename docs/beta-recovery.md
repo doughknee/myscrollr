@@ -2,7 +2,7 @@
 
 Choosing **Stable** in Settings → Updates stops future Beta offers. It does not replace the installed app. A newer installed Beta can remain installed until a newer Stable release is available.
 
-**Return to Stable** is available in 1.8.0-beta.2 and in the qualified but unpublished 1.8.0-beta.3 and 1.8.0-beta.4, for the supported packages below. In Settings → Updates, select Stable, check for updates, then choose **Return to Stable 1.7.3**. A separate confirmation shows the versions before any download or installation. The action is not present in 1.8.0-beta.1; use the manual instructions below if that version cannot be updated.
+**Return to Stable** is available in 1.8.0-beta.2 and 1.8.0-beta.4, for the supported packages below. (1.8.0-beta.3 was qualified but never published; its changes shipped in Beta 4.) In Settings → Updates, select Stable, check for updates, then choose **Return to Stable 1.7.3**. A separate confirmation shows the versions before any download or installation. The action is not present in 1.8.0-beta.1; use the manual instructions below if that version cannot be updated.
 
 ## If a Beta will not open
 
@@ -40,10 +40,14 @@ Two things differ from Beta 2 and are recorded so the evidence is read correctly
 
 These rehearsals use a mock native updater host with actual signed packages. They do not exercise the source app controller, a real signed-in profile or physical hardware. The local signed-in Windows round trip was not performed for this Beta. A candidate rebuild invalidates this evidence and needs both runs again against the final bytes.
 
+Beta 3 was never published. Beta 4 contains all of its changes and was published instead, and the unpublished Beta 3 draft was deleted on 14 November 2026. `1.8.0-beta.3` remains in the recovery allowlist and in the rehearsal workflow's draft-recovery condition; nobody has that build, so neither matters to users. Remove both when the next Beta candidate is prepared.
+
 ### Beta 4 qualification
 
 The exact Beta 4 packages from [build 43527096021](https://github.com/doughknee/myscrollr/actions/runs/43527096021), source `425609aed142750666c89fc3b53b871c24bc7589`, passed both [Stable → Beta installation](https://github.com/doughknee/myscrollr/actions/runs/43529051567) and [Beta → Stable recovery](https://github.com/doughknee/myscrollr/actions/runs/43529063593) on Windows x64 NSIS, macOS ARM64 and Linux x64 AppImage on 13 November 2026. Each passed signature/source verification, native replacement, packaged restart and synthetic preference retention. The rehearsal harness ran from the candidate commit. Stable 1.7.3 assets, signatures and build run `41688396593` remain fixed.
 
 Beta 4 changes no storage keys, app identifier or package layout relative to Beta 3. It does change sign-in handling (a cancellable sign-in, stricter refresh rules, account data cleared on an account change), which these rehearsals cannot see: they use a mock native updater host with actual signed packages and a synthetic profile. Before publishing, check by hand on Beta 4: a normal browser sign-in, Cancel then sign in again, wake from sleep with the bar reconnecting within about 45 seconds, and on Windows with the bar docked, the screen work area before and after an in-app update from this version. The local signed-in Windows round trip was not performed for this Beta. A candidate rebuild invalidates this evidence and needs both runs again against the final bytes.
+
+Beta 4 was published to the Beta channel on 14 November 2026 ([finish run 43608706910](https://github.com/doughknee/myscrollr/actions/runs/43608706910)) after the owner ran the by-hand checks on an installed Beta 4 on Windows with a real signed-in profile: browser sign-in, Cancel then sign in again, wake from sleep with the bar reconnecting, and windows around the docked bar all passed. That was a fresh install over Beta 2, not an in-app update, and the macOS check was not run.
 
 The rehearsal workflow's main-only draft recovery condition accepts the Beta 3 and Beta 4 pairs. Narrow it again when the next candidate is prepared.
