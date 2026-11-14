@@ -66,6 +66,40 @@ on Linux. Each must stay alive for 30 seconds. These checks do not prove login,
 rendered content, real update transport, physical Fill cursor behavior, sleep/wake,
 or monitor reconnect. Evidence is retained for 30 days beside build proofs.
 
+### 1.8.0 Stable candidate qualification
+
+The exact 1.8.0 packages from [build 43614083197](https://github.com/doughknee/myscrollr/actions/runs/43614083197),
+source `a5a5dca3c4ce99eaa1cc2628b93fa18e17535353`, were an **unpublished draft**
+when this was written on 14 November 2026. Under `desktop/`, that source differs
+from the published `desktop-v1.8.0-beta.4` only in the five version files,
+including the MSI number `1.8.0.0`. No application code changed.
+
+| Path | Run | Result |
+|---|---|---|
+| Stable 1.7.3 → 1.8.0, native updater: Windows x64 NSIS, macOS ARM64, Linux x64 AppImage | [43615750820](https://github.com/doughknee/myscrollr/actions/runs/43615750820) | passed on all three |
+| Beta 4 → 1.8.0, native updater, same three | [43615762926](https://github.com/doughknee/myscrollr/actions/runs/43615762926) | passed on all three |
+| `.msi` 1.7.3 (`1.7.3.0`) → 1.8.0 (`1.8.0.0`) | [43615765606](https://github.com/doughknee/myscrollr/actions/runs/43615765606) | one installed-apps entry, program 1.8.0, started |
+| `.msi` Beta 4 (`1.8.0.4`) → 1.8.0 (`1.8.0.0`) | [43615772621](https://github.com/doughknee/myscrollr/actions/runs/43615772621) | one installed-apps entry, program 1.8.0, started |
+
+The last row is the Beta-to-final MSI qualification required above. A read-only
+review before the version change (#589) traced every place where a prerelease
+version behaves differently from a final one: `1.8.0` compares newer than
+`1.8.0-beta.4` in the app, the Rust updater and the server; Return to Stable
+cannot appear on a final build; a 1.7.3 user stays on Stable.
+
+Carried over from Beta 4, which has the same application code: the owner's
+by-hand checks on Windows on 14 November 2026 with a real signed-in profile
+(browser sign-in, Cancel then sign in again, wake from sleep with the bar
+reconnecting, windows around the docked bar).
+
+Not qualified by any of this: no person has opened a 1.8 build on a real Mac,
+and the macOS package comes from `macos-15` build machines, new since 1.7.3; an
+in-app update through the production controller on real hardware; Fill this
+display on physical monitors beyond the owner's own Beta use. Stable has no
+in-app way back: a bad 1.8.0 is corrected by 1.8.1. A candidate rebuild
+invalidates this evidence. Build proofs are retained for 30 days from the build,
+after which publication needs a new candidate version.
+
 ## Maintenance baseline source
 
 The approved maintenance exception is exactly `release/desktop-1.7`, restricted
