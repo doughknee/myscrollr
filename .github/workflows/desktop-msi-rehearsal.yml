@@ -22,22 +22,14 @@ on:
       target_tag:
         description: "Installed over it: a published or draft desktop-v<version> tag"
         required: true
-  # TEMPORARY while this workflow is developed on its branch; removed before merge.
-  push:
-    branches: [ci/msi-replacement-rehearsal]
 
 permissions:
   contents: read
 
 jobs:
   replace:
-    strategy:
-      fail-fast: false
-      matrix:
-        pair:
-          - { source: desktop-v1.8.0-beta.2, target: desktop-v1.8.0-beta.4 }
-          - { source: desktop-v1.8.0-beta.4, target: desktop-v1.8.0-beta.2 }
-          - { source: desktop-v1.7.3, target: desktop-v1.8.0-beta.4 }
+    # Drafts are only readable from protected main.
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     timeout-minutes: 15
     # Seeing a draft's assets needs push access. Only read commands run.
@@ -46,8 +38,8 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      SOURCE_TAG: ${{ matrix.pair.source }}
-      TARGET_TAG: ${{ matrix.pair.target }}
+      SOURCE_TAG: ${{ inputs.source_tag }}
+      TARGET_TAG: ${{ inputs.target_tag }}
     steps:
       - name: Install the source .msi, install the target over it, check the result
         shell: pwsh
@@ -134,7 +126,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: msi-rehearsal-${{ matrix.pair.source }}-to-${{ matrix.pair.target }}
+          name: msi-rehearsal-${{ inputs.source_tag }}-to-${{ inputs.target_tag }}
           path: ${{ runner.temp }}/msi-rehearsal/*.log
           if-no-files-found: warn
           retention-days: 30
