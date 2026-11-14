@@ -1,0 +1,140 @@
+# Installs one signed Windows .msi over another on a disposable runner and
+# checks what is left. The update rehearsal (desktop-update-rehearsal.yml)
+# exercises the NSIS installer only; this covers the .msi path.
+#
+# Why it exists: every Beta's .msi carries a four-part number (1.8.0.4) because
+# WiX cannot derive one from "beta.4", and Windows Installer compares only the
+# first three parts. A Beta-to-final replacement (1.8.0.4 -> 1.8.0) is therefore
+# a same-version install, which docs/DESKTOP_RELEASES.md requires qualifying
+# before Stable promotion.
+#
+# Read-only: it downloads release assets and publishes nothing. It does not run
+# the app's own updater, which starts msiexec the same way but with a prompt.
+name: Desktop MSI Replacement Rehearsal
+run-name: MSI ${{ inputs.source_tag }} -> ${{ inputs.target_tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Installed first: a published or draft desktop-v<version> tag"
+        required: true
+      target_tag:
+        description: "Installed over it: a published or draft desktop-v<version> tag"
+        required: true
+  # TEMPORARY while this workflow is developed on its branch; removed before merge.
+  push:
+    branches: [ci/msi-replacement-rehearsal]
+
+permissions:
+  contents: read
+
+jobs:
+  replace:
+    strategy:
+      fail-fast: false
+      matrix:
+        pair:
+          - { source: desktop-v1.8.0-beta.2, target: desktop-v1.8.0-beta.4 }
+          - { source: desktop-v1.8.0-beta.4, target: desktop-v1.8.0-beta.2 }
+          - { source: desktop-v1.7.3, target: desktop-v1.8.0-beta.4 }
+    runs-on: windows-latest
+    timeout-minutes: 15
+    # Seeing a draft's assets needs push access. Only read commands run.
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_TAG: ${{ matrix.pair.source }}
+      TARGET_TAG: ${{ matrix.pair.target }}
+    steps:
+      - name: Install the source .msi, install the target over it, check the result
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $work = Join-Path $env:RUNNER_TEMP 'msi-rehearsal'
+          New-Item -ItemType Directory -Force $work | Out-Null
+          $summary = [System.Collections.Generic.List[string]]::new()
+
+          function Get-Msi([string]$tag) {
+            if ($tag -notmatch '^desktop-v\d+\.\d+\.\d+(-beta\.\d+)?$') { throw "Unexpected tag '$tag'" }
+            $dir = Join-Path $work $tag
+            gh release download $tag --pattern '*_x64_en-US.msi' --dir $dir | Out-Host
+            if ($LASTEXITCODE -ne 0) { throw "Could not download the .msi for $tag" }
+            $msi = @(Get-ChildItem $dir -Filter *.msi -File)
+            if ($msi.Count -ne 1) { throw "Expected one .msi for $tag, found $($msi.Count)" }
+            $sig = Get-AuthenticodeSignature -LiteralPath $msi[0].FullName
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Scrollr, LLC') {
+              throw "Signature on $($msi[0].Name) is $($sig.Status), signer '$($sig.SignerCertificate.Subject)'"
+            }
+            $hash = (Get-FileHash -LiteralPath $msi[0].FullName -Algorithm SHA256).Hash.ToLower()
+            $summary.Add("- ``$($msi[0].Name)`` sha256 ``$hash``, signed by Scrollr, LLC")
+            $msi[0].FullName
+          }
+
+          function Get-Entries {
+            $roots = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                     'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                     'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
+            @(Get-ItemProperty $roots -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Scrollr' })
+          }
+
+          function Install-Msi([string]$msi, [string]$name) {
+            $log = Join-Path $work "$name.log"
+            $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/qn', '/norestart', '/l*v', "`"$log`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0) {
+              Get-Content -LiteralPath $log -Tail 80
+              throw "msiexec exited $($p.ExitCode) installing $name"
+            }
+          }
+
+          # One Scrollr entry in Windows' installed-apps list, and the installed
+          # program reporting the version of the package that was just installed.
+          function Assert-Installed([string]$tag, [string]$step) {
+            $want = $tag -replace '^desktop-v', ''
+            $entries = Get-Entries
+            $dir = if ($entries.Count -ge 1 -and $entries[0].InstallLocation) { $entries[0].InstallLocation.Trim('"') } else { Join-Path $env:ProgramFiles 'Scrollr' }
+            $exe = Join-Path $dir 'scrollr-desktop.exe'
+            $have = if (Test-Path -LiteralPath $exe) { (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion } else { 'missing' }
+            $line = "- $step`: installed-apps entries = $($entries.Count), installer version = $(($entries | ForEach-Object DisplayVersion) -join ', '), program version = $have"
+            Write-Host $line
+            $summary.Add($line)
+            if ($entries.Count -ne 1) { throw "$step`: expected exactly one Scrollr entry, found $($entries.Count)" }
+            if ($have -ne $want) { throw "$step`: program version is '$have', expected '$want'" }
+            $exe
+          }
+
+          try {
+            if (@(Get-Entries).Count -ne 0) { throw 'Scrollr is already installed on this runner' }
+            $summary.Add("### MSI replacement: $env:SOURCE_TAG then $env:TARGET_TAG")
+            $source = Get-Msi $env:SOURCE_TAG
+            $target = Get-Msi $env:TARGET_TAG
+
+            Install-Msi $source 'source'
+            Assert-Installed $env:SOURCE_TAG 'After the source' | Out-Null
+
+            Install-Msi $target 'target'
+            $exe = Assert-Installed $env:TARGET_TAG 'After the target'
+
+            $app = Start-Process -FilePath $exe -PassThru
+            Start-Sleep -Seconds 20
+            if ($app.HasExited) { throw "The installed program exited within 20 seconds (code $($app.ExitCode))" }
+            Get-Process scrollr-desktop -ErrorAction SilentlyContinue | Stop-Process -Force
+            $summary.Add('- The installed program started and stayed up for 20 seconds')
+            $summary.Add('')
+            $summary.Add('**Passed.**')
+          } catch {
+            $summary.Add('')
+            $summary.Add("**Failed:** $($_.Exception.Message)")
+            throw
+          } finally {
+            $summary -join "`n" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: msi-rehearsal-${{ matrix.pair.source }}-to-${{ matrix.pair.target }}
+          path: ${{ runner.temp }}/msi-rehearsal/*.log
+          if-no-files-found: warn
+          retention-days: 30
