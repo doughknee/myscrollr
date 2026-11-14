@@ -46,6 +46,19 @@ identity remains `1.8.0-beta.1`; the version guard rejects a numeric MSI overrid
 with different major/minor/patch. Qualify Beta-to-final MSI replacement before
 Stable promotion; installer numbering is not the updater's SemVer policy.
 
+**Desktop MSI Replacement Rehearsal** (`desktop-msi-rehearsal.yml`, main only,
+read-only) is that qualification. Dispatch it with `source_tag` and `target_tag`:
+on a disposable Windows runner it installs the source `.msi`, installs the target
+over it, requires exactly one Scrollr entry in Windows' installed-apps list and
+the installed program to report the target version, then starts the program for
+20 seconds. Windows Installer compares only the first three parts of an MSI
+version, so Beta-to-Beta and Beta-to-final are same-version installs. Development
+run [43612778502](https://github.com/doughknee/myscrollr/actions/runs/43612778502)
+showed `1.8.0.2 → 1.8.0.4`, `1.8.0.4 → 1.8.0.2` and `1.7.3.0 → 1.8.0.4` each
+replace cleanly. It installs silently as administrator; it does not run the
+app's own updater, sign in, or touch physical displays. The update rehearsal
+below covers the NSIS installer only.
+
 The main build also runs bounded packaged startup smoke checks on disposable
 runners: signed NSIS install and native window on Windows, launch from the
 verified mounted DMG copy on macOS, and the final repackaged AppImage under Xvfb
