@@ -1,43 +1,43 @@
 {
-  "version": "1.8.0-beta.2",
-  "notes": "See the [full changelog](https://github.com/brandon-relentnet/myscrollr/commits/desktop-v1.8.0-beta.2) for details.",
-  "pub_date": "2026-11-04T00:05:01.65Z",
+  "version": "1.8.0-beta.4",
+  "notes": "See the [full changelog](https://github.com/doughknee/myscrollr/commits/desktop-v1.8.0-beta.4) for details.",
+  "pub_date": "2026-11-13T23:35:56.812Z",
   "platforms": {
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm8wMmQ0OUNVWitCK0x3djkxSmlYMFNXU1orS3AvQWltSW13cHVCSUxTLzF0NEt1REF4TFoxa0ZGVmZMaURoVVExR1dhbHF0SzZpWE1FTlVDNndNR0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwOTg4CWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjJfYW1kNjQuQXBwSW1hZ2UKaGk5K080ZlgrUUhPeEdKei9YKytHMzk3T2I4ZS9oTnhIVTJ5ck40elFCUVlxdisvNTJuVUwycDR4Tkxzd0FyZ2dtYkxKZjMxMmZuTEF2b2JBNUJxQXc9PQo=",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_1.8.0-beta.2_amd64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNml4cWx2QWFncCtJQS9BZ3MwQjNWUHdEUnV0UTFZejlPTkMzbkVVeHZ4c3lMakhKNFg1VDNXYi9hWFJMZ1VpbnVLbVZLTTdLTGNmMnluamFhSlpDR2djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEzMjczCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjRfYW1kNjQuQXBwSW1hZ2UKeHliMmg2Qmw2c3VvSjU1OXYwclgrVWxDVWFqS3hNZlZONUxNdEFkcld5ZnF3eTRlSWp2NTJLaHFuTDl5dytUKzFiUWRvK2ZGenQ0V3FwNlpZS1RYQWc9PQo=",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_1.8.0-beta.4_amd64.AppImage"
     },
     "linux-x86_64-appimage": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm8wMmQ0OUNVWitCK0x3djkxSmlYMFNXU1orS3AvQWltSW13cHVCSUxTLzF0NEt1REF4TFoxa0ZGVmZMaURoVVExR1dhbHF0SzZpWE1FTlVDNndNR0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwOTg4CWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjJfYW1kNjQuQXBwSW1hZ2UKaGk5K080ZlgrUUhPeEdKei9YKytHMzk3T2I4ZS9oTnhIVTJ5ck40elFCUVlxdisvNTJuVUwycDR4Tkxzd0FyZ2dtYkxKZjMxMmZuTEF2b2JBNUJxQXc9PQo=",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_1.8.0-beta.2_amd64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNml4cWx2QWFncCtJQS9BZ3MwQjNWUHdEUnV0UTFZejlPTkMzbkVVeHZ4c3lMakhKNFg1VDNXYi9hWFJMZ1VpbnVLbVZLTTdLTGNmMnluamFhSlpDR2djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEzMjczCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjRfYW1kNjQuQXBwSW1hZ2UKeHliMmg2Qmw2c3VvSjU1OXYwclgrVWxDVWFqS3hNZlZONUxNdEFkcld5ZnF3eTRlSWp2NTJLaHFuTDl5dytUKzFiUWRvK2ZGenQ0V3FwNlpZS1RYQWc9PQo=",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_1.8.0-beta.4_amd64.AppImage"
     },
     "linux-x86_64-deb": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNnBJN004Y2xZVnVpTDFYMGNNUC9vaUF6OWgxc0lVaVVFSHdITCt5cmdMdG42blh6amJGSTIrcG1EWFlMOExZYWVwNjQzT3hPQmlJU1lOaTlEMGFWSEF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwNTExCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjJfYW1kNjQuZGViCjRGSm10V3ZuakhPK0I4bEowZlBhTFAvV3hvL0l3MUpYMFdjQ3BSZkNQSEd1R3craUxURnZYTWRGamxiUWRTVGkrSnM4REVkd3hwU1lxRUxzYzNMZUJBPT0K",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_1.8.0-beta.2_amd64.deb"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNnJVV2MvTWVSdndmc2FhZ3VibzZOSkhkMGJyazNvdDUybGNQeG12T1BCM0YwL2lhRTdsOENOQTlMRlp0Ym1FZ1NnWC81Q0xFUkRRRTZSamJVaEM5N3dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEyODU5CWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjRfYW1kNjQuZGViCm5oY0VuNk83VEJpVDQzSlpTa0Z5Wm5CUitnNTlDbzk3NFdzaEI5NXYwNll2Q3IzZ0NERVNKbzJLNVhpSUdjZThSNDdjdzBQUmd5RC9Mb25Ua0pBT0FnPT0K",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_1.8.0-beta.4_amd64.deb"
     },
     "linux-x86_64-rpm": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm0vdjJ5V0RDUUNqajlqaW9rdkc2Q0diZGZXeWVzZDNzZ21TV250YXpZUWxHQW9qbTRrWklRakxWZTlib01IWkltRGxlT3dSMkQrcEpxRjhjV0ppTWdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwNTExCWZpbGU6U2Nyb2xsci0xLjguMC1iZXRhLjItMS54ODZfNjQucnBtCk4wZkhFVU1CR0k1U2R1dXJacDloQXEvU1dka3RaWldPUTMvQnJ6NVFpeFFoZUM1NlhrT3ZrRkpoazlUbFEvdEVGNHRsT0FFSU9TTUxVSS80bTZ5Y0FRPT0K",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr-1.8.0-beta.2-1.x86_64.rpm"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNnY5Y0xxK3F5bytiWjgwdVJjSzk3dVdNNFR4eXdTcG9oZkpzKzduTDNBU296bXhGdDVYbDRoSEswVXhpVU5nWXpjTzNoeXVBSURuYnFOMURKb0dlWlFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEyODU5CWZpbGU6U2Nyb2xsci0xLjguMC1iZXRhLjQtMS54ODZfNjQucnBtCmVHSWJJdE1sc25zWmh2cXViWDNZell5aTE0eTlnVzRwL0t1M1FQUkh0cEhoWWZVLzhNQmM1YXA0RW93UElnMkp5ZmgrSXkrQ1F1c2tNMnNEYjVETEF3PT0K",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr-1.8.0-beta.4-1.x86_64.rpm"
     },
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNmdkUXl0Uzc1Si9WeWhYMmZVU0srcml1Z1krb2ZJeTNobGQxa0dYMUNLT3YyeENVRkhzT3RyYXViQ2Rkekp3NHNRN0wzcE9ReEhYWUdpNjI3V3BWSWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwNjk3CWZpbGU6U2Nyb2xsci5hcHAudGFyLmd6Cmp4UGphcjNDdHlLOW9jRlg4anVkN1pmeEpISGJzRFk2MkdnNG4wM21NSzRmS2JpbzJSRFJrMzM5b0Y5TVNnK215WFAvTS9Fd3BFWEwvMDZYbSsrNUJBPT0K",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm82L3AzTGV2RGtCRmFlYjA0UE9iQmhPYmoxWXhjeGxqeGdLYjhPbHFxMXBPTUltU01WZzJXSnJldFZVemVuSzRkazRVSy9laGJuU0xVN2xybmF4MXdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEyOTUyCWZpbGU6U2Nyb2xsci5hcHAudGFyLmd6Cmw5MzVnckYza1crL0trckpHaXEybFk2TU9selo2Y2MwdTRMTHRidGRxUDNjUnIzd1FudmYrZGpxNVhZM0NDQnJFc3JzTVl2a3ZQS1lveTEwdUVCQUF3PT0K",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_aarch64.app.tar.gz"
     },
     "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNmdkUXl0Uzc1Si9WeWhYMmZVU0srcml1Z1krb2ZJeTNobGQxa0dYMUNLT3YyeENVRkhzT3RyYXViQ2Rkekp3NHNRN0wzcE9ReEhYWUdpNjI3V3BWSWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwNjk3CWZpbGU6U2Nyb2xsci5hcHAudGFyLmd6Cmp4UGphcjNDdHlLOW9jRlg4anVkN1pmeEpISGJzRFk2MkdnNG4wM21NSzRmS2JpbzJSRFJrMzM5b0Y5TVNnK215WFAvTS9Fd3BFWEwvMDZYbSsrNUJBPT0K",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm82L3AzTGV2RGtCRmFlYjA0UE9iQmhPYmoxWXhjeGxqeGdLYjhPbHFxMXBPTUltU01WZzJXSnJldFZVemVuSzRkazRVSy9laGJuU0xVN2xybmF4MXdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEyOTUyCWZpbGU6U2Nyb2xsci5hcHAudGFyLmd6Cmw5MzVnckYza1crL0trckpHaXEybFk2TU9selo2Y2MwdTRMTHRidGRxUDNjUnIzd1FudmYrZGpxNVhZM0NDQnJFc3JzTVl2a3ZQS1lveTEwdUVCQUF3PT0K",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_aarch64.app.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNnQ2OFhLM05rY2tjQ3A1RU9VbDZEQU83bnlCblNBNnRuazZxbm00QlNOVmlsL0NTclpoQVNPdGtsUFlmSHBZL1pMdm4wbXpQUS9hWk5HNVRqeTgra1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwODMwCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjJfeDY0X2VuLVVTLm1zaQpoV0tEUkROUkVlNGE1QWtNUStlYmY4MlVqWkFudjFGeVFiUDNpUlVLZWg3QWdQemV3ZlZnVnE2T09Cb0o4YXk2WVBuMDc3RXN0WXI1aEFpdUYrdUtEUT09Cg==",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_1.8.0-beta.2_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm8rNHU4dzlwU1ZRYkd2OS9TZUdGTmo2RmNCemhHNGgzSnIwV3NrUzZkMTE4MWpBOWdBNFpKZ3hXd3Y2Y0xsWUtqVmxiTkJqeGRCQnk1c2VOZUVxMGdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEzMTUwCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjRfeDY0X2VuLVVTLm1zaQpzYjFOdUhqSm1PaCt1VTJQL3VZS2gvR2lVa25UdHJXUzNBZjB0U2lQQUNKY09xSWpiUUtYaUdMRVhwMnhFNmh3M3BIWm1IeVlScUxhMlhGZDdsWVVDZz09Cg==",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_1.8.0-beta.4_x64_en-US.msi"
     },
     "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNnQ2OFhLM05rY2tjQ3A1RU9VbDZEQU83bnlCblNBNnRuazZxbm00QlNOVmlsL0NTclpoQVNPdGtsUFlmSHBZL1pMdm4wbXpQUS9hWk5HNVRqeTgra1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwODMwCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjJfeDY0X2VuLVVTLm1zaQpoV0tEUkROUkVlNGE1QWtNUStlYmY4MlVqWkFudjFGeVFiUDNpUlVLZWg3QWdQemV3ZlZnVnE2T09Cb0o4YXk2WVBuMDc3RXN0WXI1aEFpdUYrdUtEUT09Cg==",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_1.8.0-beta.2_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNm8rNHU4dzlwU1ZRYkd2OS9TZUdGTmo2RmNCemhHNGgzSnIwV3NrUzZkMTE4MWpBOWdBNFpKZ3hXd3Y2Y0xsWUtqVmxiTkJqeGRCQnk1c2VOZUVxMGdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEzMTUwCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjRfeDY0X2VuLVVTLm1zaQpzYjFOdUhqSm1PaCt1VTJQL3VZS2gvR2lVa25UdHJXUzNBZjB0U2lQQUNKY09xSWpiUUtYaUdMRVhwMnhFNmh3M3BIWm1IeVlScUxhMlhGZDdsWVVDZz09Cg==",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_1.8.0-beta.4_x64_en-US.msi"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNmhPZDhSazlsM0p5UzVMWU16L2FRQlZKbzdyeG5IR0pzYUNWVFpIelNGTnZQV1RBWm52TlFWRFQyNm5lNE5ncG0yamRKWWQyNEhoa2hEQnFtcjFJZEF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzUwODMwCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjJfeDY0LXNldHVwLmV4ZQppc01pbnJOeVFEUEtlYm83WmhGeWo0a20vai9mK1Nxajg2RkNRRGExRFVrbzc1UEo4T3J4OU1jeEVycWc3NFBDYlZyQVhwRlB3SnExaUxlUjhjWGpCdz09Cg==",
-      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.2/Scrollr_1.8.0-beta.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMndGQmF6anhLNnVYR0hCb0N4YmJUbFBCNWQydU1pbUd1eTVtQVhNSlBKa3JjcjM5V25iOGw3UlQwTDVDMUZ4bWJNaTFmZ2dBR2VRblhmVEZ0dUhZa0lBeW9lT24rS2drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NjEzMTUwCWZpbGU6U2Nyb2xscl8xLjguMC1iZXRhLjRfeDY0LXNldHVwLmV4ZQprWnhNT0ZLbkhlREhkQks0NHZvVDU5Tjdaa0JlcTF3bzJhVTlwNjZMSTlCYngzc2hteCs3NE16NUxrdFR3b1pLVVROVUxXSmZHL2VVWnVLSVo3OTREZz09Cg==",
+      "url": "https://github.com/doughknee/myscrollr/releases/download/desktop-v1.8.0-beta.4/Scrollr_1.8.0-beta.4_x64-setup.exe"
     }
   }
 }
